@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  No INTERNET or broad-access permission is declared here (P1, P2 in
+  docs/PRODUCT_PRINCIPLES.md). Any future manifest change touching
+  permissions, exported components, or backup/data-extraction rules requires
+  a THREAT_MODEL.md review before merging (AGENTS.md).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:name=".OpenLifeApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <!--
+          Placeholder launcher activity for Stage 0. It is replaced by the
+          real source-list UI in Stage 7 and is deliberately unexported like
+          every other component except the single intake activity added in
+          Stage 6.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

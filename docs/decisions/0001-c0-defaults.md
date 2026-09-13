@@ -1,0 +1,94 @@
+# Decision 0001 — Capability 0 engineering defaults
+
+Date: 2026-09-13
+Status: accepted for C0 implementation; app-lock and licence-for-distribution
+items remain open per the design document.
+
+## Context
+
+`openlife-design-v0.2.md` §7 and §14 leave a set of engineering defaults for an
+implementation agent to confirm against the actual build environment, with the
+requirement to record the reason for any refinement and repeat affected tests
+(§1, "Requirement language"). This records what was confirmed for the
+environment this repository was built in, on 2026-09-13.
+
+## Environment as found
+
+| Item | Value |
+| --- | --- |
+| JDK | OpenJDK 21.0.12 |
+| Gradle | 9.7.1 (wrapper; already present in the local wrapper cache) |
+| Android Gradle Plugin | 9.4.0 |
+| Kotlin | 2.4.10 |
+| Jetpack Compose BOM | 2026.08.00 |
+| Room | 2.8.5 |
+| SQLCipher for Android | `net.zetetic:sqlcipher-android` 4.19.0 |
+| Android SDK | read-only Nix-store path; platforms android-36 and
+  android-37.0, build-tools 36.0.0 and 37.0.0, no NDK present |
+| Emulator | AVD `dev36`: Pixel 7 profile, Android 16 (API 36), Google APIs,
+  x86_64, KVM available |
+
+## Decisions
+
+1. **Modules**: two Gradle modules, `app` and `vault`, as specified. No
+   dependency-injection framework; a small composition root in
+   `OpenLifeApp.kt` wires dependencies explicitly.
+2. **minSdk 29, compileSdk 37, targetSdk 37.** The design proposes minSdk 29;
+   nothing in the environment forces a change, so it is retained. compileSdk
+   and targetSdk are pinned to 37 — both the `android-37.0` platform and its
+   build-tools are present, and several pinned AndroidX artifacts (Compose UI
+   1.12.0, SQLCipher 4.19.0) require compiling against API 37 or later.
+   The `dev36` emulator runs API 36, below targetSdk 37; this is a normal,
+   supported configuration (a device's API level only needs to meet
+   `minSdk`), not a mismatch requiring correction.
+3. **Room + `net.zetetic:sqlcipher-android` 4.19.0**, using the Room 2.8.x
+   SQLCipher-driver integration path (not the deprecated
+   `android-database-sqlcipher` package, and not a mixed Room-2-factory /
+   Room-3-driver configuration). The exact integration class and its
+   compatibility note are recorded in the vault module's storage README when
+   Stage 2 lands.
+4. **Testing-API gap (owner-relevant, recorded here per the design's
+   traceability requirement).** The only installable Android system image in
+   this environment is API 36. No API 29 image can be added because
+   `$ANDROID_HOME` is a read-only Nix store path — `sdkmanager` cannot write
+   into it, and no writable SDK overlay was created for this build.
+   Consequently:
+   - The app is still **built** with `minSdk 29`, preserving support for
+     Android 10+ devices.
+   - All instrumented/adversarial tests in this repository's evidence run
+     against API 36 only.
+   - `docs/verification/C0.md` and the C0 handoff record the lowest-supported
+     API leg of test C0-16 as **not run in this environment**, rather than
+     reporting it as passed. Closing this gap requires either a writable SDK
+     with an API 29/30 system image, or a physical low-API device.
+5. **Licence: Apache-2.0**, added at the repository root as `LICENSE`. This
+   satisfies P6's "choose a project licence before public distribution" for
+   the current development phase; it does not itself constitute public
+   distribution.
+6. **Bounded whole-file authenticated reads** and **device-lock-only access**
+   (no separate biometric/passcode lock in C0) are retained as proposed. The
+   design states the app-lock question must be resolved before distributing
+   C0 to real users — this remains open and is not resolved by this decision
+   record.
+
+7. **`android.builtInKotlin=false`.** AGP 9.0 made Kotlin compilation
+   built-in and deprecated the `org.jetbrains.kotlin.android` plugin in
+   favour of a new `android.kotlin { }` DSL block. This project opts out via
+   the documented `android.builtInKotlin=false` Gradle property
+   (`gradle.properties`) and keeps applying `org.jetbrains.kotlin.android`
+   explicitly, because that plugin surface is the one Room, SQLCipher, and
+   Compose documentation assumes, and is far better exercised than a DSL that
+   shipped with this AGP line. Android documents this opt-out as removed in
+   AGP 10 (mid-2026); moving to the built-in-Kotlin DSL is a future decision,
+   not an accidental side effect of a later AGP bump.
+
+## Consequences
+
+- C0's acceptance evidence will explicitly show one incomplete test matrix
+  leg (lowest-API device testing) rather than a false pass. Per §13's release
+  acceptance rule, if a required device test cannot run, the capability is
+  reported as incomplete for that leg — this decision exists so that gap is
+  visible and attributable, not silently absorbed.
+- Anyone continuing this work in an environment with a writable SDK should
+  add the API 29/30 system image, re-run the instrumented suite there, and
+  update this record and `docs/verification/C0.md` accordingly.

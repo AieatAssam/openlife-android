@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy (pre-Android 12) full-backup rules. allowBackup is false, so this is
+  a defence-in-depth statement, not the primary control. Everything under the
+  app's data directories is explicitly excluded; nothing is included.
+  See docs/THREAT_MODEL.md.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+    <!--
+      no_backup (noBackupFilesDir, where the vault actually lives) is not a
+      valid domain for the legacy full-backup-content schema — it is already
+      excluded from legacy Auto Backup by definition, unlike the modern
+      data_extraction_rules.xml device-transfer path, which can reach it and
+      so excludes it explicitly there.
+    -->
+</full-backup-content>
