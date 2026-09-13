@@ -23,4 +23,7 @@ interface SourceDao {
 
     @Query("SELECT COUNT(*) FROM sources")
     suspend fun count(): Int
+
+    @Query("DELETE FROM sources WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

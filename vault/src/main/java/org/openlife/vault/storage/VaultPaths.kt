@@ -2,6 +2,7 @@ package org.openlife.vault.storage
 
 import android.content.Context
 import java.io.File
+import java.util.UUID
 
 /**
  * File locations for the vault. Everything lives under
@@ -22,4 +23,12 @@ class VaultPaths(context: Context) {
         vaultDir.mkdirs()
         artefactsDir.mkdirs()
     }
+
+    /**
+     * File names are derived exclusively from the app-generated Source
+     * UUID — never a provider name or extension (design §9).
+     */
+    fun stageFile(sourceId: UUID): File = File(artefactsDir, "$sourceId.stage")
+
+    fun blobFile(sourceId: UUID): File = File(artefactsDir, "$sourceId.blob")
 }
