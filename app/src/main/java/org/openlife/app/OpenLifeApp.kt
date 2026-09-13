@@ -11,6 +11,7 @@ import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.RecoveryRepository
+import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
@@ -54,6 +55,7 @@ class OpenLifeApp : Application() {
                             mutationQueue = mutationQueue,
                         ),
                         deletionRepository = DeletionRepository(paths, database, mutationQueue),
+                        viewRepository = SourceViewRepository(paths, database, keystoreWrapper),
                         lastRecovery = report,
                     )
                 }

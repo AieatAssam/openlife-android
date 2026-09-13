@@ -48,6 +48,13 @@ class IntakeActivityTest {
     @Before
     fun setUp() {
         TestHostileContentProvider.reset()
+        // The first-run explanation screen blocks the intake flow entirely
+        // until acknowledged (design §8); this suite exercises intake
+        // behaviour, not onboarding, so acknowledge it up front the way a
+        // returning user's device already would have.
+        org.openlife.app.ui.FirstRunPreferences.setAcknowledged(
+            InstrumentationRegistry.getInstrumentation().targetContext
+        )
     }
 
     @After

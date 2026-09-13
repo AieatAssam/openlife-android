@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Minimal Stage 2 access needed to prove the schema and its READY invariant
@@ -32,4 +33,8 @@ interface SourceDao {
 
     @Query("SELECT * FROM sources WHERE state = 'READY' AND byteCount = :byteCount AND sha256 = :sha256 LIMIT 1")
     suspend fun findReadyDuplicate(byteCount: Long, sha256: ByteArray): SourceEntity?
+
+    /** READY and CORRUPT only - a STAGED row is transient and never shown in the list. */
+    @Query("SELECT * FROM sources WHERE state IN ('READY', 'CORRUPT') ORDER BY importedAt ASC")
+    fun observeVisibleSources(): Flow<List<SourceEntity>>
 }

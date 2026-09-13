@@ -141,6 +141,20 @@ class ImportRepository(
     }
 
     /**
+     * User-initiated Cancel from the preview screen (design §8: "no undo"
+     * applies to Save, not to cancelling a not-yet-saved preview). Returns
+     * false if the row is not actually STAGED (e.g. already saved or
+     * already cancelled) rather than acting on a row this call shouldn't
+     * touch.
+     */
+    suspend fun cancelStagedImport(sourceId: UUID): Boolean = mutationQueue.acquire {
+        val entity = database.sourceDao().findById(sourceId.toString())
+        if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
+        cancelStage(sourceId)
+        true
+    }
+
+    /**
      * Design §11 "Save": recheck the stage and duplicate policy, authenticate
      * the stage, rename it to its final blob name and fsync, then commit
      * READY — success is returned only after that commit completes. Any

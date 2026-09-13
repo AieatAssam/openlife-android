@@ -8,74 +8,119 @@ import android.os.Bundle
 import android.os.Parcelable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.openlife.app.OpenLifeApp
-import org.openlife.app.VaultAccess
+import org.openlife.app.ui.FirstRunExplanationScreen
+import org.openlife.app.ui.FirstRunPreferences
+import org.openlife.app.ui.IntakeScreen
+import org.openlife.app.ui.IntakeUiState
+import org.openlife.app.ui.IntakeViewModel
+import org.openlife.app.ui.applySecureWindow
 import org.openlife.vault.model.IntakeKind
-import org.openlife.vault.repository.ImportLimits
-import org.openlife.vault.repository.PrepareResult
 
 /**
  * The single exported intake activity (design §8/§11). Every incoming
  * intent is validated here regardless of the declared `<intent-filter>`,
  * because an exported activity can be started directly with an arbitrary
  * intent (design §8: "Validate every incoming intent regardless of the
- * filter"). This screen is a Stage-6 placeholder for the real preview
- * screen design §8's user flow describes ("Preview shows a sampled
- * rendering...") — that UI is Stage 7. What this activity is responsible
- * for now: rejecting a hostile or malformed intent, and handing a
- * validated, already-opened, bounded stream to the vault repository
- * without ever letting a `Uri`, filename, or claimed sender identity reach
- * it (design §7 repository layout).
+ * filter"). Hands a validated, already-opened, bounded stream to
+ * [IntakeViewModel] without ever letting a `Uri`, filename, or claimed
+ * sender identity reach the vault layer (design §7 repository layout).
+ *
+ * Also the entry point for Photo Picker imports: [MainActivity] forwards a
+ * picked `content://` URI here as a same-app `ACTION_SEND` intent carrying
+ * [EXTRA_INTAKE_KIND], so both routes share one validated pipeline and one
+ * preview/save UI rather than two parallel implementations.
  */
 class IntakeActivity : ComponentActivity() {
 
-    private var statusText by mutableStateOf("Preparing…")
+    private val viewModel: IntakeViewModel by viewModels {
+        IntakeViewModel.factory(application as OpenLifeApp)
+    }
 
-    /** Test-only observation seam; Stage 7's real UI replaces this screen entirely. */
-    fun currentStatusForTest(): String = statusText
+    /** Test-only observation seam for the C0-05/C0-02/C0-03 instrumented tests. */
+    fun currentStatusForTest(): String = describeForTest(viewModel.state.value)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applySecureWindow()
+
+        // Validate only on a fresh launch. On a configuration-change
+        // recreation the ViewModel already holds (or is restoring) the
+        // Source UUID via SavedStateHandle - re-validating an already
+        // consumed Intent would be meaningless (design §8: rotation
+        // survives through the ViewModel and UUID, never by re-deriving
+        // from the original Intent/Uri).
+        val validation = if (savedInstanceState == null) {
+            IntakeIntentValidator.validate(extractShape(intent), packageName)
+        } else {
+            null
+        }
+
         setContent {
+            var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text(statusText)
+                if (!acknowledged) {
+                    FirstRunExplanationScreen(
+                        onContinue = {
+                            FirstRunPreferences.setAcknowledged(this)
+                            acknowledged = true
+                        }
+                    )
+                } else {
+                    if (validation != null) {
+                        LaunchedEffect(validation) {
+                            when (validation) {
+                                is IntakeValidationResult.Rejected ->
+                                    viewModel.showRejected(describeIntentRejection(validation.reason))
+                                is IntakeValidationResult.Valid ->
+                                    startImportFromUri(Uri.parse(validation.uriString))
+                            }
+                        }
                     }
+                    val state by viewModel.state.collectAsState()
+                    IntakeScreen(
+                        state = state,
+                        onSave = viewModel::confirmSave,
+                        onCancel = viewModel::cancel,
+                        onDone = { finish() },
+                    )
                 }
             }
         }
-        handleIntent(intent)
     }
 
-    private fun handleIntent(intent: Intent) {
-        val shape = extractShape(intent)
-        when (val validation = IntakeIntentValidator.validate(shape, packageName)) {
-            is IntakeValidationResult.Rejected -> {
-                statusText = "Not imported: ${validation.reason}"
-            }
-
-            is IntakeValidationResult.Valid -> {
-                proceedWithUri(Uri.parse(validation.uriString))
-            }
+    private fun startImportFromUri(uri: Uri) {
+        val declaredType = contentResolver.getType(uri)
+        val stream = try {
+            contentResolver.openInputStream(uri)
+        } catch (e: SecurityException) {
+            // Missing or expired URI grant (design §11 step 1: "If a share
+            // grant expires or a provider disappears, ask the user to
+            // select the item again").
+            viewModel.showRejected("could not access the selected item; please select it again")
+            return
+        } catch (e: java.io.FileNotFoundException) {
+            viewModel.showRejected("could not access the selected item; please select it again")
+            return
         }
+        if (stream == null) {
+            viewModel.showRejected("could not access the selected item; please select it again")
+            return
+        }
+        val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+            IntakeKind.PHOTO_PICKER
+        } else {
+            IntakeKind.SHARE
+        }
+        viewModel.startImport(stream, declaredType ?: "", intakeKind)
     }
 
     private fun extractShape(intent: Intent): IntentShape {
@@ -104,67 +149,29 @@ class IntakeActivity : ComponentActivity() {
             intent.getParcelableExtra(name)
         }
 
-    private fun proceedWithUri(uri: Uri) {
-        // The URI itself is never handed to the vault layer - only the
-        // bytes it names and the provider-reported MIME type (design §7:
-        // "No UI composable may accept a persistent content URI as the
-        // saved Source" - the same boundary applies here, one layer below
-        // any composable).
-        lifecycleScope.launch {
-            val access = (application as OpenLifeApp).vault()
-            when (access) {
-                is VaultAccess.Unavailable -> statusText = "Vault unavailable: ${access.reason}"
-                is VaultAccess.Ready -> importFrom(uri, access)
-            }
-        }
+    companion object {
+        const val EXTRA_INTAKE_KIND = "org.openlife.app.intake.EXTRA_INTAKE_KIND"
     }
+}
 
-    private suspend fun importFrom(uri: Uri, access: VaultAccess.Ready) {
-        val declaredType = contentResolver.getType(uri)
-        val stream = try {
-            contentResolver.openInputStream(uri)
-        } catch (e: SecurityException) {
-            // Missing or expired URI grant (design §11 step 1: "If a share
-            // grant expires or a provider disappears, ask the user to
-            // select the item again").
-            statusText = "Could not access the selected item; please select it again."
-            return
-        } catch (e: java.io.FileNotFoundException) {
-            // The provider itself failed or the item is gone - same
-            // reselect path, not a crash (design §9: "unavailable
-            // provider" is a non-sensitive error category).
-            statusText = "Could not access the selected item; please select it again."
-            return
-        }
-        if (stream == null) {
-            statusText = "Could not access the selected item; please select it again."
-            return
-        }
+private fun describeIntentRejection(reason: IntakeRejectionReason): String = when (reason) {
+    IntakeRejectionReason.WRONG_ACTION -> "unsupported action"
+    IntakeRejectionReason.NO_CANDIDATE -> "no image was included"
+    IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES -> "more than one item was included"
+    IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> "unsupported source"
+    IntakeRejectionReason.OWN_AUTHORITY -> "invalid source"
+    IntakeRejectionReason.MALFORMED_URI -> "invalid source"
+}
 
-        val result = stream.use { input ->
-            withContext(Dispatchers.IO) {
-                // Cooperative cancellation: closing the descriptor on a
-                // provider that never delivers bytes is what unblocks the
-                // otherwise-synchronous read inside prepareImport, which
-                // then fails closed as a normal I/O error (design §12: "not
-                // a guaranteed hard stop for a blocked provider").
-                val deadline = launch {
-                    delay(ImportLimits.PROVIDER_READ_DEADLINE_SECONDS * 1000)
-                    input.close()
-                }
-                try {
-                    access.importRepository.prepareImport(input, declaredType ?: "", IntakeKind.SHARE)
-                } finally {
-                    deadline.cancel()
-                }
-            }
-        }
-
-        statusText = when (result) {
-            is PrepareResult.Prepared -> "Prepared ${result.format} ${result.width}x${result.height}"
-            is PrepareResult.Rejected -> "Not imported: ${result.reason}"
-            PrepareResult.Busy -> "Another import is already in progress."
-            PrepareResult.Failed -> "Import failed; please try again."
-        }
-    }
+private fun describeForTest(state: IntakeUiState): String = when (state) {
+    IntakeUiState.Preparing -> "Preparing"
+    is IntakeUiState.Preview -> "Prepared ${state.format} ${state.width}x${state.height}"
+    is IntakeUiState.Saving -> "Saving"
+    is IntakeUiState.Saved -> "Saved on this device"
+    is IntakeUiState.Duplicate -> "Not imported again"
+    is IntakeUiState.Rejected -> "Not imported: ${state.message}"
+    IntakeUiState.Busy -> "Another import is already in progress."
+    IntakeUiState.Failed -> "Import failed"
+    is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.reason}"
+    IntakeUiState.Cancelled -> "Cancelled"
 }

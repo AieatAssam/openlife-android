@@ -1,45 +1,147 @@
 package org.openlife.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import java.util.UUID
+import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.ui.DeleteConfirmationDialog
+import org.openlife.app.ui.FirstRunExplanationScreen
+import org.openlife.app.ui.FirstRunPreferences
+import org.openlife.app.ui.SourceListScreen
+import org.openlife.app.ui.SourceListUiState
+import org.openlife.app.ui.SourceListViewModel
+import org.openlife.app.ui.ViewerScreen
+import org.openlife.app.ui.applySecureWindow
+import org.openlife.app.ui.sourceLabel
+import org.openlife.vault.model.IntakeKind
 
-/**
- * Stage 0 placeholder launcher screen. This is replaced by the real source
- * list (Stage 7) once import, save, and view exist. It intentionally does
- * nothing else: no permission requests, no intake, no persistence.
- */
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            OpenLifePlaceholder()
-        }
-    }
+private sealed interface Screen {
+    data object List : Screen
+    data class Viewer(val sourceId: UUID) : Screen
 }
 
-@Composable
-private fun OpenLifePlaceholder() {
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("OpenLife — Capability 0 scaffold. No import UI yet.")
+/**
+ * The persistent app: source list, viewer, and deletion (design §8). The
+ * transient intake flow (progress -> preview -> save) lives in
+ * `IntakeActivity`; Photo Picker selections are forwarded there as a
+ * same-app `ACTION_SEND` intent so both intake routes share one validated
+ * pipeline (design §8: "Photo Picker through the AndroidX contract...").
+ */
+class MainActivity : ComponentActivity() {
+
+    private val viewModel: SourceListViewModel by viewModels {
+        SourceListViewModel.factory(application as OpenLifeApp)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        applySecureWindow()
+
+        setContent {
+            var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
+            var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.List) }
+
+            val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                if (uri != null) {
+                    startActivity(
+                        Intent(this, IntakeActivity::class.java).apply {
+                            action = Intent.ACTION_SEND
+                            type = contentResolver.getType(uri) ?: "image/*"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(IntakeActivity.EXTRA_INTAKE_KIND, IntakeKind.PHOTO_PICKER.name)
+                        }
+                    )
+                }
+            }
+
+            MaterialTheme {
+                if (!acknowledged) {
+                    FirstRunExplanationScreen(
+                        onContinue = {
+                            FirstRunPreferences.setAcknowledged(this)
+                            acknowledged = true
+                        }
+                    )
+                } else {
+                    when (val current = screen) {
+                        Screen.List -> {
+                            val state by viewModel.state.collectAsState()
+                            SourceListScreen(
+                                state = state,
+                                loadThumbnail = viewModel::loadThumbnail,
+                                onOpen = { screen = Screen.Viewer(it) },
+                                onDelete = { viewModel.delete(it) {} },
+                                onImportFromPhotoPicker = {
+                                    pickMedia.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                },
+                            )
+                        }
+
+                        is Screen.Viewer -> {
+                            val listState = viewModel.state.collectAsState().value
+                            val source = (listState as? SourceListUiState.Loaded)
+                                ?.sources?.find { it.id == current.sourceId }
+                            if (source == null) {
+                                screen = Screen.List
+                            } else {
+                                var pendingDelete by remember { mutableStateOf(false) }
+                                ViewerScreen(
+                                    source = source,
+                                    loadBytes = { viewModelLoadReadyBytes(current.sourceId) },
+                                    onBack = { screen = Screen.List },
+                                    onDeleteRequested = { pendingDelete = true },
+                                )
+                                if (pendingDelete) {
+                                    DeleteConfirmationDialog(
+                                        itemLabel = sourceLabel(source),
+                                        onConfirm = {
+                                            pendingDelete = false
+                                            viewModel.delete(current.sourceId) {}
+                                            screen = Screen.List
+                                        },
+                                        onDismiss = { pendingDelete = false },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+
+    private suspend fun viewModelLoadReadyBytes(sourceId: UUID): ByteArray? =
+        ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.loadReadyBytes(sourceId)
 }
+
+private val ScreenSaver = androidx.compose.runtime.saveable.Saver<Screen, String>(
+    save = { screen ->
+        when (screen) {
+            Screen.List -> "list"
+            is Screen.Viewer -> "viewer:${screen.sourceId}"
+        }
+    },
+    restore = { raw ->
+        if (raw == "list") {
+            Screen.List
+        } else {
+            Screen.Viewer(UUID.fromString(raw.removePrefix("viewer:")))
+        }
+    }
+)
