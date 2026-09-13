@@ -18,9 +18,9 @@
 
         <!--
           Placeholder launcher activity for Stage 0. It is replaced by the
-          real source-list UI in Stage 7 and is deliberately unexported like
-          every other component except the single intake activity added in
-          Stage 6.
+          real source-list UI in Stage 7. Exported because Android requires
+          the LAUNCHER activity to be (design §11: "unless Android requires
+          otherwise").
         -->
         <activity
             android:name=".MainActivity"
@@ -28,6 +28,24 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          The one exported intake activity (design §8/§11). Every incoming
+          intent is re-validated in code regardless of this filter, since an
+          exported activity can be started directly with an arbitrary
+          intent. No other component in this app is exported.
+        -->
+        <activity
+            android:name=".intake.IntakeActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
 

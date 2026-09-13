@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only manifest additions, merged into debug builds only (never
+  release). See TestHostileContentProvider.kt: design §13 requires a
+  test-only content provider for adversarial intake tests, explicitly
+  never shipped.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <provider
+            android:name=".intake.TestHostileContentProvider"
+            android:authorities="net.openlifetest.hostileprovider"
+            android:exported="false" />
+    </application>
+
+</manifest>
