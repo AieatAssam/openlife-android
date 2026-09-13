@@ -17,16 +17,19 @@ import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.Fsync
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
 
 private const val DEK_LENGTH_BYTES = 32
 private const val SCHEMA_ARTEFACT_VERSION = 1
 
 /**
- * The "Prepare and preview" half of design §11. Save (STAGED -> READY) and
- * startup recovery are Stage 4. Duplicate detection is deliberately not
- * here: design §11 places it in the Save step ("recheck the stage and
- * duplicate policy under the mutation queue"), not at prepare time.
+ * The "Prepare and preview" and "Save" halves of design §11
+ * (STAGED -> READY). Startup recovery is [RecoveryRepository].
+ *
+ * Duplicate detection lives in [saveImport], not [prepareImport]: design
+ * §11 places it in the Save step ("recheck the stage and duplicate policy
+ * under the mutation queue"), not at prepare time.
  *
  * Platform URI access stays at the intake boundary (app module); this
  * class only ever sees an already-opened, already-validated-shape
@@ -41,6 +44,7 @@ class ImportRepository(
     private val mutationQueue: MutationQueue,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
     suspend fun prepareImport(
         inputStream: InputStream,
@@ -134,5 +138,42 @@ class ImportRepository(
     private suspend fun cancelStage(sourceId: UUID) {
         paths.stageFile(sourceId).delete()
         database.sourceDao().deleteById(sourceId.toString())
+    }
+
+    /**
+     * Design §11 "Save": recheck the stage and duplicate policy, authenticate
+     * the stage, rename it to its final blob name and fsync, then commit
+     * READY — success is returned only after that commit completes. Any
+     * failure along the way leaves the row STAGED for startup recovery to
+     * resolve; it is never reported as saved.
+     */
+    suspend fun saveImport(sourceId: UUID): SaveResult = mutationQueue.acquire {
+        val entity = database.sourceDao().findById(sourceId.toString())
+        if (entity == null || entity.state != SourceState.STAGED.name) {
+            return@acquire SaveResult.StageNotFound
+        }
+        val source = entity.toDomain()
+
+        val stageFile = paths.stageFile(sourceId)
+        if (!stageFile.exists()) return@acquire SaveResult.StageNotFound
+
+        if (!authenticator.authenticates(source, stageFile)) return@acquire SaveResult.Failed
+
+        val duplicate = database.sourceDao().findReadyDuplicate(source.byteCount!!, source.sha256!!)
+        if (duplicate != null) {
+            cancelStage(sourceId)
+            return@acquire SaveResult.DuplicateFound(UUID.fromString(duplicate.id))
+        }
+
+        try {
+            val blobFile = paths.blobFile(sourceId)
+            if (!stageFile.renameTo(blobFile)) return@acquire SaveResult.Failed
+            Fsync.syncDirectory(paths.artefactsDir)
+        } catch (e: IOException) {
+            return@acquire SaveResult.Failed
+        }
+
+        database.sourceDao().update(source.copy(state = SourceState.READY).toEntity())
+        SaveResult.Saved(sourceId)
     }
 }

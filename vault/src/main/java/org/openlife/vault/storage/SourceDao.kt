@@ -26,4 +26,10 @@ interface SourceDao {
 
     @Query("DELETE FROM sources WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("SELECT * FROM sources")
+    suspend fun findAll(): List<SourceEntity>
+
+    @Query("SELECT * FROM sources WHERE state = 'READY' AND byteCount = :byteCount AND sha256 = :sha256 LIMIT 1")
+    suspend fun findReadyDuplicate(byteCount: Long, sha256: ByteArray): SourceEntity?
 }

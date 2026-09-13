@@ -43,6 +43,7 @@ class ImportRepositoryTest {
     private lateinit var alias: String
     private lateinit var paths: VaultPaths
     private lateinit var db: OpenLifeDatabase
+    private lateinit var wrapper: KeystoreWrapper
     private lateinit var repository: ImportRepository
 
     private fun syntheticJpegBytes(width: Int = 64, height: Int = 48): ByteArray {
@@ -58,7 +59,7 @@ class ImportRepositoryTest {
         alias = "test.${UUID.randomUUID()}"
         paths = VaultPaths(context)
         paths.vaultDir.deleteRecursively()
-        val wrapper = KeystoreWrapper(alias)
+        wrapper = KeystoreWrapper(alias)
         val ready = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Ready
         db = OpenLifeDatabaseFactory.create(context, paths, ready.databaseSecret)
         repository = ImportRepository(
@@ -174,5 +175,98 @@ class ImportRepositoryTest {
 
         release.complete(Unit)
         firstImport.await()
+    }
+
+    // --- Save (design §11 "Save") ---
+
+    @Test
+    fun saveTransitionsStagedToReadyAndRenamesStageToBlob(): Unit = runBlocking {
+        val original = syntheticJpegBytes()
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(original), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+
+        val result = repository.saveImport(prepared.sourceId)
+
+        assertEquals(SaveResult.Saved(prepared.sourceId), result)
+        val row = db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain()
+        assertEquals(SourceState.READY, row.state)
+        assertTrue(!paths.stageFile(prepared.sourceId).exists())
+        assertTrue(paths.blobFile(prepared.sourceId).exists())
+    }
+
+    @Test
+    fun savedBlobAuthenticatesAndReproducesTheExactOriginalBytes(): Unit = runBlocking {
+        val original = syntheticJpegBytes()
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(original), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+        repository.saveImport(prepared.sourceId)
+
+        val row = db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain()
+        val dek = wrapper.unwrap(
+            EnvelopeCodec.decode(row.wrappedDek!!),
+            org.openlife.vault.crypto.EnvelopeDomain.SOURCE_KEY,
+            prepared.sourceId
+        )
+        val envelope = EnvelopeCodec.decode(paths.blobFile(prepared.sourceId).readBytes())
+        val decrypted = org.openlife.vault.crypto.AesGcmCodec.decrypt(
+            envelope,
+            javax.crypto.spec.SecretKeySpec(dek, "AES"),
+            org.openlife.vault.crypto.EnvelopeAad.forSource(
+                org.openlife.vault.crypto.EnvelopeDomain.ARTEFACT,
+                prepared.sourceId
+            )
+        )
+        assertEquals(original.toList(), decrypted.toList())
+    }
+
+    @Test
+    fun savingAnExactDuplicateDiscardsTheNewStageAndPreservesTheExisting(): Unit = runBlocking {
+        val original = syntheticJpegBytes()
+        val first = repository.prepareImport(
+            ByteArrayInputStream(original), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+        repository.saveImport(first.sourceId)
+
+        val second = repository.prepareImport(
+            ByteArrayInputStream(original), "image/jpeg", IntakeKind.PHOTO_PICKER
+        ) as PrepareResult.Prepared
+
+        val result = repository.saveImport(second.sourceId)
+
+        assertEquals(SaveResult.DuplicateFound(first.sourceId), result)
+        // The existing original is untouched...
+        assertTrue(paths.blobFile(first.sourceId).exists())
+        assertEquals(SourceState.READY, db.sourceDao().findById(first.sourceId.toString())!!.toDomain().state)
+        // ...and the new staging is fully discarded, not left half-saved.
+        assertEquals(null, db.sourceDao().findById(second.sourceId.toString()))
+        assertTrue(!paths.stageFile(second.sourceId).exists())
+        assertTrue(!paths.blobFile(second.sourceId).exists())
+    }
+
+    @Test
+    fun savingAnUnknownSourceIdReturnsStageNotFound(): Unit = runBlocking {
+        val result = repository.saveImport(UUID.randomUUID())
+        assertEquals(SaveResult.StageNotFound, result)
+    }
+
+    @Test
+    fun savingATamperedStageFailsAndLeavesTheRowStaged(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+        val stageFile = paths.stageFile(prepared.sourceId)
+        val bytes = stageFile.readBytes()
+        bytes[bytes.size - 1] = (bytes[bytes.size - 1].toInt() xor 0x01).toByte()
+        stageFile.writeBytes(bytes)
+
+        val result = repository.saveImport(prepared.sourceId)
+
+        assertEquals(SaveResult.Failed, result)
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state
+        )
     }
 }
