@@ -41,12 +41,19 @@ environment this repository was built in, on 2026-09-13.
    The `dev36` emulator runs API 36, below targetSdk 37; this is a normal,
    supported configuration (a device's API level only needs to meet
    `minSdk`), not a mismatch requiring correction.
-3. **Room + `net.zetetic:sqlcipher-android` 4.19.0**, using the Room 2.8.x
-   SQLCipher-driver integration path (not the deprecated
-   `android-database-sqlcipher` package, and not a mixed Room-2-factory /
-   Room-3-driver configuration). The exact integration class and its
-   compatibility note are recorded in the vault module's storage README when
-   Stage 2 lands.
+3. **Room + `net.zetetic:sqlcipher-android` 4.19.0**, integrated via Room's
+   classic (2.x) `SupportSQLiteOpenHelper.Factory` API — concretely,
+   `net.zetetic.database.sqlcipher.SupportOpenHelperFactory(password)` passed
+   to `Room.databaseBuilder(...).openHelperFactory(...)` — confirmed by
+   decompiling the pinned AAR's `classes.jar` rather than assumed, since Room
+   3's newer driver-based API (a different, incompatible integration
+   surface) is documented to also exist for other databases and the two must
+   not be mixed. Not the deprecated `android-database-sqlcipher` package.
+   `net.zetetic.database.sqlcipher.SQLiteDatabase` loads its native library
+   from a static initializer with no public `loadLibs` entry point in this
+   artifact (also confirmed from the decompiled classes), so no manual
+   library-loading step is needed. See
+   `vault/src/main/java/org/openlife/vault/storage/OpenLifeDatabaseFactory.kt`.
 4. **Testing-API gap (owner-relevant, recorded here per the design's
    traceability requirement).** The only installable Android system image in
    this environment is API 36. No API 29 image can be added because
@@ -81,6 +88,22 @@ environment this repository was built in, on 2026-09-13.
    shipped with this AGP line. Android documents this opt-out as removed in
    AGP 10 (mid-2026); moving to the built-in-Kotlin DSL is a future decision,
    not an accidental side effect of a later AGP bump.
+
+8. **READY-invariant enforcement via SQL triggers, not a declarative CHECK
+   constraint.** Design §9 calls for "a database constraint" requiring every
+   validated Source field to be non-null once `state = READY`. Room 2.8.5
+   has no `@Entity(checkConstraints = ...)` or equivalent annotation
+   (confirmed by inspecting the `room-common`/`room-compiler` jars for any
+   `CheckConstraint`-shaped class — none exists in this release), and SQLite
+   itself does not support adding a `CHECK` constraint to a table after
+   creation via `ALTER TABLE`. Instead, `OpenLifeDatabase.readyInvariantCallback`
+   creates `BEFORE INSERT`/`BEFORE UPDATE` triggers on the `sources` table
+   (in `RoomDatabase.Callback.onCreate`) that `RAISE(ABORT, ...)` when a row
+   with `state = 'READY'` has any validated field still null. This is
+   genuine SQL-level enforcement, independent of and in addition to the
+   repository-level enforcement design §9 also requires ("The repository
+   enforces legal state transitions") — it is not a weakening of the
+   requirement, just a different mechanism than a literal `CHECK` clause.
 
 ## Consequences
 

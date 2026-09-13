@@ -20,9 +20,6 @@ import javax.crypto.spec.GCMParameterSpec
  */
 object AesGcmCodec {
 
-    class AuthenticationFailedException(cause: Throwable) :
-        Exception("envelope authentication failed", cause)
-
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private val secureRandom = SecureRandom()
 
@@ -40,7 +37,7 @@ object AesGcmCodec {
      * Authenticates and decrypts. Any failure at all — wrong key, wrong AAD
      * (wrong domain or wrong bound Source UUID), a tampered ciphertext, a
      * tampered tag, a tampered nonce, or a structurally invalid ciphertext
-     * length — surfaces as [AuthenticationFailedException]. No partial or
+     * length — surfaces as [EnvelopeAuthenticationException]. No partial or
      * unauthenticated plaintext is ever returned; every failure mode here
      * fails closed the same way (design §10).
      */
@@ -55,7 +52,7 @@ object AesGcmCodec {
             cipher.updateAAD(aad)
             return cipher.doFinal(envelope.ciphertext)
         } catch (e: Exception) {
-            throw AuthenticationFailedException(e)
+            throw EnvelopeAuthenticationException(e)
         }
     }
 }

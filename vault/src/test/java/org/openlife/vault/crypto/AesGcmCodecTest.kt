@@ -55,7 +55,7 @@ class AesGcmCodecTest {
     fun wrongKeyFailsClosed() {
         val aad = EnvelopeAad.forDomain(EnvelopeDomain.ARTEFACT)
         val envelope = AesGcmCodec.encrypt(plaintext, freshKey(), aad)
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(envelope, freshKey(), aad)
         }
     }
@@ -67,7 +67,7 @@ class AesGcmCodecTest {
         val envelope = AesGcmCodec.encrypt(plaintext, key, aad)
         val tampered = envelope.ciphertext.copyOf()
         tampered[0] = (tampered[0].toInt() xor 0x01).toByte()
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(Envelope(envelope.nonce, tampered), key, aad)
         }
     }
@@ -82,7 +82,7 @@ class AesGcmCodecTest {
         val tampered = envelope.ciphertext.copyOf()
         val lastIndex = tampered.size - 1
         tampered[lastIndex] = (tampered[lastIndex].toInt() xor 0x01).toByte()
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(Envelope(envelope.nonce, tampered), key, aad)
         }
     }
@@ -94,7 +94,7 @@ class AesGcmCodecTest {
         val envelope = AesGcmCodec.encrypt(plaintext, key, aad)
         val tamperedNonce = envelope.nonce.copyOf()
         tamperedNonce[0] = (tamperedNonce[0].toInt() xor 0x01).toByte()
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(Envelope(tamperedNonce, envelope.ciphertext), key, aad)
         }
     }
@@ -103,7 +103,7 @@ class AesGcmCodecTest {
     fun wrongDomainLabelFailsClosed() {
         val key = freshKey()
         val envelope = AesGcmCodec.encrypt(plaintext, key, EnvelopeAad.forDomain(EnvelopeDomain.ARTEFACT))
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(envelope, key, EnvelopeAad.forDomain(EnvelopeDomain.SOURCE_KEY))
         }
     }
@@ -121,7 +121,7 @@ class AesGcmCodecTest {
         // This is the specific attack the design calls out: a valid
         // ciphertext for one Source must not decrypt under another
         // Source's identity, even with the same key and domain.
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(envelope, key, EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, otherSourceId))
         }
     }
@@ -135,7 +135,7 @@ class AesGcmCodecTest {
             key,
             EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId)
         )
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(envelope, key, EnvelopeAad.forDomain(EnvelopeDomain.ARTEFACT))
         }
     }
@@ -167,7 +167,7 @@ class AesGcmCodecTest {
         )
         val bytes = EnvelopeCodec.encode(envelope)
         val decoded = EnvelopeCodec.decode(bytes) // succeeds: framing is valid
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(decoded, key, EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, UUID.randomUUID()))
         }
     }
@@ -178,7 +178,7 @@ class AesGcmCodecTest {
         val aad = EnvelopeAad.forDomain(EnvelopeDomain.ARTEFACT)
         val envelope = AesGcmCodec.encrypt(plaintext, key, aad)
         val truncated = envelope.ciphertext.copyOf(EnvelopeFormat.TAG_LENGTH_BYTES - 1)
-        assertThrows(AesGcmCodec.AuthenticationFailedException::class.java) {
+        assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(Envelope(envelope.nonce, truncated), key, aad)
         }
     }
