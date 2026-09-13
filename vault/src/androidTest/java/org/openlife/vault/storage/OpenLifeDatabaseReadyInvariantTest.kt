@@ -72,17 +72,17 @@ class OpenLifeDatabaseReadyInvariantTest {
     }
 
     @Test
-    fun stagedRowWithAllFieldsNullInsertsFine() = runBlocking {
+    fun stagedRowWithAllFieldsNullInsertsFine(): Unit = runBlocking {
         db.sourceDao().insert(stagedRow())
     }
 
     @Test
-    fun readyRowWithAllFieldsPresentInsertsFine() = runBlocking {
+    fun readyRowWithAllFieldsPresentInsertsFine(): Unit = runBlocking {
         db.sourceDao().insert(completeReadyRow())
     }
 
     @Test
-    fun readyRowMissingASingleFieldIsRejectedOnInsert() = runBlocking {
+    fun readyRowMissingASingleFieldIsRejectedOnInsert(): Unit = runBlocking {
         val incomplete = completeReadyRow().copy(sha256 = null)
         assertThrows(SQLiteConstraintException::class.java) {
             runBlocking { db.sourceDao().insert(incomplete) }
@@ -90,7 +90,7 @@ class OpenLifeDatabaseReadyInvariantTest {
     }
 
     @Test
-    fun transitioningAStagedRowToReadyWithoutFillingFieldsIsRejectedOnUpdate() = runBlocking {
+    fun transitioningAStagedRowToReadyWithoutFillingFieldsIsRejectedOnUpdate(): Unit = runBlocking {
         val id = UUID.randomUUID().toString()
         db.sourceDao().insert(stagedRow(id))
         val prematureReady = stagedRow(id).copy(state = "READY")

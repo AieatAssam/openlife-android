@@ -49,10 +49,18 @@ environment this repository was built in, on 2026-09-13.
    3's newer driver-based API (a different, incompatible integration
    surface) is documented to also exist for other databases and the two must
    not be mixed. Not the deprecated `android-database-sqlcipher` package.
-   `net.zetetic.database.sqlcipher.SQLiteDatabase` loads its native library
-   from a static initializer with no public `loadLibs` entry point in this
-   artifact (also confirmed from the decompiled classes), so no manual
-   library-loading step is needed. See
+   **Correction from initial static analysis:** there is no public
+   `loadLibs` entry point in this artifact (confirmed from the decompiled
+   classes), which was initially taken to mean the native library loads
+   itself automatically. It does not — an instrumented-test
+   `UnsatisfiedLinkError` on `SQLiteConnection.nativeOpen` on 2026-09-13
+   proved the AAR's bundled `jni/<abi>/libsqlcipher.so` is never loaded on
+   its own. `OpenLifeDatabaseFactory.create` now calls
+   `System.loadLibrary("sqlcipher")` before every open (a documented
+   no-op on repeat calls). Lesson recorded because it is exactly the kind
+   of thing static decompilation cannot substitute for actually running
+   the code (design §13: "A mocked encryption layer cannot prove Keystore
+   behaviour" — the same is true of native library loading). See
    `vault/src/main/java/org/openlife/vault/storage/OpenLifeDatabaseFactory.kt`.
 4. **Testing-API gap (owner-relevant, recorded here per the design's
    traceability requirement).** The only installable Android system image in

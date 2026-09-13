@@ -61,7 +61,7 @@ class VaultBootstrapperTest {
     }
 
     @Test
-    fun restartReusesTheSameSecretAndPersistedDataSurvives() = runBlocking {
+    fun restartReusesTheSameSecretAndPersistedDataSurvives(): Unit = runBlocking {
         val first = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Ready
         val db = OpenLifeDatabaseFactory.create(context, paths, first.databaseSecret)
         val row = SourceEntity(

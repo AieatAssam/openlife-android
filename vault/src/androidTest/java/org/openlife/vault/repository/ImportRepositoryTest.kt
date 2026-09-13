@@ -81,7 +81,7 @@ class ImportRepositoryTest {
     }
 
     @Test
-    fun validJpegIsPreparedAndStagedRowMatchesTheOriginal() = runBlocking {
+    fun validJpegIsPreparedAndStagedRowMatchesTheOriginal(): Unit = runBlocking {
         val original = syntheticJpegBytes()
         val expectedDigest = MessageDigest.getInstance("SHA-256").digest(original)
 
@@ -99,7 +99,7 @@ class ImportRepositoryTest {
     }
 
     @Test
-    fun stageFileDecryptsBackToTheExactOriginalBytes() = runBlocking {
+    fun stageFileDecryptsBackToTheExactOriginalBytes(): Unit = runBlocking {
         val original = syntheticJpegBytes()
         val prepared = repository.prepareImport(
             ByteArrayInputStream(original), "image/jpeg", IntakeKind.SHARE
@@ -125,7 +125,7 @@ class ImportRepositoryTest {
     }
 
     @Test
-    fun rejectedImportLeavesNoStagedRowOrFile() = runBlocking {
+    fun rejectedImportLeavesNoStagedRowOrFile(): Unit = runBlocking {
         val garbage = "not an image".toByteArray()
         val before = db.sourceDao().count()
 
@@ -137,7 +137,7 @@ class ImportRepositoryTest {
     }
 
     @Test
-    fun forgedMimeTypeMismatchIsRejectedAndCleanedUp() = runBlocking {
+    fun forgedMimeTypeMismatchIsRejectedAndCleanedUp(): Unit = runBlocking {
         // Real JPEG bytes, declared as PNG - a forged MIME type.
         val result = repository.prepareImport(
             ByteArrayInputStream(syntheticJpegBytes()), "image/png", IntakeKind.PHOTO_PICKER
@@ -147,7 +147,7 @@ class ImportRepositoryTest {
     }
 
     @Test
-    fun secondImportWhileFirstIsInProgressIsToldBusy() = runBlocking {
+    fun secondImportWhileFirstIsInProgressIsToldBusy(): Unit = runBlocking {
         val holding = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val blockingStream = object : java.io.InputStream() {
