@@ -114,7 +114,13 @@ class TestHostileContentProvider : ContentProvider() {
 
         val file = File.createTempFile("hostile", ".tmp", contextOrThrow().cacheDir)
         FileOutputStream(file).use { it.write(bytes) }
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        // Unlink immediately - the open fd keeps the (test) bytes readable
+        // until closed, but nothing is left sitting in cacheDir afterward.
+        // Found by C0-13's on-device cache inspection: a leftover
+        // "hostileNNN.tmp" file from an earlier run was still present.
+        file.delete()
+        return fd
     }
 
     override fun getType(uri: Uri): String? = mimeTypeToReport
