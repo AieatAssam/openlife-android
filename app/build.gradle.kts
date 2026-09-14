@@ -35,6 +35,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Debug-key signing so CI can produce an installable release
+            // APK/AAB for internal testing without a real keystore secret.
+            // This is not store-distribution signing - replace with a real
+            // signing config (from a secret keystore) before any real
+            // release, per docs/decisions/0001-c0-defaults.md's pending
+            // pre-distribution decisions.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     // Debug-only hostile/adversarial content provider lives in src/debug and
