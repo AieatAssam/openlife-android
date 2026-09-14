@@ -67,6 +67,35 @@ class TestHostileContentProvider : ContentProvider() {
         }
 
         fun uriFor(name: String): Uri = Uri.parse("content://$AUTHORITY/$name")
+
+        /**
+         * A real, multi-megabyte decodable JPEG, generated on demand rather
+         * than held in a static field - so a manual, host-driven real
+         * process-kill fault-injection run (`adb shell am start ... -d
+         * ${LARGE_FIXTURE_NAME}`, C0-09/C0-10's "true" leg) doesn't need any
+         * prior same-process instrumented test to seed state, and works
+         * across a real `kill -9` and app respawn. Same-app, same-uid
+         * access to this unexported provider needs no URI permission grant
+         * at all, unlike a cross-app `content://media/...` URI - the actual
+         * problem this replaced during Stage 8 fault-injection testing.
+         */
+        const val LARGE_FIXTURE_NAME = "large-fault-injection.jpg"
+
+        private fun generateLargeJpeg(): ByteArray {
+            val width = 4000
+            val height = 3000
+            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            val random = java.util.Random(42)
+            val row = IntArray(width)
+            for (y in 0 until height) {
+                for (x in 0 until width) row[x] = random.nextInt() or -0x1000000
+                bitmap.setPixels(row, 0, width, 0, y, width, 1)
+            }
+            val out = java.io.ByteArrayOutputStream()
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+            bitmap.recycle()
+            return out.toByteArray()
+        }
     }
 
     override fun onCreate(): Boolean = true
@@ -74,7 +103,9 @@ class TestHostileContentProvider : ContentProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         if (failOpen) throw FileNotFoundException("simulated provider failure")
 
-        val bytes = if (mutateAfterFirstOpen && openCount > 0) {
+        val bytes = if (uri.lastPathSegment == LARGE_FIXTURE_NAME) {
+            generateLargeJpeg()
+        } else if (mutateAfterFirstOpen && openCount > 0) {
             ByteArray(bytesToServe.size)
         } else {
             bytesToServe

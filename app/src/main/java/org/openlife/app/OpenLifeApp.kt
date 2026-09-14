@@ -46,6 +46,10 @@ class OpenLifeApp : Application() {
                     val database = OpenLifeDatabaseFactory.create(this@OpenLifeApp, paths, result.databaseSecret)
                     cachedDatabase = database
                     val report = RecoveryRepository(paths, database, keystoreWrapper, mutationQueue).recover()
+                    // Counts only, never content (design §8/§15): safe to log,
+                    // and useful for confirming startup recovery actually ran
+                    // after a real process kill rather than a constructed test state.
+                    android.util.Log.i("OpenLifeRecovery", report.toString())
                     VaultAccess.Ready(
                         importRepository = ImportRepository(
                             paths = paths,
