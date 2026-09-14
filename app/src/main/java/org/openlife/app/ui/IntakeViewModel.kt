@@ -147,7 +147,12 @@ class IntakeViewModel(
     }
 
     fun confirmSave() {
-        val id = sourceId ?: return
+        val preview = _state.value as? IntakeUiState.Preview ?: return
+        // A staged row can outlive a failed authentication/read on process
+        // recreation. Keep Save unavailable in that case; the UI gate is
+        // backed by the same invariant at the ViewModel boundary.
+        if (preview.previewBytes == null) return
+        val id = preview.sourceId
         viewModelScope.launch {
             _state.value = IntakeUiState.Saving(id)
             when (val access = application.vault()) {
