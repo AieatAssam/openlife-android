@@ -36,6 +36,7 @@ class RecoveryRepository(
 
         val rows = database.sourceDao().findAll()
         val referencedIds = mutableSetOf<UUID>()
+        var allRowsReconciled = true
 
         for (entity in rows) {
             val source = entity.toDomain()
@@ -43,9 +44,16 @@ class RecoveryRepository(
 
             when (source.state) {
                 SourceState.STAGED -> {
-                    removeArtefactFiles(source.id)
-                    database.sourceDao().deleteById(source.id.toString())
-                    cleanedStaged++
+                    if (removeArtefactFiles(source.id)) {
+                        database.sourceDao().deleteById(source.id.toString())
+                        cleanedStaged++
+                    } else {
+                        // Keep the STAGED row as durable retry state when a
+                        // provider-owned artefact cannot be removed. A later
+                        // recovery pass can retry without losing the row's
+                        // ownership record or treating its files as orphans.
+                        allRowsReconciled = false
+                    }
                 }
 
                 SourceState.READY -> {
@@ -58,9 +66,15 @@ class RecoveryRepository(
                 }
 
                 SourceState.DELETING -> {
-                    removeArtefactFiles(source.id)
-                    database.sourceDao().deleteById(source.id.toString())
-                    resumedDeletions++
+                    if (removeArtefactFiles(source.id)) {
+                        database.sourceDao().deleteById(source.id.toString())
+                        resumedDeletions++
+                    } else {
+                        // DELETING is intentionally retained until both
+                        // possible artefact paths are gone; hiding the row
+                        // would make a failed cleanup impossible to retry.
+                        allRowsReconciled = false
+                    }
                 }
 
                 SourceState.CORRUPT -> {
@@ -70,7 +84,14 @@ class RecoveryRepository(
             }
         }
 
-        val removedOrphans = removeUnreferencedArtefactFiles(referencedIds)
+        // Orphan deletion is safe only after every row was reconciled. If a
+        // cleanup failed above, retain all unreferenced files for the next
+        // pass rather than risking deletion during a partial recovery.
+        val removedOrphans = if (allRowsReconciled) {
+            removeUnreferencedArtefactFiles(referencedIds)
+        } else {
+            0
+        }
 
         RecoveryReport(
             cleanedStaged = cleanedStaged,
@@ -81,9 +102,15 @@ class RecoveryRepository(
         )
     }
 
-    private fun removeArtefactFiles(sourceId: UUID) {
-        paths.stageFile(sourceId).delete()
-        paths.blobFile(sourceId).delete()
+    private fun removeArtefactFiles(sourceId: UUID): Boolean {
+        val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
+        val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
+        return stageRemoved && blobRemoved
+    }
+
+    private fun deleteIfExists(file: java.io.File): Boolean {
+        if (!file.exists()) return true
+        return file.delete() && !file.exists()
     }
 
     /**

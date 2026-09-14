@@ -105,6 +105,31 @@ class RecoveryRepositoryTest {
     }
 
     @Test
+    fun stagedRowIsRetainedWhenRecoveryCannotRemoveAnArtefact(): Unit = runBlocking {
+        val id = prepareOnly()
+        val stage = paths.stageFile(id)
+        assertTrue(stage.delete())
+        assertTrue(stage.mkdir())
+        java.io.File(stage, "occupied").writeText("x")
+
+        val report = recoveryRepository.recover()
+
+        assertEquals(0, report.cleanedStaged)
+        val row = db.sourceDao().findById(id.toString())
+        assertTrue(row != null)
+        assertEquals(SourceState.STAGED, row!!.toDomain().state)
+        assertTrue(stage.exists())
+
+        // The failed cleanup is recoverable: once the blocker is removed, a
+        // later recovery pass can finish the abandoned import.
+        assertTrue(java.io.File(stage, "occupied").delete())
+        assertTrue(stage.delete())
+        val retryReport = recoveryRepository.recover()
+        assertEquals(1, retryReport.cleanedStaged)
+        assertEquals(null, db.sourceDao().findById(id.toString()))
+    }
+
+    @Test
     fun validReadySourceIsConfirmedAndUntouched(): Unit = runBlocking {
         val id = prepareAndSave()
 
@@ -169,6 +194,32 @@ class RecoveryRepositoryTest {
         assertEquals(1, report.resumedDeletions)
         assertEquals(null, db.sourceDao().findById(id.toString()))
         assertTrue(!paths.blobFile(id).exists())
+    }
+
+    @Test
+    fun deletingRowIsRetainedWhenRecoveryCannotRemoveAnArtefact(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val entity = db.sourceDao().findById(id.toString())!!
+        db.sourceDao().update(entity.toDomain().copy(state = SourceState.DELETING).toEntity())
+
+        val blob = paths.blobFile(id)
+        assertTrue(blob.delete())
+        assertTrue(blob.mkdir())
+        java.io.File(blob, "occupied").writeText("x")
+
+        val report = recoveryRepository.recover()
+
+        assertEquals(0, report.resumedDeletions)
+        val row = db.sourceDao().findById(id.toString())
+        assertTrue(row != null)
+        assertEquals(SourceState.DELETING, row!!.toDomain().state)
+        assertTrue(blob.exists())
+
+        assertTrue(java.io.File(blob, "occupied").delete())
+        assertTrue(blob.delete())
+        val retryReport = recoveryRepository.recover()
+        assertEquals(1, retryReport.resumedDeletions)
+        assertEquals(null, db.sourceDao().findById(id.toString()))
     }
 
     @Test
