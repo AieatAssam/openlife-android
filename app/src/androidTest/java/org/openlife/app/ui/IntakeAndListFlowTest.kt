@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -29,6 +30,21 @@ import org.openlife.vault.repository.DeleteResult
  */
 @RunWith(AndroidJUnit4::class)
 class IntakeAndListFlowTest {
+
+    private class TrackingInputStream(bytes: ByteArray) : InputStream() {
+        private val delegate = ByteArrayInputStream(bytes)
+        @Volatile var closed = false
+
+        override fun read(): Int = delegate.read()
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+            delegate.read(buffer, offset, length)
+
+        override fun close() {
+            closed = true
+            delegate.close()
+        }
+    }
 
     private val application = ApplicationProvider.getApplicationContext<OpenLifeApp>()
 
@@ -117,6 +133,61 @@ class IntakeAndListFlowTest {
         val listViewModel = SourceListViewModel(application)
         val loaded = awaitState(listViewModel) { it is SourceListUiState.Loaded } as SourceListUiState.Loaded
         assertNull(loaded.sources.find { it.id == prepared.sourceId })
+    }
+
+    @Test
+    fun providerStreamClosesAfterImportCompletes(): Unit = runBlocking {
+        val stream = TrackingInputStream(syntheticJpegBytes())
+        val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
+
+        intakeViewModel.startImport(stream, "image/jpeg", IntakeKind.SHARE)
+        awaitState(intakeViewModel) { it is IntakeUiState.Preview }
+
+        assertTrue("provider stream must close after normal import completion", stream.closed)
+
+        intakeViewModel.cancel()
+        awaitState(intakeViewModel) { it is IntakeUiState.Cancelled }
+    }
+
+    @Test
+    fun providerStreamClosesAfterImportFailure(): Unit = runBlocking {
+        val stream = TrackingInputStream("not an image".toByteArray())
+        val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
+
+        intakeViewModel.startImport(stream, "image/jpeg", IntakeKind.SHARE)
+        awaitState(intakeViewModel) { it is IntakeUiState.Rejected || it is IntakeUiState.Failed }
+
+        assertTrue("provider stream must close after failed import", stream.closed)
+    }
+
+    @Test
+    fun cancellingWhilePreparingClosesProviderStream(): Unit = runBlocking {
+        val stream = TrackingInputStream(syntheticJpegBytes())
+        val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
+
+        intakeViewModel.startImport(stream, "image/jpeg", IntakeKind.SHARE)
+        intakeViewModel.cancel()
+        awaitState(intakeViewModel) { it is IntakeUiState.Cancelled }
+
+        assertTrue("provider stream must close when preparation is cancelled", stream.closed)
+    }
+
+    @Test
+    fun sampledPreviewDecoderStaysWithinPixelBudget(): Unit {
+        val bitmap = Bitmap.createBitmap(3000, 2000, Bitmap.Config.ARGB_8888)
+        val encoded = ByteArrayOutputStream().also { output ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+        }.toByteArray()
+        bitmap.recycle()
+
+        val preview = SampledBitmapDecoder.decode(encoded)
+
+        assertTrue(preview != null)
+        assertTrue(
+            preview!!.width.toLong() * preview.height <=
+                org.openlife.vault.repository.ImportLimits.MAX_PREVIEW_PIXELS
+        )
+        preview.recycle()
     }
 
     @Test

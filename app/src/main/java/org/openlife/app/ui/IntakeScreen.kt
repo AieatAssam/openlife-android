@@ -1,6 +1,5 @@
 package org.openlife.app.ui
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,9 +69,7 @@ fun IntakeScreen(state: IntakeUiState, onSave: () -> Unit, onCancel: () -> Unit,
 @Composable
 private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onCancel: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        val bitmap = remember(state.previewBytes) {
-            state.previewBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-        }
+        val bitmap = remember(state.previewBytes) { state.previewBytes?.let(SampledBitmapDecoder::decode) }
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (bitmap != null) {
                 Image(bitmap = bitmap.asImageBitmap(), contentDescription = "Selected image preview")
@@ -88,7 +85,7 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
         )
         Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
             OutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) { Text("Cancel") }
-            Button(onClick = onSave) { Text("Save") }
+            Button(onClick = onSave, enabled = bitmap != null) { Text("Save") }
         }
     }
 }

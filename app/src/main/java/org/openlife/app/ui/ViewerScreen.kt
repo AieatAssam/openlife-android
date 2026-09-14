@@ -67,9 +67,7 @@ fun ViewerScreen(
         Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val decoded = remember(bytes) {
-                        bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
-                    }
+                    val decoded = remember(bytes) { bytes?.let(SampledBitmapDecoder::decode) }
                     when {
                         source.state == SourceState.CORRUPT -> Text("This item's saved content is unreadable.")
                         bytes == null -> Text("Verifying…")

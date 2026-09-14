@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +52,10 @@ class IntakeViewModel(
     private val _state = MutableStateFlow<IntakeUiState>(IntakeUiState.Preparing)
     val state: StateFlow<IntakeUiState> = _state
 
+    /** The active provider read, so cancelling while still preparing closes it immediately. */
+    private var activeImportJob: Job? = null
+    private var activeInputStream: InputStream? = null
+
     private var sourceId: UUID?
         get() = savedStateHandle.get<String>(KEY_SOURCE_ID)?.let(UUID::fromString)
         set(value) {
@@ -62,27 +67,47 @@ class IntakeViewModel(
     }
 
     fun startImport(stream: InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
-        viewModelScope.launch {
-            when (val access = application.vault()) {
-                is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
-                is VaultAccess.Ready -> {
-                    val result = withContext(Dispatchers.IO) {
-                        // Cooperative cancellation: closing the descriptor is
-                        // what unblocks a stuck provider read, which then
-                        // fails closed through prepareImport's own I/O
-                        // handling (design §12).
-                        val deadline = launch {
-                            delay(ImportLimits.PROVIDER_READ_DEADLINE_SECONDS * 1000)
-                            stream.close()
+        activeImportJob?.cancel()
+        activeInputStream?.let { closeQuietly(it) }
+        activeInputStream = stream
+        activeImportJob = viewModelScope.launch {
+            try {
+                // The intake boundary owns the provider descriptor after opening
+                // it. Closing through `use` covers normal completion, a failed
+                // read, vault/bootstrap failure, and coroutine cancellation.
+                stream.use { input ->
+                    when (val access = application.vault()) {
+                        is VaultAccess.Unavailable -> {
+                            closeQuietly(input)
+                            _state.value = IntakeUiState.VaultUnavailable(access.reason)
                         }
-                        try {
-                            access.importRepository.prepareImport(stream, declaredMimeType, intakeKind)
-                        } finally {
-                            deadline.cancel()
+                        is VaultAccess.Ready -> {
+                            val result = withContext(Dispatchers.IO) {
+                                // Cooperative cancellation: closing the descriptor is
+                                // what unblocks a stuck provider read, which then
+                                // fails closed through prepareImport's own I/O
+                                // handling (design §12).
+                                val deadline = launch {
+                                    delay(ImportLimits.PROVIDER_READ_DEADLINE_SECONDS * 1000)
+                                    input.close()
+                                }
+                                try {
+                                    access.importRepository.prepareImport(input, declaredMimeType, intakeKind)
+                                } finally {
+                                    deadline.cancel()
+                                }
+                            }
+                            // Publish no terminal state while the provider
+                            // descriptor is still open; this makes cancellation
+                            // and failure observable as fully released at the
+                            // state boundary.
+                            closeQuietly(input)
+                            applyPrepareResult(result, access)
                         }
                     }
-                    applyPrepareResult(result, access)
                 }
+            } finally {
+                if (activeInputStream === stream) activeInputStream = null
             }
         }
     }
@@ -147,12 +172,23 @@ class IntakeViewModel(
     fun cancel() {
         val id = sourceId
         if (id == null) {
+            activeInputStream?.let { closeQuietly(it) }
+            activeImportJob?.cancel()
             _state.value = IntakeUiState.Cancelled
             return
         }
         viewModelScope.launch {
             (application.vault() as? VaultAccess.Ready)?.importRepository?.cancelStagedImport(id)
             _state.value = IntakeUiState.Cancelled
+        }
+    }
+
+    private fun closeQuietly(stream: InputStream) {
+        try {
+            stream.close()
+        } catch (_: Exception) {
+            // The cancellation path must still transition the UI even if a
+            // provider reports an error while releasing its descriptor.
         }
     }
 
