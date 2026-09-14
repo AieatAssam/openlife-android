@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.UUID
 import org.openlife.app.intake.IntakeActivity
 import org.openlife.app.ui.DeleteConfirmationDialog
@@ -44,6 +45,15 @@ class MainActivity : ComponentActivity() {
     private val viewModel: SourceListViewModel by viewModels {
         SourceListViewModel.factory(application as OpenLifeApp)
     }
+    private val backgroundEpoch = MutableStateFlow(0L)
+
+    override fun onStop() {
+        // Drop decoded thumbnails and force the viewer composable out of the
+        // tree while this content-bearing activity is hidden.
+        viewModel.clearSensitiveContent()
+        backgroundEpoch.value += 1
+        super.onStop()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +62,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
             var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.List) }
+            val epoch by backgroundEpoch.collectAsState()
+            val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
+
+            androidx.compose.runtime.LaunchedEffect(epoch) {
+                if (epoch > 0L) screen = Screen.List
+            }
 
             val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                 if (uri != null) {
@@ -85,6 +101,7 @@ class MainActivity : ComponentActivity() {
                             SourceListScreen(
                                 state = state,
                                 loadThumbnail = viewModel::loadThumbnail,
+                                thumbnailGeneration = thumbnailGeneration,
                                 onOpen = { screen = Screen.Viewer(it) },
                                 onDelete = { viewModel.delete(it) {} },
                                 onImportFromPhotoPicker = {

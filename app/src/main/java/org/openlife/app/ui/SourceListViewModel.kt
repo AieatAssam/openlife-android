@@ -10,6 +10,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.openlife.app.OpenLifeApp
@@ -35,7 +36,11 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     private val _state = MutableStateFlow<SourceListUiState>(SourceListUiState.Loading)
     val state: StateFlow<SourceListUiState> = _state
 
-    private val thumbnailCache = mutableMapOf<UUID, android.graphics.Bitmap?>()
+    private val thumbnailCache = SensitiveContentCache<UUID, android.graphics.Bitmap?> { bitmap ->
+        if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+    }
+    private val _sensitiveContentGeneration = MutableStateFlow(thumbnailCache.generation())
+    val sensitiveContentGeneration: StateFlow<Long> = _sensitiveContentGeneration.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -49,8 +54,9 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     }
 
     suspend fun loadThumbnail(sourceId: UUID): android.graphics.Bitmap? {
-        thumbnailCache[sourceId]?.let { return it }
-        if (thumbnailCache.containsKey(sourceId)) return null // cached negative result
+        thumbnailCache.get(sourceId)?.let { return it }
+        if (thumbnailCache.contains(sourceId)) return null // cached negative result
+        val generation = thumbnailCache.generation()
         val access = application.vault() as? VaultAccess.Ready ?: return null
         val bitmap = withContext(Dispatchers.Default) {
             val bytes = access.viewRepository.loadReadyBytes(sourceId) ?: return@withContext null
@@ -63,8 +69,7 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
             }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sampleSize })
         }
-        thumbnailCache[sourceId] = bitmap
-        return bitmap
+        return if (thumbnailCache.put(sourceId, bitmap, generation)) bitmap else null
     }
 
     fun delete(sourceId: UUID, onResult: (DeleteResult) -> Unit) {
@@ -74,6 +79,17 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
             if (result is DeleteResult.Deleted) thumbnailCache.remove(sourceId)
             onResult(result)
         }
+    }
+
+    /** Drop decoded thumbnails when the app leaves the foreground. */
+    fun clearSensitiveContent() {
+        thumbnailCache.clear()
+        _sensitiveContentGeneration.value = thumbnailCache.generation()
+    }
+
+    override fun onCleared() {
+        clearSensitiveContent()
+        super.onCleared()
     }
 
     companion object {

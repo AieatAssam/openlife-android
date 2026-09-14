@@ -51,6 +51,16 @@ class IntakeActivity : ComponentActivity() {
     /** Test-only observation seam for the C0-05/C0-02/C0-03 instrumented tests. */
     fun currentStatusForTest(): String = describeForTest(viewModel.state.value)
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.restoreSensitiveContentAfterForeground()
+    }
+
+    override fun onStop() {
+        viewModel.clearSensitiveContentForBackground()
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySecureWindow()
@@ -115,45 +125,61 @@ class IntakeActivity : ComponentActivity() {
         // "Preparing…" spinner (recoverable by leaving the screen) instead
         // of freezing the app.
         lifecycleScope.launch(Dispatchers.IO) {
-            val providerType = try {
-                contentResolver.getType(uri)
-            } catch (e: SecurityException) {
-                viewModel.showRejected("could not access the selected item; please select it again")
-                return@launch
-            } catch (e: java.io.FileNotFoundException) {
-                viewModel.showRejected("could not access the selected item; please select it again")
-                return@launch
-            } ?: run {
-                viewModel.showRejected("the selected item type did not match its contents")
-                return@launch
+            var openedStream: java.io.InputStream? = null
+            try {
+                val providerType = try {
+                    contentResolver.getType(uri)
+                } catch (e: SecurityException) {
+                    viewModel.showRejected("could not access the selected item; please select it again")
+                    return@launch
+                } catch (e: java.io.FileNotFoundException) {
+                    viewModel.showRejected("could not access the selected item; please select it again")
+                    return@launch
+                } ?: run {
+                    viewModel.showRejected("the selected item type did not match its contents")
+                    return@launch
+                }
+                val normalizedProviderType = providerType.lowercase()
+                if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
+                    viewModel.showRejected("the selected item type did not match its contents")
+                    return@launch
+                }
+                openedStream = try {
+                    contentResolver.openInputStream(uri)
+                } catch (e: SecurityException) {
+                    // Missing or expired URI grant (design §11 step 1: "If a
+                    // share grant expires or a provider disappears, ask the
+                    // user to select the item again").
+                    viewModel.showRejected("could not access the selected item; please select it again")
+                    return@launch
+                } catch (e: java.io.FileNotFoundException) {
+                    viewModel.showRejected("could not access the selected item; please select it again")
+                    return@launch
+                }
+                val stream = openedStream ?: run {
+                    viewModel.showRejected("could not access the selected item; please select it again")
+                    return@launch
+                }
+                val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+                    IntakeKind.PHOTO_PICKER
+                } else {
+                    IntakeKind.SHARE
+                }
+                viewModel.startImport(stream, normalizedProviderType, intakeKind)
+                // Ownership transfers to IntakeViewModel, which closes it on
+                // completion, cancellation, failure, or teardown.
+                openedStream = null
+            } finally {
+                // If lifecycle cancellation or a rejected validation happens
+                // after open but before handoff, do not leak the descriptor.
+                openedStream?.let { stream ->
+                    try {
+                        stream.close()
+                    } catch (_: Exception) {
+                        // Best-effort release on a hostile provider.
+                    }
+                }
             }
-            val normalizedProviderType = providerType.lowercase()
-            if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
-                viewModel.showRejected("the selected item type did not match its contents")
-                return@launch
-            }
-            val stream = try {
-                contentResolver.openInputStream(uri)
-            } catch (e: SecurityException) {
-                // Missing or expired URI grant (design §11 step 1: "If a
-                // share grant expires or a provider disappears, ask the
-                // user to select the item again").
-                viewModel.showRejected("could not access the selected item; please select it again")
-                return@launch
-            } catch (e: java.io.FileNotFoundException) {
-                viewModel.showRejected("could not access the selected item; please select it again")
-                return@launch
-            }
-            if (stream == null) {
-                viewModel.showRejected("could not access the selected item; please select it again")
-                return@launch
-            }
-            val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
-                IntakeKind.PHOTO_PICKER
-            } else {
-                IntakeKind.SHARE
-            }
-            viewModel.startImport(stream, normalizedProviderType, intakeKind)
         }
     }
 

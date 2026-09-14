@@ -25,7 +25,7 @@ class SourceViewRepository(
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
-    /** READY and CORRUPT sources, ordered by import time - design §8's source list. */
+    /** Saved, corrupt, and pending-deletion sources, ordered by import time. */
     fun observeVisibleSources(): Flow<List<Source>> =
         database.sourceDao().observeVisibleSources().map { entities -> entities.map { it.toDomain() } }
 

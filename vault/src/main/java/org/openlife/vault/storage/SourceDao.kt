@@ -34,7 +34,7 @@ interface SourceDao {
     @Query("SELECT * FROM sources WHERE state = 'READY' AND byteCount = :byteCount AND sha256 = :sha256 LIMIT 1")
     suspend fun findReadyDuplicate(byteCount: Long, sha256: ByteArray): SourceEntity?
 
-    /** READY and CORRUPT only - a STAGED row is transient and never shown in the list. */
-    @Query("SELECT * FROM sources WHERE state IN ('READY', 'CORRUPT') ORDER BY importedAt ASC")
+    /** Saved, corrupt, and pending-deletion rows; STAGED remains transient and hidden. */
+    @Query("SELECT * FROM sources WHERE state IN ('READY', 'CORRUPT', 'DELETING') ORDER BY importedAt ASC")
     fun observeVisibleSources(): Flow<List<SourceEntity>>
 }

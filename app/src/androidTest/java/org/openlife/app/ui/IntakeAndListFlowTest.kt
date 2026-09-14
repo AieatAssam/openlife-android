@@ -220,6 +220,24 @@ class IntakeAndListFlowTest {
         awaitState(restored) { it is IntakeUiState.Cancelled }
     }
 
+    @Test
+    fun backgroundScrubsPreviewAndForegroundReauthenticatesIt(): Unit = runBlocking {
+        val intake = IntakeViewModel(application, SavedStateHandle())
+        intake.startImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
+        val preview = awaitState(intake) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        assertTrue(preview.previewBytes != null)
+
+        intake.clearSensitiveContentForBackground()
+        assertEquals(IntakeUiState.Preparing, intake.state.value)
+
+        intake.restoreSensitiveContentAfterForeground()
+        val restored = awaitState(intake) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        assertEquals(preview.sourceId, restored.sourceId)
+        assertTrue(restored.previewBytes != null)
+        intake.cancel()
+        awaitState(intake) { it is IntakeUiState.Cancelled }
+    }
+
     private suspend fun awaitState(viewModel: IntakeViewModel, predicate: (IntakeUiState) -> Boolean): IntakeUiState {
         var last: IntakeUiState = viewModel.state.value
         awaitCondition {

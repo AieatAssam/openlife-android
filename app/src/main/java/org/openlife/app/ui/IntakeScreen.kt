@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +71,11 @@ fun IntakeScreen(state: IntakeUiState, onSave: () -> Unit, onCancel: () -> Unit,
 private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onCancel: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         val bitmap = remember(state.previewBytes) { state.previewBytes?.let(SampledBitmapDecoder::decode) }
+        DisposableEffect(bitmap) {
+            onDispose {
+                if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+            }
+        }
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (bitmap != null) {
                 Image(bitmap = bitmap.asImageBitmap(), contentDescription = "Selected image preview")

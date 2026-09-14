@@ -45,6 +45,7 @@ import org.openlife.vault.model.SourceState
 fun SourceListScreen(
     state: SourceListUiState,
     loadThumbnail: suspend (UUID) -> android.graphics.Bitmap?,
+    thumbnailGeneration: Long = 0L,
     onOpen: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     onImportFromPhotoPicker: () -> Unit,
@@ -84,6 +85,7 @@ fun SourceListScreen(
                                 SourceRow(
                                     source = source,
                                     loadThumbnail = loadThumbnail,
+                                    thumbnailGeneration = thumbnailGeneration,
                                     onOpen = { onOpen(source.id) },
                                     onDeleteRequested = { pendingDelete = source },
                                 )
@@ -111,11 +113,16 @@ fun SourceListScreen(
 private fun SourceRow(
     source: Source,
     loadThumbnail: suspend (UUID) -> android.graphics.Bitmap?,
+    thumbnailGeneration: Long,
     onOpen: () -> Unit,
     onDeleteRequested: () -> Unit,
 ) {
+    val deletionPending = source.state == SourceState.DELETING
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (deletionPending) Modifier else Modifier.clickable(onClick = onOpen))
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -125,10 +132,10 @@ private fun SourceRow(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            if (source.state == SourceState.CORRUPT) {
+            if (source.state == SourceState.CORRUPT || deletionPending) {
                 Icon(Icons.Filled.Warning, contentDescription = "Content unavailable")
             } else {
-                val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, source.id) {
+                val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, source.id, thumbnailGeneration) {
                     value = loadThumbnail(source.id)
                 }
                 bitmap?.let { Image(it.asImageBitmap(), contentDescription = null) }
@@ -138,10 +145,13 @@ private fun SourceRow(
             Text(sourceLabel(source))
             if (source.state == SourceState.CORRUPT) {
                 Text("Content unavailable", style = MaterialTheme.typography.bodySmall)
+            } else if (deletionPending) {
+                Text("Deletion pending — retry", style = MaterialTheme.typography.bodySmall)
+                Text("Content unavailable", style = MaterialTheme.typography.bodySmall)
             }
         }
         IconButton(onClick = onDeleteRequested) {
-            Icon(Icons.Filled.Delete, contentDescription = "Delete")
+            Icon(Icons.Filled.Delete, contentDescription = if (deletionPending) "Retry deletion" else "Delete")
         }
     }
 }

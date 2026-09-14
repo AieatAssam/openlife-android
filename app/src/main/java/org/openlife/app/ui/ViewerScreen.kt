@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -68,6 +69,11 @@ fun ViewerScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val decoded = remember(bytes) { bytes?.let(SampledBitmapDecoder::decode) }
+                    DisposableEffect(decoded) {
+                        onDispose {
+                            if (decoded != null && !decoded.isRecycled) decoded.recycle()
+                        }
+                    }
                     when {
                         source.state == SourceState.CORRUPT -> Text("This item's saved content is unreadable.")
                         bytes == null -> Text("Verifying…")

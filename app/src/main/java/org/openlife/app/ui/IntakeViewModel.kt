@@ -55,6 +55,7 @@ class IntakeViewModel(
     /** The active provider read, so cancelling while still preparing closes it immediately. */
     private var activeImportJob: Job? = null
     private var activeInputStream: InputStream? = null
+    private var backgrounded = false
 
     private var sourceId: UUID?
         get() = savedStateHandle.get<String>(KEY_SOURCE_ID)?.let(UUID::fromString)
@@ -116,10 +117,16 @@ class IntakeViewModel(
         _state.value = when (result) {
             is PrepareResult.Prepared -> {
                 sourceId = result.sourceId
-                val previewBytes = access.viewRepository.loadStagePreviewBytes(result.sourceId)
-                IntakeUiState.Preview(
-                    result.sourceId, result.format, result.width, result.height, result.byteCount, previewBytes
-                )
+                if (backgrounded) {
+                    // Keep only the UUID while stopped. The authenticated
+                    // stage can be reloaded after the activity returns.
+                    IntakeUiState.Preparing
+                } else {
+                    val previewBytes = access.viewRepository.loadStagePreviewBytes(result.sourceId)
+                    IntakeUiState.Preview(
+                        result.sourceId, result.format, result.width, result.height, result.byteCount, previewBytes
+                    )
+                }
             }
             is PrepareResult.Rejected -> IntakeUiState.Rejected(describeImageRejection(result.reason))
             PrepareResult.Busy -> IntakeUiState.Busy
@@ -185,6 +192,22 @@ class IntakeViewModel(
         viewModelScope.launch {
             (application.vault() as? VaultAccess.Ready)?.importRepository?.cancelStagedImport(id)
             _state.value = IntakeUiState.Cancelled
+        }
+    }
+
+    /** Clear authenticated preview bytes before the activity becomes hidden. */
+    fun clearSensitiveContentForBackground() {
+        backgrounded = true
+        if (_state.value is IntakeUiState.Preview) {
+            _state.value = IntakeUiState.Preparing
+        }
+    }
+
+    /** Re-authenticate the retained staged UUID after returning to the foreground. */
+    fun restoreSensitiveContentAfterForeground() {
+        backgrounded = false
+        if (_state.value == IntakeUiState.Preparing) {
+            sourceId?.let { restorePreviewIfNeeded(it) }
         }
     }
 
