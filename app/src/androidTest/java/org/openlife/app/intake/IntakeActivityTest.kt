@@ -151,10 +151,14 @@ class IntakeActivityTest {
         }
     }
 
-    private fun waitForStatusContaining(scenario: ActivityScenario<IntakeActivity>, expected: String) {
+    private fun waitForStatusContaining(
+        scenario: ActivityScenario<IntakeActivity>,
+        expected: String,
+        timeoutMs: Long = 30_000,
+    ) {
         // Generous: first-access vault bootstrap (Keystore + SQLCipher) can
         // be slow on a loaded, single-core emulator.
-        val deadline = System.currentTimeMillis() + 30_000
+        val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             var text: String? = null
             scenario.onActivity { activity ->

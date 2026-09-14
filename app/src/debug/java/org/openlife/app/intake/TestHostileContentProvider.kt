@@ -18,6 +18,19 @@ import java.io.FileOutputStream
  * Instrumented tests running in the same process set the companion state
  * directly before launching an intent referencing [uriFor], then reset it
  * in their teardown.
+ *
+ * Deliberately does NOT simulate "provider never responds" via a real,
+ * unwritten OS pipe closed from another thread: an earlier version did
+ * exactly that, and closing a file descriptor that another thread is
+ * blocked reading is a known-hazardous race (the closed fd number can be
+ * reused before the kernel has fully unblocked the original read, so an
+ * unrelated later file open in the same process can silently inherit a
+ * corrupted or still-in-use descriptor). That test made an *unrelated*,
+ * later instrumented test in the same process hang - found by running the
+ * suite repeatedly, not by inspection. `BoundedStreamReaderTest`
+ * (`:vault:test`, pure JVM) verifies the same cooperative-cancellation
+ * behaviour with a plain in-memory `InputStream`, with no real file
+ * descriptor involved.
  */
 class TestHostileContentProvider : ContentProvider() {
 

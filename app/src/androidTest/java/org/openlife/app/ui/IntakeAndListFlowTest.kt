@@ -95,7 +95,16 @@ class IntakeAndListFlowTest {
         assertEquals(prepared.width, restoredState.width)
         assertTrue(restoredState.previewBytes != null)
 
+        // cancel() runs on viewModelScope (fire-and-forget) and holds the
+        // app-wide MutationQueue mutex while it runs - awaiting its
+        // completion here (rather than letting the test method return
+        // immediately) matters because the same mutex is shared by every
+        // ViewModel in this process. A dangling cancel from this test was
+        // found to make the *next* test's own import spuriously come back
+        // Busy instead of Prepared, since tryAcquire found the mutex still
+        // held - a real cross-test race, not a hang in the code under test.
         restored.cancel()
+        awaitState(restored) { it is IntakeUiState.Cancelled }
     }
 
     private suspend fun awaitState(viewModel: IntakeViewModel, predicate: (IntakeUiState) -> Boolean): IntakeUiState {
@@ -130,7 +139,7 @@ class IntakeAndListFlowTest {
         it is SourceListUiState.Loaded && it.sources.none { s -> s.id == id }
     } as SourceListUiState.Loaded
 
-    private suspend fun awaitCondition(timeoutMs: Long = 15_000, check: () -> Boolean) {
+    private suspend fun awaitCondition(timeoutMs: Long = 30_000, check: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (check()) return
