@@ -47,8 +47,16 @@ adversary.
 
 `FLAG_SECURE` is required on all content-bearing windows and dialogs (R6). It
 helps prevent supported screenshots and non-secure display output, but is not
-universal protection against hostile devices. Visible content is cleared when
-the app backgrounds. Accessibility (TalkBack) is preserved and tested.
+universal protection against hostile devices. "Protected recents" and
+"content cleared while backgrounded" are effects of this single
+`FLAG_SECURE` control (`applySecureWindow()`), not separate implementations
+— confirmed via `dumpsys window` showing no recents-thumbnail bitmap for the
+task; there is no additional explicit state-clearing code, nor is any
+needed. Every icon-only control carries a `contentDescription` and large-text
+rendering (1.3x/2.0x scale) was checked for clipping across every screen
+(`docs/verification/C0.md` C0-16); an actual TalkBack accessibility-service
+run has not been performed in this environment and remains an open item
+(`docs/reviews/C0-security-self-review.md`), not a passed check.
 
 ## Access policy limit (owner decision pending)
 
