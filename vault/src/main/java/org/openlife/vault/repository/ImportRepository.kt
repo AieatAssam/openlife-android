@@ -134,10 +134,23 @@ class ImportRepository(
         }
     }
 
-    /** Removes a STAGED row and its possible stage file. Never touches a READY row. */
-    private suspend fun cancelStage(sourceId: UUID) {
-        paths.stageFile(sourceId).delete()
+    /**
+     * Removes a STAGED row and both possible artefact files. Never touches a
+     * READY row. If either file cannot be removed, retain the row so startup
+     * recovery (or an explicit retry) still owns the artefact and can try
+     * cleanup again (design §11: failed cleanup is recoverable state).
+     */
+    private suspend fun cancelStage(sourceId: UUID): Boolean {
+        val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
+        val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
+        if (!stageRemoved || !blobRemoved) return false
         database.sourceDao().deleteById(sourceId.toString())
+        return true
+    }
+
+    private fun deleteIfExists(file: java.io.File): Boolean {
+        if (!file.exists()) return true
+        return file.delete() && !file.exists()
     }
 
     /**
@@ -151,7 +164,6 @@ class ImportRepository(
         val entity = database.sourceDao().findById(sourceId.toString())
         if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
         cancelStage(sourceId)
-        true
     }
 
     /**

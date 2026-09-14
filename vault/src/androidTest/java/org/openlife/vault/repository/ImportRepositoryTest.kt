@@ -148,6 +148,36 @@ class ImportRepositoryTest {
     }
 
     @Test
+    fun cancellingAStagedImportRetainsTheRowWhenStageCleanupFails(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+
+        // A non-empty directory at the stage path makes File.delete() fail,
+        // simulating a provider/filesystem cleanup failure without changing
+        // production storage code or relying on permissions.
+        val stage = paths.stageFile(prepared.sourceId)
+        assertTrue(stage.delete())
+        assertTrue(stage.mkdir())
+        val blocker = java.io.File(stage, "occupied")
+        blocker.writeText("x")
+        assertTrue(blocker.exists())
+
+        assertEquals(false, repository.cancelStagedImport(prepared.sourceId))
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,
+        )
+
+        // Once the blocker is removed, the same durable row can be retried
+        // and converges to the normal cancelled state.
+        assertTrue(blocker.delete())
+        assertTrue(stage.delete())
+        assertEquals(true, repository.cancelStagedImport(prepared.sourceId))
+        assertEquals(null, db.sourceDao().findById(prepared.sourceId.toString()))
+    }
+
+    @Test
     fun secondImportWhileFirstIsInProgressIsToldBusy(): Unit = runBlocking {
         val holding = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
