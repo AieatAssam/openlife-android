@@ -43,23 +43,19 @@ fun IntakeScreen(state: IntakeUiState, onSave: () -> Unit, onCancel: () -> Unit,
             }
 
             is IntakeUiState.Rejected -> {
-                CenteredMessage("Not imported: ${state.message}")
-                DoneAfterAcknowledging(onDone)
+                TerminalMessage("Not imported: ${state.message}", onDone)
             }
 
             IntakeUiState.Busy -> {
-                CenteredMessage("Another import is already in progress. Finish or cancel it first.")
-                DoneAfterAcknowledging(onDone)
+                TerminalMessage("Another import is already in progress. Finish or cancel it first.", onDone)
             }
 
             IntakeUiState.Failed -> {
-                CenteredMessage("Import failed. Please try again.")
-                DoneAfterAcknowledging(onDone)
+                TerminalMessage("Import failed. Please try again.", onDone)
             }
 
             is IntakeUiState.VaultUnavailable -> {
-                CenteredMessage("The vault is unavailable right now.")
-                DoneAfterAcknowledging(onDone)
+                TerminalMessage("The vault is unavailable right now.", onDone)
             }
 
             IntakeUiState.Cancelled -> onDone()
@@ -105,11 +101,25 @@ private fun CenteredMessage(text: String) {
     }
 }
 
-/** Terminal states auto-advance after a moment rather than requiring a tap on a screen the user didn't ask to keep open. */
+@Composable
+private fun TerminalMessage(text: String, onDone: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text)
+            Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {
+                Text("Done")
+            }
+        }
+    }
+}
+
+/** Successful terminal states auto-advance after a moment; errors stay visible until acknowledged. */
 @Composable
 private fun DoneAfterAcknowledging(onDone: () -> Unit) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(1500)
+        // Keep terminal feedback visible long enough for a slow first-run
+        // device/provider boundary to render it before auto-returning.
+        kotlinx.coroutines.delay(5_000)
         onDone()
     }
 }
