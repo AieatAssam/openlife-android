@@ -1,21 +1,34 @@
 # OpenLife
 
-OpenLife is a private, on-device memory for information a person deliberately
-imports: a screenshot, receipt, letter, or similar item. It preserves the
-original, shows what it understood, connects every extracted conclusion back
-to evidence, and helps the user remember an explicitly confirmed obligation or
-event. There is no cloud processing, no accounts, no sync, and no background
-access to photos, storage, contacts, or messages.
+![status](https://img.shields.io/badge/status-work--in--progress-orange?style=for-the-badge)
 
-The full product and engineering specification is `openlife-design-v0.2.md` at
-the repository root. It is the source of truth; everything else in `docs/`
-restates parts of it for traceability during implementation.
+> [!WARNING]
+> ## 🚧 Work in progress — not ready for real use 🚧
+>
+> OpenLife is being built one small capability at a time, and right now it
+> only knows how to hold a single test image. It's not feature-complete, it
+> hasn't been through a real security audit, and it *will* change shape
+> under you. Don't install it expecting to keep anything in it yet.
 
-**Current state: Capability 0 (Trusted Core) only.** Import one JPEG or PNG,
-preview the exact snapshot being retained, save it encrypted, reopen it after
-process death and reboot, and delete it. No OCR, facts, records, reminders, or
-export exist yet — see `docs/capabilities/C0.md` and the capability sequence
-in the design document §5.
+OpenLife is a private, on-device memory app for the stuff you choose to save
+— a screenshot, a receipt, a letter, whatever. It keeps your original file
+exactly as you gave it to it, shows you exactly what it saved, and links
+anything it later figures out back to the evidence that supports it. Nothing
+leaves your phone: no cloud processing, no accounts, no sync, no background
+access to your photos, storage, contacts, or messages.
+
+The full product and engineering spec lives in `openlife-design-v0.2.md` at
+the repo root — that's the source of truth. Everything under `docs/` is a
+working restatement of pieces of it, kept up to date as the app is built.
+
+## Where things stand
+
+Only **Capability 0 ("Trusted Core")** exists so far: import one JPEG or PNG,
+preview the exact snapshot before saving, save it encrypted, reopen it after
+the app is killed or the phone reboots, and delete it. That's the whole
+feature set today — no OCR, no extracted facts, no reminders, no export.
+`docs/capabilities/C0.md` spells out exactly what's in and out of scope, and
+§5 of the design doc lays out what's planned after this.
 
 ## Repository layout
 
@@ -25,19 +38,18 @@ vault/   Storage, encryption, and the import lifecycle
 docs/    Principles, threat model, per-capability specs, decisions, verification evidence
 ```
 
-See `AGENTS.md` for the rules that govern changes to this repository.
+Ground rules for contributing changes are in `AGENTS.md`.
 
 ## Building
 
 ```bash
 ./gradlew assembleDebug
 ./gradlew :vault:test :app:test
-./gradlew connectedDebugAndroidTest   # requires a running emulator or device
+./gradlew connectedDebugAndroidTest   # needs a running emulator or device
 ```
 
 ## Licence
 
-Apache License 2.0 — see `LICENSE`. Choosing a licence for the development
-repository is not itself the "choose a licence before public distribution"
-decision the design document requires (§14); that remains an owner decision at
-release time.
+Apache License 2.0 — see `LICENSE`. That covers the source code here; it
+isn't the same as deciding the app is ready for anyone to install and trust,
+which is a separate call to make later (design doc §14).
