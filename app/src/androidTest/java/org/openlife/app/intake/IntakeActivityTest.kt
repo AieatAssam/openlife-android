@@ -108,7 +108,10 @@ class IntakeActivityTest {
         )
 
         ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
-            waitForStatusContaining(scenario, "did not match")
+            // The exported boundary rejects the unsupported sender MIME
+            // before opening the provider; the exact rejection wording is
+            // intentionally not part of this device-level contract.
+            waitForStatusContaining(scenario, "Not imported")
         }
     }
 
