@@ -61,6 +61,10 @@ class MainActivity : ComponentActivity() {
                             type = contentResolver.getType(uri) ?: "image/*"
                             putExtra(Intent.EXTRA_STREAM, uri)
                             putExtra(IntakeActivity.EXTRA_INTAKE_KIND, IntakeKind.PHOTO_PICKER.name)
+                            // Forward the Picker's one-shot read grant to the
+                            // exported intake activity. IntakeActivity checks
+                            // this flag before opening the URI.
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                     )
                 }

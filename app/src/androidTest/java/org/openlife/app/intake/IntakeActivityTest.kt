@@ -80,6 +80,39 @@ class IntakeActivityTest {
     }
 
     @Test
+    fun actionSendWithoutReadGrantIsRejectedBeforeProviderOpen() {
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes()
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("a.jpg"))
+            // Deliberately omit FLAG_GRANT_READ_URI_PERMISSION. A directly
+            // invoked exported intake activity must not treat a public-looking
+            // content URI as permission to read.
+        }.targetIntakeActivityDirectly()
+
+        ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
+            // The JVM validator test asserts the precise rejection reason;
+            // this device-level check verifies the exported activity never
+            // proceeds to the provider/import path when no grant is present.
+            waitForStatusContaining(scenario, "Not imported")
+        }
+    }
+
+    @Test
+    fun conflictingIntentAndProviderMimeTypesAreRejectedBeforeRead() {
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes()
+        TestHostileContentProvider.mimeTypeToReport = "image/jpeg"
+        val intent = sendIntentFor(
+            TestHostileContentProvider.uriFor("a.jpg"),
+            mimeType = "image/png",
+        )
+
+        ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
+            waitForStatusContaining(scenario, "did not match")
+        }
+    }
+
+    @Test
     fun multipleClipDataItemsAreRejectedWithoutTouchingTheProvider() {
         TestHostileContentProvider.bytesToServe = syntheticJpegBytes()
         val first = TestHostileContentProvider.uriFor("a.jpg")

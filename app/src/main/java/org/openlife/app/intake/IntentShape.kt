@@ -12,4 +12,8 @@ data class IntentShape(
     val dataUri: String?,
     val extraStreamUri: String?,
     val clipDataUris: List<String>,
+    /** MIME type declared by the incoming ACTION_SEND intent. */
+    val intentMimeType: String? = null,
+    /** Whether the sender supplied the one-shot read grant required by C0. */
+    val hasReadUriPermission: Boolean = false,
 )

@@ -1,6 +1,8 @@
 package org.openlife.app.intake
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -17,7 +19,52 @@ class IntakeIntentValidatorTest {
         dataUri: String? = null,
         extraStreamUri: String? = null,
         clipDataUris: List<String> = emptyList(),
-    ) = IntentShape(action, dataUri, extraStreamUri, clipDataUris)
+        intentMimeType: String? = "image/jpeg",
+        hasReadUriPermission: Boolean = true,
+    ) = IntentShape(
+        action,
+        dataUri,
+        extraStreamUri,
+        clipDataUris,
+        intentMimeType,
+        hasReadUriPermission,
+    )
+
+    @Test
+    fun missingIncomingReadGrantIsRejectedBeforeOpeningCandidate() {
+        val result = IntakeIntentValidator.validate(
+            shape(
+                extraStreamUri = "content://com.example.provider/image1",
+                hasReadUriPermission = false,
+            ),
+            ownPackage
+        )
+        assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.MISSING_READ_GRANT), result)
+    }
+
+    @Test
+    fun missingOrWildcardIntentMimeTypeIsRejected() {
+        val result = IntakeIntentValidator.validate(
+            shape(
+                extraStreamUri = "content://com.example.provider/image1",
+                intentMimeType = "image/*",
+            ),
+            ownPackage
+        )
+        assertEquals(
+            IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE),
+            result
+        )
+    }
+
+    @Test
+    fun senderAndProviderMimeTypesMustMatchExactlyOnSupportedFormat() {
+        assertTrue(IntakeIntentValidator.mimeTypesMatch("image/jpeg", "image/jpeg"))
+        assertTrue(IntakeIntentValidator.mimeTypesMatch("IMAGE/PNG", "image/png"))
+        assertFalse(IntakeIntentValidator.mimeTypesMatch("image/jpeg", "image/png"))
+        assertFalse(IntakeIntentValidator.mimeTypesMatch("image/*", "image/jpeg"))
+        assertFalse(IntakeIntentValidator.mimeTypesMatch(null, "image/jpeg"))
+    }
 
     @Test
     fun singleContentUriInExtraStreamIsValid() {

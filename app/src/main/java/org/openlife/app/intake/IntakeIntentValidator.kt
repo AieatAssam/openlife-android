@@ -29,6 +29,19 @@ object IntakeIntentValidator {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.WRONG_ACTION)
         }
 
+        // ACTION_SEND is exported, so a direct caller must prove it received
+        // a one-shot read grant for the supplied content URI. A caller cannot
+        // manufacture access merely by naming a public-looking content URI.
+        // Photo Picker forwarding adds this same flag in MainActivity before
+        // starting this activity, so it follows the identical boundary.
+        if (!shape.hasReadUriPermission) {
+            return IntakeValidationResult.Rejected(IntakeRejectionReason.MISSING_READ_GRANT)
+        }
+
+        if (!isSupportedMimeType(shape.intentMimeType)) {
+            return IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE)
+        }
+
         val candidates = buildSet {
             shape.dataUri?.let { add(it) }
             shape.extraStreamUri?.let { add(it) }
@@ -63,4 +76,19 @@ object IntakeIntentValidator {
 
         return IntakeValidationResult.Valid(candidate)
     }
+
+    /**
+     * The sender-declared type and the provider's reported type must agree
+     * exactly on one supported image format before any bytes are opened. The
+     * repository still checks the provider type against the actual magic
+     * bytes; this check closes the gap where the incoming Intent type was
+     * previously ignored.
+     */
+    fun mimeTypesMatch(intentMimeType: String?, providerMimeType: String?): Boolean =
+        isSupportedMimeType(intentMimeType) &&
+            intentMimeType.equals(providerMimeType, ignoreCase = true)
+
+    private fun isSupportedMimeType(mimeType: String?): Boolean =
+        mimeType.equals("image/jpeg", ignoreCase = true) ||
+            mimeType.equals("image/png", ignoreCase = true)
 }

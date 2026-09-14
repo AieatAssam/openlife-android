@@ -115,7 +115,23 @@ class IntakeActivity : ComponentActivity() {
         // "Preparing…" spinner (recoverable by leaving the screen) instead
         // of freezing the app.
         lifecycleScope.launch(Dispatchers.IO) {
-            val declaredType = contentResolver.getType(uri)
+            val providerType = try {
+                contentResolver.getType(uri)
+            } catch (e: SecurityException) {
+                viewModel.showRejected("could not access the selected item; please select it again")
+                return@launch
+            } catch (e: java.io.FileNotFoundException) {
+                viewModel.showRejected("could not access the selected item; please select it again")
+                return@launch
+            } ?: run {
+                viewModel.showRejected("the selected item type did not match its contents")
+                return@launch
+            }
+            val normalizedProviderType = providerType.lowercase()
+            if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
+                viewModel.showRejected("the selected item type did not match its contents")
+                return@launch
+            }
             val stream = try {
                 contentResolver.openInputStream(uri)
             } catch (e: SecurityException) {
@@ -137,7 +153,7 @@ class IntakeActivity : ComponentActivity() {
             } else {
                 IntakeKind.SHARE
             }
-            viewModel.startImport(stream, declaredType ?: "", intakeKind)
+            viewModel.startImport(stream, normalizedProviderType, intakeKind)
         }
     }
 
@@ -156,6 +172,8 @@ class IntakeActivity : ComponentActivity() {
             dataUri = intent.data?.toString(),
             extraStreamUri = extraStreamUri?.toString(),
             clipDataUris = clipDataUris,
+            intentMimeType = intent.type,
+            hasReadUriPermission = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0,
         )
     }
 
@@ -179,6 +197,8 @@ private fun describeIntentRejection(reason: IntakeRejectionReason): String = whe
     IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> "unsupported source"
     IntakeRejectionReason.OWN_AUTHORITY -> "invalid source"
     IntakeRejectionReason.MALFORMED_URI -> "invalid source"
+    IntakeRejectionReason.MISSING_READ_GRANT -> "the selected item was not shared with read access"
+    IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> "unsupported or missing image type"
 }
 
 private fun describeForTest(state: IntakeUiState): String = when (state) {

@@ -7,6 +7,8 @@ enum class IntakeRejectionReason {
     UNSUPPORTED_URI_SCHEME,
     OWN_AUTHORITY,
     MALFORMED_URI,
+    MISSING_READ_GRANT,
+    UNSUPPORTED_OR_MISSING_MIME_TYPE,
 }
 
 sealed interface IntakeValidationResult {
