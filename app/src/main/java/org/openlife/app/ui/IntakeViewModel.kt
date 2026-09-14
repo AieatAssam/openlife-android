@@ -192,6 +192,15 @@ class IntakeViewModel(
         }
     }
 
+    override fun onCleared() {
+        // If the coroutine was cancelled before it entered `use`, its
+        // finally block cannot release the descriptor. Close the boundary
+        // stream explicitly before allowing the ViewModel scope to finish.
+        activeInputStream?.let { closeQuietly(it) }
+        activeImportJob?.cancel()
+        super.onCleared()
+    }
+
     companion object {
         fun factory(application: OpenLifeApp): ViewModelProvider.Factory = viewModelFactory {
             initializer { IntakeViewModel(application, createSavedStateHandle()) }
