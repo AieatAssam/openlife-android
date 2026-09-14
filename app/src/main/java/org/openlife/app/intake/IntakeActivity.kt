@@ -16,6 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
@@ -98,29 +101,44 @@ class IntakeActivity : ComponentActivity() {
     }
 
     private fun startImportFromUri(uri: Uri) {
-        val declaredType = contentResolver.getType(uri)
-        val stream = try {
-            contentResolver.openInputStream(uri)
-        } catch (e: SecurityException) {
-            // Missing or expired URI grant (design §11 step 1: "If a share
-            // grant expires or a provider disappears, ask the user to
-            // select the item again").
-            viewModel.showRejected("could not access the selected item; please select it again")
-            return
-        } catch (e: java.io.FileNotFoundException) {
-            viewModel.showRejected("could not access the selected item; please select it again")
-            return
+        // contentResolver.getType/openInputStream are ordinary blocking JVM
+        // calls into another (possibly slow or hostile) content provider,
+        // with no timeout of their own - calling them directly from this
+        // LaunchedEffect (the main/Compose thread) blocks the entire UI for
+        // as long as the provider takes to answer. A ~6s test provider
+        // delay reproduced a real Android ANR ("Input dispatching timed
+        // out... Waited 5000ms") during Stage 8's C0-17 pass; the 15s
+        // cooperative-cancellation deadline in IntakeViewModel.startImport
+        // only covers reading an *already-opened* stream, not this open
+        // call itself. Dispatching to Dispatchers.IO keeps the open call
+        // off the main thread so a slow provider degrades to a stuck
+        // "Preparing…" spinner (recoverable by leaving the screen) instead
+        // of freezing the app.
+        lifecycleScope.launch(Dispatchers.IO) {
+            val declaredType = contentResolver.getType(uri)
+            val stream = try {
+                contentResolver.openInputStream(uri)
+            } catch (e: SecurityException) {
+                // Missing or expired URI grant (design §11 step 1: "If a
+                // share grant expires or a provider disappears, ask the
+                // user to select the item again").
+                viewModel.showRejected("could not access the selected item; please select it again")
+                return@launch
+            } catch (e: java.io.FileNotFoundException) {
+                viewModel.showRejected("could not access the selected item; please select it again")
+                return@launch
+            }
+            if (stream == null) {
+                viewModel.showRejected("could not access the selected item; please select it again")
+                return@launch
+            }
+            val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+                IntakeKind.PHOTO_PICKER
+            } else {
+                IntakeKind.SHARE
+            }
+            viewModel.startImport(stream, declaredType ?: "", intakeKind)
         }
-        if (stream == null) {
-            viewModel.showRejected("could not access the selected item; please select it again")
-            return
-        }
-        val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
-            IntakeKind.PHOTO_PICKER
-        } else {
-            IntakeKind.SHARE
-        }
-        viewModel.startImport(stream, declaredType ?: "", intakeKind)
     }
 
     private fun extractShape(intent: Intent): IntentShape {

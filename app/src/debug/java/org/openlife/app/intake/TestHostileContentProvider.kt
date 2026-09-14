@@ -56,6 +56,18 @@ class TestHostileContentProvider : ContentProvider() {
         /** If true, every open after the first returns zeroed-out bytes of the same length. */
         @Volatile var mutateAfterFirstOpen: Boolean = false
 
+        /**
+         * A real, bounded `Thread.sleep` before `openFile` returns, for
+         * C0-17's "slow provider" coverage (design §12's 15s provider-read
+         * deadline). Deliberately a plain bounded sleep, not an unwritten
+         * pipe held open indefinitely - the earlier version of "slow
+         * provider" support used exactly that and caused the real,
+         * documented fd-corruption hang investigated during Stage 7/8 (see
+         * the class doc below). A bounded sleep always returns on its own
+         * and carries none of that risk.
+         */
+        @Volatile var artificialDelayMillis: Long = 0
+
         private var openCount = 0
 
         fun reset() {
@@ -63,6 +75,7 @@ class TestHostileContentProvider : ContentProvider() {
             mimeTypeToReport = "image/jpeg"
             failOpen = false
             mutateAfterFirstOpen = false
+            artificialDelayMillis = 0
             openCount = 0
         }
 
@@ -102,8 +115,15 @@ class TestHostileContentProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         if (failOpen) throw FileNotFoundException("simulated provider failure")
+        // "slow-<millis>.jpg" lets a host-driven `adb shell am start` encode
+        // its own delay directly in the URI, the same reason
+        // LARGE_FIXTURE_NAME needs no prior same-process state-setting call.
+        uri.lastPathSegment?.removePrefix("slow-")?.removeSuffix(".jpg")?.toLongOrNull()?.let {
+            Thread.sleep(it)
+        }
+        if (artificialDelayMillis > 0) Thread.sleep(artificialDelayMillis)
 
-        val bytes = if (uri.lastPathSegment == LARGE_FIXTURE_NAME) {
+        val bytes = if (uri.lastPathSegment == LARGE_FIXTURE_NAME || uri.lastPathSegment?.startsWith("slow-") == true) {
             generateLargeJpeg()
         } else if (mutateAfterFirstOpen && openCount > 0) {
             ByteArray(bytesToServe.size)

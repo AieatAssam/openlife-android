@@ -151,6 +151,29 @@ class IntakeActivityTest {
         }
     }
 
+    @Test
+    fun slowProviderOpenStaysResponsiveInsteadOfFreezingTheActivity() {
+        // C0-17: a real ~6s delay inside a provider's openFile() (a
+        // deliberately slower version of this same delay) produced a real
+        // Android ANR ("Input dispatching timed out... Waited 5000ms")
+        // during Stage 8, since contentResolver.openInputStream was called
+        // directly on the composition's main thread with no timeout of its
+        // own - found on-device, not by inspection. Fixed by moving that
+        // call to Dispatchers.IO in IntakeActivity.startImportFromUri. This
+        // test's own polling loop (waitForStatusContaining, via
+        // scenario.onActivity) only completes at all if the main thread
+        // keeps servicing that callback throughout the delay, so a
+        // regression back to a frozen main thread would show up as this
+        // test timing out, not just as a slow pass.
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes()
+        TestHostileContentProvider.artificialDelayMillis = 3_000
+        val uri = TestHostileContentProvider.uriFor("slow.jpg")
+
+        ActivityScenario.launch<IntakeActivity>(sendIntentFor(uri)).use { scenario ->
+            waitForStatusContaining(scenario, "Prepared")
+        }
+    }
+
     private fun waitForStatusContaining(
         scenario: ActivityScenario<IntakeActivity>,
         expected: String,
