@@ -8,6 +8,8 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -44,6 +46,7 @@ class EnvelopeTamperingThroughRepositoryTest {
     private lateinit var wrapper: KeystoreWrapper
     private lateinit var importRepository: ImportRepository
     private lateinit var viewRepository: SourceViewRepository
+    private lateinit var mutationQueue: MutationQueue
 
     private fun syntheticJpegBytes(): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 48, Bitmap.Config.ARGB_8888)
@@ -61,7 +64,7 @@ class EnvelopeTamperingThroughRepositoryTest {
         wrapper = KeystoreWrapper(alias)
         val ready = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Ready
         db = OpenLifeDatabaseFactory.create(context, paths, ready.databaseSecret)
-        val mutationQueue = MutationQueue()
+        mutationQueue = MutationQueue()
         importRepository = ImportRepository(
             paths = paths,
             database = db,
@@ -69,7 +72,7 @@ class EnvelopeTamperingThroughRepositoryTest {
             bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
             mutationQueue = mutationQueue,
         )
-        viewRepository = SourceViewRepository(paths, db, wrapper)
+        viewRepository = SourceViewRepository(paths, db, wrapper, mutationQueue)
     }
 
     @After
@@ -142,5 +145,27 @@ class EnvelopeTamperingThroughRepositoryTest {
         assertTrue(original != null && original.isNotEmpty())
         val row = db.sourceDao().findById(sourceId.toString())!!.toDomain()
         assertEquals(sourceId, row.id)
+    }
+
+    @Test
+    fun viewerReadSharesTheMutationQueueWithDeletionWork(): Unit = runBlocking {
+        val sourceId = saveASource()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val mutation = async {
+            mutationQueue.acquire {
+                entered.complete(Unit)
+                release.await()
+            }
+        }
+        entered.await()
+
+        val read = async { viewRepository.loadReadyBytes(sourceId) }
+        kotlinx.coroutines.delay(50)
+        assertTrue("viewer read must wait for an in-flight deletion/mutation", !read.isCompleted)
+
+        release.complete(Unit)
+        mutation.await()
+        assertTrue(read.await() != null)
     }
 }

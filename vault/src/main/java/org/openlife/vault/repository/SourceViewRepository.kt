@@ -22,6 +22,7 @@ class SourceViewRepository(
     private val paths: VaultPaths,
     private val database: OpenLifeDatabase,
     keystoreWrapper: KeystoreWrapper,
+    private val mutationQueue: MutationQueue = MutationQueue(),
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -34,14 +35,18 @@ class SourceViewRepository(
 
     /** The not-yet-saved stage, authenticated from the encrypted file on disk (design §11 step 4). */
     suspend fun loadStagePreviewBytes(sourceId: UUID): ByteArray? {
-        val source = findSource(sourceId) ?: return null
-        return authenticator.decryptAndVerify(source, paths.stageFile(sourceId))
+        return mutationQueue.acquire {
+            val source = database.sourceDao().findById(sourceId.toString())?.toDomain() ?: return@acquire null
+            authenticator.decryptAndVerify(source, paths.stageFile(sourceId))
+        }
     }
 
     /** A saved (READY) source's original bytes, authenticated before use (design §8). */
     suspend fun loadReadyBytes(sourceId: UUID): ByteArray? {
-        val source = findSource(sourceId) ?: return null
-        if (source.state != SourceState.READY) return null
-        return authenticator.decryptAndVerify(source, paths.blobFile(sourceId))
+        return mutationQueue.acquire {
+            val source = database.sourceDao().findById(sourceId.toString())?.toDomain() ?: return@acquire null
+            if (source.state != SourceState.READY) return@acquire null
+            authenticator.decryptAndVerify(source, paths.blobFile(sourceId))
+        }
     }
 }

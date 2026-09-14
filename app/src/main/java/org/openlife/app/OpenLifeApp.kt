@@ -59,7 +59,7 @@ class OpenLifeApp : Application() {
                             mutationQueue = mutationQueue,
                         ),
                         deletionRepository = DeletionRepository(paths, database, mutationQueue),
-                        viewRepository = SourceViewRepository(paths, database, keystoreWrapper),
+                        viewRepository = SourceViewRepository(paths, database, keystoreWrapper, mutationQueue),
                         lastRecovery = report,
                     )
                 }
