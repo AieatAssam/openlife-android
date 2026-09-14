@@ -94,9 +94,14 @@ class TestHostileContentProvider : ContentProvider() {
          */
         const val LARGE_FIXTURE_NAME = "large-fault-injection.jpg"
 
-        private fun generateLargeJpeg(): ByteArray {
-            val width = 4000
-            val height = 3000
+        /**
+         * "noise-<w>x<h>.jpg" generates a real decodable JPEG at the
+         * requested dimensions on demand - used by [LARGE_FIXTURE_NAME]
+         * (fixed at 4000x3000) and by Stage 8's §12 performance pass, which
+         * needed a ~4 MiB fixture (the design's own baseline size) rather
+         * than the 16 MiB-adjacent one C0-09/C0-10 wanted.
+         */
+        private fun generateNoiseJpeg(width: Int, height: Int): ByteArray {
             val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
             val random = java.util.Random(42)
             val row = IntArray(width)
@@ -109,6 +114,10 @@ class TestHostileContentProvider : ContentProvider() {
             bitmap.recycle()
             return out.toByteArray()
         }
+
+        private fun generateLargeJpeg(): ByteArray = generateNoiseJpeg(4000, 3000)
+
+        private val noisePattern = Regex("""noise-(\d+)x(\d+)\.jpg""")
     }
 
     override fun onCreate(): Boolean = true
@@ -123,8 +132,11 @@ class TestHostileContentProvider : ContentProvider() {
         }
         if (artificialDelayMillis > 0) Thread.sleep(artificialDelayMillis)
 
+        val noiseMatch = uri.lastPathSegment?.let { noisePattern.matchEntire(it) }
         val bytes = if (uri.lastPathSegment == LARGE_FIXTURE_NAME || uri.lastPathSegment?.startsWith("slow-") == true) {
             generateLargeJpeg()
+        } else if (noiseMatch != null) {
+            generateNoiseJpeg(noiseMatch.groupValues[1].toInt(), noiseMatch.groupValues[2].toInt())
         } else if (mutateAfterFirstOpen && openCount > 0) {
             ByteArray(bytesToServe.size)
         } else {
