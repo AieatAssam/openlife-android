@@ -54,6 +54,39 @@ class ImportRepositoryTest {
         return out.toByteArray()
     }
 
+    private fun be32(value: Long): ByteArray = byteArrayOf(
+        (value shr 24).toByte(),
+        (value shr 16).toByte(),
+        (value shr 8).toByte(),
+        value.toByte(),
+    )
+
+    /** Minimal synthetic PNG header for rejection-path tests only. */
+    private fun syntheticPng(width: Long, height: Long, animated: Boolean = false): ByteArray {
+        val out = ByteArrayOutputStream()
+        out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 0x0D, 0x0A, 0x1A, 0x0A))
+        out.write(be32(13))
+        out.write("IHDR".toByteArray(Charsets.US_ASCII))
+        out.write(be32(width))
+        out.write(be32(height))
+        out.write(byteArrayOf(8, 6, 0, 0, 0))
+        out.write(be32(0)) // synthetic CRC; parser does not decode it
+        if (animated) {
+            out.write(be32(8))
+            out.write("acTL".toByteArray(Charsets.US_ASCII))
+            out.write(be32(1))
+            out.write(be32(0))
+            out.write(be32(0))
+        }
+        out.write(be32(0))
+        out.write("IDAT".toByteArray(Charsets.US_ASCII))
+        out.write(be32(0))
+        out.write(be32(0))
+        out.write("IEND".toByteArray(Charsets.US_ASCII))
+        out.write(be32(0))
+        return out.toByteArray()
+    }
+
     @Before
     fun setUp() {
         alias = "test.${UUID.randomUUID()}"
@@ -145,6 +178,57 @@ class ImportRepositoryTest {
         )
         assertEquals(PrepareResult.Rejected(ImageRejectionReason.DECLARED_FORMAT_MISMATCH), result)
         assertEquals(0, db.sourceDao().count())
+    }
+
+    @Test
+    fun animatedPngIsRejectedAndLeavesNoStagedState(): Unit = runBlocking {
+        val result = repository.prepareImport(
+            ByteArrayInputStream(syntheticPng(50, 50, animated = true)),
+            "image/png",
+            IntakeKind.SHARE,
+        )
+
+        assertEquals(
+            PrepareResult.Rejected(ImageRejectionReason.ANIMATED_NOT_SUPPORTED),
+            result,
+        )
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
+    fun corruptPngIsRejectedAndLeavesNoStagedState(): Unit = runBlocking {
+        val corrupt = syntheticPng(50, 50).also {
+            "IHDX".toByteArray(Charsets.US_ASCII).copyInto(it, 12)
+        }
+
+        val result = repository.prepareImport(
+            ByteArrayInputStream(corrupt),
+            "image/png",
+            IntakeKind.PHOTO_PICKER,
+        )
+
+        assertEquals(PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT), result)
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
+    fun extremePngDimensionsAreRejectedAndLeavesNoStagedState(): Unit = runBlocking {
+        val result = repository.prepareImport(
+            ByteArrayInputStream(
+                syntheticPng(ImportLimits.MAX_LONGEST_EDGE_PIXELS.toLong() + 1, 10),
+            ),
+            "image/png",
+            IntakeKind.SHARE,
+        )
+
+        assertEquals(
+            PrepareResult.Rejected(ImageRejectionReason.EXCEEDS_DIMENSION_LIMIT),
+            result,
+        )
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
     }
 
     @Test
@@ -298,5 +382,26 @@ class ImportRepositoryTest {
             SourceState.STAGED,
             db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state
         )
+    }
+
+    @Test
+    fun saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+
+        // Force the READY invariant trigger to reject the final database
+        // commit after the stage has already been renamed. This models a
+        // commit failure without replacing the real SQLCipher/Room stack.
+        val staged = db.sourceDao().findById(prepared.sourceId.toString())!!
+        db.sourceDao().update(staged.copy(mimeType = null))
+
+        assertEquals(SaveResult.Failed, repository.saveImport(prepared.sourceId))
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,
+        )
+        assertTrue(!paths.stageFile(prepared.sourceId).exists())
+        assertTrue(paths.blobFile(prepared.sourceId).exists())
     }
 }

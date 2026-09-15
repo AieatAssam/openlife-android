@@ -199,7 +199,15 @@ class ImportRepository(
             return@acquire SaveResult.Failed
         }
 
-        database.sourceDao().update(source.copy(state = SourceState.READY).toEntity())
+        try {
+            database.sourceDao().update(source.copy(state = SourceState.READY).toEntity())
+        } catch (_: Exception) {
+            // The rename already happened, but the row remains STAGED when
+            // the final commit is rejected (for example by the READY
+            // invariant trigger). Recovery owns both possible artefact paths
+            // and will remove them on the next pass; never surface success.
+            return@acquire SaveResult.Failed
+        }
         SaveResult.Saved(sourceId)
     }
 }
