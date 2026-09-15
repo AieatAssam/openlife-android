@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `abbcf46` (2026-09-15; code; documentation update follows)
+- Commit: `bd43e8e` (2026-09-15; deletion checkpoint fault-injection coverage)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
@@ -59,7 +59,7 @@ per-row evidence (already cites concrete test names for every row).
 | C0-R30 (15s provider-read deadline) | `BoundedStreamReaderTest.closingTheStreamFromAnotherThreadUnblocksABlockedRead`; `IntakeActivityTest.slowProviderOpenStaysResponsiveInsteadOfFreezingTheActivity` | **Found and fixed a real gap this stage**: the deadline covered reading an opened stream but not opening it — see below |
 | C0-R31 (no INTERNET/exported reader/telemetry, any variant) | Re-run C0-01 dependency inventory + full manifest diff (debug vs. release), 2026-09-14 | Confirmed against the *complete* app, not the Stage 0 placeholder this row was originally checked against |
 | C0-R8 (sampled authenticated preview and Save gating) | `IntakeAndListFlowTest.sampledPreviewDecoderStaysWithinPixelBudget`; `IntakeScreenTest.saveIsUnavailableWhenAuthenticatedPreviewCannotBeLoaded`; ViewModel `confirmSave` guard | Red/green coverage added; included in the final 20/20 app connected run |
-| C0-R24 (DELETING durability, retry, and view serialization) | `DeletionRepositoryTest` (6/6); `RecoveryRepositoryTest` (10 cases); `DeletionRetryFlowTest.failedDeletionRemainsVisibleUntilRetrySucceeds`; `EnvelopeTamperingThroughRepositoryTest.viewerReadSharesTheMutationQueueWithDeletionWork` | Failed cleanup remains visible and retryable; authenticated reads share the mutation queue with deletion |
+| C0-R24 (DELETING durability, retry, and view serialization) | `DeletionRepositoryTest` (7 cases, including `aFailureAfterTheFirstDeleteKeepsDeletingStateForRetry`); `RecoveryRepositoryTest` (10 cases); `DeletionRetryFlowTest.failedDeletionRemainsVisibleUntilRetrySucceeds`; `EnvelopeTamperingThroughRepositoryTest.viewerReadSharesTheMutationQueueWithDeletionWork` | A one-shot fault after the first file-removal checkpoint leaves the durable `DELETING` row/blob and a retry completes it; failed cleanup remains visible and retryable, and authenticated viewer reads share the mutation queue with deletion. The new connected execution remains pending the emulator/package-service gap. |
 | C0-R32 (FLAG_SECURE, explicit background scrubbing, no content in logs/recents) | Full real lifecycle/logcat evidence (C0-15); `SensitiveContentCacheTest`; `IntakeAndListFlowTest.backgroundScrubsPreviewAndForegroundReauthenticatesIt` | Lifecycle/cache coverage is included in the final 20/20 app connected run |
 | C0-R33 (large text, TalkBack) | Manual `uiautomator` walk at 1.3x/2.0x font scale across every screen (C0-16) | TalkBack itself remains unverified in this environment — stated as a gap in both `docs/verification/C0.md` and the security self-review, not claimed as passing |
 | C0-R5 (own-authority trust boundary) | `IntakeIntentValidatorTest.ownAuthorityMatchIsCaseInsensitive` | JVM regression passes on the current tree; it rejects case variants of the app authority before any provider open |

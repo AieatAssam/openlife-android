@@ -93,6 +93,10 @@ from memory of earlier stages.
   and `directorySyncFailureReturnsFailedAndLeavesRenamedArtefactRecoverable`
   use the narrow `ArtefactFileOps` seam; production still delegates to the
   real `Fsync` implementation, while tests force the exact failure boundaries.
+- Deletion checkpoint failure: `DeletionRepositoryTest.aFailureAfterTheFirstDeleteKeepsDeletingStateForRetry`
+  uses the same seam to fail blob removal after the first checkpoint and
+  verifies that the `DELETING` row and remaining blob are retained until a
+  later retry succeeds. The production default still verifies each deletion.
 - **Confirmed, strengthened this stage** (real kills, not only constructed
   states).
 
