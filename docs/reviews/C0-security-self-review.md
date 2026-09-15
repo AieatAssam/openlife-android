@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `abbcf46` (2026-09-15), rather than restating the design document's
+commit `0f1001f` (2026-09-15), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
@@ -80,7 +80,8 @@ from memory of earlier stages.
   this stage (C0-09), each followed by clean, idempotent self-healing with
   no accumulation and no `FATAL EXCEPTION`.
 - Failed cancellation cleanup: `ImportRepositoryTest.cancellingAStagedImportRetainsTheRowWhenStageCleanupFails`
-  (included in the focused 11/11 and full 46-test vault connected runs) proves
+  (included in the 21-case import class and full 57-test vault connected run)
+  proves
   a blocked stage path leaves the STAGED row available for a later retry.
 - Final commit rejection: `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable`
   covers a post-rename database rejection; `saveImport` returns failure and
