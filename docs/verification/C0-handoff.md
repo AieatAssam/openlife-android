@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `a194b38` (2026-09-14)
+- Commit: `7b18a9e` (2026-09-15; code; documentation update follows)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
@@ -29,10 +29,10 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 | Suite | Count | Result |
 | --- | --- | --- |
-| `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree |
-| `:app:connectedDebugAndroidTest` | 20 | all pass on `dev36` (IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 1/1, SourceListScreen 1/1) |
-| `:vault:connectedDebugAndroidTest` | 46 | all pass on `dev36`, including staged-cleanup recovery retry and authenticated-view serialization |
-| `:app:assembleDebug` / `lint` | — | passed after the persistent intake-error fix on 2026-09-14 |
+| `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree (`./gradlew :app:test :vault:test assembleDebug lint`, 2026-09-15) |
+| `:app:connectedDebugAndroidTest` | 20 (prior code) | all pass on `dev36` for `a194b38` (IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 1/1, SourceListScreen 1/1); the new duplicate-choice test is not yet device-verified |
+| `:vault:connectedDebugAndroidTest` | 46 (prior code) | all pass on `dev36` for `a194b38`; the new ImportRepository rejection/commit-failure tests are compiled but their focused connected run was blocked by another project repeatedly taking the sole emulator and breaking its package service |
+| `:app:assembleDebug` / `lint` | — | passed on the current tree on 2026-09-15 |
 
 The JVM suites, build/lint sweep, and vault connected suite were re-run on the
 current tree on 2026-09-14. The final app connected run passed all 20 tests on
@@ -62,6 +62,9 @@ per-row evidence (already cites concrete test names for every row).
 | C0-R24 (DELETING durability, retry, and view serialization) | `DeletionRepositoryTest` (6/6); `RecoveryRepositoryTest` (10 cases); `DeletionRetryFlowTest.failedDeletionRemainsVisibleUntilRetrySucceeds`; `EnvelopeTamperingThroughRepositoryTest.viewerReadSharesTheMutationQueueWithDeletionWork` | Failed cleanup remains visible and retryable; authenticated reads share the mutation queue with deletion |
 | C0-R32 (FLAG_SECURE, explicit background scrubbing, no content in logs/recents) | Full real lifecycle/logcat evidence (C0-15); `SensitiveContentCacheTest`; `IntakeAndListFlowTest.backgroundScrubsPreviewAndForegroundReauthenticatesIt` | Lifecycle/cache coverage is included in the final 20/20 app connected run |
 | C0-R33 (large text, TalkBack) | Manual `uiautomator` walk at 1.3x/2.0x font scale across every screen (C0-16) | TalkBack itself remains unverified in this environment — stated as a gap in both `docs/verification/C0.md` and the security self-review, not claimed as passing |
+| C0-R5 (own-authority trust boundary) | `IntakeIntentValidatorTest.ownAuthorityMatchIsCaseInsensitive` | JVM regression passes on the current tree; it rejects case variants of the app authority before any provider open |
+| C0-R16 (duplicate choice) | `IntakeScreenTest.duplicateOffersOpenExistingOrCancel`; `MainActivity.EXTRA_OPEN_SOURCE_ID` route | UI and navigation are implemented; connected execution is pending the emulator gap recorded above |
+| C0-R21 (final READY commit failure) | `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable` | Repository now returns failure and retains durable STAGED ownership after a post-rename DB rejection; connected execution is pending the emulator gap recorded above |
 
 ## Real bugs found and fixed during Stage 8 (not merely constructed states)
 
@@ -103,6 +106,12 @@ per-row evidence (already cites concrete test names for every row).
    instead of the intended list-volume check) — both root-caused with live
    `adb shell debuggerd -b` thread dumps rather than guessed at, and both
    were bugs in test code, not app code.
+8. Duplicate imports previously auto-dismissed without the required user
+   choice; the UI now offers `Open existing` or `Cancel` and routes the
+   existing UUID back to the viewer.
+9. A database rejection after stage-to-blob rename previously escaped from
+   `saveImport`; it now returns `Failed` while leaving the STAGED row and blob
+   for recovery.
 
 ## Storage and backup observations
 
@@ -148,11 +157,11 @@ automated runs).
 ## Acceptance recommendation
 
 The implementation gaps found in review are fixed and covered by red/green
-regressions. C0 is not yet a release acceptance: the API-29, TalkBack, and
-physical-device/transfer checks remain required design-gate evidence. Record
-those as explicit blockers rather than calling them non-blocking. The code
-slice is ready for owner review; no C1 implementation should begin until the
-remaining C0 evidence is accepted.
+regressions. C0 is not yet a release acceptance: the API-29, TalkBack,
+physical-device/transfer checks, and the newly added device-level regressions
+remain required design-gate evidence. Record those as explicit blockers rather
+than calling them non-blocking. The code slice is ready for owner review; no
+C1 implementation should begin until the remaining C0 evidence is accepted.
 
 Per AGENTS.md and design §13 ("Do not begin C1 to fill the time"): this
 stage stops here. The next step is proposing the C1 (Text provenance)

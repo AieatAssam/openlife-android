@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `a194b38` (2026-09-14), rather than restating the design document's
+commit `7b18a9e` (2026-09-15), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
@@ -82,6 +82,9 @@ from memory of earlier stages.
 - Failed cancellation cleanup: `ImportRepositoryTest.cancellingAStagedImportRetainsTheRowWhenStageCleanupFails`
   (included in the focused 11/11 and full 46-test vault connected runs) proves
   a blocked stage path leaves the STAGED row available for a later retry.
+- Final commit rejection: `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable`
+  covers a post-rename database rejection; `saveImport` returns failure and
+  leaves durable STAGED ownership for recovery.
 - **Confirmed, strengthened this stage** (real kills, not only constructed
   states).
 
