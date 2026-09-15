@@ -171,6 +171,15 @@ class IntakeIntentValidatorTest {
     }
 
     @Test
+    fun ownAuthorityMatchIsCaseInsensitive() {
+        val result = IntakeIntentValidator.validate(
+            shape(extraStreamUri = "content://${ownPackage.uppercase()}/vault/1.blob"),
+            ownPackage
+        )
+        assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY), result)
+    }
+
+    @Test
     fun uriPointingAtASubAuthorityOfOwnPackageIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://$ownPackage.fileprovider/vault/1.blob"),

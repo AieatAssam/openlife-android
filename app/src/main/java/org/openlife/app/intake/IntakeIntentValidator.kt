@@ -70,7 +70,10 @@ object IntakeIntentValidator {
         // trusted (design §8), and this stops a future provider addition
         // from becoming a same-app confused-deputy vector by default.
         val authority = parsed.authority
-        if (authority != null && (authority == ownPackageName || authority.startsWith("$ownPackageName."))) {
+        if (authority != null &&
+            (authority.equals(ownPackageName, ignoreCase = true) ||
+                authority.startsWith("$ownPackageName.", ignoreCase = true))
+        ) {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY)
         }
 
