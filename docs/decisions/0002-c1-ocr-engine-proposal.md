@@ -28,6 +28,13 @@ C1 verification handoff. The engine is kept behind a local `OcrEngine`
 interface so a future fully local alternative can be selected without
 changing the persisted provenance contract.
 
+Implementation note: the pinned bundled artifact brings Google transport
+classes transitively because the ML Kit client references them at class-load.
+OpenLife removes `INTERNET` and `ACCESS_NETWORK_STATE` from both merged app
+manifests, does not configure runtime model download, and exposes no cloud or
+telemetry call. The transitive transport footprint is recorded for release
+review rather than hidden in the dependency inventory.
+
 ## Alternatives requiring an explicit change
 
 - Tesseract with a vendored, pinned `eng` traineddata file: stronger

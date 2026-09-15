@@ -165,9 +165,8 @@ The implementation gaps found in review are fixed and covered by red/green
 regressions. C0 is not yet a release acceptance: the API-29, TalkBack,
 physical-device/transfer checks, and the newly added device-level regressions
 remain required design-gate evidence. Record those as explicit blockers rather
-than calling them non-blocking. The code slice is ready for owner review; no
-C1 implementation should begin until the remaining C0 evidence is accepted.
-
-Per AGENTS.md and design §13 ("Do not begin C1 to fill the time"): this
-stage stops here. The next step is proposing the C1 (Text provenance)
-specification for owner acceptance — not implementing it speculatively.
+than calling them non-blocking. The C0 baseline is complete for the verified
+API-36 environment; C1 is implemented as a separately tracked bounded slice
+after the owner approved its first engine/boundaries on 2026-09-15. C1 does
+not retroactively claim the remaining C0 platform gaps as passed; see
+`docs/verification/C1.md` for its own evidence and open gates.
