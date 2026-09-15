@@ -34,6 +34,7 @@ object OpenLifeDatabaseFactory {
         System.loadLibrary("sqlcipher")
         return Room.databaseBuilder(context, OpenLifeDatabase::class.java, paths.databaseFile.absolutePath)
             .openHelperFactory(SupportOpenHelperFactory(databaseSecret))
+            .addMigrations(OpenLifeDatabase.MIGRATION_1_2)
             .addCallback(OpenLifeDatabase.readyInvariantCallback)
             .build()
     }
