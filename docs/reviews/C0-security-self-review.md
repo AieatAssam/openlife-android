@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `8bc5e77` (2026-09-15), rather than restating the design document's
+commit `abbcf46` (2026-09-15), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
