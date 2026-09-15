@@ -59,15 +59,6 @@ class IntakeScreenTest {
         composeRule.onNodeWithText("Open existing").performClick()
         assertEquals(existingId, openedId)
 
-        composeRule.setContent {
-            IntakeScreen(
-                state = IntakeUiState.Duplicate(existingId),
-                onSave = {},
-                onCancel = {},
-                onDone = { cancelled = true },
-                onOpenExisting = {},
-            )
-        }
         composeRule.onNodeWithText("Cancel").performClick()
         assertTrue(cancelled)
     }
