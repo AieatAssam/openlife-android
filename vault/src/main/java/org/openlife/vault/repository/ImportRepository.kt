@@ -14,7 +14,6 @@ import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
-import org.openlife.vault.storage.Fsync
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
@@ -43,6 +42,7 @@ class ImportRepository(
     private val bitmapSampler: BitmapSampler,
     private val mutationQueue: MutationQueue,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -108,7 +108,7 @@ class ImportRepository(
                     SecretKeySpec(dek, "AES"),
                     EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId)
                 )
-                Fsync.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
+                fileOps.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
             } catch (e: IOException) {
                 cancelStage(sourceId)
                 return PrepareResult.Failed
@@ -193,8 +193,8 @@ class ImportRepository(
 
         try {
             val blobFile = paths.blobFile(sourceId)
-            if (!stageFile.renameTo(blobFile)) return@acquire SaveResult.Failed
-            Fsync.syncDirectory(paths.artefactsDir)
+            if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
+            fileOps.syncDirectory(paths.artefactsDir)
         } catch (e: IOException) {
             return@acquire SaveResult.Failed
         }

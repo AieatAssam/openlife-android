@@ -104,6 +104,15 @@ class ImportRepositoryTest {
         )
     }
 
+    private fun repositoryWithFileOps(fileOps: ArtefactFileOps): ImportRepository = ImportRepository(
+        paths = paths,
+        database = db,
+        keystoreWrapper = wrapper,
+        bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
+        mutationQueue = MutationQueue(),
+        fileOps = fileOps,
+    )
+
     @After
     fun tearDown() {
         db.close()
@@ -190,6 +199,28 @@ class ImportRepositoryTest {
         }
 
         val result = repository.prepareImport(failingStream, "image/jpeg", IntakeKind.SHARE)
+
+        assertEquals(PrepareResult.Failed, result)
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
+    fun stageWriteFailureReturnsFailedAndCleansStagedRow(): Unit = runBlocking {
+        val writeFailureRepository = repositoryWithFileOps(object : ArtefactFileOps {
+            override fun writeAndSync(file: java.io.File, bytes: ByteArray) {
+                throw java.io.IOException("synthetic stage write failure")
+            }
+
+            override fun rename(stage: java.io.File, blob: java.io.File): Boolean =
+                stage.renameTo(blob)
+
+            override fun syncDirectory(directory: java.io.File) = Unit
+        })
+
+        val result = writeFailureRepository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        )
 
         assertEquals(PrepareResult.Failed, result)
         assertEquals(0, db.sourceDao().count())
@@ -423,6 +454,32 @@ class ImportRepositoryTest {
         assertTrue(repository.cancelStagedImport(prepared.sourceId))
         assertEquals(null, db.sourceDao().findById(prepared.sourceId.toString()))
         assertTrue(!paths.stageFile(prepared.sourceId).exists())
+    }
+
+    @Test
+    fun directorySyncFailureReturnsFailedAndLeavesRenamedArtefactRecoverable(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+        val syncFailureRepository = repositoryWithFileOps(object : ArtefactFileOps {
+            override fun writeAndSync(file: java.io.File, bytes: ByteArray) =
+                ArtefactFileOps.Default.writeAndSync(file, bytes)
+
+            override fun rename(stage: java.io.File, blob: java.io.File): Boolean =
+                ArtefactFileOps.Default.rename(stage, blob)
+
+            override fun syncDirectory(directory: java.io.File) {
+                throw java.io.IOException("synthetic directory sync failure")
+            }
+        })
+
+        assertEquals(SaveResult.Failed, syncFailureRepository.saveImport(prepared.sourceId))
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,
+        )
+        assertTrue(!paths.stageFile(prepared.sourceId).exists())
+        assertTrue(paths.blobFile(prepared.sourceId).exists())
     }
 
     @Test
