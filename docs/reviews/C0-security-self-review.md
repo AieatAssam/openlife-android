@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `7b18a9e` (2026-09-15), rather than restating the design document's
+commit `ab3eb0e` (2026-09-15), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
@@ -85,6 +85,10 @@ from memory of earlier stages.
 - Final commit rejection: `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable`
   covers a post-rename database rejection; `saveImport` returns failure and
   leaves durable STAGED ownership for recovery.
+- Provider and rename failures: `providerReadFailureReturnsFailedAndCleansStagedRow`
+  and `renameFailureReturnsFailedAndLeavesTheStageForRecovery` cover cleanup
+  after an input read error and preservation of the stage when the final blob
+  rename is rejected.
 - **Confirmed, strengthened this stage** (real kills, not only constructed
   states).
 
