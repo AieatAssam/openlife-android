@@ -31,7 +31,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 | --- | --- | --- |
 | `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree (`./gradlew :app:test :vault:test assembleDebug lint`, 2026-09-15) |
 | `:app:connectedDebugAndroidTest` | 20 (prior code) | all pass on `dev36` for `a194b38` (IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 1/1, SourceListScreen 1/1); the new duplicate-choice test is not yet device-verified |
-| `:vault:connectedDebugAndroidTest` | 46 (prior code) | all pass on `dev36` for `a194b38`; the new ImportRepository rejection/commit-failure tests are compiled but their focused connected run was blocked by another project repeatedly taking the sole emulator and breaking its package service |
+| `:vault:connectedDebugAndroidTest` | 46 (prior code) | all pass on `dev36` for `a194b38`; the new ImportRepository tests are compiled but their focused connected run was blocked first by another project taking the shared emulator and then by a fresh isolated AVD hanging in the package service during streamed APK installation |
 | `:app:assembleDebug` / `lint` | — | passed on the current tree on 2026-09-15 |
 
 The JVM suites, build/lint sweep, and vault connected suite were re-run on the
