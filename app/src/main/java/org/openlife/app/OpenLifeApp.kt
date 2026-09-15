@@ -10,8 +10,11 @@ import org.openlife.vault.repository.AndroidBitmapSampler
 import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.MutationQueue
+import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryRepository
 import org.openlife.vault.repository.SourceViewRepository
+import org.openlife.vault.ocr.MlKitOcrEngine
+import org.openlife.vault.ocr.OcrEngineRegistry
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
@@ -60,6 +63,13 @@ class OpenLifeApp : Application() {
                         ),
                         deletionRepository = DeletionRepository(paths, database, mutationQueue),
                         viewRepository = SourceViewRepository(paths, database, keystoreWrapper, mutationQueue),
+                        ocrRepository = OcrRepository(
+                            paths = paths,
+                            database = database,
+                            keystoreWrapper = keystoreWrapper,
+                            engineRegistry = OcrEngineRegistry(listOf(MlKitOcrEngine()), "mlkit-latin"),
+                            mutationQueue = mutationQueue,
+                        ),
                         lastRecovery = report,
                     )
                 }

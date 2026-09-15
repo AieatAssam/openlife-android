@@ -67,7 +67,11 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.sqlcipher.android)
-    implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition) {
+        // The bundled recognizer is local. Exclude ML Kit's CCT metrics
+        // transport so no telemetry backend is packaged or initialized.
+        exclude(group = "com.google.android.datatransport", module = "transport-backend-cct")
+    }
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

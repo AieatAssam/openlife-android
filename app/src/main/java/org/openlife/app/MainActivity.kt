@@ -45,6 +45,9 @@ class MainActivity : ComponentActivity() {
     private val viewModel: SourceListViewModel by viewModels {
         SourceListViewModel.factory(application as OpenLifeApp)
     }
+    private val ocrViewModel: org.openlife.app.ui.OcrViewModel by viewModels {
+        org.openlife.app.ui.OcrViewModel.factory(application as OpenLifeApp)
+    }
     private val backgroundEpoch = MutableStateFlow(0L)
     private val openSourceRequests = MutableStateFlow<UUID?>(null)
 
@@ -74,6 +77,7 @@ class MainActivity : ComponentActivity() {
             val requestedSourceId by openSourceRequests.collectAsState()
             val epoch by backgroundEpoch.collectAsState()
             val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
+            val ocrStates by ocrViewModel.states.collectAsState()
 
             androidx.compose.runtime.LaunchedEffect(epoch) {
                 if (epoch > 0L) screen = Screen.List
@@ -160,6 +164,19 @@ class MainActivity : ComponentActivity() {
                                     loadBytes = { viewModelLoadReadyBytes(current.sourceId) },
                                     onBack = { screen = Screen.List },
                                     onDeleteRequested = { pendingDelete = true },
+                                    ocrState = ocrStates[current.sourceId] ?: org.openlife.app.ui.OcrUiState.Idle,
+                                    onExtractText = { ocrViewModel.run(current.sourceId) },
+                                    onCancelOcr = { ocrViewModel.cancel(current.sourceId) },
+                                    onCorrect = { span, correctedText ->
+                                        val ready = ocrStates[current.sourceId] as? org.openlife.app.ui.OcrUiState.Ready
+                                        if (ready != null) {
+                                            ocrViewModel.correct(current.sourceId, ready.revisionId, span.id, correctedText)
+                                        }
+                                    },
+                                    onReview = { reviewState ->
+                                        val ready = ocrStates[current.sourceId] as? org.openlife.app.ui.OcrUiState.Ready
+                                        if (ready != null) ocrViewModel.review(current.sourceId, ready.revisionId, reviewState)
+                                    },
                                 )
                                 if (pendingDelete) {
                                     DeleteConfirmationDialog(

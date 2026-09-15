@@ -5,7 +5,13 @@
   permissions, exported components, or backup/data-extraction rules requires
   a THREAT_MODEL.md review before merging (AGENTS.md).
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ML Kit's transitive metrics transport is not part of OpenLife's
+         boundary. Keep the merged shipping manifest free of network access. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
         android:name=".OpenLifeApp"

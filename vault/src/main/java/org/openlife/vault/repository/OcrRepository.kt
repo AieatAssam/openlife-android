@@ -12,12 +12,14 @@ import org.openlife.vault.ocr.OcrEngineInput
 import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrOutputValidator
 import org.openlife.vault.ocr.OcrRevision
+import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrScriptPolicy
 import org.openlife.vault.ocr.OcrScriptStatus
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrUnsupportedScriptException
+import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
@@ -150,6 +152,36 @@ class OcrRepository(
 
     suspend fun findSpans(revisionId: UUID): List<OcrSpan> =
         database.ocrDao().findSpans(revisionId.toString()).map { it.toDomain() }
+
+    suspend fun addCorrection(revisionId: UUID, spanId: UUID?, correctedText: String): Boolean =
+        mutationQueue.acquire {
+            val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain()
+                ?: return@acquire false
+            if (revision.state != OcrRevisionState.READY) return@acquire false
+            if (spanId != null) {
+                val span = database.ocrDao().findSpan(spanId.toString()) ?: return@acquire false
+                if (span.revisionId != revisionId.toString()) return@acquire false
+            }
+            database.ocrDao().insertUserRevision(
+                OcrUserRevision(
+                    id = UUID.randomUUID(),
+                    revisionId = revisionId,
+                    spanId = spanId,
+                    correctedText = correctedText,
+                    createdAt = clock(),
+                ).toEntity(),
+            )
+            true
+        }
+
+    suspend fun setReviewState(revisionId: UUID, reviewState: OcrReviewState): Boolean =
+        mutationQueue.acquire {
+            val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain()
+                ?: return@acquire false
+            if (revision.state != OcrRevisionState.READY) return@acquire false
+            database.ocrDao().updateRevision(revision.copy(reviewState = reviewState).toEntity())
+            true
+        }
 
     private suspend fun markCancelled(revisionId: UUID) {
         withContext(NonCancellable) {

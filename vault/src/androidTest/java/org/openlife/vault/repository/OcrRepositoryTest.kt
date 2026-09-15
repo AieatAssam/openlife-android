@@ -27,6 +27,7 @@ import org.openlife.vault.ocr.OcrEngineInput
 import org.openlife.vault.ocr.OcrEngineOutput
 import org.openlife.vault.ocr.OcrEngineRegistry
 import org.openlife.vault.ocr.OcrFailureReason
+import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrSpanDraft
@@ -157,6 +158,22 @@ class OcrRepositoryTest {
 
         assertEquals(OcrRunResult.Failed(nullOrRevision(result), OcrFailureReason.UNSUPPORTED_SCRIPT), result)
         assertEquals(OcrRevisionState.FAILED, db.ocrDao().findRevisionsForSource(sourceId.toString()).single().toDomain().state)
+    }
+
+    @Test
+    fun correctionIsASeparateAttributedRowAndReviewDoesNotOverwriteOcr(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val result = repository(TestEngine { OcrEngineOutput(listOf(OcrSpanDraft("hello", null, null))) })
+            .runOcr(sourceId) as OcrRunResult.Completed
+        val spanId = result.spans.single().id
+        val repository = repository(TestEngine { OcrEngineOutput(emptyList()) })
+
+        assertTrue(repository.addCorrection(result.revisionId, spanId, "hullo"))
+        assertTrue(repository.setReviewState(result.revisionId, OcrReviewState.ACCEPTED))
+
+        assertEquals("hello", repository.findSpans(result.revisionId).single().text)
+        assertEquals("hullo", db.ocrDao().findUserRevisions(result.revisionId.toString()).single().toDomain().correctedText)
+        assertEquals(OcrReviewState.ACCEPTED, repository.findRevision(result.revisionId)!!.reviewState)
     }
 
     private fun nullOrRevision(result: OcrRunResult): UUID? =

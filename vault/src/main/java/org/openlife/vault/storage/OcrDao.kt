@@ -32,6 +32,9 @@ interface OcrDao {
     @Query("SELECT * FROM ocr_spans WHERE revisionId = :revisionId ORDER BY ordinal ASC")
     suspend fun findSpans(revisionId: String): List<OcrSpanEntity>
 
+    @Query("SELECT * FROM ocr_spans WHERE id = :spanId")
+    suspend fun findSpan(spanId: String): OcrSpanEntity?
+
     @Query("SELECT * FROM ocr_user_revisions WHERE revisionId = :revisionId ORDER BY createdAt ASC")
     suspend fun findUserRevisions(revisionId: String): List<OcrUserRevisionEntity>
 
