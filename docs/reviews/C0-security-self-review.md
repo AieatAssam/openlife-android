@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `be14a05` (2026-09-14), rather than restating the design document's
+commit `a194b38` (2026-09-14), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
@@ -76,9 +76,12 @@ from memory of earlier stages.
   (`EnvelopeTamperingThroughRepositoryTest`, 3/3).
 - Staged commit + deterministic recovery: `RecoveryRepository`, exercised
   against every constructed interrupted state (`RecoveryRepositoryTest`,
-  8/8) *and* against four genuine `kill -9`-mid-write real process kills
+  10/10) *and* against four genuine `kill -9`-mid-write real process kills
   this stage (C0-09), each followed by clean, idempotent self-healing with
   no accumulation and no `FATAL EXCEPTION`.
+- Failed cancellation cleanup: `ImportRepositoryTest.cancellingAStagedImportRetainsTheRowWhenStageCleanupFails`
+  (included in the focused 11/11 and full 46-test vault connected runs) proves
+  a blocked stage path leaves the STAGED row available for a later retry.
 - **Confirmed, strengthened this stage** (real kills, not only constructed
   states).
 
@@ -95,22 +98,27 @@ from memory of earlier stages.
   model's "Protected recents" and "Secure windows" bullets are, in this
   implementation, one control (`applySecureWindow()`), not two independent
   ones — worth noting so a future reader doesn't look for separate recents-
-  clearing code that doesn't exist (see "Visible content is cleared when the
-  app backgrounds" below).
+  clearing code that doesn't exist. Explicit lifecycle scrubbing is a
+  separate control now: `MainActivity.onStop()` clears decoded thumbnails and
+  returns the viewer to the list, while `IntakeActivity.onStop()` drops
+  authenticated preview state and re-authenticates its staged UUID on return.
+  `DisposableEffect` releases decoded viewer/preview bitmaps, and the
+  generation barrier prevents an in-flight thumbnail decode from repopulating
+  the cache after backgrounding.
 - No content notifications: confirmed — `grep -rn Notification app/src/main
   vault/src/main` returns nothing; the app never posts a notification at
   all in C0.
-- **"Visible content is cleared when the app backgrounds" (THREAT_MODEL.md)
-  — open item, see below.**
+- **Background scrubbing is explicit and covered by the new lifecycle/cache
+  regression tests**; no plaintext state is intentionally retained by the
+  app-owned UI after `onStop()`.
 - Accessibility (TalkBack) "preserved and tested": **partially
   unsubstantiated.** Every icon-only control carries a `contentDescription`
   (re-verified this stage), and large-text rendering was checked at 1.3×/2.0×
   scale with no clipping (C0-16). But no TalkBack accessibility-service run
   was actually performed in this environment — "tested" overstates what
-  Stage 8 could verify here. Recommend softening this THREAT_MODEL.md wording
-  to match `docs/verification/C0.md`'s more precise "partial" status for
-  C0-16, or performing the TalkBack pass on a real device before relying on
-  this line.
+  Stage 8 could verify here. `THREAT_MODEL.md` now states this as an
+  unverified gap, matching `docs/verification/C0.md`'s precise "partial"
+  status for C0-16.
 
 ### Compromised dependency or release
 
@@ -150,9 +158,8 @@ from memory of earlier stages.
 ## Open items
 
 1. ~~"Visible content is cleared when the app backgrounds" had no
-   corresponding app code~~ — **fixed**: `THREAT_MODEL.md` now attributes
-   this and "protected recents" to the single `FLAG_SECURE` control rather
-   than implying separate state-clearing code that doesn't exist.
+   corresponding app code~~ — **fixed in `d497234`** with explicit lifecycle
+   scrubbing and a red/green cache regression test.
 2. ~~TalkBack "tested" overstated actual coverage~~ — **fixed**:
    `THREAT_MODEL.md` now states plainly that an actual TalkBack
    accessibility-service run has not been performed in this environment.

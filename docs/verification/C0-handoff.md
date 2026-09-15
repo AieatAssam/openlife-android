@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `be33aa601d3463a38a9c190c2023c40e0abbf846` (2026-09-14)
+- Commit: `a194b38` (2026-09-14)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
@@ -29,16 +29,15 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 | Suite | Count | Result |
 | --- | --- | --- |
-| `:app:test` + `:vault:test` (JVM unit) | 65 | all pass |
-| `:app:connectedDebugAndroidTest` | 11 | all pass |
-| `:vault:connectedDebugAndroidTest` | 42 | all pass |
-| `:app:lintDebug` / `:vault:lintDebug` | — | clean |
+| `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree |
+| `:app:connectedDebugAndroidTest` | 20 | all pass on `dev36` (IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 1/1, SourceListScreen 1/1) |
+| `:vault:connectedDebugAndroidTest` | 46 | all pass on `dev36`, including staged-cleanup recovery retry and authenticated-view serialization |
+| `:app:assembleDebug` / `lint` | — | passed after the persistent intake-error fix on 2026-09-14 |
 
-Re-run and confirmed together immediately before this handoff (2026-09-14).
-`:app:connectedDebugAndroidTest` was independently re-run 3 consecutive
-times during the cross-test-hang investigation (see
-`docs/verification/C0.md`'s Stage 7 findings) with identical 9→11/9 passing
-results each time, once that investigation's fix landed.
+The JVM suites, build/lint sweep, and vault connected suite were re-run on the
+current tree on 2026-09-14. The final app connected run passed all 20 tests on
+`dev36`; earlier package-manager/process instability is retained in the
+environment limitations rather than used to downgrade this completed run.
 
 ## Requirement-to-test traceability
 
@@ -55,11 +54,13 @@ per-row evidence (already cites concrete test names for every row).
 | C0-R11 (rotation via ViewModel/UUID only) | `IntakeAndListFlowTest.restoringFromASavedStateHandleReAuthenticatesTheStagePreview` | Pre-existing; the fix this stage was to the *test's own* cross-test hygiene (awaiting `Cancelled`), not this requirement's evidence |
 | C0-R14 (no plaintext/thumbnail/URI persisted) | On-device `od`/`strings` inspection of `.blob`, `openlife.db`, `.db-wal`, `database.key` (C0-13) | Found and fixed a real (debug-only) hygiene gap: a leftover cache temp file from `TestHostileContentProvider`, unrelated to production code |
 | C0-R19/C0-R20 (envelope binding, authenticate-before-decode) | `EnvelopeTamperingThroughRepositoryTest` (3/3) | New this stage — proves the codec-level guarantees (`AesGcmCodecTest`/`EnvelopeCodecTest`) hold through the real repository/viewer path, not only in isolation |
-| C0-R22/C0-R23 (idempotent recovery, no false-empty inference) | `RecoveryRepositoryTest` (constructed states) + 4 real `kill -9` mid-write injections (C0-09) | Real kills landed confirmed-mid-write (distinct fresh `.stage` file each time); every relaunch logged `RecoveryReport(cleanedStaged=1, ...)` with no accumulation |
+| C0-R12/C0-R22/C0-R23 (durable staged cleanup and idempotent recovery) | `ImportRepositoryTest.cancellingAStagedImportRetainsTheRowWhenStageCleanupFails`; `RecoveryRepositoryTest` (constructed states) + 4 real `kill -9` mid-write injections (C0-09) | Failed cancellation retains the STAGED row for retry; real kills landed confirmed-mid-write (distinct fresh `.stage` file each time); every relaunch logged `RecoveryReport(cleanedStaged=1, ...)` with no accumulation |
 | C0-R29 (one concurrent import) | `MutationQueueTest`; incidentally re-proven by the Stage 7 cross-test hang investigation, where `tryAcquire` correctly returning "busy" was shown to work exactly as designed | The hang that investigation resolved was a test-isolation bug, not a defect in this requirement's implementation |
 | C0-R30 (15s provider-read deadline) | `BoundedStreamReaderTest.closingTheStreamFromAnotherThreadUnblocksABlockedRead`; `IntakeActivityTest.slowProviderOpenStaysResponsiveInsteadOfFreezingTheActivity` | **Found and fixed a real gap this stage**: the deadline covered reading an opened stream but not opening it — see below |
 | C0-R31 (no INTERNET/exported reader/telemetry, any variant) | Re-run C0-01 dependency inventory + full manifest diff (debug vs. release), 2026-09-14 | Confirmed against the *complete* app, not the Stage 0 placeholder this row was originally checked against |
-| C0-R32 (FLAG_SECURE, no content in logs/recents) | Full real lifecycle captured under `logcat` (C0-15); `dumpsys window`/`dumpsys activity recents` | Clarified in `THREAT_MODEL.md` that "protected recents" and "cleared on backgrounding" are the same `FLAG_SECURE` control, not separate implementations |
+| C0-R8 (sampled authenticated preview and Save gating) | `IntakeAndListFlowTest.sampledPreviewDecoderStaysWithinPixelBudget`; `IntakeScreenTest.saveIsUnavailableWhenAuthenticatedPreviewCannotBeLoaded`; ViewModel `confirmSave` guard | Red/green coverage added; included in the final 20/20 app connected run |
+| C0-R24 (DELETING durability, retry, and view serialization) | `DeletionRepositoryTest` (6/6); `RecoveryRepositoryTest` (10 cases); `DeletionRetryFlowTest.failedDeletionRemainsVisibleUntilRetrySucceeds`; `EnvelopeTamperingThroughRepositoryTest.viewerReadSharesTheMutationQueueWithDeletionWork` | Failed cleanup remains visible and retryable; authenticated reads share the mutation queue with deletion |
+| C0-R32 (FLAG_SECURE, explicit background scrubbing, no content in logs/recents) | Full real lifecycle/logcat evidence (C0-15); `SensitiveContentCacheTest`; `IntakeAndListFlowTest.backgroundScrubsPreviewAndForegroundReauthenticatesIt` | Lifecycle/cache coverage is included in the final 20/20 app connected run |
 | C0-R33 (large text, TalkBack) | Manual `uiautomator` walk at 1.3x/2.0x font scale across every screen (C0-16) | TalkBack itself remains unverified in this environment — stated as a gap in both `docs/verification/C0.md` and the security self-review, not claimed as passing |
 
 ## Real bugs found and fixed during Stage 8 (not merely constructed states)
@@ -73,10 +74,30 @@ per-row evidence (already cites concrete test names for every row).
    infrastructure or documentation — see `docs/verification/C0.md`'s C0-17
    row and the security self-review's "Resource exhaustion by a provider"
    section.
-2. A debug-only test fixture (`TestHostileContentProvider`) left served
+2. **Intake-boundary trust gaps.** The exported activity previously ignored
+   the incoming read-grant flag and sender MIME declaration. It now requires
+   `FLAG_GRANT_READ_URI_PERMISSION`, compares the sender and provider MIME
+   types before opening bytes, and closes a stream if lifecycle cancellation
+   happens before handoff.
+3. **Unbounded UI preview and background retention.** Intake/viewer decode
+   now samples to the 4M-pixel budget; Save is blocked if authenticated
+   preview bytes cannot be loaded; lifecycle scrubbing clears preview bytes,
+   decoded bitmaps, and thumbnail cache generations.
+4. **Durable cleanup retry.** Recovery retains STAGED/DELETING rows when a
+   file cannot be removed, the list exposes an unavailable retry state, and
+   authenticated viewer reads serialize with deletion mutations. The
+   cancellation path now also retains a STAGED row when its stage/blob cleanup
+   fails, with a red/green retry regression.
+5. **Transient intake errors disappeared before they could be acknowledged.**
+   A slow first-run device/provider boundary could finish the exported
+   activity before the rejection text was observed, and the user had no way
+   to keep an error visible. Error, busy, and vault-unavailable states now
+   remain on screen with an explicit Done action; only success and duplicate
+   results auto-return.
+6. A debug-only test fixture (`TestHostileContentProvider`) left served
    bytes in a `cacheDir` temp file indefinitely — confirmed not to affect
    any production code path, fixed anyway.
-3. Two test-isolation bugs (a fire-and-forget `cancel()` coroutine racing
+7. Two test-isolation bugs (a fire-and-forget `cancel()` coroutine racing
    the next test's mutex acquisition; byte-identical synthetic content
    across loop iterations accidentally exercising duplicate detection
    instead of the intended list-volume check) — both root-caused with live
@@ -97,7 +118,7 @@ manufacturer-specific backup behavior remain unverifiable on this emulator
 
 ## Checkpoint recovery results
 
-Summarized from C0-09/C0-10: `RecoveryRepositoryTest` (8/8) covers every
+Summarized from C0-09/C0-10: `RecoveryRepositoryTest` (10/10) covers every
 constructed interrupted state. Four **real** `kill -9`s landed confirmed
 mid-write during Stage 8; every relaunch self-healed idempotently with no
 accumulation, no false success, and no crash. Kill-during-Save could not be
@@ -126,13 +147,12 @@ automated runs).
 
 ## Acceptance recommendation
 
-All 17 C0 verification-matrix rows (`docs/verification/C0.md`) are now
-**pass** or **partial with an explicitly stated, non-blocking gap** (API 29,
-TalkBack, physical-device-only checks) — none are **not started** or
-**fail**. The one real app-code defect found this stage (the provider-open
-ANR) is fixed and regression-tested. No fabricated evidence, no silently
-skipped row. Recommend accepting C0 with the stated gaps recorded as
-inherited by C1, not re-litigated.
+The implementation gaps found in review are fixed and covered by red/green
+regressions. C0 is not yet a release acceptance: the API-29, TalkBack, and
+physical-device/transfer checks remain required design-gate evidence. Record
+those as explicit blockers rather than calling them non-blocking. The code
+slice is ready for owner review; no C1 implementation should begin until the
+remaining C0 evidence is accepted.
 
 Per AGENTS.md and design §13 ("Do not begin C1 to fill the time"): this
 stage stops here. The next step is proposing the C1 (Text provenance)

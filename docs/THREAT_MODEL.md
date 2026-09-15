@@ -41,19 +41,21 @@ adversary.
 | Malicious or misleading shared image | Explicit preview, strict type and size checks, inert display | Import does not establish sender identity or truth |
 | Copied storage or accidental backup | Encrypted artefacts and database, Keystore wrapping, backup exclusions | File count and ciphertext sizes may remain observable |
 | Corruption or interrupted writes | Authenticated encryption, staged commit, deterministic recovery | Failed media or lost keys may make content unrecoverable |
-| Screenshot or shoulder surfing | Secure windows, protected recents, no content notifications | An external camera and compromised OS remain possible |
+| Screenshot or shoulder surfing | Secure windows, protected recents, explicit foreground/background content scrubbing, no content notifications | An external camera and compromised OS remain possible |
 | Compromised dependency or release | Minimal dependency set, locked artefacts, manifest and egress checks | Source availability alone does not prove binary integrity |
 | Resource exhaustion by a provider | Byte and pixel ceilings, bounded preview, cancellable I/O | In-process native decoding cannot guarantee a hard time bound |
 
 `FLAG_SECURE` is required on all content-bearing windows and dialogs (R6). It
 helps prevent supported screenshots and non-secure display output, but is not
-universal protection against hostile devices. "Protected recents" and
-"content cleared while backgrounded" are effects of this single
-`FLAG_SECURE` control (`applySecureWindow()`), not separate implementations
-— confirmed via `dumpsys window` showing no recents-thumbnail bitmap for the
-task; there is no additional explicit state-clearing code, nor is any
-needed. Every icon-only control carries a `contentDescription` and large-text
-rendering (1.3x/2.0x scale) was checked for clipping across every screen
+universal protection against hostile devices. `MainActivity.onStop()` clears
+decoded list thumbnails and returns the viewer to the list; `IntakeActivity`
+clears authenticated preview state and re-authenticates its staged UUID on
+return. `DisposableEffect` releases decoded viewer/preview bitmaps, and the
+thumbnail cache uses a generation barrier so an in-flight decode cannot be
+retained after a background transition. Protected recents remain an effect of
+`FLAG_SECURE` (`applySecureWindow()`), confirmed via `dumpsys window` showing
+no recents-thumbnail bitmap for the task. Every icon-only control carries a
+`contentDescription` and large-text rendering (1.3x/2.0x scale) was checked for clipping across every screen
 (`docs/verification/C0.md` C0-16); an actual TalkBack accessibility-service
 run has not been performed in this environment and remains an open item
 (`docs/reviews/C0-security-self-review.md`), not a passed check.
