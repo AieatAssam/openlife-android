@@ -25,6 +25,7 @@ class DeletionRepository(
     private val paths: VaultPaths,
     private val database: OpenLifeDatabase,
     private val mutationQueue: MutationQueue,
+    private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
 ) {
 
     suspend fun deleteSource(sourceId: UUID): DeleteResult = mutationQueue.acquire {
@@ -45,8 +46,8 @@ class DeletionRepository(
             database.sourceDao().update(source.copy(state = SourceState.DELETING).toEntity())
         }
 
-        val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
-        val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
+        val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
+        val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
         if (!stageRemoved || !blobRemoved) {
             return@acquire DeleteResult.Failed
         }
@@ -55,8 +56,4 @@ class DeletionRepository(
         DeleteResult.Deleted
     }
 
-    private fun deleteIfExists(file: java.io.File): Boolean {
-        if (!file.exists()) return true
-        return file.delete() && !file.exists()
-    }
 }

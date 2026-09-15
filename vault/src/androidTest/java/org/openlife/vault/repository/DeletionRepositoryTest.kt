@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -38,6 +39,7 @@ class DeletionRepositoryTest {
     private lateinit var db: OpenLifeDatabase
     private lateinit var importRepository: ImportRepository
     private lateinit var deletionRepository: DeletionRepository
+    private lateinit var mutationQueue: MutationQueue
 
     private fun syntheticJpegBytes(): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 48, Bitmap.Config.ARGB_8888)
@@ -55,7 +57,7 @@ class DeletionRepositoryTest {
         val wrapper = KeystoreWrapper(alias)
         val ready = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Ready
         db = OpenLifeDatabaseFactory.create(context, paths, ready.databaseSecret)
-        val mutationQueue = MutationQueue()
+        mutationQueue = MutationQueue()
         importRepository = ImportRepository(
             paths = paths,
             database = db,
@@ -167,5 +169,42 @@ class DeletionRepositoryTest {
         // Cleanup so tearDown's deleteRecursively can proceed normally.
         java.io.File(blob, "occupied").delete()
         blob.delete()
+    }
+
+    @Test
+    fun aFailureAfterTheFirstDeleteKeepsDeletingStateForRetry(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val blob = paths.blobFile(id)
+        val fault = FailOnceOnBlobDelete(blob)
+        val faultInjectingRepository = DeletionRepository(paths, db, mutationQueue, fault)
+
+        assertEquals(DeleteResult.Failed, faultInjectingRepository.deleteSource(id))
+        assertTrue("the blob must remain owned after a failed cleanup", blob.exists())
+        assertEquals(SourceState.DELETING, db.sourceDao().findById(id.toString())!!.toDomain().state)
+
+        assertEquals(DeleteResult.Deleted, faultInjectingRepository.deleteSource(id))
+        assertEquals(null, db.sourceDao().findById(id.toString()))
+        assertTrue(!blob.exists())
+    }
+
+    private class FailOnceOnBlobDelete(private val blob: File) : ArtefactFileOps {
+        private var failed = false
+
+        override fun writeAndSync(file: File, bytes: ByteArray) =
+            ArtefactFileOps.Default.writeAndSync(file, bytes)
+
+        override fun rename(stage: File, blob: File): Boolean =
+            ArtefactFileOps.Default.rename(stage, blob)
+
+        override fun syncDirectory(directory: File) =
+            ArtefactFileOps.Default.syncDirectory(directory)
+
+        override fun deleteIfExists(file: File): Boolean {
+            if (!failed && file == blob) {
+                failed = true
+                return false
+            }
+            return ArtefactFileOps.Default.deleteIfExists(file)
+        }
     }
 }

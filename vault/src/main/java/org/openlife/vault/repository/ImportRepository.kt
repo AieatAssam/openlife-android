@@ -141,16 +141,11 @@ class ImportRepository(
      * cleanup again (design §11: failed cleanup is recoverable state).
      */
     private suspend fun cancelStage(sourceId: UUID): Boolean {
-        val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
-        val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
+        val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
+        val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
         if (!stageRemoved || !blobRemoved) return false
         database.sourceDao().deleteById(sourceId.toString())
         return true
-    }
-
-    private fun deleteIfExists(file: java.io.File): Boolean {
-        if (!file.exists()) return true
-        return file.delete() && !file.exists()
     }
 
     /**
