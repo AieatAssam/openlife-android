@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `0f1001f` (2026-09-15), rather than restating the design document's
+commit `00a11d6` (2026-09-15), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
@@ -98,6 +98,9 @@ from memory of earlier stages.
   uses the same seam to fail blob removal after the first checkpoint and
   verifies that the `DELETING` row and remaining blob are retained until a
   later retry succeeds. The production default still verifies each deletion.
+- Duplicate-choice UI: `IntakeScreenTest.duplicateOffersOpenExistingOrCancel`
+  is covered by the final 21/21 app connected run, including both the
+  existing-source route callback and explicit cancellation.
 - **Confirmed, strengthened this stage** (real kills, not only constructed
   states).
 

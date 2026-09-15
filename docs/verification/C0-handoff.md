@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `0f1001f` (2026-09-15; deletion checkpoint fault-injection coverage and connected fixture correction)
+- Commit: `00a11d6` (2026-09-15; deletion checkpoint fault-injection coverage, connected fixtures, and duplicate-choice UI verification)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
@@ -30,14 +30,15 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 | Suite | Count | Result |
 | --- | --- | --- |
 | `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree (`./gradlew :app:test :vault:test assembleDebug lint`, 2026-09-15) |
-| `:app:connectedDebugAndroidTest` | 20 (prior code) | all pass on `dev36` for `a194b38` (IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 1/1, SourceListScreen 1/1); the new duplicate-choice test is not yet device-verified |
+| `:app:connectedDebugAndroidTest` | 21 | all pass on `dev36` for `00a11d6` (2026-09-15): IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 2/2 including duplicate Open existing/Cancel, SourceListScreen 1/1 |
 | `:vault:connectedDebugAndroidTest` | 57 | all pass on `dev36` for `0f1001f` (2026-09-15), including 7 deletion, 21 import, 10 recovery, 4 READY-invariant, and 6 Keystore cases; an earlier same-session run exposed stale anonymous fault fixtures and failed with `AbstractMethodError`, then the corrected clean rerun passed |
 | `:app:assembleDebug` / `lint` | — | passed on the current tree on 2026-09-15 |
 
-The JVM suites, build/lint sweep, and vault connected suite were re-run on the
-current tree on 2026-09-14. The final app connected run passed all 20 tests on
-`dev36`; earlier package-manager/process instability is retained in the
-environment limitations rather than used to downgrade this completed run.
+The JVM suites, build/lint sweep, vault connected suite, and app connected
+suite were re-run on the current tree on 2026-09-15. The final app run passed
+all 21 tests and the final vault run passed all 57 tests on `dev36`; earlier
+package-manager/process instability is retained in the environment
+limitations rather than used to downgrade these completed runs.
 
 ## Requirement-to-test traceability
 
@@ -58,13 +59,13 @@ per-row evidence (already cites concrete test names for every row).
 | C0-R29 (one concurrent import) | `MutationQueueTest`; incidentally re-proven by the Stage 7 cross-test hang investigation, where `tryAcquire` correctly returning "busy" was shown to work exactly as designed | The hang that investigation resolved was a test-isolation bug, not a defect in this requirement's implementation |
 | C0-R30 (15s provider-read deadline) | `BoundedStreamReaderTest.closingTheStreamFromAnotherThreadUnblocksABlockedRead`; `IntakeActivityTest.slowProviderOpenStaysResponsiveInsteadOfFreezingTheActivity` | **Found and fixed a real gap this stage**: the deadline covered reading an opened stream but not opening it — see below |
 | C0-R31 (no INTERNET/exported reader/telemetry, any variant) | Re-run C0-01 dependency inventory + full manifest diff (debug vs. release), 2026-09-14 | Confirmed against the *complete* app, not the Stage 0 placeholder this row was originally checked against |
-| C0-R8 (sampled authenticated preview and Save gating) | `IntakeAndListFlowTest.sampledPreviewDecoderStaysWithinPixelBudget`; `IntakeScreenTest.saveIsUnavailableWhenAuthenticatedPreviewCannotBeLoaded`; ViewModel `confirmSave` guard | Red/green coverage added; included in the final 20/20 app connected run |
+| C0-R8 (sampled authenticated preview and Save gating) | `IntakeAndListFlowTest.sampledPreviewDecoderStaysWithinPixelBudget`; `IntakeScreenTest.saveIsUnavailableWhenAuthenticatedPreviewCannotBeLoaded`; ViewModel `confirmSave` guard | Red/green coverage added; included in the final 21/21 app connected run |
 | C0-R24 (DELETING durability, retry, and view serialization) | `DeletionRepositoryTest` (7 cases, including `aFailureAfterTheFirstDeleteKeepsDeletingStateForRetry`); `RecoveryRepositoryTest` (10 cases); `DeletionRetryFlowTest.failedDeletionRemainsVisibleUntilRetrySucceeds`; `EnvelopeTamperingThroughRepositoryTest.viewerReadSharesTheMutationQueueWithDeletionWork` | A one-shot fault after the first file-removal checkpoint leaves the durable `DELETING` row/blob and a retry completes it; all 57 vault connected tests pass on `dev36` for `0f1001f`. Failed cleanup remains visible and retryable, and authenticated viewer reads share the mutation queue with deletion. |
-| C0-R32 (FLAG_SECURE, explicit background scrubbing, no content in logs/recents) | Full real lifecycle/logcat evidence (C0-15); `SensitiveContentCacheTest`; `IntakeAndListFlowTest.backgroundScrubsPreviewAndForegroundReauthenticatesIt` | Lifecycle/cache coverage is included in the final 20/20 app connected run |
+| C0-R32 (FLAG_SECURE, explicit background scrubbing, no content in logs/recents) | Full real lifecycle/logcat evidence (C0-15); `SensitiveContentCacheTest`; `IntakeAndListFlowTest.backgroundScrubsPreviewAndForegroundReauthenticatesIt` | Lifecycle/cache coverage is included in the final 21/21 app connected run |
 | C0-R33 (large text, TalkBack) | Manual `uiautomator` walk at 1.3x/2.0x font scale across every screen (C0-16) | TalkBack itself remains unverified in this environment — stated as a gap in both `docs/verification/C0.md` and the security self-review, not claimed as passing |
 | C0-R5 (own-authority trust boundary) | `IntakeIntentValidatorTest.ownAuthorityMatchIsCaseInsensitive` | JVM regression passes on the current tree; it rejects case variants of the app authority before any provider open |
-| C0-R16 (duplicate choice) | `IntakeScreenTest.duplicateOffersOpenExistingOrCancel`; `MainActivity.EXTRA_OPEN_SOURCE_ID` route | UI and navigation are implemented; connected execution is pending the emulator gap recorded above |
-| C0-R21 (final READY commit failure) | `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable` | Repository now returns failure and retains durable STAGED ownership after a post-rename DB rejection; connected execution is pending the emulator gap recorded above |
+| C0-R16 (duplicate choice) | `IntakeScreenTest.duplicateOffersOpenExistingOrCancel`; `MainActivity.EXTRA_OPEN_SOURCE_ID` route | UI and navigation are implemented and included in the 21/21 app connected run |
+| C0-R21 (final READY commit failure) | `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable` | Repository now returns failure and retains durable STAGED ownership after a post-rename DB rejection; included in the 57/57 vault connected run |
 | C0-R10/C0-R15 (provider and rename failure ownership) | `ImportRepositoryTest.providerReadFailureReturnsFailedAndCleansStagedRow`; `ImportRepositoryTest.renameFailureReturnsFailedAndLeavesTheStageForRecovery` | New repository regressions preserve cleanup/recovery ownership for read and filesystem rename failures; included in the 21 import cases of the 57/57 connected vault run |
 | C0-R10/C0-R21 (write/sync failure ownership) | `ImportRepositoryTest.stageWriteFailureReturnsFailedAndCleansStagedRow`; `ImportRepositoryTest.directorySyncFailureReturnsFailedAndLeavesRenamedArtefactRecoverable` | `ArtefactFileOps` injects only the tested durability boundary; the production default still uses `Fsync`; both pass in the 57/57 connected vault run |
 | C0-R1/C0-R2 (JPEG and PNG prepare paths) | `ImportRepositoryTest.validJpegIsPreparedAndStagedRowMatchesTheOriginal`; `ImportRepositoryTest.validPngIsPreparedAndStagedRowMatchesTheOriginal` | Platform-encoded JPEG and PNG success paths pass in the 21-case import class, included in the 57/57 connected vault run |
