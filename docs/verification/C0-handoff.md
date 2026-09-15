@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `7b18a9e` (2026-09-15; code; documentation update follows)
+- Commit: `ab3eb0e` (2026-09-15; code; documentation update follows)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
@@ -65,6 +65,7 @@ per-row evidence (already cites concrete test names for every row).
 | C0-R5 (own-authority trust boundary) | `IntakeIntentValidatorTest.ownAuthorityMatchIsCaseInsensitive` | JVM regression passes on the current tree; it rejects case variants of the app authority before any provider open |
 | C0-R16 (duplicate choice) | `IntakeScreenTest.duplicateOffersOpenExistingOrCancel`; `MainActivity.EXTRA_OPEN_SOURCE_ID` route | UI and navigation are implemented; connected execution is pending the emulator gap recorded above |
 | C0-R21 (final READY commit failure) | `ImportRepositoryTest.saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable` | Repository now returns failure and retains durable STAGED ownership after a post-rename DB rejection; connected execution is pending the emulator gap recorded above |
+| C0-R10/C0-R15 (provider and rename failure ownership) | `ImportRepositoryTest.providerReadFailureReturnsFailedAndCleansStagedRow`; `ImportRepositoryTest.renameFailureReturnsFailedAndLeavesTheStageForRecovery` | New repository regressions preserve cleanup/recovery ownership for read and filesystem rename failures; connected execution is pending the emulator gap recorded above |
 
 ## Real bugs found and fixed during Stage 8 (not merely constructed states)
 
