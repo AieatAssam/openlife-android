@@ -9,5 +9,5 @@ package org.openlife.vault
  * see docs/THREAT_MODEL.md.
  */
 internal object Vault {
-    const val SCHEMA_VERSION = 1
+    const val SCHEMA_VERSION = 2
 }

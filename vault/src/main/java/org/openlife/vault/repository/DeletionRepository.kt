@@ -52,6 +52,11 @@ class DeletionRepository(
             return@acquire DeleteResult.Failed
         }
 
+        // Delete derived OCR rows on the same serialized mutation path as the
+        // Source. The foreign keys also cascade in SQLite, but keeping this
+        // explicit makes the C1 deletion contract independent of connection
+        // pragma defaults and leaves no dependent provenance row behind.
+        database.ocrDao().deleteForSource(sourceId.toString())
         database.sourceDao().deleteById(sourceId.toString())
         DeleteResult.Deleted
     }

@@ -10,6 +10,6 @@ import org.junit.Test
 class VaultTest {
     @Test
     fun schemaVersionIsOne() {
-        assertEquals(1, Vault.SCHEMA_VERSION)
+        assertEquals(2, Vault.SCHEMA_VERSION)
     }
 }

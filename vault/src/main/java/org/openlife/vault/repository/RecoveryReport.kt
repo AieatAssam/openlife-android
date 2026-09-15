@@ -7,4 +7,5 @@ data class RecoveryReport(
     val markedCorrupt: Int = 0,
     val resumedDeletions: Int = 0,
     val removedOrphanFiles: Int = 0,
+    val markedStaleOcrRevisions: Int = 0,
 )

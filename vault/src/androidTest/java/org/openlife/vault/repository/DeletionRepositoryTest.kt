@@ -17,6 +17,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.IntakeKind
+import org.openlife.vault.model.Orientation
+import org.openlife.vault.ocr.OcrReviewState
+import org.openlife.vault.ocr.OcrRevision
+import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
@@ -96,6 +100,32 @@ class DeletionRepositoryTest {
         assertEquals(DeleteResult.Deleted, result)
         assertEquals(null, db.sourceDao().findById(id.toString()))
         assertTrue(!paths.blobFile(id).exists())
+    }
+
+    @Test
+    fun deletingASourceRemovesItsDependentOcrRevision(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val revisionId = UUID.randomUUID()
+        db.ocrDao().insertRevision(
+            OcrRevision(
+                id = revisionId,
+                sourceId = id,
+                state = OcrRevisionState.READY,
+                engineId = "test-engine",
+                modelVersion = "test",
+                orientation = Orientation.NORMAL,
+                sourceDigest = ByteArray(32) { 1 },
+                startedAt = 1,
+                extractedAt = 2,
+                reviewState = OcrReviewState.UNREVIEWED,
+                failureReason = null,
+                charCount = 4,
+                spanCount = 1,
+            ).toEntity(),
+        )
+
+        assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
+        assertEquals(0, db.ocrDao().countRevisions())
     }
 
     @Test

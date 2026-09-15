@@ -16,6 +16,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.IntakeKind
+import org.openlife.vault.model.Orientation
+import org.openlife.vault.ocr.OcrReviewState
+import org.openlife.vault.ocr.OcrRevision
+import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
@@ -138,6 +142,34 @@ class RecoveryRepositoryTest {
         assertEquals(1, report.confirmedReady)
         assertEquals(SourceState.READY, db.sourceDao().findById(id.toString())!!.toDomain().state)
         assertTrue(paths.blobFile(id).exists())
+    }
+
+    @Test
+    fun runningOcrRevisionIsMarkedStaleOnRecovery(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val revisionId = UUID.randomUUID()
+        db.ocrDao().insertRevision(
+            OcrRevision(
+                id = revisionId,
+                sourceId = id,
+                state = OcrRevisionState.RUNNING,
+                engineId = "test-engine",
+                modelVersion = "test",
+                orientation = Orientation.NORMAL,
+                sourceDigest = ByteArray(32) { 4 },
+                startedAt = 1,
+                extractedAt = null,
+                reviewState = OcrReviewState.UNREVIEWED,
+                failureReason = null,
+                charCount = 0,
+                spanCount = 0,
+            ).toEntity(),
+        )
+
+        val report = recoveryRepository.recover()
+
+        assertEquals(1, report.markedStaleOcrRevisions)
+        assertEquals(OcrRevisionState.STALE, db.ocrDao().findRevision(revisionId.toString())!!.toDomain().state)
     }
 
     @Test
