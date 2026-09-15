@@ -1,10 +1,11 @@
 # Decision 0002 — Capability 1 OCR engine proposal
 
-Status: **proposal; owner acceptance required before implementation**.
+Status: **accepted first slice; owner approved 2026-09-15**.
 
-This record narrows the C1 choices without adding a runtime, model, network
-permission, or schema ahead of acceptance. It follows
-`docs/capabilities/C1.md` and does not change the accepted C0 boundary.
+This record selects the first C1 engine without changing the no-network,
+no-telemetry, or preserved-byte C0 boundary. It follows
+`docs/capabilities/C1.md`; later local engines remain configurable alternatives
+and require their own review before registration.
 
 ## Recommended first slice
 
@@ -13,7 +14,7 @@ and support Latin only in the first C1 release. An image containing unsupported
 or mixed scripts is reported as unsupported or partially ungrounded; the app
 does not silently guess a language or translate text.
 
-The current leading candidate is the bundled ML Kit Text Recognition artifact
+The selected engine is the bundled ML Kit Text Recognition artifact
 `com.google.mlkit:text-recognition:16.0.1`. Google documents bundled versus
 unbundled installation and exposes text-block, line, element, and symbol
 regions plus confidence/rotation metadata:
@@ -21,9 +22,11 @@ regions plus confidence/rotation metadata:
 - <https://developers.google.com/ml-kit/vision/text-recognition/v2/android>
 - <https://developers.google.com/ml-kit/release-notes>
 
-This candidate is **not selected yet**. Its distribution terms, exact packaged
-asset size, native ABI footprint, peak memory, and offline behavior on the
-declared API matrix must be reviewed before adding it.
+The first implementation records the dependency, packaged asset/native ABI
+inventory, peak-memory/performance measurements, and offline behavior in the
+C1 verification handoff. The engine is kept behind a local `OcrEngine`
+interface so a future fully local alternative can be selected without
+changing the persisted provenance contract.
 
 ## Alternatives requiring an explicit change
 
@@ -38,22 +41,20 @@ No unbundled or runtime-downloaded model is acceptable. No cloud OCR, remote
 model, `INTERNET` permission, telemetry, or automatic outbound action may be
 introduced.
 
-## Acceptance conditions before code
+## Accepted first-slice conditions
 
-The owner must approve:
+The owner approved:
 
-1. Engine/model and licence, including the exact pinned artifact or vendored
-   model hash.
-2. Supported scripts/languages for C1-R2, plus behavior for unsupported and
-   mixed-language images.
-3. Measured limits: source bytes and pixels inherited from C0, OCR decode
-   budget, wall-clock cancellation deadline, peak memory, and maximum derived
-   text/spans per revision.
-4. Evidence coordinates: source pixel coordinates after the C0 orientation
-   transform, with nullable confidence and no fabricated regions.
-5. Correction semantics: OCR output is immutable; a user correction is a
-   separate attributed revision; accepting/rejecting a revision and deleting
-   its Source have explicit state transitions.
+1. Bundled ML Kit Latin `16.0.1`; licence and packaged footprint are reviewed
+   as part of the C1 dependency handoff.
+2. Latin-only support; unsupported or mixed scripts are reported as
+   ungrounded/unsupported and never guessed or translated.
+3. C0 byte/pixel limits, a 15-second OCR deadline, 200,000 characters, and
+   2,000 spans per revision.
+4. `SOURCE_PIXELS` coordinates after orientation, nullable confidence and
+   nullable regions when the engine supplies none.
+5. Immutable OCR output, separate attributed user corrections, explicit
+   review metadata, and cascade deletion with the Source.
 
 ## Planned schema once accepted
 
