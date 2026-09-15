@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `00a11d6` (2026-09-15; deletion checkpoint fault-injection coverage, connected fixtures, and duplicate-choice UI verification)
+- Commit: current verified tree (2026-09-15; C0 baseline plus the accepted bounded C1 OCR slice; the exact implementation commit is recorded below after the final push)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
@@ -30,13 +30,13 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 | Suite | Count | Result |
 | --- | --- | --- |
 | `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree (`./gradlew :app:test :vault:test assembleDebug lint`, 2026-09-15) |
-| `:app:connectedDebugAndroidTest` | 21 | all pass on `dev36` for `00a11d6` (2026-09-15): IntakeActivity 8/8, IntakeAndListFlow 9/9, DeletionRetryFlow 1/1, IntakeScreen 2/2 including duplicate Open existing/Cancel, SourceListScreen 1/1 |
-| `:vault:connectedDebugAndroidTest` | 57 | all pass on `dev36` for `0f1001f` (2026-09-15), including 7 deletion, 21 import, 10 recovery, 4 READY-invariant, and 6 Keystore cases; an earlier same-session run exposed stale anonymous fault fixtures and failed with `AbstractMethodError`, then the corrected clean rerun passed |
+| `:app:connectedDebugAndroidTest` | 23 | all pass on `dev36` (2026-09-15): the 21-test C0 baseline plus 2 C1 viewer tests for inert text, evidence selection, and correction/review |
+| `:vault:connectedDebugAndroidTest` | 70 | all pass on `dev36` (2026-09-15): 6 Keystore, 1 bundled-engine, 8 deletion, 4 envelope, 21 import, 6 OCR repository, 11 recovery, 4 OCR database (including v1→v2 migration), 4 READY-invariant, and 5 bootstrap cases |
 | `:app:assembleDebug` / `lint` | — | passed on the current tree on 2026-09-15 |
 
 The JVM suites, build/lint sweep, vault connected suite, and app connected
 suite were re-run on the current tree on 2026-09-15. The final app run passed
-all 21 tests and the final vault run passed all 57 tests on `dev36`; earlier
+all 23 tests and the final vault run passed all 70 tests on `dev36`; earlier
 package-manager/process instability is retained in the environment
 limitations rather than used to downgrade these completed runs.
 

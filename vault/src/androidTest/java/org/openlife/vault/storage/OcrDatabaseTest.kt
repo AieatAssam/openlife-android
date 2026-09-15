@@ -1,6 +1,8 @@
 package org.openlife.vault.storage
 
 import androidx.room.Room
+import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
@@ -9,6 +11,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,10 +25,19 @@ import org.openlife.vault.model.Orientation
 
 @RunWith(AndroidJUnit4::class)
 class OcrDatabaseTest {
+    private val migrationHelper by lazy {
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            OpenLifeDatabase::class.java,
+            emptyList(),
+            FrameworkSQLiteOpenHelperFactory(),
+        )
+    }
     private lateinit var db: OpenLifeDatabase
 
     @Before
     fun setUp() {
+        System.loadLibrary("sqlcipher")
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         db = Room.inMemoryDatabaseBuilder(context, OpenLifeDatabase::class.java)
             .openHelperFactory(SupportOpenHelperFactory("test-passphrase".toByteArray()))
@@ -116,6 +128,38 @@ class OcrDatabaseTest {
 
         assertEquals(1, db.ocrDao().markRunningStale())
         assertEquals(OcrRevisionState.STALE, db.ocrDao().findRevisionsForSource(sourceId.toString()).single().toDomain().state)
+    }
+
+    @Test
+    fun versionOneSourceRowsSurviveTheC1MigrationAndNewTablesExist() {
+        val databaseName = "c1-migration-${UUID.randomUUID()}"
+        val old = migrationHelper.createDatabase(databaseName, 1)
+        old.execSQL(
+            """
+            INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height, orientation, wrappedDek, artefactVersion)
+            VALUES ('source-1', 'READY', 1, 'SHARE', 'image/jpeg', 10, X'0102', 10, 10, 'NORMAL', X'0304', 1)
+            """.trimIndent(),
+        )
+        old.close()
+
+        val migrated = migrationHelper.runMigrationsAndValidate(
+            databaseName,
+            2,
+            true,
+            OpenLifeDatabase.MIGRATION_1_2,
+        )
+        migrated.query("SELECT state, sha256 FROM sources WHERE id = 'source-1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("READY", cursor.getString(0))
+            assertEquals(byteArrayOf(1, 2).toList(), cursor.getBlob(1).toList())
+        }
+        migrated.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'ocr_%'").use { cursor ->
+            val names = buildList {
+                while (cursor.moveToNext()) add(cursor.getString(0))
+            }
+            assertEquals(setOf("ocr_revisions", "ocr_spans", "ocr_user_revisions"), names.toSet())
+        }
+        migrated.close()
     }
 
     private fun revision(id: UUID, sourceId: UUID) = org.openlife.vault.ocr.OcrRevision(
