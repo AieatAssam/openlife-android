@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
@@ -104,6 +105,15 @@ class IntakeActivity : ComponentActivity() {
                         onSave = viewModel::confirmSave,
                         onCancel = viewModel::cancel,
                         onDone = { finish() },
+                        onOpenExisting = { existingSourceId ->
+                            startActivity(
+                                Intent(this, MainActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
+                                }
+                            )
+                            finish()
+                        },
                     )
                 }
             }

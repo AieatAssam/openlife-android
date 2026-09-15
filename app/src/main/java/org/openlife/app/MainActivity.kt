@@ -46,6 +46,13 @@ class MainActivity : ComponentActivity() {
         SourceListViewModel.factory(application as OpenLifeApp)
     }
     private val backgroundEpoch = MutableStateFlow(0L)
+    private val openSourceRequests = MutableStateFlow<UUID?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openSourceIdFrom(intent)?.let { openSourceRequests.value = it }
+    }
 
     override fun onStop() {
         // Drop decoded thumbnails and force the viewer composable out of the
@@ -61,12 +68,21 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
-            var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.List) }
+            var screen by rememberSaveable(stateSaver = ScreenSaver) {
+                mutableStateOf<Screen>(openSourceIdFrom(intent)?.let { Screen.Viewer(it) } ?: Screen.List)
+            }
+            val requestedSourceId by openSourceRequests.collectAsState()
             val epoch by backgroundEpoch.collectAsState()
             val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
 
             androidx.compose.runtime.LaunchedEffect(epoch) {
                 if (epoch > 0L) screen = Screen.List
+            }
+            androidx.compose.runtime.LaunchedEffect(requestedSourceId) {
+                requestedSourceId?.let {
+                    screen = Screen.Viewer(it)
+                    openSourceRequests.value = null
+                }
             }
 
             val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -119,7 +135,24 @@ class MainActivity : ComponentActivity() {
                             val source = (listState as? SourceListUiState.Loaded)
                                 ?.sources?.find { it.id == current.sourceId }
                             if (source == null) {
-                                screen = Screen.List
+                                if (listState is SourceListUiState.Loaded) {
+                                    screen = Screen.List
+                                } else {
+                                    SourceListScreen(
+                                        state = listState,
+                                        loadThumbnail = viewModel::loadThumbnail,
+                                        thumbnailGeneration = thumbnailGeneration,
+                                        onOpen = { screen = Screen.Viewer(it) },
+                                        onDelete = { viewModel.delete(it) {} },
+                                        onImportFromPhotoPicker = {
+                                            pickMedia.launch(
+                                                androidx.activity.result.PickVisualMediaRequest(
+                                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                                )
+                                            )
+                                        },
+                                    )
+                                }
                             } else {
                                 var pendingDelete by remember { mutableStateOf(false) }
                                 ViewerScreen(
@@ -149,7 +182,16 @@ class MainActivity : ComponentActivity() {
 
     private suspend fun viewModelLoadReadyBytes(sourceId: UUID): ByteArray? =
         ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.loadReadyBytes(sourceId)
+
+    companion object {
+        const val EXTRA_OPEN_SOURCE_ID = "org.openlife.app.MainActivity.openSourceId"
+    }
 }
+
+private fun openSourceIdFrom(intent: Intent): UUID? =
+    intent.getStringExtra(MainActivity.EXTRA_OPEN_SOURCE_ID)?.let { raw ->
+        runCatching { UUID.fromString(raw) }.getOrNull()
+    }
 
 private val ScreenSaver = androidx.compose.runtime.saveable.Saver<Screen, String>(
     save = { screen ->

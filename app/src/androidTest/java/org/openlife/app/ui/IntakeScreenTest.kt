@@ -1,10 +1,13 @@
 package org.openlife.app.ui
 
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,5 +38,37 @@ class IntakeScreenTest {
         }
 
         composeRule.onNodeWithText("Save").assertIsNotEnabled()
+    }
+
+    @Test
+    fun duplicateOffersOpenExistingOrCancel() {
+        val existingId = UUID.randomUUID()
+        var openedId: UUID? = null
+        var cancelled = false
+
+        composeRule.setContent {
+            IntakeScreen(
+                state = IntakeUiState.Duplicate(existingId),
+                onSave = {},
+                onCancel = {},
+                onDone = { cancelled = true },
+                onOpenExisting = { openedId = it },
+            )
+        }
+
+        composeRule.onNodeWithText("Open existing").performClick()
+        assertEquals(existingId, openedId)
+
+        composeRule.setContent {
+            IntakeScreen(
+                state = IntakeUiState.Duplicate(existingId),
+                onSave = {},
+                onCancel = {},
+                onDone = { cancelled = true },
+                onOpenExisting = {},
+            )
+        }
+        composeRule.onNodeWithText("Cancel").performClick()
+        assertTrue(cancelled)
     }
 }

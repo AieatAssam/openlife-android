@@ -21,9 +21,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import java.util.UUID
 
 @Composable
-fun IntakeScreen(state: IntakeUiState, onSave: () -> Unit, onCancel: () -> Unit, onDone: () -> Unit) {
+fun IntakeScreen(
+    state: IntakeUiState,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    onDone: () -> Unit,
+    onOpenExisting: (UUID) -> Unit = {},
+) {
     Surface(modifier = Modifier.fillMaxSize()) {
         when (state) {
             IntakeUiState.Preparing -> CenteredMessage("Preparing…")
@@ -38,8 +45,7 @@ fun IntakeScreen(state: IntakeUiState, onSave: () -> Unit, onCancel: () -> Unit,
             }
 
             is IntakeUiState.Duplicate -> {
-                CenteredMessage("This matches something already saved. Not imported again.")
-                DoneAfterAcknowledging(onDone)
+                DuplicateContent(state.existingSourceId, onOpenExisting, onDone)
             }
 
             is IntakeUiState.Rejected -> {
@@ -59,6 +65,27 @@ fun IntakeScreen(state: IntakeUiState, onSave: () -> Unit, onCancel: () -> Unit,
             }
 
             IntakeUiState.Cancelled -> onDone()
+        }
+    }
+}
+
+@Composable
+private fun DuplicateContent(
+    existingSourceId: UUID,
+    onOpenExisting: (UUID) -> Unit,
+    onCancel: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("This matches something already saved. Not imported again.")
+            Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
+                Button(onClick = { onOpenExisting(existingSourceId) }) {
+                    Text("Open existing")
+                }
+                OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                    Text("Cancel")
+                }
+            }
         }
     }
 }
