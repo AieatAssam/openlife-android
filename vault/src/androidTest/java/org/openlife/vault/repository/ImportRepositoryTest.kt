@@ -54,6 +54,14 @@ class ImportRepositoryTest {
         return out.toByteArray()
     }
 
+    private fun syntheticPngBytes(width: Int = 64, height: Int = 48): ByteArray {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val out = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        bitmap.recycle()
+        return out.toByteArray()
+    }
+
     private fun be32(value: Long): ByteArray = byteArrayOf(
         (value shr 24).toByte(),
         (value shr 16).toByte(),
@@ -137,6 +145,25 @@ class ImportRepositoryTest {
 
         val row = db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain()
         assertEquals(SourceState.STAGED, row.state) // not READY until an explicit Save (Stage 4)
+        assertEquals(expectedDigest.toList(), row.sha256!!.toList())
+        assertTrue(paths.stageFile(prepared.sourceId).exists())
+    }
+
+    @Test
+    fun validPngIsPreparedAndStagedRowMatchesTheOriginal(): Unit = runBlocking {
+        val original = syntheticPngBytes()
+        val expectedDigest = MessageDigest.getInstance("SHA-256").digest(original)
+
+        val result = repository.prepareImport(
+            ByteArrayInputStream(original), "image/png", IntakeKind.PHOTO_PICKER
+        )
+
+        assertTrue(result is PrepareResult.Prepared)
+        val prepared = result as PrepareResult.Prepared
+        assertEquals(ImageFormat.PNG, prepared.format)
+        assertEquals(original.size.toLong(), prepared.byteCount)
+        val row = db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain()
+        assertEquals(SourceState.STAGED, row.state)
         assertEquals(expectedDigest.toList(), row.sha256!!.toList())
         assertTrue(paths.stageFile(prepared.sourceId).exists())
     }
@@ -256,6 +283,42 @@ class ImportRepositoryTest {
         )
 
         assertEquals(PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT), result)
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
+    fun excessBytesAreRejectedAndLeaveNoStagedState(): Unit = runBlocking {
+        val prefix = syntheticPngBytes(10, 10)
+        val excess = object : java.io.InputStream() {
+            private var prefixOffset = 0
+            private var remaining = ImportLimits.MAX_ORIGINAL_BYTES + 1 - prefix.size
+
+            override fun read(): Int {
+                if (prefixOffset < prefix.size) return prefix[prefixOffset++].toInt() and 0xFF
+                if (remaining == 0L) return -1
+                remaining--
+                return 0
+            }
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                if (prefixOffset < prefix.size) {
+                    val count = minOf(length, prefix.size - prefixOffset)
+                    prefix.copyInto(buffer, offset, prefixOffset, prefixOffset + count)
+                    prefixOffset += count
+                    return count
+                }
+                if (remaining == 0L) return -1
+                val count = minOf(length.toLong(), remaining).toInt()
+                java.util.Arrays.fill(buffer, offset, offset + count, 0)
+                remaining -= count
+                return count
+            }
+        }
+
+        val result = repository.prepareImport(excess, "image/png", IntakeKind.SHARE)
+
+        assertEquals(PrepareResult.Rejected(ImageRejectionReason.EXCEEDS_BYTE_LIMIT), result)
         assertEquals(0, db.sourceDao().count())
         assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
     }
