@@ -181,6 +181,22 @@ class ImportRepositoryTest {
     }
 
     @Test
+    fun providerReadFailureReturnsFailedAndCleansStagedRow(): Unit = runBlocking {
+        val failingStream = object : java.io.InputStream() {
+            override fun read(): Int = throw java.io.IOException("synthetic provider failure")
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+                throw java.io.IOException("synthetic provider failure")
+        }
+
+        val result = repository.prepareImport(failingStream, "image/jpeg", IntakeKind.SHARE)
+
+        assertEquals(PrepareResult.Failed, result)
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
     fun animatedPngIsRejectedAndLeavesNoStagedState(): Unit = runBlocking {
         val result = repository.prepareImport(
             ByteArrayInputStream(syntheticPng(50, 50, animated = true)),
@@ -382,6 +398,31 @@ class ImportRepositoryTest {
             SourceState.STAGED,
             db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state
         )
+    }
+
+    @Test
+    fun renameFailureReturnsFailedAndLeavesTheStageForRecovery(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+
+        // A directory at the final blob path makes the platform rename fail
+        // without changing permissions or filling the test device.
+        val blob = paths.blobFile(prepared.sourceId)
+        assertTrue(blob.mkdir())
+        assertEquals(SaveResult.Failed, repository.saveImport(prepared.sourceId))
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,
+        )
+        assertTrue(paths.stageFile(prepared.sourceId).exists())
+
+        // Recovery ownership remains usable after the transient destination
+        // conflict is removed.
+        assertTrue(blob.delete())
+        assertTrue(repository.cancelStagedImport(prepared.sourceId))
+        assertEquals(null, db.sourceDao().findById(prepared.sourceId.toString()))
+        assertTrue(!paths.stageFile(prepared.sourceId).exists())
     }
 
     @Test
