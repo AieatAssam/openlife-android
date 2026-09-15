@@ -5,7 +5,7 @@ independent audit.** Per design §13: "Security and provenance reviews must
 inspect the actual implementation, not just approve this document." This
 review re-derives each claim in `docs/THREAT_MODEL.md` against the actual
 code, manifest, dependency graph, and test evidence in this repository as of
-commit `ab3eb0e` (2026-09-15), rather than restating the design document's
+commit `8bc5e77` (2026-09-15), rather than restating the design document's
 intentions. Findings that required a code change are already fixed and
 committed; findings that remain open are listed under "Open items," not
 silently dropped.
@@ -89,6 +89,10 @@ from memory of earlier stages.
   and `renameFailureReturnsFailedAndLeavesTheStageForRecovery` cover cleanup
   after an input read error and preservation of the stage when the final blob
   rename is rejected.
+- Write and directory-sync failures: `stageWriteFailureReturnsFailedAndCleansStagedRow`
+  and `directorySyncFailureReturnsFailedAndLeavesRenamedArtefactRecoverable`
+  use the narrow `ArtefactFileOps` seam; production still delegates to the
+  real `Fsync` implementation, while tests force the exact failure boundaries.
 - **Confirmed, strengthened this stage** (real kills, not only constructed
   states).
 
