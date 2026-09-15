@@ -243,6 +243,9 @@ class ImportRepositoryTest {
                 stage.renameTo(blob)
 
             override fun syncDirectory(directory: java.io.File) = Unit
+
+            override fun deleteIfExists(file: java.io.File): Boolean =
+                ArtefactFileOps.Default.deleteIfExists(file)
         })
 
         val result = writeFailureRepository.prepareImport(
@@ -534,6 +537,9 @@ class ImportRepositoryTest {
             override fun syncDirectory(directory: java.io.File) {
                 throw java.io.IOException("synthetic directory sync failure")
             }
+
+            override fun deleteIfExists(file: java.io.File): Boolean =
+                ArtefactFileOps.Default.deleteIfExists(file)
         })
 
         assertEquals(SaveResult.Failed, syncFailureRepository.saveImport(prepared.sourceId))
