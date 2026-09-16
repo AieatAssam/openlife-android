@@ -9,7 +9,7 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 ## Build identifier
 
-- Commit: `bb539e6` (2026-09-15; C0 baseline plus the accepted bounded C1 OCR slice and Room migration regression coverage)
+- Commit: `0519e86` (2026-09-16; C0 baseline plus the accepted bounded C1 OCR slice, Room migration regression coverage, accessibility semantics, restart recovery, and packaged backup-rule checks)
 - `applicationId` `org.openlife`, `versionCode` 1, `versionName` 0.0.1-c0
 - Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.10 (pinned in `gradle/libs.versions.toml`,
   no dynamic version ranges anywhere in that file)
