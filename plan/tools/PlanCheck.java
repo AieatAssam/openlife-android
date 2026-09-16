@@ -8,13 +8,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -378,14 +376,12 @@ public final class PlanCheck {
 
   private static final class StepRef {
     private final String id;
-    private final String phase;
     private final String file;
     private final List<String> dependencies;
     private final String status;
 
     private StepRef(String id, String phase, String file, List<String> dependencies, String status) {
       this.id = id;
-      this.phase = phase;
       this.file = file;
       this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies));
       this.status = status;

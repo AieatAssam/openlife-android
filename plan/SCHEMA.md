@@ -53,3 +53,8 @@ against the recorded evidence.
 ```
 
 Keep the entry on one line so the checker's flow-map parsing stays valid.
+
+`scripts/plan-check.sh` accepts an optional plan directory for fixture tests
+and `--json` for machine-readable CI summaries. `scripts/plan-status.sh`
+accepts the same optional plan directory and `--json`; both options may be
+combined. Neither script downloads dependencies or accesses the network.

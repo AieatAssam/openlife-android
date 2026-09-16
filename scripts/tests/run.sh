@@ -49,6 +49,15 @@ set -e
 assert_nonzero "plan-check rejects a dependency cycle" "$TMP/cycle.out" "$cycle_status"
 assert_contains "cycle diagnostic is present" "cycle" "$(<"$TMP/cycle.out")"
 
+cp -R "$ROOT/plan" "$TMP/plan-missing-key"
+sed -i '/^owner: agent$/d' "$TMP/plan-missing-key/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-missing-key" >"$TMP/missing-key.out" 2>&1
+missing_key_status=$?
+set -e
+assert_nonzero "plan-check rejects a missing required key" "$TMP/missing-key.out" "$missing_key_status"
+assert_contains "missing-key diagnostic names file and key" "P0-01.yaml: owner: missing key" "$(<"$TMP/missing-key.out")"
+
 bash "$ROOT/scripts/plan-check.sh" "$ROOT/plan" >"$TMP/real.out"
 assert_contains "plan-check accepts the real plan" "errors=0" "$(<"$TMP/real.out")"
 
