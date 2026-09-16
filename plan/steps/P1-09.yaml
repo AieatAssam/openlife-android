@@ -1,0 +1,80 @@
+id: P1-09
+title: Repository and crypto hardening
+phase: P1
+status: todo
+depends_on: [P0-03]
+estimate: M
+owner: agent
+closes_findings: [F-12, F-13, F-14]
+
+summary: >
+  Close the small but real repository-level issues: bound artefact file
+  reads by length before allocation, remove the dangerous default
+  MutationQueue parameter, make the provider-read deadline an explicit,
+  tested cooperative-cancellation design, and add plaintext buffer
+  zeroisation where the design asks for it.
+
+rationale: >
+  ArtefactAuthenticator.readBytes() allocates the whole file before
+  EnvelopeCodec's length bound runs; a corrupted multi-hundred-megabyte file
+  would OOM the process before failing closed. SourceViewRepository's default
+  `MutationQueue()` would silently break the read/deletion lease if a caller
+  omitted the argument. The 15-second deadline closes the stream from another
+  coroutine, which the project's own notes flag as hazardous.
+
+ethos_check:
+  - "Fail closed before allocation (design §10 'Bound lengths before allocation')."
+
+requirements:
+  - id: P1-09-R1
+    text: "MUST check `artefactFile.length()` against EnvelopeFormat.MAX_CIPHERTEXT_LENGTH + header before reading in ArtefactAuthenticator, VaultKeyFile.read, and any other file read; oversize -> authentication failure (null), never an allocation."
+  - id: P1-09-R2
+    text: "MUST remove the default value of `mutationQueue` in SourceViewRepository and any other repository; the composition root passes the shared instance; SourceEgressBoundaryTest gains a grep assertion that `MutationQueue()` is constructed only in OpenLifeApp and test code."
+  - id: P1-09-R3
+    text: "MUST redesign the provider-read deadline: BoundedStreamReader.read takes a `deadline: () -> Boolean` (or a CancellationToken) checked between 64 KiB chunks and throws a typed ReadDeadlineExceededException; IntakeViewModel uses withTimeout around prepareImport and the stream is closed by the owning coroutine in `finally` on the same thread that opened it; the cross-thread close is kept ONLY as a last-resort unblock for a provider that never returns from read(), executed after a second grace period (deadline + 5 s), documented in code and THREAT_MODEL as a known hazard with rationale."
+  - id: P1-09-R4
+    text: "MUST zero plaintext byte arrays that the repository owns after use: prepareImport's read.bytes after encryption and validation; OcrRepository's captured bytes after the engine returns (P2-02 does the OCR side; this step does import). Compose-held preview bytes are cleared when the state leaves Preview (set to null and let GC; document the JVM zeroisation limit)."
+  - id: P1-09-R5
+    text: "MUST keep MutationQueue's semantics unchanged in this step (P1-15 redesigns leases); reference the existing viewerReadSharesTheMutationQueueWithDeletionWork test as the regression that must stay green here."
+
+constraints:
+  - "No behaviour change to envelope format or AAD."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/repository/ArtefactAuthenticator.kt
+  - vault/src/main/java/org/openlife/vault/storage/VaultKeyFile.kt
+  - vault/src/main/java/org/openlife/vault/repository/SourceViewRepository.kt
+  - vault/src/main/java/org/openlife/vault/repository/BoundedStreamReader.kt
+  - vault/src/main/java/org/openlife/vault/repository/ImportRepository.kt
+  - app/src/main/java/org/openlife/app/ui/IntakeViewModel.kt
+  - tests: vault test + androidTest, app test
+
+tdd:
+  red:
+    - name: "ArtefactAuthenticatorTest.oversizedArtefactFileFailsClosedWithoutReadingIt (JVM: temp file of MAX+1 bytes header-only sparse; assert null and that a counting FileOps saw no read)"
+    - name: VaultKeyFileTest.oversizedKeyFileIsMalformedNotAllocated
+    - name: BoundedStreamReaderTest.deadlineCallbackStopsReadingBetweenChunksWithTypedException
+    - name: SourceEgressBoundaryTest.noRepositoryConstructsItsOwnMutationQueue
+    - name: ImportRepositoryTest.plaintextBufferIsZeroedAfterPrepare (test seam exposes the last buffer reference; assert all zeros)
+    - name: app androidTest IntakeAndListFlowTest.readDeadlineProducesFailedStateAndReleasesTheDescriptorOnTheOwningThread
+  green:
+    - "Implement."
+  refactor:
+    - "Introduce `BoundedFileReader.readAtMost(file, max)` used by both authenticator and key file."
+
+verification:
+  commands:
+    - "./gradlew detekt :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Tests."
+
+acceptance_criteria:
+  - "No path allocates a buffer proportional to an unverified on-disk length."
+  - "The deadline design is documented and tested; the cross-thread close is a documented last resort."
+
+docs_to_update:
+  - docs/THREAT_MODEL.md (resource exhaustion row: deadline mechanism)
+  - docs/capabilities/C0.md (C0-R30 wording)
+
+risks: []
+rollback: "Per-item revert."

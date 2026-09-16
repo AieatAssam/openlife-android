@@ -1,0 +1,19 @@
+id: P10-03
+title: C1b acceptance and v1.2.0
+phase: P10
+status: todo
+depends_on: [P10-02]
+estimate: M
+owner: agent+owner
+summary: "C1b verification matrix, security review (runtime surface, model import, memory), provenance review (grounding of every span, engine labelling), handoff, owner acceptance, release v1.2.0 via the checklist."
+requirements:
+  - id: P10-03-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P10-03-R1
+    text: "MUST produce docs/verification/C1b.md, docs/reviews/C1b-security-review.md, docs/reviews/C1b-provenance-review.md, docs/verification/C1b-handoff.md and run the release checklist."
+tdd: {red: [], green: [], refactor: []}
+verification: {commands: ["Full suites; CI; checklists"], evidence_required: ["Docs; tag"]}
+acceptance_criteria: ["Owner acceptance recorded."]
+docs_to_update: [docs/verification/*, docs/reviews/*, CHANGELOG.md]
+risks: []
+rollback: "Untag."

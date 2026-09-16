@@ -1,0 +1,25 @@
+id: P6-05
+title: C7 warranty coverage
+phase: P6
+status: todo
+depends_on: [P6-03]
+estimate: M
+owner: agent
+summary: "Explicit coverage period and evidence linked to the item: a Warranty record with start (purchase date or evidenced start), duration or end date fact, DERIVED end date via the same DeadlineRule engine ('warranty-end-v1'), optional reminder; spec C7.md; no inferred statutory rights."
+requirements:
+  - id: P6-05-R1
+    text: "MUST write C7.md; implement schema, rule, UI, reminder hookup mirroring C6."
+  - id: P6-05-R2
+    text: "MUST refuse to propose any warranty without an evidenced duration or end date; a USER-entered duration is allowed and labelled."
+files_touched: [docs/capabilities/C7.md, vault records/warranty/*, app ui/warranty/*]
+tdd:
+  red:
+    - name: WarrantyRepositoryTest.noProposalWithoutEvidencedOrUserDuration
+    - name: WarrantyFlowTest.endDateIsDerivedWithInputsAndReminderIsOptional
+  green: ["Implement."]
+  refactor: ["Share Return/Warranty deadline UI."]
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"], evidence_required: ["Tests"]}
+acceptance_criteria: ["Warranty end reminder from an evidenced '2 year warranty' line."]
+docs_to_update: [docs/capabilities/C7.md]
+risks: []
+rollback: "Hide."

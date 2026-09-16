@@ -1,0 +1,68 @@
+id: P1-08
+title: Settings and About screens
+phase: P1
+status: todo
+depends_on: [P1-06, P1-07, P0-02]
+estimate: M
+owner: agent
+closes_findings: [F-20]
+
+summary: >
+  Add Settings (app lock, reset vault, later: reminders defaults) and About
+  (version, build identity, licences, privacy explanation, vault security
+  details reported honestly from KeyInfo, diagnostics counts).
+
+rationale: >
+  P6 requires publishing licences and permission rationale; P7 requires
+  explaining limits. Users need a place to see what protects their data and
+  what does not, and to reach the reset flow.
+
+ethos_check:
+  - "Honesty: security level is reported from KeyInfo (software / TEE / StrongBox) with a plain explanation; never 'hardware-backed' unless KeyInfo says so."
+
+requirements:
+  - id: P1-08-R1
+    text: "MUST add routes Settings and About in the nav host with entries from the list screen overflow menu."
+  - id: P1-08-R2
+    text: "MUST show in About: versionName, versionCode, git identity (BuildConfig field injected at build from `git describe --tags --always --dirty`, 'unknown' when unavailable; P5-03 pins it to the tag for reproducible builds), signing certificate SHA-256 read at runtime from PackageManager (so users can compare with README), open-source licences (rendered from docs/generated/THIRD_PARTY_LICENSES.md packaged as a raw resource by the licence-report task), link to the privacy policy text bundled offline (no browser launch; text shown in-app)."
+  - id: P1-08-R3
+    text: "MUST show 'Vault security details': wrapping key security level via KeyFactory KeyInfo.securityLevel (API 31+) or isInsideSecureHardware (API 29-30), database encryption 'SQLCipher (AES-256-CBC pages)', artefact encryption 'AES-256-GCM per file', backup 'excluded', and the sentence that a compromised OS or an unlocked phone is outside the boundary; plus a 'What OpenLife will not do' list (export, share, sync, cloud backup, device transfer) with the design §1/§14 rationale that the recipient app or service could transmit content."
+  - id: P1-08-R4
+    text: "MUST show diagnostics counts only: sources by state, last recovery report counts, last bootstrap failure cause counts (from P1-06). No identifiers."
+  - id: P1-08-R5
+    text: "MUST NOT include any outbound link that opens a browser; URLs are displayed as text with a note that OpenLife does not open links."
+
+constraints:
+  - "Licence text rendering must handle a multi-hundred-kilobyte resource without ANR: read on IO and show in a LazyColumn."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/settings/{SettingsScreen.kt,AboutScreen.kt,VaultSecurityInfo.kt,DiagnosticsCounts.kt}
+  - app/build.gradle.kts (BuildConfig GIT_COMMIT, buildConfig=true)
+  - vault/src/main/java/org/openlife/vault/crypto/KeystoreWrapper.kt (securityLevel query)
+  - docs/generated/THIRD_PARTY_LICENSES.md -> app/src/main/res/raw/third_party_licenses.md (copied by a Gradle task with an up-to-date check)
+
+tdd:
+  red:
+    - name: VaultSecurityInfoTest.mapsKeyInfoSecurityLevelsToHonestLabels (JVM, pure mapping)
+    - name: DiagnosticsCountsTest.containsNoUuidOrHashLikeStrings
+    - name: app androidTest AboutScreenTest.showsVersionCommitFingerprintAndLicencesWithoutOpeningAnyIntent (assert no startActivity via Intents.init() + intended(none))
+    - name: SettingsScreenTest.resetVaultRequiresTypedConfirmation (may live in P1-06's test; reference it)
+  green:
+    - "Implement screens and the licence raw resource task."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew detekt :app:test :vault:test && ./gradlew :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Tests; uiautomator dump of About on the emulator showing the security level label."
+
+acceptance_criteria:
+  - "About shows correct version/commit/fingerprint; licences list is complete; no intent leaves the app."
+
+docs_to_update:
+  - README.md (verify fingerprint against About)
+  - docs/PRIVACY_POLICY.md (in-app location)
+
+risks: []
+rollback: "Remove routes."

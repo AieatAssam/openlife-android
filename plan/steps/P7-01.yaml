@@ -1,0 +1,33 @@
+id: P7-01
+title: C8 document expiry (ADR-0014)
+phase: P7
+status: todo
+depends_on: [P6-06]
+estimate: L
+owner: agent
+owner_action: OA-4
+summary: "One supported document type: a user-declared expiring document. The user labels the category (USER fact DOCUMENT_CATEGORY from a fixed list), extraction proposes only the expiry date fact ('expires', 'valid until', 'exp' tokens with evidence), and a reminder is offered through the C3 pipeline with a user-chosen lead time. No identity-field extraction, no classification."
+requirements:
+  - id: P7-01-R1
+    text: "MUST write docs/capabilities/C8.md and docs/decisions/0014-document-expiry-scope.md, obtain approval, then implement document_records with categoryUserFact, expiryFactRevisionId, reminder hookup, and a Documents list."
+  - id: P7-01-R2
+    text: "MUST add expiry-token proximity rules to DateExtractor as a separate rule id 'expiry-date-v1' that only tags candidates; it never creates a fact without an evidenced date."
+  - id: P7-01-R3
+    text: "MUST default lead times to a fixed list (1 day, 1 week, 1 month, 3 months) chosen by the user; nothing is scheduled automatically."
+  - id: P7-01-R4
+    text: "MUST NOT extract names, numbers, or other identity fields even if present; a boundary test asserts no fact of kind other than DATE/TIME/MONEY/URL/EMAIL/PHONE/MERCHANT/DURATION/DOCUMENT_CATEGORY exists after processing an identity-document-like fixture."
+files_touched: [docs/capabilities/C8.md, docs/decisions/0014-*.md, vault records/document/*, extractors, app ui/documents/*]
+tdd:
+  red:
+    - name: ExpiryRuleTest.tagsOnlyEvidencedDatesNearExpiryTokens
+    - name: DocumentRepositoryTest.noIdentityFieldsAreEverPersisted
+    - name: DocumentFlowTest.categoryIsUserFactAndReminderUsesChosenLeadTime
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"], evidence_required: ["Tests; C8 verification doc"]}
+acceptance_criteria:
+  - "Expiring-document flow with reminder; identity boundary test green."
+  - "Spec written with the seven-part structure of P3-01 and reviewed by an adversarial reviewer against design §4/§5/§14; findings resolved in the same PR."
+docs_to_update: [docs/capabilities/C8.md, docs/THREAT_MODEL.md]
+risks: []
+rollback: "Hide."

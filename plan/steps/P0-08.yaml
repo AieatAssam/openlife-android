@@ -1,0 +1,76 @@
+id: P0-08
+title: Documentation hygiene and public-repo files
+phase: P0
+status: todo
+depends_on: [P0-01]
+estimate: S
+owner: agent
+
+summary: >
+  Remove stale stage-era comments, add the files a public open-source
+  privacy app needs (SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md,
+  privacy policy, permissions rationale), and add a docs index.
+
+rationale: >
+  Comments such as "Placeholder launcher activity for Stage 0" and
+  "Minimal Stage 2 access" mislead reviewers. P6 requires publishing the
+  permission rationale and threat model; Play and F-Droid require a privacy
+  policy URL.
+
+ethos_check:
+  - "P6/P7: public documentation states limits honestly (no backup, no recovery, device-level adversaries)."
+
+requirements:
+  - id: P0-08-R1
+    text: "MUST rewrite or delete every comment referencing implementation stages (grep -rn 'Stage [0-9]' app vault) so comments describe current behaviour; keep the recorded lessons by moving them to docs/verification/C0.md if not already there."
+  - id: P0-08-R2
+    text: "MUST add SECURITY.md (private disclosure via GitHub security advisories, response targets: acknowledge 3 days, fix or mitigation plan 30 days), CONTRIBUTING.md (link AGENTS.md rules, TDD requirement, DCO sign-off), CODE_OF_CONDUCT.md (Contributor Covenant 2.1)."
+  - id: P0-08-R3
+    text: "MUST add docs/PRIVACY_POLICY.md: what is stored, where, that nothing leaves the device, that there is no backup, what the Photo Picker cloud-provider caveat means, contact method; published via GitHub Pages or the repository URL (owner chooses in P5-01)."
+  - id: P0-08-R4
+    text: "MUST add docs/PERMISSIONS.md listing every permission in the merged manifest with its reason and denial path (currently none beyond AndroidX-internal; P4-04 adds POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, SCHEDULE_EXACT_ALARM)."
+  - id: P0-08-R5
+    text: "MUST add docs/README.md as an index of docs/ with one line per file, and update README.md 'Where things stand' to reference plan/plan.yaml."
+  - id: P0-08-R6
+    text: "MUST remove the marker object vault/src/main/java/org/openlife/vault/Vault.kt or repurpose it as the single place that declares SCHEMA_VERSION consumed by a test that asserts it equals OpenLifeDatabase's @Database version."
+  - id: P0-08-R7
+    text: "MUST correct the backup_rules.xml comment that claims an explicit no_backup exclusion exists in data_extraction_rules.xml (F-39); state that protection of noBackupFilesDir relies on the platform default plus allowBackup=false, and keep the physical-device transfer check as the recorded gap."
+  - id: P0-08-R8
+    text: "MUST fix docs/verification/C0.md C0-11's reference to a non-existent AesGcmCodec.AuthenticationFailedException (actual: EnvelopeAuthenticationException) and the release workflow comment claiming minification (F-46)."
+  - id: P0-08-R9
+    text: "MUST make the RecoveryReport log line debug-only (BuildConfig.DEBUG guard) so release builds emit nothing to logcat (F-48); the SourceEgressBoundaryTest allowlist is updated accordingly."
+
+constraints:
+  - "No marketing claims: never write 'secure', 'military-grade', or 'unhackable'; describe mechanisms and limits."
+
+files_touched:
+  - SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+  - docs/PRIVACY_POLICY.md, docs/PERMISSIONS.md, docs/README.md
+  - README.md
+  - app/src/main/AndroidManifest.xml (comments)
+  - vault/src/main/java/org/openlife/vault/Vault.kt
+  - vault/src/main/java/org/openlife/vault/storage/SourceDao.kt (comments)
+
+tdd:
+  red:
+    - name: VaultTest.schemaVersionMatchesRoomDatabaseVersion
+      asserts: "Vault.SCHEMA_VERSION == 2 today; test reads the @Database annotation value via reflection (JVM test with Room annotations on classpath)."
+    - name: "scripts/tests/run.sh: `grep -rn 'Stage [0-9]' app/src vault/src` returns nothing (docs are allowed to keep history)."
+  green:
+    - "Edit docs and comments."
+  refactor: []
+
+verification:
+  commands:
+    - "bash scripts/tests/run.sh && ./gradlew :vault:test"
+  evidence_required:
+    - "Grep output empty; test pass."
+
+acceptance_criteria:
+  - "A first-time reader of README can find the plan, principles, threat model, privacy policy, and how to verify a release."
+
+docs_to_update:
+  - README.md
+
+risks: []
+rollback: "Docs only."

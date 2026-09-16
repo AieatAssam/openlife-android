@@ -1,0 +1,24 @@
+id: P8-03
+title: C11 evaluation gate and enablement
+phase: P8
+status: todo
+depends_on: [P8-02]
+estimate: L
+owner: agent
+summary: "Run the local model over the OCR/facts/receipts evaluation sets, compare proposal quality against the rule-based builders, and enable the Local understanding setting only if the measured improvement gate in C11.md is met (design §14: a model must improve a measured task before it earns a dependency or storage budget)."
+requirements:
+  - id: P8-03-R1
+    text: "MUST add eval/understanding/v1 with the gate.json thresholds from C11.md (proposal precision, citation validity 100%, wrong-actionable-date count 0) and record results per model/prompt version in docs/verification/understanding-eval.md."
+  - id: P8-03-R2
+    text: "MUST keep the feature disabled by default and only surface the Settings toggle when the gate passes for the imported model's allowlist entry."
+files_touched: [eval/understanding/v1, vault understanding eval harness, app settings]
+tdd:
+  red:
+    - name: SemanticProposalEvalTest.improvesOverRulesOrStaysDisabled
+  green: ["Run and record; enable only on pass."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest --tests '*UnderstandingEval*'"], evidence_required: ["Eval comparison"]}
+acceptance_criteria: ["Measured improvement recorded or the feature stays disabled."]
+docs_to_update: [docs/capabilities/C11.md, docs/verification/understanding-eval.md]
+risks: ["Small models hallucinate; citation validation is the hard gate."]
+rollback: "Disable."

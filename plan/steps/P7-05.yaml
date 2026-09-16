@@ -1,0 +1,29 @@
+id: P7-05
+title: C10 assessment UI and proposal gates
+phase: P7
+status: todo
+depends_on: [P7-04, P7-02]
+estimate: M
+owner: agent
+summary: "Render assessment states and concerns with evidence in the viewer, run assessment automatically for communication-like content before any actionable proposal, wire the gates into the C3/C6/C7/C8 proposal builders, and extend assessment to per-page PDF sources."
+requirements:
+  - id: P7-05-R1
+    text: "MUST render each concern with the specific observed feature and its evidence region; dismissal is recorded as a review event and never opens a link or enables sending."
+  - id: P7-05-R2
+    text: "MUST make proposal builders consult the assessment: CONCERNS_FOUND shows warnings that must be acknowledged before confirmation; NOT_ASSESSED on communication-like content runs assessment first; INCONCLUSIVE shows the gap and still allows the user to proceed with an explicit acknowledgement."
+  - id: P7-05-R3
+    text: "MUST run assessment per page for PDF sources and aggregate the state as the worst page state."
+files_touched: [app ui/assessment/*, proposal builders, viewer]
+tdd:
+  red:
+    - name: AssessmentPanelTest.concernsShowObservedFeatureAndEvidenceAndDismissalIsRecorded
+    - name: ProposalGateTest.concernsFoundRequiresAcknowledgementAndNeverActs
+    - name: ProposalGateTest.notAssessedCommunicationRunsAssessmentFirst
+    - name: PdfAssessmentTest.worstPageStateWins
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :app:test && ./gradlew :app:connectedDebugAndroidTest"], evidence_required: ["Tests; accessibility checks"]}
+acceptance_criteria: ["Design §6 states and wording rules implemented end to end."]
+docs_to_update: [docs/capabilities/C10.md, docs/THREAT_MODEL.md]
+risks: []
+rollback: "Gate off."

@@ -1,0 +1,27 @@
+id: P6-03
+title: C5 purchased item
+phase: P6
+status: todo
+depends_on: [P6-02]
+estimate: M
+owner: agent
+summary: "A user-confirmed item linked to its purchase and evidence: item_records with a USER or EXTRACTED name (line-item OCR span chosen by the user), optional evidenced price (never the receipt total), linked purchaseRecordId; spec C5.md, schema, UI to pick a span as the item name, list of items per purchase."
+requirements:
+  - id: P6-03-R1
+    text: "MUST write C5.md (exclusions: inventory, automatic matching, quantities) and implement schema/migration/cascade."
+  - id: P6-03-R2
+    text: "MUST implement 'Add item from this receipt': the user taps a span (evidence) or types a name (USER); price only if a MONEY fact on the same line exists and the user confirms it."
+  - id: P6-03-R3
+    text: "MUST enforce by test that a receipt total fact cannot be linked as an item price."
+files_touched: [docs/capabilities/C5.md, vault records/item/*, app ui/items/*]
+tdd:
+  red:
+    - name: ItemRepositoryTest.totalFactCannotBecomeItemPrice
+    - name: AddItemScreenTest.spanSelectionCreatesEvidencedNameAndTypedNameIsUserOrigin
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"], evidence_required: ["Tests"]}
+acceptance_criteria: ["Item linked to purchase with evidence."]
+docs_to_update: [docs/capabilities/C5.md]
+risks: []
+rollback: "Hide."

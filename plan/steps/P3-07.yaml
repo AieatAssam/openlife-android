@@ -1,0 +1,27 @@
+id: P3-07
+title: Facts in local search
+phase: P3
+status: todo
+depends_on: [P3-04, P2-08]
+estimate: S
+owner: agent
+summary: "Index canonical fact values and raw text in the FTS tables so a user can search '2026-10-08' or '42.50' and land on the fact and its evidence."
+requirements:
+  - id: P3-07-R1
+    text: "MUST add fact_fts (external content over fact_revisions rawText and canonical display text) with triggers; hits carry factRevisionId; rejected/stale revisions excluded."
+  - id: P3-07-R2
+    text: "MUST make search results show kind and status; tapping opens the Facts panel with the fact highlighted."
+files_touched: [vault storage migration, SearchRepository, app search UI]
+tdd:
+  red:
+    - name: SearchRepositoryTest.findsConfirmedAndUnreviewedFactsButNotRejectedOrStale
+    - name: SearchScreenTest.factHitOpensFactsPanelHighlighted
+  green: ["Implement."]
+  refactor: []
+verification:
+  commands: ["./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"]
+  evidence_required: ["Tests"]
+acceptance_criteria: ["Fact search works and respects status."]
+docs_to_update: [docs/decisions/0010-local-search.md]
+risks: []
+rollback: "Drop fact_fts."

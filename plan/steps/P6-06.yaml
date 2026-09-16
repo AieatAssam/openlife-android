@@ -1,0 +1,23 @@
+id: P6-06
+title: Receipt-path evaluation, acceptance, v1.1.0
+phase: P6
+status: todo
+depends_on: [P6-04, P6-05]
+estimate: M
+owner: agent+owner
+summary: "Evaluation set for the receipt path (30 synthetic receipts with truth for merchant/date/total/items/return/warranty lines), gate on wrong-actionable-date count = 0 and total precision >= 0.95; C4-C7 verification matrices, security and provenance reviews, handoff, owner acceptance, release v1.1.0 via the checklist."
+requirements:
+  - id: P6-06-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P6-06-R1
+    text: "MUST add eval/receipts/v1 and gate.json; results in docs/verification/receipts-eval.md."
+  - id: P6-06-R2
+    text: "MUST produce verification, review, and handoff docs per capability (C4..C7) and update THREAT_MODEL with the new record types (no new permissions)."
+  - id: P6-06-R3
+    text: "MUST execute the release checklist for v1.1.0."
+tdd: {red: ["Gate test"], green: [], refactor: []}
+verification: {commands: ["Full suites; eval; checklist"], evidence_required: ["Docs; tag"]}
+acceptance_criteria: ["Owner acceptance; release published."]
+docs_to_update: [docs/verification/*, docs/reviews/*, CHANGELOG.md]
+risks: []
+rollback: "Untag."

@@ -1,0 +1,81 @@
+id: P0-03
+title: Static analysis and lint policy
+phase: P0
+status: todo
+depends_on: [P0-01]
+estimate: M
+owner: agent
+
+summary: >
+  Add detekt (with the formatting ruleset) as the single Kotlin static-analysis
+  tool, tighten Android Lint to fail on warnings for security-relevant checks,
+  and add a repository-level "boundary" test suite so egress or broad-access
+  regressions fail before review.
+
+rationale: >
+  The codebase has good discipline but no mechanical enforcement of style,
+  common bug patterns, or the security boundary. Later phases add many files;
+  reviewers should spend attention on provenance, not formatting.
+
+ethos_check:
+  - "P1/P2: lint checks for INTERNET, exported components, and broad permissions become CI failures."
+
+requirements:
+  - id: P0-03-R1
+    text: "MUST add detekt with `detekt-formatting`, a committed config/detekt/detekt.yml, and a baseline that is empty after this step (fix findings; do not baseline them)."
+  - id: P0-03-R2
+    text: "MUST set Android Lint: abortOnError=true, warningsAsErrors=true for the categories Security, Correctness, Performance (Accessibility remains warning until P1-10 makes it error), checkReleaseBuilds=true, and a committed lint.xml listing any suppressed ids with a reason."
+  - id: P0-03-R3
+    text: "MUST add app/src/test/.../boundary/ManifestBoundaryTest that parses the merged release manifest (build/intermediates/merged_manifests/release/AndroidManifest.xml produced by a task the test depends on) and asserts: no INTERNET, no ACCESS_NETWORK_STATE, no READ_MEDIA_*, no READ_EXTERNAL_STORAGE, no MANAGE_EXTERNAL_STORAGE, no READ_CONTACTS/SMS, no BIND_NOTIFICATION_LISTENER_SERVICE, no BIND_ACCESSIBILITY_SERVICE, no CAMERA; exported components are exactly MainActivity and IntakeActivity (plus receivers added by P4-04 when that step updates the expected set); allowBackup=false."
+  - id: P0-03-R4
+    text: "MUST add a boundary test asserting no source file under app/src/main or vault/src/main references android.util.Log except the allowlisted RecoveryReport call site, and none references ClipboardManager or WebView; startActivity or an Intent constructed with ACTION_VIEW/ACTION_SEND/ACTION_SENDTO is forbidden outside app/src/main/java/org/openlife/app/intake/ (inbound validation lives there) and MainActivity's same-app forward; P4-04 adds a named allowlist entry for ACTION_APP_NOTIFICATION_SETTINGS."
+  - id: P0-03-R5
+    text: "MUST wire `./gradlew detekt lint :app:test :vault:test` as the standard pre-commit command in AGENTS.md/CLAUDE.md (already referenced; make it true)."
+
+constraints:
+  - "detekt runs without type resolution in CI for speed; type-resolution rules are optional and may be run locally."
+  - "No ktlint plugin in addition to detekt; one tool."
+
+design_decisions:
+  - "Formatting rules: official Kotlin style, max line length 120, trailing commas allowed (matches the current code)."
+  - "The manifest-boundary test depends on `processReleaseMainManifest`; wire task dependency in app/build.gradle.kts so `:app:test` triggers manifest processing for release."
+
+files_touched:
+  - build.gradle.kts
+  - config/detekt/detekt.yml
+  - app/lint.xml
+  - vault/lint.xml
+  - app/build.gradle.kts
+  - vault/build.gradle.kts
+  - app/src/test/java/org/openlife/app/boundary/ManifestBoundaryTest.kt
+  - app/src/test/java/org/openlife/app/boundary/SourceEgressBoundaryTest.kt
+
+tdd:
+  red:
+    - name: ManifestBoundaryTest.releaseManifestDeclaresNoNetworkOrBroadAccessPermission
+      asserts: "Passes immediately (RED should come from a deliberate local mutation: add INTERNET, watch it fail, revert; record in evidence)."
+    - name: ManifestBoundaryTest.onlyLauncherAndIntakeAreExported
+    - name: SourceEgressBoundaryTest.noOutboundContentChannelsInShippedSource
+  green:
+    - "Add tools and configs; fix all detekt findings."
+  refactor:
+    - "Delete stale comments detekt flags; do not suppress."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test"
+  evidence_required:
+    - "detekt: 0 issues; lint: 0 errors; list of any lint.xml suppressions with reasons."
+
+acceptance_criteria:
+  - "Adding `<uses-permission android:name=\"android.permission.INTERNET\"/>` to the manifest fails `:app:test` and `lint`."
+  - "detekt baseline file is absent or empty."
+
+docs_to_update:
+  - AGENTS.md (verify commands)
+  - CLAUDE.md (verify commands)
+  - docs/decisions/0007-release-engineering.md
+
+risks:
+  - "detekt may flag large existing composables; split them rather than raising thresholds beyond LongMethod=80, ComplexMethod=15."
+rollback: "Remove detekt plugin; keep boundary tests."

@@ -1,0 +1,52 @@
+id: P3-05
+title: Facts UI with origin badges, review, user-provided facts, inert values
+phase: P3
+status: todo
+depends_on: [P3-04]
+estimate: L
+owner: agent
+
+summary: >
+  Show facts per source with origin and status badges, evidence navigation
+  into the viewer (P2-06 selection), confirm/reject/clarify flows, and a
+  form to add a USER fact; values are rendered inert.
+
+ethos_check:
+  - "P3/P4: confirmation is per fact, focused on values that change outcomes; no link opening, no copy; USER facts visibly labelled."
+
+requirements:
+  - id: P3-05-R1
+    text: "MUST add a Facts panel in the viewer (and a Facts route for a full list) grouped by kind, each row: canonical value, origin badge (Extracted / Derived / You), status chip (Unreviewed / Confirmed / Rejected / Needs clarification / Stale), 'Show evidence' action selecting the span+region, and for CLARIFICATION_NEEDED a chooser listing the candidates (e.g. 3 April 2026 vs 4 March 2026) whose choice creates a USER-origin revision superseding the extracted one (status CONFIRMED) — never mutates the extracted revision."
+  - id: P3-05-R2
+    text: "MUST provide 'Add a fact' with kind picker and typed input (DatePicker for dates, time picker, decimal + currency code chooser, text for URL/email/phone) creating a USER revision with createdAt and no evidence."
+  - id: P3-05-R3
+    text: "MUST render URLs/emails/phones as plain text with a note 'OpenLife does not open links or copy them'; no ClickableText, no selection, no LinkAnnotation."
+  - id: P3-05-R4
+    text: "MUST show stale facts greyed with 'The text this came from changed' and a 'Re-extract' action."
+  - id: P3-05-R6
+    text: "MUST display dates, times, and amounts locale-formatted (java.time formatters, NumberFormat with the ISO code) while storage stays canonical; a test switches locale and asserts the stored canonical value is unchanged."
+  - id: P3-05-R5
+    text: "MUST pass accessibility checks (P1-10 rule) and large-font layout tests."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/ui/facts/{FactsPanel.kt,FactsScreen.kt,AddFactSheet.kt,FactsViewModel.kt}
+  - navigation routes
+  - tests: app androidTest FactsScreenTest, FactsFlowTest
+
+tdd:
+  red:
+    - name: FactsScreenTest.showsOriginAndStatusBadgesAndEvidenceNavigation
+    - name: FactsScreenTest.clarificationChoiceCreatesUserRevisionAndLeavesExtractedIntact
+    - name: FactsScreenTest.urlIsInertAndNotSelectable (assert no LinkAnnotation semantics, no clickable)
+    - name: FactsFlowTest.addUserFactPersistsWithUserOriginAndNoEvidence
+    - name: FactsFlowTest.staleFactIsGreyedAndReextractCreatesNewRevisions
+  green: ["Implement."]
+  refactor: []
+
+verification:
+  commands: ["./gradlew :app:test && ./gradlew :app:connectedDebugAndroidTest"]
+  evidence_required: ["Tests; accessibility check results"]
+acceptance_criteria: ["A user can confirm the date on a synthetic appointment screenshot and see its evidence in two taps."]
+docs_to_update: [docs/capabilities/C2.md]
+risks: []
+rollback: "Hide panel."

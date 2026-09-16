@@ -1,0 +1,28 @@
+id: P7-03
+title: C10 communication assessment — specification and model (ADR-0012)
+phase: P7
+status: todo
+depends_on: [P6-06]
+estimate: L
+owner: agent
+owner_action: OA-4
+summary: "First of three C10 steps: write C10.md and ADR-0012, obtain owner approval, and implement the assessment data model (assessment_concerns table, states, method versioning, cascade). Rules and evaluation are P7-04; UI and proposal gates are P7-05."
+requirements:
+  - id: P7-03-R1
+    text: "MUST write C10.md: inputs (sources with userContentKind COMMUNICATION or heuristically communication-like: greeting/sign-off/sender tokens), states, indicator catalogue with ids and versions, evidence model (assessment_concerns rows linking to spans), UI wording rules (observed features only; never 'verified sender' or 'safe'), failure behaviour (assessment failure keeps the source viewable, state INCONCLUSIVE, blocks actionable derivation), exclusions (inbox access, monitoring, replies, reporting to third parties)."
+  - id: P7-03-R2
+    text: "MUST implement the schema (next schema version): assessment_concerns (id, sourceId, indicatorId, indicatorVersion, spanId NULL, pageIndex NULL, createdAt) with cascade from sources; AssessmentRepository persistence API (recordAssessment, listConcerns, observeAssessment) under the mutation queue; no rules yet."
+  - id: P7-03-R3
+    text: "MUST write the spec with the same seven-part structure as P3-01 (entities, states, boundaries, failure behaviour, limits, exclusions, test matrix C10-01..C10-12) and obtain the adversarial spec review and owner approval before P7-04 starts."
+files_touched: [docs/capabilities/C10.md, docs/decisions/0012-*.md, vault assessment/*, storage migration (assessment_concerns), app ui/assessment/*, eval/communications/v1]
+tdd:
+  red:
+    - name: AssessmentDatabaseTest.migrationAddsConcernsTableWithCascade
+    - name: AssessmentRepositoryTest.recordsStateMethodVersionAndConcernsUnderTheQueue
+  green: ["Implement schema and repository."]
+  refactor: []
+verification: {commands: ["Full suites; eval"], evidence_required: ["Tests; eval results; C10 docs"]}
+acceptance_criteria: ["Spec approved after adversarial review; schema and repository tested."]
+docs_to_update: [docs/capabilities/C10.md, docs/THREAT_MODEL.md]
+risks: ["Rule-based assessment has limits; wording must never overclaim."]
+rollback: "Assessment off; NOT_ASSESSED remains."

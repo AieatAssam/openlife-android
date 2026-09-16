@@ -1,0 +1,32 @@
+id: P10-01
+title: Candidate evaluation on device and allowlist (ADR-0015)
+phase: P10
+status: todo
+depends_on: [P8-01, P2-04, P6-06]
+estimate: L
+owner: agent+owner
+owner_action: OA-4
+summary: "Evaluate the vision-language candidates from decision 0015 on the CI emulator and a physical arm64 device through the llama.cpp runtime (mtmd), using the OCR and receipts evaluation sets; verify weights licences and hashes at that time; produce the allowlist (model id, GGUF hash, mmproj hash, licence, budget) and the C1b specification section; obtain owner approval."
+requirements:
+  - id: P10-01-R1
+    text: "MUST write docs/capabilities/C1b.md (grounding rules, states, limits, failure behaviour, exclusions, test matrix C1b-01..C1b-08) with the seven-part structure of P3-01 and obtain adversarial spec review and owner approval."
+  - id: P10-01-R2
+    text: "MUST run each candidate over eval/ocr/v1 and eval/receipts/v1 producing per-model CER, evidence-IoU (native boxes where available; hybrid alignment otherwise), abstention correctness, p95 latency, peak RSS, APK/model size; results in docs/verification/vlm-eval.md."
+  - id: P10-01-R3
+    text: "MUST allowlist only models with OSI-approved weights licences verified at evaluation time (record the licence URL and text hash) that beat Tesseract on CER at equal or better IoU within the budget (peak RSS <= 2.5 GB, p95 <= 20 s on the CI emulator and the baseline device, cancellable, no ANR); models failing any gate are recorded as evaluated-not-allowlisted."
+  - id: P10-01-R4
+    text: "MUST record prompt templates and decoding parameters per model as versioned files under eval/vlm/v1/prompts/ so the engine id includes their hash."
+files_touched: [docs/capabilities/C1b.md, docs/verification/vlm-eval.md, eval/vlm/v1/*, vault model allowlist]
+tdd:
+  red:
+    - name: VlmEvalHarnessTest.computesMetricsAgainstTruthForBothGroundingModes
+    - name: ModelAllowlistTest.entriesCarryOsiLicenceHashAndBudget
+  green: ["Run and record."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest --tests '*VlmEval*' (Slow)"], evidence_required: ["Per-model results; owner approval line in C1b.md"]}
+acceptance_criteria:
+  - "At least one model allowlisted or the phase recorded as not viable with numbers."
+  - "Spec reviewed by an adversarial reviewer against design §2/§4/§14; findings resolved."
+docs_to_update: [docs/decisions/0015-local-vision-model-ocr-tier.md (candidate table refreshed), docs/THREAT_MODEL.md]
+risks: ["Model licences and availability change quickly; the record is refreshed at evaluation time."]
+rollback: "No engine shipped."

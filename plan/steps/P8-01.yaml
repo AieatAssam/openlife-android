@@ -1,0 +1,33 @@
+id: P8-01
+title: Local model runtime and explicit artefact import (ADR-0013)
+phase: P8
+status: todo
+depends_on: [P5-05]
+estimate: L
+owner: agent+owner
+owner_action: OA-4
+summary: "Select and integrate a fully local language-model runtime (llama.cpp via a pinned JNI build compiled from source in CI, not a prebuilt binary) with a model the user imports explicitly through the single-document picker, accepted only if its SHA-256 matches the repository allowlist (Qwen2.5-1.5B-Instruct Q4_K_M GGUF, Apache-2.0). Measure device budget; the feature stays off until a model is imported. Write ADR-0013 and C11's runtime section of the spec."
+requirements:
+  - id: P8-01-R1
+    text: "MUST build llama.cpp from a pinned commit in CI (cmake, NDK pinned and recorded) producing libllama for arm64-v8a and x86_64 (armeabi-v7a is not built; the Local understanding setting is shown only when Build.SUPPORTED_ABIS contains a built ABI, and About explains the limitation); no prebuilt native binaries in the repository; the NDK is absent in the sandbox so this build is CI-only; verification metadata covers the NDK/cmake plugin artefacts."
+  - id: P8-01-R2
+    text: "MUST implement ModelArtefactImport: single-document pick (application/octet-stream), bounded copy into an encrypted artefact ; model files are public artefacts, not user content, so they are stored unencrypted under noBackupFilesDir/models/ (documented in THREAT_MODEL and About) with SHA-256 verified against the allowlist before use; mismatch -> refuse and delete the copy."
+  - id: P8-01-R3
+    text: "MUST implement LocalModelRuntime with bounded context (4k tokens), deadline 60 s, memory guard (refuse to load if available RAM < model size + 512 MB), and cancellation; runs in-process (no service, no exported component)."
+  - id: P8-01-R4
+    text: "MUST add an evaluation of inference time and memory on the CI emulator and record; the feature is gated behind Settings > Local understanding with the budget shown."
+files_touched: [docs/decisions/0013-*.md, docs/capabilities/C11.md (runtime section), native/llama (submodule or fetch script with pinned commit and checksum), vault model/*, app settings]
+tdd:
+  red:
+    - name: ModelArtefactImportTest.refusesUnlistedDigestAndDeletesCopy
+    - name: LocalModelRuntimeTest.refusesToLoadBelowMemoryBudgetAndCancelsWithinDeadline
+    - name: DependencyBoundaryTest and ManifestBoundaryTest remain green (no network, no new permissions)
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest --tests '*Model*'"], evidence_required: ["Build logs; measurements"]}
+acceptance_criteria:
+  - "A listed model imports and answers a prompt offline within budget; unlisted model is refused."
+  - "Runtime section of C11.md reviewed by an adversarial reviewer against design §2/§14; findings resolved in the same PR."
+docs_to_update: [docs/THREAT_MODEL.md (model artefacts), docs/PRIVACY_POLICY.md]
+risks: ["Native build complexity; model licence changes; keep the allowlist small."]
+rollback: "Feature off."

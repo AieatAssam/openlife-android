@@ -1,0 +1,25 @@
+id: P3-08
+title: C2 acceptance and v0.3.0
+phase: P3
+status: todo
+depends_on: [P3-05, P3-06, P3-07]
+estimate: M
+owner: agent+owner
+summary: "Complete the C2 gate: matrix C2-01..C2-12 with evidence, security and provenance reviews (evidence chain Source -> span -> fact revision, correction propagation, deletion cascade, inert values), handoff, owner acceptance, tag v0.3.0."
+requirements:
+  - id: P3-08-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P3-08-R1
+    text: "MUST produce docs/verification/C2.md, docs/reviews/C2-security-review.md, docs/reviews/C2-provenance-review.md (must demonstrate: original preservation, evidence navigation, correction creating revisions with stale propagation, deletion propagation), docs/verification/C2-handoff.md."
+  - id: P3-08-R2
+    text: "MUST run the full suites on CI legs plus the eval gates and record URLs."
+  - id: P3-08-R3
+    text: "MUST bump VERSION to 0.3.0, CHANGELOG, tag after owner sign-off."
+verification:
+  commands: ["./gradlew detekt lint :app:test :vault:test assembleRelease; CI; bash scripts/release-smoke.sh"]
+  evidence_required: ["Docs; tag"]
+acceptance_criteria: ["Owner acceptance recorded."]
+docs_to_update: [docs/verification/C2.md, docs/reviews/*, CHANGELOG.md]
+tdd: {red: [], green: [], refactor: []}
+risks: []
+rollback: "Untag."

@@ -1,0 +1,80 @@
+id: P2-02
+title: OCR engine lifecycle, cancellation, and memory hygiene
+phase: P2
+status: todo
+depends_on: [P1-09]
+estimate: M
+owner: agent
+closes_findings: [F-05, F-21, F-30, F-38, F-41, F-42, F-49]
+
+summary: >
+  Make the OCR run cancellation-safe and atomic: one transaction for the
+  final commit, NonCancellable state marking, correct handling of
+  cancellation during capture, a single timeout, typed engine exceptions,
+  cancellation of the engine task, zeroisation of the captured plaintext,
+  and repository-side forgetting on deletion.
+
+rationale: >
+  The current run can leave a READY revision with zero spans, a RUNNING row
+  orphaned by cancellation during capture, a ViewModel job killed by the
+  inner timeout, and a recycled bitmap in use by the recogniser thread. Up
+  to 16 MiB of plaintext stays referenced after the run.
+
+ethos_check:
+  - "C1-R6: cancellation, process death, deletion never create a confirmed text result."
+
+requirements:
+  - id: P2-02-R1
+    text: "MUST wrap the final commit (revision READY + spans insert) in database.withTransaction inside withContext(NonCancellable); markFailed/markCancelled are NonCancellable; capture is wrapped so a CancellationException between insertRevision and returning Capture marks CANCELLED."
+  - id: P2-02-R2
+    text: "MUST have exactly one deadline (repository-level withTimeoutOrNull) and remove the engine's inner withTimeout; TimeoutCancellationException from any layer maps to Cancelled(reason=TIMEOUT), added to OcrFailureReason as TIMEOUT distinct from user CANCELLED."
+  - id: P2-02-R3
+    text: "MUST introduce typed engine exceptions: OcrDecodeException, OcrLimitExceededException (exists), OcrUnsupportedScriptException (exists), OcrEngineException; the repository maps each to its failure reason; IllegalArgumentException is no longer caught as LIMIT_EXCEEDED."
+  - id: P2-02-R4
+    text: "MUST make the engine interface cancellation-aware: OcrEngine.extract runs inside suspendCancellableCoroutine with invokeOnCancellation that cancels the underlying task (ML Kit: CancellationTokenSource; Tesseract in P2-03: TessBaseAPI.stop()) and MUST NOT recycle the input bitmap until the task has completed or acknowledged cancellation (await a completion latch with a bounded wait; leak-over-crash if the engine never returns, documented)."
+  - id: P2-02-R5
+    text: "MUST zero the captured plaintext byte array (OcrEngineInput.bytes) in a finally after extract returns or fails; OcrEngineInput exposes `close()` to do it; a test seam asserts zeros."
+  - id: P2-02-R6
+    text: "MUST forget in-flight jobs on source deletion: DeletionRepository signals an `onSourceDeleted` callback (or the ViewModel observes the source flow) so the running OCR job is cancelled and its revision marked STALE(SOURCE_DELETED)."
+  - id: P2-02-R7
+    text: "MUST add the missing test: deleting a source while its OCR UI state is displayed clears the panel and leaves no OCR rows (C1-R7 evidence)."
+
+constraints:
+  - "Engine adapters own no persistence."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/repository/OcrRepository.kt
+  - vault/src/main/java/org/openlife/vault/ocr/{OcrEngine.kt,OcrModel.kt,OcrStates.kt,MlKitOcrEngine.kt}
+  - app/src/main/java/org/openlife/app/ui/OcrViewModel.kt
+  - vault androidTest OcrRepositoryTest (fake engine with controllable suspension), app androidTest ViewerScreenC1Test
+
+tdd:
+  red:
+    - name: OcrRepositoryTest.commitFailureBetweenRevisionAndSpansLeavesNoReadyRevision (DAO wrapper throwing in insertSpans)
+    - name: OcrRepositoryTest.cancellationDuringCaptureMarksRevisionCancelledNotRunning
+    - name: OcrRepositoryTest.engineTimeoutIsReportedAsCancelledTimeoutAndDoesNotPropagate
+    - name: OcrRepositoryTest.decodeFailureIsEngineFailureNotLimitExceeded
+    - name: OcrRepositoryTest.inputBytesAreZeroedAfterExtraction
+    - name: OcrRepositoryTest.cancellingTheJobCancelsTheEngineTaskBeforeBitmapRecycle (fake engine records ordering)
+    - name: app androidTest ViewerScreenC1Test.deletingTheSourceWhileOcrTextIsShownClearsItAndRemovesRows
+  green:
+    - "Implement."
+  refactor:
+    - "Extract OcrRunStateMachine (pure Kotlin) with JVM tests for transitions; the repository only performs I/O around it."
+
+verification:
+  commands:
+    - "./gradlew :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Tests."
+
+acceptance_criteria:
+  - "No interleaving of cancel/timeout/delete/kill can produce a READY revision without spans or a stuck RUNNING row within the process."
+
+docs_to_update:
+  - docs/capabilities/C1.md (C1-R6 states: add TIMEOUT)
+  - docs/verification/C1.md (C1-03 row)
+
+risks:
+  - "ML Kit task cancellation is best-effort; the bounded wait before recycle is the safety net until P2-05 removes ML Kit."
+rollback: "Per-item."

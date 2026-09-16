@@ -1,0 +1,108 @@
+id: P0-07
+title: UI foundation (theme, edge-to-edge, navigation, strings, icon, splash)
+phase: P0
+status: todo
+depends_on: [P0-03]
+estimate: L
+owner: agent
+
+summary: >
+  Give the app a production UI foundation without changing any vault
+  behaviour: Material 3 theme with light/dark and dynamic colour, edge-to-edge
+  inset handling, Navigation Compose with type-safe routes and predictive
+  back, all strings in resources, an adaptive launcher icon, and the Android
+  12 splash API. Fixes F-03 (back exits the app) and F-11.
+
+rationale: >
+  targetSdk 37 enforces edge-to-edge and predictive back; the current
+  hand-rolled screen state has no BackHandler, so back from the viewer exits
+  the app. Hardcoded strings block localisation and accessibility review. The
+  default system icon and Theme.Material.Light are not shippable.
+
+ethos_check:
+  - "P2/P3 untouched: no behaviour change to intake, storage, or provenance."
+  - "P7: onboarding copy is moved to resources and reviewed for honesty, not softened."
+
+requirements:
+  - id: P0-07-R1
+    text: "MUST add org.openlife.app.ui.theme with OpenLifeTheme: Material 3 colour schemes (light 'paper' and dark 'carbon') from docs/design/VISUAL_IDENTITY.md section 4, dynamic colour OFF, typography from section 5 (fonts bundled by P0-09; until then the system font with the same scale), shapes from section 6; every activity uses it; system bars follow theme."
+  - id: P0-07-R2
+    text: "MUST call enableEdgeToEdge() in every activity and handle insets with Scaffold contentWindowInsets / Modifier.safeDrawingPadding on non-Scaffold screens (first-run, intake terminal states); a Compose test asserts the primary action button is fully within the window on a 400x700dp window with a 48dp bottom inset."
+  - id: P0-07-R3
+    text: "MUST replace the Screen sealed class in MainActivity with Navigation Compose (androidx.navigation:navigation-compose, type-safe routes with @Serializable route objects) with routes: List, Viewer(sourceId), Settings (placeholder until P1-08), About (placeholder). BackHandler/predictive back returns from Viewer to List and never exits from a nested screen; the manifest sets android:enableOnBackInvokedCallback=true."
+  - id: P0-07-R4
+    text: "MUST keep the onStop scrub: navigating away from content on background remains (viewer pops to list on onStop); test retained."
+  - id: P0-07-R5
+    text: "MUST move every user-visible string (app + intake + viewer + dialogs + content descriptions + OCR failure messages) to app/src/main/res/values/strings.xml with stable names; a JVM test scans app/src/main/java for string literals passed to Text(...) or contentDescription = and fails on any (allowlist: empty)."
+  - id: P0-07-R6
+    text: "MUST add an adaptive launcher icon (vector foreground/background, monochrome layer) under res/mipmap-anydpi-v26 implementing the folded-corner keyhole mark from VISUAL_IDENTITY.md section 3 (P0-09 commits the SVG source; this step ships the vector drawables), and android:roundIcon."
+  - id: P0-07-R7
+    text: "MUST add the androidx.core:core-splashscreen theme (Theme.OpenLife.Starting -> Theme.OpenLife) so cold start shows the icon instead of a white frame; no content on the splash."
+  - id: P0-07-R8
+    text: "MUST keep FLAG_SECURE on every activity window; a test asserts each activity's window has FLAG_SECURE after onCreate (existing dumpsys evidence plus an instrumented assertion via activity.window.attributes.flags)."
+  - id: P0-07-R9
+    text: "MUST NOT add any UI library beyond AndroidX (navigation-compose, core-splashscreen, material3 already present, material-icons-extended NOT added; keep icons-core)."
+  - id: P0-07-R10
+    text: "MUST supply string resources for RTL and large text: no fixed-width text containers; the existing 1.3x/2.0x checks are re-run as an instrumented test that sets fontScale via a Density override in the Compose test."
+
+constraints:
+  - "Do not introduce a DI framework; ViewModels stay factory-constructed."
+  - "Navigation arguments carry only the Source UUID string, never bytes or paths (C0-R11)."
+  - "Intake stays a separate activity (noHistory, excludeFromRecents)."
+
+design_decisions:
+  - "Navigation Compose chosen over a hand-rolled back stack because C2-C7 add at least six screens; type-safe routes avoid string route bugs."
+  - "Dynamic colour is off (identity brief); the fixed palette is used everywhere including screenshots."
+  - "Icon: the folded-corner paper stub with a keyhole on vermilion, per the brief; SVG source under art/icon/."
+
+files_touched:
+  - app/build.gradle.kts (navigation-compose, core-splashscreen, kotlinx-serialization plugin for type-safe routes)
+  - gradle/libs.versions.toml
+  - app/src/main/AndroidManifest.xml (theme, enableOnBackInvokedCallback, icons)
+  - app/src/main/res/values/{strings.xml,themes.xml,colors.xml}
+  - app/src/main/res/values-night/themes.xml
+  - app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml, drawable/ic_launcher_foreground.xml, ic_launcher_background.xml, ic_launcher_monochrome.xml
+  - app/src/main/java/org/openlife/app/ui/theme/*
+  - app/src/main/java/org/openlife/app/navigation/Routes.kt, OpenLifeNavHost.kt
+  - app/src/main/java/org/openlife/app/MainActivity.kt
+  - app/src/main/java/org/openlife/app/intake/IntakeActivity.kt
+  - every screen composable (string extraction)
+  - app/src/test/java/org/openlife/app/ui/NoHardcodedUiStringsTest.kt
+  - app/src/androidTest/java/org/openlife/app/ui/NavigationBackTest.kt, EdgeToEdgeInsetsTest.kt, SecureWindowTest.kt, LargeFontLayoutTest.kt
+
+tdd:
+  red:
+    - name: NavigationBackTest.backFromViewerReturnsToListInsteadOfFinishing
+      asserts: "With one saved source, open viewer, press back (Espresso.pressBack), MainActivity is not finishing and list is displayed."
+    - name: NavigationBackTest.backFromListFinishesActivity
+    - name: NoHardcodedUiStringsTest.allUserVisibleTextComesFromResources
+    - name: EdgeToEdgeInsetsTest.primaryActionsAreNotObscuredByNavigationBarInsets
+    - name: SecureWindowTest.everyActivityWindowHasFlagSecure
+    - name: LargeFontLayoutTest.allScreensKeepActionsReachableAt2xFontScale
+    - name: RtlLayoutTest.screensMirrorCorrectlyUnderForcedRtl (CompositionLocalProvider(LocalLayoutDirection provides Rtl) plus a device pass with `settings put global debug.force_rtl 1`)
+  green:
+    - "Introduce theme, nav host, string resources, icon, splash."
+  refactor:
+    - "Delete the ScreenSaver and the duplicated SourceListScreen call in MainActivity."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug"
+    - "./gradlew :app:connectedDebugAndroidTest"
+    - "adb shell settings put system font_scale 2.0; uiautomator walk per docs/runbooks/ui-walk.md; reset to 1.0"
+  evidence_required:
+    - "Test counts; uiautomator bounds check summary at 2.0x; screenshots are black under FLAG_SECURE, so record uiautomator dumps."
+
+acceptance_criteria:
+  - "Back navigation is correct on API 29 and API 36 CI legs (predictive back enabled)."
+  - "No hardcoded UI strings remain; lint's HardcodedText is an error."
+  - "App renders correctly in dark theme and with gesture navigation insets."
+
+docs_to_update:
+  - docs/decisions/0006-ui-foundation.md (new)
+  - docs/THREAT_MODEL.md (FLAG_SECURE test reference)
+  - docs/verification/C0.md (C0-16 large-text leg now automated)
+
+risks:
+  - "Navigation Compose keeps back-stack entries in saved state; only UUID strings are stored (verify in NavigationBackTest by inspecting saved state bundle contains no ByteArray)."
+rollback: "Revert to the sealed-class navigation; keep string resources and theme."

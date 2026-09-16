@@ -1,0 +1,75 @@
+id: P0-06
+title: R8 minification and release-variant smoke
+phase: P0
+status: todo
+depends_on: [P0-05]
+estimate: M
+owner: agent
+
+summary: >
+  Enable R8 code shrinking, obfuscation, and resource shrinking on the release
+  build with explicit keep rules for Room, SQLCipher, Compose, and the OCR
+  engine, and prove the minified APK works with an automated smoke run.
+
+rationale: >
+  Shipping an unminified APK exposes more surface, is larger, and hides
+  keep-rule problems until a real user hits them. The design's §13 says to run
+  relevant cases against the release manifest and storage configuration.
+
+ethos_check:
+  - "P6: mapping.txt is retained per release so stack traces from user reports can be read without telemetry."
+
+requirements:
+  - id: P0-06-R1
+    text: "MUST set isMinifyEnabled=true, isShrinkResources=true for release; keep rules in app/proguard-rules.pro with a comment per rule explaining why."
+  - id: P0-06-R2
+    text: "MUST keep: net.zetetic.database.** (JNI), Room generated classes (consumer rules cover most; verify), kotlinx.coroutines debug-agent exclusions, and the OCR engine's JNI classes when P2-03 lands (that step extends this file)."
+  - id: P0-06-R3
+    text: "MUST add a `releaseSmoke` instrumented test source set or a script `scripts/release-smoke.sh` that installs the release APK on the CI emulator, launches MainActivity, pushes a synthetic PNG to /sdcard/Pictures, triggers a media scan (am broadcast MEDIA_SCANNER_SCAN_FILE), queries content://media/external/images/media for its id, shares that URI via `am start -a android.intent.action.SEND --grant-read-uri-permission` (the debug-only test provider is not available in release), and asserts via `uiautomator dump` that the preview text appears and no FATAL EXCEPTION is logged. Decision: script-based, run in both CI emulator legs after the debug suites (API 29 is where keep-rule regressions surface first)."
+  - id: P0-06-R4
+    text: "MUST retain app/build/outputs/mapping/release/mapping.txt as a release artefact (P0-05 workflow) and never upload it anywhere else."
+  - id: P0-06-R5
+    text: "MUST record APK size before/after in docs/verification/release-build.md."
+  - id: P0-06-R6
+    text: "MUST add scripts/check-16kb-alignment.sh that unzips the release APK and checks every lib/*/*.so for 16 KB LOAD-segment alignment (readelf -lW; every LOAD segment's Align >= 0x4000) and that `extractNativeLibs` is false (uncompressed, page-aligned in the APK via `zipalign -c -P 16 -v 4`); CI fails on any misaligned library; result recorded in docs/verification/release-build.md. SQLCipher 4.19.0 is checked now; Tesseract (P2-03) and llama (P8-01) re-run this script."
+
+constraints:
+  - "Do not use -dontobfuscate; do use -keepattributes SourceFile,LineNumberTable and -renamesourcefileattribute SourceFile so stack traces stay mappable."
+  - "Do not disable any lint check to make shrinking pass."
+
+design_decisions:
+  - "Full R8 mode (android.enableR8.fullMode=true) is enabled; if it breaks SQLCipher reflection, document the specific keep rule rather than turning full mode off."
+
+files_touched:
+  - app/build.gradle.kts
+  - app/proguard-rules.pro
+  - gradle.properties
+  - scripts/release-smoke.sh
+  - .github/workflows/ci.yml
+  - docs/verification/release-build.md
+
+tdd:
+  red:
+    - name: "scripts/release-smoke.sh against the current (unminified) release APK passes; then enable R8 and expect failures (missing classes) to drive keep rules."
+  green:
+    - "Add keep rules until the smoke script passes on API 29 and API 36 legs."
+  refactor:
+    - "Remove any keep rule that is not required (test by deleting and re-running smoke)."
+
+verification:
+  commands:
+    - "./gradlew assembleRelease && bash scripts/release-smoke.sh app/build/outputs/apk/release/app-release-unsigned.apk"
+  evidence_required:
+    - "Smoke output, APK size, list of keep rules with justifications."
+
+acceptance_criteria:
+  - "Minified release APK completes share -> preview -> save -> reopen -> delete on both CI emulator legs."
+  - "APK size reduced versus baseline (record numbers)."
+
+docs_to_update:
+  - docs/verification/release-build.md
+  - docs/decisions/0007-release-engineering.md
+
+risks:
+  - "SQLCipher JNI symbol stripping; keep `-keep class net.zetetic.** { *; }` and test."
+rollback: "Set isMinifyEnabled=false; keep the smoke script."

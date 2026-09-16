@@ -1,0 +1,31 @@
+id: P4-02
+title: Record and action schema with dependency edges and staleness
+phase: P4
+status: todo
+depends_on: [P4-01]
+estimate: M
+owner: agent
+summary: "Implement the C3 entities, migration, DAOs, EventRepository and ReminderRepository (persistence only; scheduling in P4-04), invariants as triggers, and cascade deletion."
+requirements:
+  - id: P4-02-R1
+    text: "MUST add EventRecordEntity, EventRecordRevisionEntity, ReminderEntity with FKs to sources and fact_revisions (ON DELETE CASCADE) and a migration with exported JSON."
+  - id: P4-02-R2
+    text: "MUST enforce: CONFIRMED event revision requires dateFactRevisionId to reference a fact revision with status CONFIRMED (trigger joining fact_revisions) or a USER-origin revision; reminder trigger must be in the future at scheduling time (repository check)."
+  - id: P4-02-R3
+    text: "MUST implement staleness propagation in FactRepository hooks: when a fact revision goes STALE or is superseded, dependent event revisions become STALE and their reminders SUSPENDED (persisted; the scheduler in P4-04 observes and cancels alarms)."
+  - id: P4-02-R4
+    text: "MUST extend DeletionRepository and VaultResetRepository to remove records/reminders explicitly in the same transaction and to invoke a `ReminderCanceller` seam (implemented in P4-04)."
+files_touched: [vault/src/main/java/org/openlife/vault/records/*, storage entities, migration, repositories, tests]
+tdd:
+  red:
+    - name: RecordDatabaseTest.migrationAddsRecordAndReminderTables
+    - name: RecordDatabaseTest.confirmedEventRequiresConfirmedOrUserDateFact
+    - name: EventRepositoryTest.staleFactMarksEventStaleAndSuspendsReminder
+    - name: DeletionRepositoryTest.deletingSourceRemovesRecordsRemindersAndCallsCanceller
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest"], evidence_required: ["Tests"]}
+acceptance_criteria: ["Invariants enforced; cascade proven."]
+docs_to_update: [docs/capabilities/C3.md]
+risks: []
+rollback: "Additive migration."

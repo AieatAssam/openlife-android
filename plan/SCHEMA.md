@@ -1,0 +1,55 @@
+# Plan file schema
+
+`plan/plan.yaml` is the master tracker; `plan/steps/<id>.yaml` holds one
+step each. `plan/tools/PlanCheck.java` (run through `scripts/plan-check.sh`)
+validates both. Agents edit only the tracking fields listed below; every
+other change is a plan revision and must be reviewed.
+
+## plan.yaml
+
+| Key | Meaning |
+| --- | --- |
+| `schema_version` | Integer; bump when this document changes incompatibly. |
+| `plan_version`, `plan_date`, `baseline_commit` | Identity of the plan revision and the commit it was written against. |
+| `governing_documents` | Files that override the plan on conflict. |
+| `ethos` | The product's non-negotiables restated for agents. |
+| `conventions` | Status values, transition rules, estimate scale, TDD protocol, branch and commit rules, environment notes. |
+| `release_train` | Ordered releases, the phases they contain, and the gate for each. |
+| `decisions_made_by_this_plan` | Every decision the plan makes (`ADR-*`), the step that writes the ADR, and the rationale. |
+| `phases[]` | `id`, `title`, `goal`, `exit_gate`, `steps[]`. |
+| `phases[].steps[]` | One-line flow map: `id`, `title`, `file`, `status`, `depends_on`, `estimate`, `owner`; tracking fields `started`, `completed`, `evidence`, `notes` may be added by agents. |
+| `owner_actions_required` | Items only the owner can do, each linked to a step. |
+| `review_findings_index` | Every defect or gap found in review (`F-*`) with severity and the step that closes it. |
+
+Step ids are `<phase>-<nn>`; the phase prefix must match the enclosing phase.
+
+## steps/<id>.yaml
+
+Required keys: `id`, `title`, `phase`, `status`, `depends_on`, `estimate`,
+`owner`, `summary`, `requirements`, `tdd`, `verification`,
+`acceptance_criteria`, `docs_to_update`, `risks`, `rollback`.
+
+Optional keys: `closes_findings`, `owner_action`, `rationale`, `ethos_check`,
+`constraints`, `design_decisions`, `files_touched`, `evidence`, `notes`.
+
+- `requirements[]`: `{id: <step>-R<n>, text}` using MUST / MUST NOT / SHOULD.
+- `tdd`: `red` (tests to write first, each `{name, asserts?}`), `green`
+  (minimal implementation notes), `refactor`.
+- `verification`: `commands` (exact commands to run) and `evidence_required`
+  (what to paste into plan.yaml `evidence`).
+- `depends_on` must equal the list in plan.yaml for the same id.
+
+## Status lifecycle
+
+`todo` → `in_progress` → `review` → `done`; `blocked` and `waived` as
+described in plan.yaml `conventions.status_rules`. A step is `done` only
+when a reviewer other than the implementer confirms the acceptance criteria
+against the recorded evidence.
+
+## Tracking fields an agent may write in plan.yaml
+
+```yaml
+- {id: P0-01, ..., status: review, started: 2026-09-17, evidence: "commit abc123; scripts/tests/run.sh 4/4; plan-check 0 errors", notes: "waiting on reviewer"}
+```
+
+Keep the entry on one line so the checker's flow-map parsing stays valid.

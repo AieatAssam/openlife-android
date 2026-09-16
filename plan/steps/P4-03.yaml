@@ -1,0 +1,35 @@
+id: P4-03
+title: Event proposal and confirmation UI with communication gate
+phase: P4
+status: todo
+depends_on: [P4-02, P2-07]
+estimate: L
+owner: agent
+summary: "From confirmed or unreviewed date/time facts, propose one event per source with a title, date, optional time, and zone; the user reviews each field, resolves ambiguity, answers the communication question when required, and confirms. Nothing is scheduled here."
+ethos_check:
+  - "P4: extraction proposes; the user confirms every field that changes an outcome (date, time, title)."
+  - "Design §6: no actionable proposal from unassessed communication-like content without the explicit user routing question."
+requirements:
+  - id: P4-03-R1
+    text: "MUST add EventProposalBuilder (pure Kotlin): picks the most plausible date fact (confirmed preferred; unreviewed shown with 'needs confirmation'), an optional time fact adjacent in the same span/line, and a title candidate from the first non-date, non-money span line, always labelled 'suggested'; multiple date facts produce a chooser, never a guess."
+  - id: P4-03-R2
+    text: "MUST implement the Create event screen: fields with provenance chips and 'Show evidence'; confirming an unreviewed fact from this screen records a review event CONFIRMED for that fact revision; editing a field creates a USER fact revision; zone defaults to the device zone and is shown explicitly."
+  - id: P4-03-R3
+    text: "MUST implement the communication gate: when required by C3.md, show the 'Is this a message or request from someone?' question with the 'not assessed in this version' explanation; COMMUNICATION answer still allows creating the event (the user is deciding) but the event detail carries a persistent 'from an unassessed message' label; refusing to answer blocks confirmation."
+  - id: P4-03-R4
+    text: "MUST refuse to confirm when the date is CLARIFICATION_NEEDED until resolved."
+files_touched: ["vault/.../records/EventProposalBuilder.kt", "app/.../ui/events/{CreateEventScreen.kt,EventViewModel.kt}", navigation]
+tdd:
+  red:
+    - name: EventProposalBuilderTest.prefersConfirmedDateAndNeverGuessesBetweenTwoDates
+    - name: EventProposalBuilderTest.titleIsAlwaysSuggestedNeverConfirmed
+    - name: CreateEventScreenTest.confirmingRecordsReviewEventsAndUserRevisionsWithAttribution
+    - name: CreateEventScreenTest.communicationGateBlocksUntilAnsweredAndLabelsEvent
+    - name: CreateEventScreenTest.clarificationNeededDateBlocksConfirmation
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:test :app:test && ./gradlew :app:connectedDebugAndroidTest"], evidence_required: ["Tests; accessibility checks"]}
+acceptance_criteria: ["The design's appointment scenario works end to end on a synthetic screenshot with evidence one tap away."]
+docs_to_update: [docs/capabilities/C3.md]
+risks: []
+rollback: "Hide route."

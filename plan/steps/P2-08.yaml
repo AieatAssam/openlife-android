@@ -1,0 +1,73 @@
+id: P2-08
+title: Local text search (ADR-0010)
+phase: P2
+status: todo
+depends_on: [P2-01]
+estimate: M
+owner: agent
+closes_findings: [F-22]
+
+summary: >
+  Add local full-text search over OCR span text and user corrections inside
+  the encrypted database, with results that link back to the source and
+  the matching span. Write ADR-0010.
+
+rationale: >
+  Design §5: "Local text search may be added to the C1 specification if it
+  can be completed in that slice; C12 is not a reason to postpone basic
+  retrieval." Retrieval is the product's value; a list ordered by time does
+  not scale past a few dozen items.
+
+ethos_check:
+  - "P1: the index lives inside the SQLCipher database; no plaintext index file."
+  - "P3: results always navigate to the source and span."
+
+requirements:
+  - id: P2-08-R1
+    text: "MUST add a capability check test: open the SQLCipher database and `CREATE VIRTUAL TABLE t USING fts5(x)`; if unsupported, the fallback path (R5) is used and the ADR records it."
+  - id: P2-08-R2
+    text: "MUST add `ocr_text_fts` as an FTS5 external-content table over ocr_spans(text) plus `ocr_correction_fts` over ocr_user_revisions(correctedText), maintained by triggers created in the migration (not Room entities), tokenizer unicode61 remove_diacritics 2; migration to the next schema version with exported JSON kept consistent (Room validates only its own declared tables; virtual tables created in the migration are outside its schema; a test proves Room opens and validates the database with them present)."
+  - id: P2-08-R3
+    text: "MUST expose SearchRepository.search(query, limit=50): Flow<List<SearchHit(sourceId, revisionId, spanId?, snippet, isCorrection)>> using bm25 ranking, excluding spans of rejected revisions, STALE revisions, and sources not READY; queries are sanitised into FTS5 phrase/prefix syntax (no raw user input in MATCH)."
+  - id: P2-08-R4
+    text: "MUST add a Search route with a text field (no autocomplete provider, `imeOptions` no personalised learning: `PlatformImeOptions`/`inputType` flag noPersonalizedLearning), results list showing a snippet with the match highlighted, tapping opens the viewer with the span selected (P2-06 selection API)."
+  - id: P2-08-R5
+    text: "MUST provide the fallback when FTS5 is unavailable: LIKE with a normalised lowercase column and the same API; performance recorded."
+  - id: P2-08-R6
+    text: "MUST keep deletion propagation: deleting a source removes its FTS rows (external-content triggers on delete); a test asserts no hits remain."
+  - id: P2-08-R7
+    text: "MUST NOT log queries; the search field is cleared on onStop (C0-R32 spirit)."
+
+files_touched:
+  - vault storage migration (FTS tables + triggers), SearchDao (raw @Query with MATCH), SearchRepository
+  - app ui/search/{SearchScreen.kt,SearchViewModel.kt}, navigation route
+  - docs/decisions/0010-local-search.md
+  - tests: vault androidTest SearchRepositoryTest, FtsAvailabilityTest; app SearchScreenTest
+
+tdd:
+  red:
+    - name: FtsAvailabilityTest.sqlcipherBuildSupportsFts5 (documents the outcome either way)
+    - name: SearchRepositoryTest.findsSpanTextAndCorrectionsRankedAndLinked
+    - name: SearchRepositoryTest.excludesRejectedStaleAndNonReadySources
+    - name: SearchRepositoryTest.deletingASourceRemovesItsHits
+    - name: SearchRepositoryTest.queryIsSanitisedAgainstFts5Syntax (input `"` `*` `NEAR(` `OR` cannot error or widen)
+    - name: SearchScreenTest.resultOpensViewerWithSpanSelectedAndFieldClearsOnStop
+  green:
+    - "Implement."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Tests; FTS availability result; search latency for 500 spans."
+
+acceptance_criteria:
+  - "Search returns linked results in under 200 ms for 500 spans on the emulator; deletion removes hits; no plaintext outside the database."
+
+docs_to_update:
+  - docs/decisions/0010-local-search.md, docs/capabilities/C1.md (C1-R10 search), docs/THREAT_MODEL.md (index inside vault)
+
+risks:
+  - "Room schema export and virtual tables: verify `exportSchema` output remains stable; if Room complains, create FTS tables in a Callback.onOpen with IF NOT EXISTS instead of the migration (documented)."
+rollback: "Drop FTS tables in a later migration; route removed."

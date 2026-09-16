@@ -1,0 +1,31 @@
+id: P6-01
+title: C4 purchase specification and schema
+phase: P6
+status: todo
+depends_on: [P4-08, P5-02]
+estimate: M
+owner: agent+owner
+owner_action: OA-4
+summary: "Specify C4 (merchant, purchase date, total with source-linked fields) as docs/capabilities/C4.md with the Purchase record model (purchase_records/revisions with fields mapped to fact revisions: merchantFactRevisionId (USER or EXTRACTED text fact kind MERCHANT added to C2 kinds), dateFactRevisionId, totalFactRevisionId (MONEY)), exclusions (line items, budgeting, currency conversion, tax), test matrix, and obtain approval; then implement the schema, migration, invariants (a total is a MONEY fact with non-null currency or the user confirms the currency explicitly as a USER revision), cascade, and repository."
+requirements:
+  - id: P6-01-R1
+    text: "MUST write C4.md with MUST ids C4-R1..; add fact kind MERCHANT (text) to C2's kinds with an extractor rule 'first prominent line' proposal only."
+  - id: P6-01-R2
+    text: "MUST implement PurchaseRecord entities, migration, invariants, DeletionRepository cascade, PurchaseRepository."
+  - id: P6-01-R3
+    text: "MUST keep receipts' 'total is not an item price' rule: no purchased-item price is derived from a total (C5 enforces)."
+files_touched: [docs/capabilities/C4.md, vault records/purchase/*, storage, tests]
+tdd:
+  red:
+    - name: PurchaseDatabaseTest.migrationAndInvariants
+    - name: PurchaseRepositoryTest.confirmedPurchaseRequiresConfirmedFactsOrUserRevisions
+    - name: DeletionRepositoryTest.cascadeIncludesPurchases
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest"], evidence_required: ["Owner approval; tests"]}
+acceptance_criteria:
+  - "Spec approved; schema tested."
+  - "Spec written with the seven-part structure of P3-01 (entities, states, boundaries, failure behaviour, limits, exclusions, test matrix) and reviewed by an adversarial reviewer against design §4/§5/§14; findings resolved in the same PR."
+docs_to_update: [docs/capabilities/C2.md (MERCHANT kind)]
+risks: []
+rollback: "Additive."

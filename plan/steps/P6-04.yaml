@@ -1,0 +1,31 @@
+id: P6-04
+title: C6 return deadline with reviewed counting rules
+phase: P6
+status: todo
+depends_on: [P6-03]
+estimate: L
+owner: agent
+summary: "An explicit return deadline (evidenced date fact) or a fully reviewed rule ('30 days' duration fact + purchase date + user-reviewed inclusivity and timezone) linked to the item, producing a DERIVED date fact with named rule version, then an optional reminder through the C3 pipeline. Spec C6.md; never invents policy."
+requirements:
+  - id: P6-04-R1
+    text: "MUST write C6.md with the worked example from design §4 as an acceptance test; exclusions: assumed store policies, legal advice."
+  - id: P6-04-R2
+    text: "MUST add DURATION fact kind (days/weeks/months with evidence) to the extractors and a DeadlineRule engine: inputs (start date fact revision, duration fact revision, inclusivity choice USER, zone USER) -> DERIVED date fact with fact_inputs edges and rule id 'return-deadline-v1'; ambiguous month arithmetic (e.g. Jan 31 + 1 month) requires clarification."
+  - id: P6-04-R3
+    text: "MUST show the policy text without scheduling when inputs are unresolved (design §4)."
+  - id: P6-04-R4
+    text: "MUST reuse the C3 reminder pipeline: a Return is a record type whose date field feeds an event/reminder with the same staleness rules."
+files_touched: [docs/capabilities/C6.md, vault facts/extract/DurationExtractor.kt, vault records/return/*, app ui/returns/*]
+tdd:
+  red:
+    - name: DeadlineRuleTest.workedExampleFromDesignProducesOctober10 (purchase 2026-09-10, 'Return by 10 October 2026' explicit -> uses explicit; '30 days' -> requires inclusivity then computes)
+    - name: DeadlineRuleTest.monthArithmeticEdgeRequiresClarification
+    - name: ReturnRepositoryTest.derivedFactCarriesInputsAndRuleVersionAndGoesStaleWithInputs
+    - name: ReturnFlowTest.unresolvedInputsShowPolicyTextWithoutScheduling
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"], evidence_required: ["Tests"]}
+acceptance_criteria: ["Design §4 worked example passes end to end with a reminder on 8 October 09:00 in the chosen zone."]
+docs_to_update: [docs/capabilities/C6.md, docs/capabilities/C2.md (DURATION kind)]
+risks: []
+rollback: "Hide."

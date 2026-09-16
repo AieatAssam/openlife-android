@@ -1,0 +1,22 @@
+id: P5-05
+title: v1.0.0 tag, GitHub Release, F-Droid submission
+phase: P5
+status: todo
+depends_on: [P5-02, P5-04]
+estimate: S
+owner: agent+owner
+owner_action: OA-6
+summary: "Execute docs/release/CHECKLIST.md for v1.0.0: tag, signed artefacts with SBOM, licence report, SHA-256SUMS and fingerprint on the GitHub Release; prepare the F-Droid metadata merge request (fdroiddata build recipe pointing at the tag, reproducible-builds section if P5-03 succeeded); optional Play listing deferred to P9 unless the owner opts in."
+requirements:
+  - id: P5-05-R1
+    text: "MUST verify the published APK: download, `apksigner verify --print-certs`, compare with README fingerprint, install on a clean emulator, run scripts/release-smoke.sh against the downloaded artefact."
+  - id: P5-05-R2
+    text: "MUST prepare docs/release/fdroid-metadata.yml (the fdroiddata recipe) with AntiFeatures none, Binaries URL if reproducible, and the owner files the merge request (OA-6)."
+  - id: P5-05-R3
+    text: "MUST update plan.yaml release_train v1.0.0 status and open the P6 phase."
+tdd: {red: [], green: [], refactor: []}
+verification: {commands: ["bash scripts/release-smoke.sh <downloaded apk>"], evidence_required: ["Release URL; verification transcript"]}
+acceptance_criteria: ["Release published; F-Droid request filed; README points to it."]
+docs_to_update: [README.md, CHANGELOG.md, plan/plan.yaml]
+risks: []
+rollback: "Yank release; publish 1.0.1."

@@ -1,0 +1,86 @@
+id: P0-05
+title: Release signing, versioning, changelog, F-Droid metadata skeleton
+phase: P0
+status: todo
+depends_on: [P0-04]
+estimate: M
+owner: agent+owner
+
+summary: >
+  Replace debug signing of release builds with a real upload key supplied via
+  CI secrets, define the versioning scheme, add CHANGELOG.md (Keep a
+  Changelog), and create the fastlane/metadata directory F-Droid and Play
+  both consume.
+
+rationale: >
+  Release APKs are currently debug-signed, so nothing produced by CI can be
+  distributed. P6 requires a documented relationship between source and
+  binaries.
+
+ethos_check:
+  - "P6: signing provenance and versioning are part of the published build instructions."
+
+requirements:
+  - id: P0-05-R1
+    text: "MUST read signing material from environment variables OPENLIFE_KEYSTORE_B64, OPENLIFE_KEYSTORE_PASSWORD, OPENLIFE_KEY_ALIAS, OPENLIFE_KEY_PASSWORD; when absent, release builds are unsigned (not debug-signed) and `assembleRelease` still succeeds so CI can inspect the APK."
+  - id: P0-05-R2
+    text: "MUST write docs/runbooks/signing.md: keystore generation (RSA-4096 or EC P-256, 25-year validity), secret storage, rotation, and what the SHA-256 signing certificate fingerprint is for README publication (owner action OA-1)."
+  - id: P0-05-R3
+    text: "MUST derive versionCode = major*10000 + minor*100 + patch from versionName in app/build.gradle.kts; versionName comes from a VERSION file at repo root; a unit test asserts the derivation for sample values."
+  - id: P0-05-R4
+    text: "MUST add CHANGELOG.md with an Unreleased section; release workflow fails if the tag's version has no changelog section."
+  - id: P0-05-R5
+    text: "MUST add fastlane/metadata/android/en-US/{title.txt,short_description.txt,full_description.txt,changelogs/} with honest copy that states the no-cloud/no-backup consequence; screenshots are added in P5-01."
+  - id: P0-05-R6
+    text: "MUST update .github/workflows/release.yml: on tag v*, build signed release APK and AAB, attach SBOM, licence report, SHA-256SUMS, and the signing certificate fingerprint to the GitHub Release; never publish a debug-signed artefact."
+  - id: P0-05-R7
+    text: "MUST enable v1..v4 APK signature schemes and `android.enableR8.fullMode` remains a P0-06 decision; do not enable Play App Signing assumptions in code."
+
+constraints:
+  - "Secrets never appear in logs; use `::add-mask::` and do not echo env."
+  - "The AAB is produced for optional Play distribution; F-Droid builds from source on its own infrastructure and needs no artefact."
+
+design_decisions:
+  - "versionCode derivation lives in gradle/version.gradle.kts; VersionCodeTest reads VERSION and recomputes the expected code with the same formula; CI compares it with the `printVersionCode` task output."
+  - "Upload key is owner-generated offline; CI holds only the base64 keystore secret."
+  - "Version 0.1.0 is the first tag produced by this pipeline (at P1-12)."
+
+files_touched:
+  - VERSION
+  - app/build.gradle.kts
+  - app/src/test/java/org/openlife/app/build/VersionCodeTest.kt
+  - CHANGELOG.md
+  - fastlane/metadata/android/en-US/*
+  - docs/runbooks/signing.md
+  - .github/workflows/release.yml
+
+tdd:
+  red:
+    - name: VersionCodeTest.versionCodeDerivesFromVersionFile
+      asserts: "0.1.0 -> 100; 1.0.0 -> 10000; 1.2.3 -> 10203"
+    - name: "scripts/tests/run.sh: release workflow lint via `actionlint` (vendored binary or pinned action) passes"
+  green:
+    - "Implement signing config, VERSION plumbing, workflows."
+  refactor:
+    - "Consolidate common setup into the composite action from P0-04."
+
+verification:
+  commands:
+    - "./gradlew :app:test printVersionCode"
+    - "OPENLIFE_KEYSTORE_B64= ./gradlew assembleRelease && unzip -l app/build/outputs/apk/release/*.apk | grep -c META-INF/ || true"
+    - "gh workflow run release.yml --ref <test-tag-branch> (dry run with a throwaway tag on a fork or a `workflow_dispatch` input `dry_run=true`)"
+  evidence_required:
+    - "gh commands need GitHub authentication, which the sandbox may lack; then the run URL is owner/CI evidence pasted by whoever has access."
+    - "apksigner verify --print-certs output for a signed CI artefact, fingerprint recorded in README."
+
+acceptance_criteria:
+  - "Release workflow with secrets produces a signed APK whose certificate fingerprint matches README."
+  - "Without secrets, the release build is unsigned and the workflow marks the job as 'unsigned (no secrets)' rather than shipping a debug-signed APK."
+
+docs_to_update:
+  - README.md (Releases and verification section: fingerprint, how to verify)
+  - docs/decisions/0007-release-engineering.md
+
+risks:
+  - "Owner must complete OA-1 before P1-12 can tag v0.1.0."
+rollback: "Revert workflows; keep VERSION and CHANGELOG."

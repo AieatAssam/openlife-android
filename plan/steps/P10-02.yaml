@@ -1,0 +1,38 @@
+id: P10-02
+title: Grounded VLM OCR engine (hybrid alignment) behind the seam
+phase: P10
+status: todo
+depends_on: [P10-01]
+estimate: L
+owner: agent
+summary: "Implement VlmOcrEngine as an OcrEngine: run the allowlisted model through the local runtime on the oriented, sampled bitmap; obtain lines; ground each line either from model boxes (validated against image bounds) or by aligning to Tesseract line boxes with a deterministic edit-distance matcher; unaligned lines are stored ungrounded; expose it in Settings as an opt-in tier with the budget shown; cancellable and background-safe."
+ethos_check:
+  - "P3: no line without a real region can become a fact; the alignment threshold is recorded in the revision's methodVersion."
+  - "P1: no network; model bytes only from the imported, hash-verified file."
+requirements:
+  - id: P10-02-R1
+    text: "MUST implement LineAligner (pure Kotlin, JVM-tested): given Tesseract lines with boxes and VLM lines, produce matches by normalised Levenshtein similarity >= 0.6 with monotonic ordering, one-to-one; unmatched VLM lines -> ungrounded spans; unmatched Tesseract lines -> kept with Tesseract text (so nothing is lost)."
+  - id: P10-02-R2
+    text: "MUST run the model with a hard deadline (30 s), memory guard (refuse when available RAM < model size + 768 MB), single in-flight inference, cancellation via the runtime's abort callback, and bitmap recycling only after the runtime returns."
+  - id: P10-02-R3
+    text: "MUST store engineId 'vlm-<model>@<gguf-hash8>+<prompt-hash8>' and modelVersion; the viewer labels the source of each span (model text aligned to engine box / model box / engine only)."
+  - id: P10-02-R4
+    text: "MUST keep the existing OCR limits (spans, chars, deadline) and the script policy; VLM output in unsupported scripts fails closed identically."
+  - id: P10-02-R5
+    text: "MUST pass the P2-04 evaluation gate through the same harness with the hybrid mode, and add the model's 16 KB alignment/ABI checks to the release inspection."
+files_touched: ["vault/src/main/java/org/openlife/vault/ocr/vlm/{VlmOcrEngine.kt,LineAligner.kt}", settings, tests]
+tdd:
+  red:
+    - name: LineAlignerTest.tableDriven (exact, near, reordered, missing, extra lines)
+    - name: LineAlignerTest.neverAttachesTextBelowThresholdAndKeepsEngineLines
+    - name: VlmOcrEngineTest.groundsEveryEmittedSpanOrMarksItUngrounded
+    - name: VlmOcrEngineTest.cancellationAbortsRuntimeBeforeRecycle
+    - name: VlmOcrEngineTest.memoryGuardRefusesBelowBudget
+    - name: OcrEvaluationTest.hybridModeMeetsGate
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest --tests '*Vlm*'"], evidence_required: ["Tests; eval results; budget measurements"]}
+acceptance_criteria: ["Every VLM span is grounded or visibly ungrounded; gate met; opt-in only."]
+docs_to_update: [docs/capabilities/C1b.md, docs/THREAT_MODEL.md, docs/PRIVACY_POLICY.md (model files)]
+risks: ["Runtime memory on 4 GB devices; the guard and the opt-in keep the baseline unaffected."]
+rollback: "Engine unregistered; Tesseract only."

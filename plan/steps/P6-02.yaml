@@ -1,0 +1,28 @@
+id: P6-02
+title: C4 purchase proposals and UI
+phase: P6
+status: todo
+depends_on: [P6-01]
+estimate: L
+owner: agent
+summary: "Propose a Purchase from a receipt-like source: merchant candidate, purchase date candidate, total candidate (largest MONEY fact adjacent to 'total' tokens, proposal only), each with evidence; a review screen confirms or edits each field; purchases appear in a Purchases list and in search."
+requirements:
+  - id: P6-02-R1
+    text: "MUST implement PurchaseProposalBuilder (pure Kotlin, tested on the eval receipts) with explicit abstention when no total token is evidenced."
+  - id: P6-02-R2
+    text: "MUST implement the Create purchase screen following the P4-03 pattern (provenance chips, evidence navigation, USER edits create revisions, currency must be explicit)."
+  - id: P6-02-R3
+    text: "MUST add Purchases list route and search integration (merchant text indexed)."
+files_touched: [vault records/purchase/PurchaseProposalBuilder.kt, app ui/purchases/*, search]
+tdd:
+  red:
+    - name: PurchaseProposalBuilderTest.abstainsWithoutEvidencedTotalToken
+    - name: PurchaseProposalBuilderTest.neverInfersCurrency
+    - name: CreatePurchaseScreenTest.fieldsCarryProvenanceAndEditsAreUserRevisions
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:test :app:test && ./gradlew :app:connectedDebugAndroidTest"], evidence_required: ["Tests"]}
+acceptance_criteria: ["Synthetic receipt -> confirmed purchase with three evidenced fields."]
+docs_to_update: [docs/capabilities/C4.md]
+risks: []
+rollback: "Hide route."

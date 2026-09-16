@@ -1,0 +1,27 @@
+id: P9-02
+title: Wrapping-key rotation procedure
+phase: P9
+status: todo
+depends_on: [P5-05]
+estimate: M
+owner: agent
+summary: "Design and implement an interruption-safe procedure to re-wrap the database secret and every per-source DEK under a new Keystore alias (openlife.vault.wrap.v2), needed if the key algorithm, StrongBox availability, or a security advisory requires rotation. No automatic trigger; a Settings action and a documented ADR."
+requirements:
+  - id: P9-02-R1
+    text: "MUST write docs/decisions/0015-key-rotation.md: alias versioning, the two-phase protocol (write new wrapped values alongside old under a `keyVersion` column, fsync, switch active alias marker, verify all unwraps, delete old alias last), and how bootstrap detects a half-finished rotation and resumes or rolls back without loss."
+  - id: P9-02-R2
+    text: "MUST implement KeyRotationRepository under the mutation queue with a fault seam and tests that kill at each phase and assert every Source still authenticates afterwards."
+  - id: P9-02-R3
+    text: "MUST expose Settings > Advanced > Rotate vault key with an explanation and a progress state; never destructive."
+files_touched: [docs/decisions/0015-key-rotation.md, vault crypto/storage (keyVersion column, migration), KeyRotationRepository, settings]
+tdd:
+  red:
+    - name: KeyRotationRepositoryTest.rotationSurvivesInterruptionAtEveryPhase
+    - name: VaultBootstrapperTest.halfFinishedRotationResumesWithoutLoss
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest --tests '*Rotation*'"], evidence_required: ["Tests"]}
+acceptance_criteria: ["All sources authenticate after rotation and after any injected interruption."]
+docs_to_update: [docs/THREAT_MODEL.md]
+risks: []
+rollback: "Feature hidden."

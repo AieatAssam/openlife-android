@@ -1,0 +1,25 @@
+id: P5-02
+title: Independent security review request and triage
+phase: P5
+status: todo
+depends_on: [P5-01]
+estimate: M
+owner: agent+owner
+owner_action: OA-5
+summary: "Prepare a reviewer package and have an independent party (not the implementing agents) review the v1.0.0 candidate; triage findings into fix-before-release or documented residual risk. P6 forbids calling a self-review an audit."
+requirements:
+  - id: P5-02-R1
+    text: "MUST write docs/reviews/v1.0-review-package.md: scope, build identity, threat model, how to build and verify, test evidence index, known limitations, contact; and a docs/reviews/v1.0-independent-review.md template with reviewer identity/independence statement, method, findings table (severity, status)."
+  - id: P5-02-R2
+    text: "MUST run an adversarial subagent review of the complete v1.0 tree as a pre-check (the report is filed as 'internal pre-review, not independent')."
+  - id: P5-02-R3
+    text: "MUST fix every blocker/high finding before P5-05 or record an owner-approved residual-risk ADR."
+  - id: P5-02-R4
+    text: "Owner (OA-5) commissions or requests an external review (options recorded: OSTIF/community reviewer, paid firm, or public call for review with a bounty); if none is obtained before release, README and the About screen state that no independent audit has been performed."
+files_touched: [docs/reviews/v1.0-*.md, fixes as needed]
+tdd: {red: ["Findings become failing tests first"], green: ["Fixes"], refactor: []}
+verification: {commands: ["Full suites"], evidence_required: ["Review documents; findings status table"]}
+acceptance_criteria: ["No open blocker/high; independence status stated honestly everywhere."]
+docs_to_update: [README.md, About screen text]
+risks: ["External review timing; release does not wait indefinitely but never misrepresents."]
+rollback: "None."

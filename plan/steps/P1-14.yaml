@@ -1,0 +1,92 @@
+id: P1-14
+title: Bootstrap and recovery robustness
+phase: P1
+status: todo
+depends_on: [P1-06, P1-13]
+estimate: M
+owner: agent
+closes_findings: [F-24, F-25, F-26, F-45]
+
+summary: >
+  Make vault bootstrap fail closed instead of crashing when the database
+  cannot be opened, make startup recovery shallow (existence and framing)
+  with deep authentication on first read, forbid any key generation outside
+  the fresh-install branch, and strengthen the migration tests to run on
+  SQLCipher and prove triggers survive.
+
+rationale: >
+  A corrupt database, a wrong key, or a downgraded schema currently throws
+  out of OpenLifeApp.vault() into ViewModel coroutines and crash-loops the
+  app. Startup recovery decrypts every READY blob, which makes cold start
+  proportional to vault size and turns one transient Keystore error into a
+  permanent CORRUPT mark. KeystoreWrapper.unwrap can generate a replacement
+  key when the alias is gone, contradicting design §10.
+
+ethos_check:
+  - "P7 and design §10: temporarily unavailable is distinguished from permanent loss; nothing is deleted or regenerated automatically."
+
+requirements:
+  - id: P1-14-R1
+    text: "MUST catch Throwable subclasses (SQLiteException, IllegalStateException for migration, UnsatisfiedLinkError, IOException) around OpenLifeDatabaseFactory.create and the first recovery pass in OpenLifeApp.vault(), mapping to VaultAccess.Unavailable(cause=DATABASE_OPEN_FAILED or STORAGE_IO_ERROR) with the enum from P1-06; the database file is never deleted or recreated; the failure cause count is recorded for the About diagnostics."
+  - id: P1-14-R2
+    text: "MUST split KeystoreWrapper into `ensureWrappingKey()` (used only by VaultBootstrapper's fresh-install branch) and `existingWrappingKey(): SecretKey?`; wrap/unwrap use existingWrappingKey and throw EnvelopeAuthenticationException(cause=MissingKey) when null; hasWrappingKey unchanged; bootstrap maps a missing alias with a present key file to KEY_UNWRAP_FAILED (unrecoverable) and a missing alias with no key file and no database to fresh install."
+  - id: P1-14-R3
+    text: "MUST change RecoveryRepository.recover to a shallow pass: for READY rows check blob existence and envelope framing (EnvelopeCodec.decode of the header only via BoundedFileReader reading HEADER+nonce+length bytes) and mark CORRUPT only when the file is missing or the header is malformed; deep authentication happens on first read (P1-13-R5) and in an explicit 'Verify all items' action in Settings (runs under the queue, shows counts, marks CORRUPT only on genuine authentication failure)."
+  - id: P1-14-R4
+    text: "MUST treat KeyStoreException/ProviderException/IOException during any authentication as transient: no state change, surfaced as Transient to the UI with retry."
+  - id: P1-14-R5
+    text: "MUST run the migration tests through SupportOpenHelperFactory (SQLCipher) via MigrationTestHelper with a custom open-helper factory, and assert after migration that inserting a READY row with a NULL validated field is rejected by the triggers; P0-08 owns VaultTest.schemaVersionMatchesRoomDatabaseVersion; this step only adds the SQLCipher migration assertions. MUST also test that a migration which throws midway (fault seam wrapping the migration list) leaves the database at the previous version and the next open re-runs it without data loss or destructive recreation."
+  - id: P1-14-R6
+    text: "MUST add a downgrade test: open a database with version+1 metadata and assert Unavailable(DATABASE_OPEN_FAILED) rather than a crash or destructive migration."
+
+constraints:
+  - "Recovery must remain idempotent and never delete unreferenced files unless all rows reconciled (existing rule)."
+
+design_decisions:
+  - "Deep verification is user-triggered (Settings > Verify all items) rather than at startup, so cold start stays constant-time and transient errors cannot poison state."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt
+  - vault/src/main/java/org/openlife/vault/crypto/KeystoreWrapper.kt
+  - vault/src/main/java/org/openlife/vault/storage/VaultBootstrapper.kt
+  - vault/src/main/java/org/openlife/vault/repository/RecoveryRepository.kt
+  - vault/src/main/java/org/openlife/vault/repository/VerifyAllRepository.kt (or a method on RecoveryRepository)
+  - app settings screen (Verify all items entry)
+  - vault androidTest: VaultBootstrapperTest, KeystoreWrapperTest, RecoveryRepositoryTest, OcrDatabaseTest, new DatabaseOpenFailureTest
+
+tdd:
+  red:
+    - name: DatabaseOpenFailureTest.garbageDatabaseFileYieldsUnavailableWithoutDeletingAnything
+    - name: DatabaseOpenFailureTest.wrongPassphraseYieldsUnavailable
+    - name: DatabaseOpenFailureTest.newerSchemaVersionYieldsUnavailableNotDestructiveMigration
+    - name: KeystoreWrapperTest.unwrapWithMissingAliasFailsAndDoesNotCreateAKey
+    - name: VaultBootstrapperTest.missingAliasWithExistingKeyFileIsUnrecoverableAndCreatesNoKey
+    - name: RecoveryRepositoryTest.startupDoesNotDecryptReadyBlobsAndTransientKeystoreErrorLeavesRowReady
+    - name: RecoveryRepositoryTest.missingOrMalformedBlobHeaderStillMarksCorrupt
+    - name: VerifyAllTest.tamperedBlobBecomesCorruptOnlyThroughExplicitVerify
+    - name: OcrDatabaseTest.migrationOnSqlCipherPreservesReadyInvariantTriggers
+    - name: DatabaseOpenFailureTest.migrationThrowingMidwayLeavesPreviousVersionAndRerunsNextOpen
+  green:
+    - "Implement."
+  refactor:
+    - "Bootstrap and database open become one `VaultOpener` with a single result type consumed by OpenLifeApp."
+
+verification:
+  commands:
+    - "./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "Manual: `run-as org.openlife dd if=/dev/urandom of=no_backup/vault/openlife.db bs=1k count=4 conv=notrunc`; launch; expect the unavailable screen, no crash, file untouched."
+  evidence_required:
+    - "Tests; manual transcript."
+
+acceptance_criteria:
+  - "No startup path throws out of vault(); cold start time no longer scales with vault size (measure with 50 sources: before/after)."
+  - "No code path generates a wrapping key except fresh install."
+
+docs_to_update:
+  - docs/capabilities/C0.md (C0-R22/R23 wording: shallow startup, deep on read/verify)
+  - docs/THREAT_MODEL.md (key loss paragraph)
+  - docs/verification/C0.md (C0-12 row)
+
+risks:
+  - "Existing tests assert `confirmedReady` counts from recovery; update them to the shallow semantics."
+rollback: "Restore deep startup verification behind a flag."

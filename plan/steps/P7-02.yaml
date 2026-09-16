@@ -1,0 +1,37 @@
+id: P7-02
+title: C9 bounded PDF import (ADR-0011)
+phase: P7
+status: todo
+depends_on: [P6-06]
+estimate: L
+owner: agent
+owner_action: OA-4
+summary: "Bounded local PDF import: accept application/pdf via share and the single-document picker, validate the header and size, store the original bytes as a Source (mimeType extended), render pages with the platform PdfRenderer into bounded bitmaps on demand, run OCR per page so evidence coordinates are page pixels, and extend all downstream features to multi-page sources. Spec C9.md and ADR-0011 first."
+requirements:
+  - id: P7-02-R1
+    text: "MUST write C9.md and 0011-pdf-rendering.md: limits 32 MiB, 50 pages, 20 M pixels per rendered page at 150 dpi max, 30 s render deadline per page; rendering in-process via android.graphics.pdf.PdfRenderer over a seekable in-memory fd created with android.system.Os.memfd_create (API 30+, MFD_CLOEXEC, wrapped in ParcelFileDescriptor.dup) holding the authenticated plaintext — never a plaintext file on disk; on API 29 there is no public in-memory seekable fd, so PDF import is refused at intake with an explanation (recorded C9 limitation)."
+  - id: P7-02-R2
+    text: "MUST extend intake validation: %PDF- header, encrypted PDFs rejected with an explanation (PdfRenderer throws SecurityException), page count via PdfRenderer within limits; the Source table gains `pageCount`; evidence spans gain `pageIndex` (schema migration)."
+  - id: P7-02-R3
+    text: "MUST render pages lazily with the same sampled-bitmap budget and never persist rendered pages; OCR revisions become per page (ocr_revisions.pageIndex)."
+  - id: P7-02-R4
+    text: "MUST document that PdfRenderer does not execute JavaScript, load external resources, or open attachments, and that OpenLife never parses PDF text layers (text comes from OCR of rendered pages) — ADR-0011 rationale: uniform evidence coordinates and no trust in embedded text."
+  - id: P7-02-R5
+    text: "MUST add hostile PDF fixtures (malformed xref, huge page, deep object nesting, embedded JS) to the intake tests and assert rejection or bounded failure without crash (PdfRenderer failures caught; process isolation is not available, documented residual risk)."
+files_touched: [docs/capabilities/C9.md, docs/decisions/0011-*.md, vault intake validation, storage migration, PdfPageRenderer, OCR per page, app viewer paging]
+tdd:
+  red:
+    - name: PdfHeaderValidatorTest.tableDrivenIncludingHostileFixtures
+    - name: PdfPageRendererTest.rendersWithinPixelBudgetAndNeverWritesPlaintextToDisk (FileObserver on filesDir/cacheDir)
+    - name: ImportRepositoryTest.pdfSourceIsStoredByteForByteWithPageCount
+    - name: OcrRepositoryTest.perPageRevisionsCarryPageIndexAndCascade
+    - name: ViewerScreenTest.pageNavigationAndEvidencePerPage
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["Full suites; hostile fixtures"], evidence_required: ["Tests; memory measurements"]}
+acceptance_criteria:
+  - "A 10-page synthetic PDF imports, renders, OCRs per page, and facts link to page regions."
+  - "Spec reviewed by an adversarial reviewer against design §3/§5/§12; findings resolved in the same PR."
+docs_to_update: [docs/capabilities/C9.md, docs/THREAT_MODEL.md (PDF row), docs/capabilities/C0.md (intake extension)]
+risks: ["In-process PDF parsing of hostile input; mitigated by limits and documented as residual."]
+rollback: "Reject application/pdf at intake."

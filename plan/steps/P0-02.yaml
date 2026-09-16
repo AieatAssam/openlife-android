@@ -1,0 +1,88 @@
+id: P0-02
+title: Dependency verification, SBOM, licence report
+phase: P0
+status: todo
+depends_on: [P0-01]
+estimate: M
+owner: agent
+
+summary: >
+  Enforce Gradle dependency verification (checksums, PGP where published),
+  generate a CycloneDX SBOM and an aggregated licence report on every release
+  build, and add a test that fails if any dependency in a shipped variant is
+  a networking, analytics, ads, or crash-reporting library.
+
+rationale: >
+  P6 requires pinned dependencies and verified resolved artefacts. Pinning
+  versions in libs.versions.toml does not verify bytes. The threat model row
+  "Compromised dependency or release" currently relies on a manual grep.
+
+ethos_check:
+  - "P1: the dependency-boundary test makes the 'no telemetry SDK' rule executable."
+  - "P6: SBOM and licence report are release artefacts users can audit."
+
+requirements:
+  - id: P0-02-R1
+    text: "MUST commit gradle/verification-metadata.xml with sha256 for every resolved artefact and plugin, generated with `./gradlew --write-verification-metadata sha256` locally (pgp entries are added by a CI job with key-server access and committed) and trimmed of unused entries."
+  - id: P0-02-R2
+    text: "MUST fail the build (not warn) on an unverified artefact; verification must be active for CI and local builds alike."
+  - id: P0-02-R3
+    text: "MUST produce app/build/reports/bom/bom.json (CycloneDX 1.5+) for the release variant and attach it to GitHub Releases (P0-05)."
+  - id: P0-02-R4
+    text: "MUST produce a licence report (docs/generated/THIRD_PARTY_LICENSES.md, committed) listing every runtime dependency's licence; the build fails if a runtime dependency has no declared licence or a licence outside the allowlist."
+  - id: P0-02-R5
+    text: "MUST add a JVM test `DependencyBoundaryTest` (in a root `buildSrc`-free Gradle task or a test in :app) that resolves releaseRuntimeClasspath and asserts no coordinate matches the denylist: com.google.firebase, com.google.android.datatransport, com.google.android.gms:play-services-measurement, io.sentry, com.bugsnag, com.squareup.okhttp3, io.ktor, com.android.volley, com.google.android.gms:play-services-ads, org.apache.httpcomponents, retrofit2."
+  - id: P0-02-R6
+    text: "SHOULD record the ML Kit transitive datatransport hit as a documented, time-boxed allowlist exception that expires at P2-05; the test must fail once ML Kit is gone if the exception remains."
+
+constraints:
+  - "Allowlisted licences: Apache-2.0, MIT, BSD-2/3-Clause, EPL-1.0/2.0, MPL-2.0, ISC, Unicode, CC0. Anything else requires an ADR."
+  - "No plugin may phone home during the build; CycloneDX gradle plugin is offline. Pin plugin versions in libs.versions.toml."
+  - "Verification metadata must include Gradle plugins and KSP artefacts, not only runtime deps."
+
+design_decisions:
+  - "Use org.cyclonedx.bom Gradle plugin (Apache-2.0) for SBOM."
+  - "Use com.github.jk1.dependency-license-report (Apache-2.0) for the licence report with an allowlist filter; generated file is committed so reviewers see diffs."
+  - "The denylist test runs as part of `./gradlew :app:test` so every change checks it."
+
+files_touched:
+  - gradle/verification-metadata.xml
+  - gradle/libs.versions.toml
+  - build.gradle.kts
+  - app/build.gradle.kts
+  - app/src/test/java/org/openlife/app/dependencies/DependencyBoundaryTest.kt
+  - docs/generated/THIRD_PARTY_LICENSES.md
+  - docs/decisions/0007-release-engineering.md (created here, extended by P0-03..P0-06)
+
+tdd:
+  red:
+    - name: DependencyBoundaryTest.releaseRuntimeClasspathContainsNoNetworkingOrTelemetryLibrary
+      asserts: "Fails today because com.google.android.datatransport is present transitively via ML Kit (expected RED); passes with the time-boxed exception recorded."
+    - name: DependencyBoundaryTest.everyRuntimeDependencyHasAnAllowlistedLicence
+      asserts: "Reads the generated licence report and fails on unknown licences."
+    - name: "CI step: `./gradlew assembleRelease` with a deliberately corrupted checksum in verification-metadata.xml must fail (documented manual check, recorded in evidence)."
+  green:
+    - "Add plugins, generate metadata, write the test reading a Gradle-produced classpath listing (task `:app:writeReleaseRuntimeClasspath` outputs build/reports/classpath-release.txt consumed by the test)."
+  refactor:
+    - "Move the denylist and allowlist into docs/dependency-policy.md and read them from the test resources so policy and check cannot diverge."
+
+verification:
+  commands:
+    - "./gradlew --offline :app:writeReleaseRuntimeClasspath :app:test :app:cyclonedxBom generateLicenseReport"
+    - "git diff --stat gradle/verification-metadata.xml docs/generated/THIRD_PARTY_LICENSES.md"
+  evidence_required:
+    - "Test counts, SBOM component count, licence report row count."
+
+acceptance_criteria:
+  - "A modified artefact checksum fails the build."
+  - "Licence report and SBOM are produced deterministically (two runs, identical content except timestamps)."
+  - "Denylist test passes with exactly one documented exception (ML Kit datatransport) that expires at P2-05."
+
+docs_to_update:
+  - docs/THREAT_MODEL.md ("Compromised dependency or release" row: cite the mechanisms)
+  - docs/decisions/0007-release-engineering.md
+  - README.md (Building section: mention verification)
+
+risks:
+  - "PGP verification may be unavailable for some artefacts; sha256 is the floor. Record which keys were trusted."
+rollback: "Remove plugins and metadata file; boundary test remains."

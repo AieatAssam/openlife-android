@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "color-system": {
+      "source": "owl-listener/designer-skills",
+      "sourceType": "github",
+      "skillPath": "ui-design/skills/color-system/SKILL.md",
+      "computedHash": "00668079fe31fd68331a8d51122cab722b7e3722d4464a2c8885a7fccdd0d2d0"
+    },
+    "material-3-expressive": {
+      "source": "albermonte/android-skills",
+      "sourceType": "github",
+      "skillPath": "skills/material-3-expressive/SKILL.md",
+      "computedHash": "020458bffddd6059696eeadd2814430c87c716d990530cf6431a8e9a72539ebf"
+    },
+    "mobile-android-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/mobile-android-design/SKILL.md",
+      "computedHash": "bcb274bcc4e0ad076b5947f90e5a247f370ed4da1274b2b7347dc293ee396309"
+    }
+  }
+}

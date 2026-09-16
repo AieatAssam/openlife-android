@@ -1,0 +1,81 @@
+id: P0-04
+title: CI matrix with API 29 and API 36 legs
+phase: P0
+status: todo
+depends_on: [P0-02, P0-03]
+estimate: M
+owner: agent
+
+summary: >
+  Rework .github/workflows/ci.yml: JDK 21, plan-check, detekt, lint, JVM
+  tests, dependency verification, then instrumented tests on API 29 (minSdk)
+  and API 36 emulators, uploading results and the RecoveryReport logcat
+  lines. Add a release-APK inspection job that runs aapt checks on the
+  minified release build.
+
+rationale: >
+  The single biggest recorded evidence gap is minSdk 29 device testing, which
+  the sandbox cannot provide but GitHub-hosted runners can. CI also currently
+  uses JDK 17 while the recorded environment is JDK 21.
+
+ethos_check:
+  - "P5/P6: tests run on the declared support matrix and evidence is retained as CI artefacts."
+
+requirements:
+  - id: P0-04-R1
+    text: "MUST use JDK 21 (temurin) in every job; record in docs/decisions/0007."
+  - id: P0-04-R2
+    text: "MUST run: scripts/plan-check.sh, ./gradlew detekt lint :app:test :vault:test assembleDebug, with dependency verification active (no --dependency-verification=off anywhere)."
+  - id: P0-04-R3
+    text: "MUST run :app:connectedDebugAndroidTest and :vault:connectedDebugAndroidTest on a matrix of api-level [29, 36] (google_apis, x86_64, pixel_7 profile) using reactivecircus/android-emulator-runner pinned by commit SHA, with KVM enabled."
+  - id: P0-04-R4
+    text: "MUST upload androidTest-results, logcat (filtered to org.openlife and OpenLifeRecovery tags), lint and detekt reports as artefacts retained 30 days."
+  - id: P0-04-R5
+    text: "MUST run instrumented legs on pull_request and on push to main; JVM legs also on every branch push."
+  - id: P0-04-R6
+    text: "MUST add a job that builds assembleRelease and runs scripts/inspect-release-apk.sh (aapt2 dump permissions/badging) asserting the same boundary as ManifestBoundaryTest on the actual APK, plus apk size recorded in the job summary."
+  - id: P0-04-R7
+    text: "MUST pin every third-party action by full commit SHA (supply-chain, P6)."
+  - id: P0-04-R8
+    text: "MUST use a retry-once wrapper for the connected test step to absorb emulator DeadSystemException flakes, and MUST fail if the second attempt fails or if the failure is a test assertion."
+
+constraints:
+  - "No secrets required for CI; release signing lives in the release workflow (P0-05)."
+  - "Keep total CI wall time under 40 minutes; use gradle/actions caching and `-Pandroid.testInstrumentationRunnerArguments.notAnnotation=org.openlife.test.Slow` for PR runs if needed, with the Slow-annotated tests run on push to main."
+
+design_decisions:
+  - "API 29 leg is the minSdk evidence; API 36 is the current-target evidence. API 34 leg removed."
+  - "Emulator boot uses `-no-snapshot -no-window -gpu swiftshader_indirect` in CI (no KVM GPU assumptions)."
+
+files_touched:
+  - .github/workflows/ci.yml
+  - scripts/inspect-release-apk.sh
+  - docs/decisions/0007-release-engineering.md
+
+tdd:
+  red:
+    - name: "Open a PR with the new workflow; the API 29 leg is expected to surface genuine failures (predictive-back, Photo Picker fallback, Parcelable compat). Record each failure as a plan finding closed by P1 steps rather than skipping tests."
+  green:
+    - "Workflow green on both legs, possibly with explicit @Ignore-with-reason annotations only for failures that P1 steps own, each linked by step id in the annotation reason."
+  refactor:
+    - "Extract reusable composite action .github/actions/gradle-setup for the three jobs."
+
+verification:
+  commands:
+    - "gh workflow run ci.yml --ref <branch> && gh run watch"
+  evidence_required:
+    - "gh commands need GitHub authentication, which the sandbox may lack; then the run URL is owner/CI evidence pasted by whoever has access."
+    - "Run URL, per-leg test counts, apk size."
+
+acceptance_criteria:
+  - "Both emulator legs run and upload results."
+  - "The release-inspection job fails when INTERNET is added to the manifest (verify once with a throwaway branch)."
+
+docs_to_update:
+  - docs/verification/C0.md ("Known environment limitations": API 29 evidence now comes from CI)
+  - docs/decisions/0001-c0-defaults.md item 4 (gap partially closed)
+  - README.md (CI badge)
+
+risks:
+  - "API 29 image availability on runners; fall back to API 30 with an ADR note if 29 is removed from the SDK repository."
+rollback: "Revert workflow."

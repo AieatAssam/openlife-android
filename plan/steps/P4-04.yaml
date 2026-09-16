@@ -1,0 +1,47 @@
+id: P4-04
+title: Reminder scheduling, notifications, permissions, reboot and timezone handling
+phase: P4
+status: todo
+depends_on: [P4-02]
+estimate: L
+owner: agent
+summary: "Implement ADR-0009: AlarmManager scheduling from persisted reminders, BOOT_COMPLETED/TIMEZONE_CHANGED/TIME_SET receivers, exact-alarm opt-in, POST_NOTIFICATIONS at point of use, generic notifications that open the detail behind the lock, and a 'remind me in 1 hour' action."
+ethos_check:
+  - "P1/P2: three new permissions (POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, SCHEDULE_EXACT_ALARM) each with point-of-use rationale and denial path in docs/PERMISSIONS.md; no content in notifications."
+requirements:
+  - id: P4-04-R1
+    text: "MUST add ReminderScheduler (AlarmManager wrapper behind an interface for tests) computing the instant from local date-time + zone with the DST rules from ADR-0009, using setAndAllowWhileIdle by default and setExactAndAllowWhileIdle only when reminder.exact && canScheduleExactAlarms(); PendingIntent to a non-exported BroadcastReceiver ReminderReceiver with request code derived from the reminder id (stable)."
+  - id: P4-04-R2
+    text: "MUST add BootReceiver for BOOT_COMPLETED only (not LOCKED_BOOT_COMPLETED: the vault is credential-protected and cannot open before first unlock) that reschedules all SCHEDULED reminders using goAsync() with a bounded 8 s deadline, TimeChangeReceiver for TIMEZONE_CHANGED/TIME_SET that recomputes instants, and ExactAlarmPermissionReceiver for revocation."
+  - id: P4-04-R3
+    text: "MUST post notifications via NotificationCompat on channel 'reminders' (IMPORTANCE_HIGH), VISIBILITY_PRIVATE, publicVersion with the same generic text, no content title beyond 'OpenLife reminder', contentIntent opens MainActivity with the reminder id (UUID string only); actions: 'Open', 'Remind me in 1 hour' (creates a new instant, same reminder), 'Dismiss'; tapping while locked shows the lock first (P1-07)."
+  - id: P4-04-R4
+    text: "MUST request POST_NOTIFICATIONS (API 33+) when the user enables the first reminder; on denial set status UNSCHEDULED_PERMISSION, keep the event confirmed, show the state and a Settings deep link (ACTION_APP_NOTIFICATION_SETTINGS is an app-settings intent, not content egress; allowed and documented)."
+  - id: P4-04-R5
+    text: "MUST make the receiver robust: if the vault is locked/unavailable when the alarm fires, still post the generic notification (it carries no content) and mark FIRED only after the database update succeeds on next access; never crash in a receiver (catch-all with counts)."
+  - id: P4-04-R6
+    text: "MUST declare all three receivers android:exported=false (protected system broadcasts such as BOOT_COMPLETED are still delivered to non-exported receivers); ManifestBoundaryTest's expected exported set stays {MainActivity, IntakeActivity} and its declared-receiver list gains the three; update docs/PERMISSIONS.md."
+  - id: P4-04-R7
+    text: "MUST implement the ReminderCanceller seam used by deletion/reset/staleness to cancel PendingIntents and remove posted notifications."
+files_touched: ["app/.../reminders/{ReminderScheduler.kt,ReminderReceiver.kt,BootReceiver.kt,TimeChangeReceiver.kt,ExactAlarmPermissionReceiver.kt,ReminderNotifications.kt}", AndroidManifest.xml, docs/PERMISSIONS.md, tests]
+tdd:
+  red:
+    - name: ReminderInstantCalculatorTest (JVM).dstGapMovesForwardAndOverlapTakesEarlierOffset
+    - name: ReminderInstantCalculatorTest.zoneChangeRecomputesInstantKeepingLocalTime
+    - name: ReminderSchedulerTest (androidTest with fake AlarmManager seam).schedulesInexactByDefaultAndExactOnlyWithPermission
+    - name: BootRescheduleTest.rescheduleAllRestoresEveryScheduledReminderFromDatabase
+    - name: "ReminderReceiverTest.postsGenericNotificationWithoutContentAndWithPrivateVisibility (inspect the Notification object: no extras contain fact text)"
+    - name: PermissionDenialTest.denialLeavesEventConfirmedAndReminderUnscheduledPermission
+    - name: ReminderReceiverTest.firesGenericNotificationWhenVaultUnavailableOrLockedAndMarksFiredOnNextAccess
+    - name: ManifestBoundaryTest updated expectation
+  green: ["Implement."]
+  refactor: []
+verification:
+  commands:
+    - "./gradlew :app:test && ./gradlew :app:connectedDebugAndroidTest"
+    - "Manual: schedule for +2 min, `adb reboot`, wait, confirm the notification appears; `adb shell dumpsys notification --noredact` shows only generic text."
+  evidence_required: ["Tests; dumpsys transcript"]
+acceptance_criteria: ["A reminder survives reboot and timezone change; notification text is generic; denial path works."]
+docs_to_update: [docs/PERMISSIONS.md, docs/THREAT_MODEL.md (notifications row), docs/capabilities/C3.md]
+risks: ["OEM background restrictions may delay inexact alarms; disclosed in the reminder UI ('may arrive up to 10 minutes late')."]
+rollback: "Feature flag."

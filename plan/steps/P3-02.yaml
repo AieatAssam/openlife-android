@@ -1,0 +1,52 @@
+id: P3-02
+title: Fact model, schema, migration, cascade
+phase: P3
+status: todo
+depends_on: [P3-01]
+estimate: M
+owner: agent
+
+summary: >
+  Implement the C2 schema from the approved specification as Room entities
+  with a migration, DAO, repository CRUD under the mutation queue, cascade
+  deletion from Source, acyclic dependency enforcement, and the provenance
+  invariants as SQL triggers where Room cannot express them.
+
+requirements:
+  - id: P3-02-R1
+    text: "MUST add entities FactEntity, FactRevisionEntity, FactEvidenceEntity, FactInputEntity, ReviewEventEntity with foreign keys ON DELETE CASCADE to sources/ocr_spans/fact_revisions, indices on sourceId and factId, and a migration to the next schema version with exported JSON and androidTest asset."
+  - id: P3-02-R2
+    text: "MUST enforce with triggers: an EXTRACTED revision must have at least one fact_evidence row on commit (enforced in the repository transaction; trigger checks that fact_revisions.origin='EXTRACTED' rows cannot be set to status CONFIRMED without evidence); a DERIVED revision must have at least one fact_inputs row; USER revisions must have zero fact_evidence rows."
+  - id: P3-02-R3
+    text: "MUST enforce acyclicity in the repository before inserting fact_inputs (DFS over inputs, bounded depth 32) and add a trigger preventing a revision from listing itself."
+  - id: P3-02-R4
+    text: "MUST extend DeletionRepository's transaction to remove facts (cascade handles rows; explicit DELETE keeps the contract independent of pragma defaults) and extend the FTS triggers if fact values are indexed (P3-07)."
+  - id: P3-02-R5
+    text: "MUST provide FactRepository: listFacts(sourceId): Flow<List<FactWithLatestRevision>>, addUserFact, review(revisionId, decision), markStaleForSpan(spanId), markStaleForRevision(ocrRevisionId), with all writes under withMutation and withContext(IO)."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/facts/* (model)
+  - vault/src/main/java/org/openlife/vault/storage/{Fact*Entity.kt,FactDao.kt,OpenLifeDatabase.kt}
+  - vault/src/main/java/org/openlife/vault/repository/{FactRepository.kt,DeletionRepository.kt}
+  - vault/schemas/..., vault/src/androidTest/assets/...
+  - tests: FactDatabaseTest, FactRepositoryTest, DeletionRepositoryTest
+
+tdd:
+  red:
+    - name: FactDatabaseTest.migrationCreatesFactTablesAndPreservesEverythingElse
+    - name: FactDatabaseTest.extractedRevisionCannotBeConfirmedWithoutEvidence
+    - name: FactDatabaseTest.userRevisionCannotCarryEvidence
+    - name: FactRepositoryTest.derivedRevisionWithCyclicInputsIsRejected
+    - name: FactRepositoryTest.correctionOnSpanMarksDependentRevisionsStale
+    - name: DeletionRepositoryTest.deletingASourceRemovesFactsEvidenceInputsAndReviewEvents
+  green: ["Implement."]
+  refactor: ["Shared cascade contract doc comment listing dependent tables per source."]
+
+verification:
+  commands: ["./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest"]
+  evidence_required: ["Tests; schema JSON"]
+acceptance_criteria:
+  - "All invariants from C2.md are enforced by test; migration on SQLCipher passes with existing data."
+docs_to_update: [docs/capabilities/C2.md]
+risks: []
+rollback: "Migration is additive; tables unused."

@@ -1,0 +1,49 @@
+id: P3-04
+title: Extraction pipeline from OCR revisions with evidence links and staleness
+phase: P3
+status: todo
+depends_on: [P3-02, P3-03]
+estimate: M
+owner: agent
+
+summary: >
+  Run the extractors over an accepted or unreviewed READY OCR revision
+  (never a rejected one), persist EXTRACTED fact revisions with evidence
+  links to spans, apply limits and deadline, and wire staleness on OCR
+  changes and corrections.
+
+requirements:
+  - id: P3-04-R1
+    text: "MUST add FactExtractionRepository.extract(sourceId): result, running under withContext(IO), reading spans and their latest corrections: facts extracted from corrected text carry origin EXTRACTED, evidence = the span, and a methodId suffix `+correction`; the UI labels them 'from your correction'."
+  - id: P3-04-R2
+    text: "MUST skip re-creating identical facts (same kind, canonical value, span) on re-run; new candidates create new fact identities; missing candidates on re-run mark previous EXTRACTED revisions STALE only if the OCR revision changed."
+  - id: P3-04-R3
+    text: "MUST enforce the 5 s deadline and 500-revision cap; on overflow fail closed with a LIMIT_EXCEEDED result and no partial commit (single transaction)."
+  - id: P3-04-R4
+    text: "MUST auto-run extraction after an OCR revision reaches READY (user-visible as 'Facts found: n, review them') — proposal only, nothing confirmed."
+  - id: P3-04-R5
+    text: "MUST mark STALE via FactRepository when: a span gets a new correction, a newer OCR revision becomes READY, or an OCR revision is rejected."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/repository/FactExtractionRepository.kt
+  - vault/src/main/java/org/openlife/vault/repository/OcrRepository.kt (hook)
+  - tests: FactExtractionRepositoryTest (androidTest, SQLCipher)
+
+tdd:
+  red:
+    - name: FactExtractionRepositoryTest.extractsFactsWithEvidenceLinksFromReadySpans
+    - name: FactExtractionRepositoryTest.rejectedOcrRevisionYieldsNoFacts
+    - name: FactExtractionRepositoryTest.rerunIsIdempotentForUnchangedRevision
+    - name: FactExtractionRepositoryTest.newOcrRevisionMarksPreviousFactsStale
+    - name: FactExtractionRepositoryTest.limitOverflowCommitsNothing
+    - name: FactExtractionRepositoryTest.deadlineProducesFailedResultAndNoPartialRows
+  green: ["Implement."]
+  refactor: []
+
+verification:
+  commands: ["./gradlew :vault:connectedDebugAndroidTest"]
+  evidence_required: ["Tests"]
+acceptance_criteria: ["Facts appear for a synthetic receipt with evidence; staleness propagates."]
+docs_to_update: [docs/capabilities/C2.md]
+risks: []
+rollback: "Disable auto-run."

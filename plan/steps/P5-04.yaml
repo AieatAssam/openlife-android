@@ -1,0 +1,25 @@
+id: P5-04
+title: Beta on physical devices and exit criteria
+phase: P5
+status: todo
+depends_on: [P5-01, P5-03]
+estimate: L
+owner: owner+agent
+owner_action: OA-3
+summary: "Run a closed beta of the release candidate on physical devices (owner and a handful of testers using synthetic or their own content, never shared with the project), execute the physical-device and TalkBack runbooks, collect issues through GitHub issues with a no-content reporting template, and hold the exit criteria."
+requirements:
+  - id: P5-04-R1
+    text: "MUST tag v1.0.0-rc1 from the release pipeline (signed) and publish as a GitHub pre-release with the beta guide docs/release/BETA_GUIDE.md (what to test, how to report without sharing content, how to verify the fingerprint)."
+  - id: P5-04-R2
+    text: "MUST add .github/ISSUE_TEMPLATE/beta-report.yml that instructs reporters to never attach their images or extracted text; ask for device, Android version, steps, expected/actual, and the About screen's diagnostics counts."
+  - id: P5-04-R3
+    text: "MUST define exit criteria: runbooks executed on at least two physical devices (one API 29-31, one current) with all rows pass or owner-accepted gap; zero open blocker/high issues; crash-free across testers' reports (no telemetry: self-reported); performance targets from design §12 met on the baseline device and recorded."
+  - id: P5-04-R4
+    text: "MUST fix issues via normal TDD steps appended to the plan as P5-04-fix-<n> entries."
+files_touched: [docs/release/BETA_GUIDE.md, .github/ISSUE_TEMPLATE/beta-report.yml, docs/verification/C0.md..C3.md (physical rows)]
+tdd: {red: ["Each beta bug becomes a failing test"], green: ["Fixes"], refactor: []}
+verification: {commands: ["Runbooks"], evidence_required: ["Filled runbook tables; issue list"]}
+acceptance_criteria: ["Exit criteria met and recorded in docs/verification/v1.0-beta.md."]
+docs_to_update: [docs/verification/v1.0-beta.md]
+risks: ["Tester availability; minimum is the owner's own two devices."]
+rollback: "Iterate rc tags."

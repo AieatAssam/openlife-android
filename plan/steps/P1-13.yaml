@@ -1,0 +1,99 @@
+id: P1-13
+title: Threading and lifecycle correctness
+phase: P1
+status: todo
+depends_on: [P0-07, P0-03, P1-09]
+estimate: L
+owner: agent
+closes_findings: [F-23, F-28, F-33, F-37, F-43, F-44, F-49]
+
+summary: >
+  Move every blocking repository operation off the main thread, make the
+  viewer distinguish loading from unreadable, stop recycling bitmaps that
+  may still be composed, remove side effects from composition, make the
+  "Preparing" state cancellable and survivable across rotation, and fix the
+  cross-task "Open existing" launch.
+
+rationale: >
+  Only prepareImport and thumbnail decoding leave Dispatchers.Main today.
+  Save (authenticate up to 16 MiB + rename + fsync), preview load, viewer
+  load, delete, and OCR capture all run on the main thread via
+  viewModelScope or produceState. Design §12: "There must be no main-thread
+  file I/O". The viewer shows "Verifying…" forever when authentication
+  fails, violating §11 "explain unreadable content and offer deletion".
+
+ethos_check:
+  - "P7: unreadable content is explained, never hidden behind a spinner."
+  - "No change to what is persisted; this step is about where work runs and how UI state is derived."
+
+requirements:
+  - id: P1-13-R1
+    text: "MUST make every public suspend function in ImportRepository, DeletionRepository, SourceViewRepository, RecoveryRepository, OcrRepository, and VaultResetRepository execute its body under withContext(Dispatchers.IO) (the repository owns the dispatcher; callers never need to remember). The dispatcher is injectable for tests (constructor parameter `ioDispatcher: CoroutineDispatcher = Dispatchers.IO`)."
+  - id: P1-13-R2
+    text: "MUST move composition-time bitmap decoding (remember(bytes){ SampledBitmapDecoder.decode }) in ViewerScreen and IntakeScreen into produceState/LaunchedEffect on Dispatchers.Default, with a sealed ImageState { Loading, Unreadable, Shown(bitmap) }."
+  - id: P1-13-R3
+    text: "MUST install StrictMode in debug builds (OpenLifeApp.onCreate when BuildConfig.DEBUG): ThreadPolicy detectDiskReads/detectDiskWrites/detectNetwork with penaltyLog, and an instrumented test rule that fails the test if logcat shows a StrictMode violation with an org.openlife frame during the test; the full app suite runs under it."
+  - id: P1-13-R4
+    text: "MUST change ViewerScreen to a sealed content state: Loading -> Loaded(bytes) or Unreadable; Unreadable shows the resource copy 'This item's saved content is unreadable' with a Delete action; the list thumbnail shows the warning icon for a negative load rather than a blank box."
+  - id: P1-13-R5
+    text: "MUST have SourceViewRepository.loadReadyBytes mark the row CORRUPT (under the mutation queue) only on a genuine EnvelopeAuthenticationException or digest mismatch, never on IOException/KeyStoreException (those return a typed ReadFailure.Transient); ArtefactAuthenticator returns a sealed result instead of null to make the distinction possible."
+  - id: P1-13-R6
+    text: "MUST stop recycling bitmaps that a composable may hold: SensitiveContentCache eviction drops references and the row's produceState/DisposableEffect owns recycling; deletion removes the cache entry without recycling; add a frame-pumping test that deletes while the row is visible."
+  - id: P1-13-R7
+    text: "MUST move IntakeUiState.Cancelled -> onDone() and MainActivity navigation assignments out of composition into LaunchedEffect keyed on the state."
+  - id: P1-13-R8
+    text: "MUST hand the validated URI (as a string) to IntakeViewModel and open the stream inside viewModelScope on Dispatchers.IO so rotation during Preparing cannot cancel the open; add a Cancel button to the Preparing state that closes the stream and cancels the stage."
+  - id: P1-13-R9
+    text: "MUST add FLAG_ACTIVITY_NEW_TASK to the 'Open existing' intent and set android:launchMode=singleTask on MainActivity so a share from another app's task does not create a second MainActivity instance; test with ActivityScenario launched from a different task affinity is impractical, so verify via `adb shell dumpsys activity activities` in the runbook and a unit test on the intent flags."
+  - id: P1-13-R10
+    text: "MUST add the missing runnable tests: Busy from the UI (start an import, start a second share, assert Busy state and copy), delete-while-viewing clears the viewer and returns to the list, and the deadline end-to-end through IntakeViewModel with a slow provider (uses P1-09's deadline design)."
+
+constraints:
+  - "Room DAO suspend calls already hop threads; do not wrap them twice needlessly, but the surrounding file/crypto work must be on IO."
+  - "Tests inject a StandardTestDispatcher for determinism where the JVM allows; instrumented tests use the real IO dispatcher with the StrictMode rule."
+
+files_touched:
+  - vault repository classes (dispatcher injection and withContext)
+  - vault/src/main/java/org/openlife/vault/repository/ArtefactAuthenticator.kt (sealed result)
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt (StrictMode)
+  - app/src/main/java/org/openlife/app/ui/{ViewerScreen.kt,IntakeScreen.kt,IntakeViewModel.kt,SourceListViewModel.kt,SensitiveContentCache.kt}
+  - app/src/main/java/org/openlife/app/intake/IntakeActivity.kt
+  - app/src/main/AndroidManifest.xml (launchMode)
+  - app/src/androidTest/java/org/openlife/app/test/StrictModeRule.kt
+  - tests across app and vault
+
+tdd:
+  red:
+    - name: app androidTest MainThreadPolicyTest.saveViewDeleteAndOcrNeverTouchDiskOrCryptoOnMain (StrictMode rule + full flow)
+    - name: vault androidTest SourceViewRepositoryTest.transientKeystoreFailureReturnsTransientAndLeavesRowReady
+    - name: vault androidTest SourceViewRepositoryTest.tamperedBlobAtReadMarksCorruptOnce
+    - name: app androidTest ViewerScreenTest.unreadableContentIsExplainedWithDeleteActionNotVerifying
+    - name: app androidTest SourceListScreenTest.deletingAVisibleRowDoesNotCrashWithRecycledBitmap
+    - name: app androidTest IntakeAndListFlowTest.rotatingDuringPreparingStillReachesPreviewOrCancelled
+    - name: app androidTest IntakeAndListFlowTest.cancelDuringPreparingClosesStreamAndLeavesNoStage
+    - name: app androidTest IntakeAndListFlowTest.secondShareDuringActivePreviewShowsBusyCopy
+    - name: app androidTest IntakeAndListFlowTest.deletingWhileViewingClearsViewerAndReturnsToList
+    - name: app test OpenExistingIntentTest.carriesNewTaskAndClearTopFlags
+  green:
+    - "Implement dispatcher ownership, sealed states, StrictMode rule, cancel button, intent flags."
+  refactor:
+    - "Delete IntakeActivity.startImportFromUri; the ViewModel owns the open."
+
+verification:
+  commands:
+    - "./gradlew detekt :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "adb logcat -d | grep -c 'StrictMode policy violation' (expect 0 with org.openlife frames after a full manual flow)"
+  evidence_required:
+    - "Tests; logcat grep count."
+
+acceptance_criteria:
+  - "Zero StrictMode disk/network violations attributable to org.openlife across the instrumented suites and a manual flow."
+  - "Unreadable content is explained with a delete path; rotation during preparing never strands the user."
+
+docs_to_update:
+  - docs/verification/C0.md (C0-17, C0-14 rows)
+  - docs/capabilities/C0.md (evidence updates)
+
+risks:
+  - "Moving Save to IO changes timing in existing tests that await states; keep awaits state-based, not sleep-based."
+rollback: "Per-item revert; StrictMode rule can be downgraded to log-only."

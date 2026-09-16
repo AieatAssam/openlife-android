@@ -1,0 +1,30 @@
+id: P1-16
+title: Adaptive layout, multi-window, and low-memory behaviour
+phase: P1
+status: todo
+depends_on: [P0-07, P1-13, P1-04]
+estimate: M
+owner: agent
+summary: "Make the app correct on large screens, split-screen, and foldables (Android 16 ignores orientation and resizability restrictions for targetSdk 36+), and release sensitive memory on system trim signals."
+requirements:
+  - id: P1-16-R1
+    text: "MUST use window size classes (androidx.compose.material3.adaptive or WindowSizeClass from material3-window-size-class) so list/viewer become a two-pane layout at expanded width; no fixed 320dp image box: the viewer image area sizes from the window."
+  - id: P1-16-R2
+    text: "MUST keep FLAG_SECURE and the onStop scrub correct in multi-window: in split-screen the activity may be STARTED but not RESUMED; content stays visible while STARTED (design intent: scrub on hidden, not on focus loss) — an instrumented test uses ActivityScenario.moveToState(STARTED) and asserts the viewer still shows content and that moving to CREATED scrubs it."
+  - id: P1-16-R3
+    text: "MUST implement ComponentCallbacks2.onTrimMemory in OpenLifeApp: TRIM_MEMORY_UI_HIDDEN and RUNNING_LOW clear SensitiveContentCache and drop OCR transient text; test via `adb shell am send-trim-memory org.openlife RUNNING_LOW` in the device script and a JVM test of the policy mapping."
+  - id: P1-16-R4
+    text: "MUST record a supported RAM floor (2 GB, `ActivityManager.isLowRamDevice` devices show a warning in About) and verify the 16 MiB import on a 2 GB emulator config in CI (P0-04 adds `-memory 2048` to the API 29 leg)."
+files_touched: [app ui (adaptive layouts), OpenLifeApp.kt, tests, .github/workflows/ci.yml]
+tdd:
+  red:
+    - name: AdaptiveLayoutTest.expandedWidthShowsTwoPanes
+    - name: MultiWindowScrubTest.startedNotResumedKeepsContentAndCreatedScrubs
+    - name: TrimMemoryPolicyTest.uiHiddenAndRunningLowClearSensitiveCaches
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :app:test && ./gradlew :app:connectedDebugAndroidTest", "adb shell am send-trim-memory org.openlife RUNNING_LOW"], evidence_required: ["Tests; 2 GB leg run URL"]}
+acceptance_criteria: ["Split-screen and tablet layouts usable; trim signals release plaintext caches."]
+docs_to_update: [docs/capabilities/C0.md, docs/THREAT_MODEL.md (multi-window note)]
+risks: []
+rollback: "Single-pane fallback."

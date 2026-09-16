@@ -1,0 +1,76 @@
+id: P0-01
+title: Plan conventions and status tooling
+phase: P0
+status: todo
+depends_on: []
+estimate: S
+owner: agent
+
+summary: >
+  Establish how agents consume and update this plan: a status script, a
+  step-file schema check, and the rule that review findings are appended to
+  plan.yaml's review_findings_index with a closing step.
+
+rationale: >
+  Sixty-plus steps across several agents need one mechanical way to find the
+  next runnable step and to record evidence. Without it, status drifts and
+  "done" stops meaning "verified".
+
+ethos_check:
+  - "P5 small complete capabilities: the tooling enforces that a step is done only with evidence."
+  - "P6 auditability: evidence fields are the audit trail for each step."
+
+requirements:
+  - id: P0-01-R1
+    text: "MUST provide scripts/plan-status.sh that prints every step with status, and lists 'runnable' steps (todo with all depends_on done)."
+  - id: P0-01-R2
+    text: "MUST provide scripts/plan-check.sh that validates plan/plan.yaml and every plan/steps/*.yaml against the schema in plan/SCHEMA.md (required keys present, ids match filenames, depends_on ids exist, no cycles)."
+  - id: P0-01-R3
+    text: "MUST run plan-check in CI (P0-04 wires it) and fail on schema violations."
+  - id: P0-01-R4
+    text: "MUST NOT require Python packages or network access. Decision (already applied by the planning session): plan/tools/PlanCheck.java parses real YAML with the SnakeYAML jar that ships inside the Gradle wrapper distribution; scripts/plan-check.sh compiles and runs it; scripts/plan-status.sh is bash/awk over the one-line step entries. This step hardens both (tests, error messages naming file and key, `--json` output for CI summaries) rather than rewriting them."
+
+constraints:
+  - "The YAML subset used by plan.yaml is deliberately simple: step entries are single-line flow maps. Keep them that way so the bash checker stays correct."
+  - "Do not add a plan-management dependency to the Android modules."
+
+design_decisions:
+  - "Status transitions are defined in plan.yaml conventions.status_rules; the script only reports, never mutates."
+
+files_touched:
+  - plan/SCHEMA.md
+  - scripts/plan-status.sh
+  - scripts/plan-check.sh
+  - .github/workflows/ci.yml (P0-04 adds the invocation)
+
+tdd:
+  red:
+    - name: scripts/tests/plan-check.bats or a shell test harness script `scripts/tests/run.sh`
+      asserts:
+        - "plan-check exits non-zero on a fixture plan with a missing step file"
+        - "plan-check exits non-zero on a dependency cycle fixture"
+        - "plan-check exits zero on the real plan"
+        - "plan-status lists P0-01 as runnable on the real plan when its status is todo"
+  green:
+    - "Implement the two scripts with bash, grep, awk, sed only."
+  refactor:
+    - "Factor the step-line parser into scripts/lib/plan.sh shared by both scripts."
+
+verification:
+  commands:
+    - "bash scripts/tests/run.sh"
+    - "bash scripts/plan-check.sh"
+    - "bash scripts/plan-status.sh"
+  evidence_required:
+    - "Command output pasted into plan.yaml evidence for P0-01."
+
+acceptance_criteria:
+  - "A new agent can run one command to see the next runnable step."
+  - "A malformed step file fails plan-check with a message naming the file and key."
+
+docs_to_update:
+  - "AGENTS.md and CLAUDE.md already reference these scripts; adjust names if they change."
+
+risks:
+  - "Over-engineering: keep the scripts under 200 lines total."
+rollback: "Delete scripts; plan remains readable by hand."

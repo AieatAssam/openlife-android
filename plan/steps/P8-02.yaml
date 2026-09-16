@@ -1,0 +1,29 @@
+id: P8-02
+title: C11 specification and proposal validator
+phase: P8
+status: todo
+depends_on: [P8-01]
+estimate: L
+owner: agent
+summary: "Optional on-device semantic proposals: the model receives OCR text (as data, in a constrained prompt with span ids) and returns structured proposals (event/purchase/document candidates) that must cite span ids; proposals without valid citations are discarded; everything remains a proposal for the existing confirmation flows; model output is untrusted. Spec C11.md first (this step); the evaluation gate and enabling the feature are P8-03."
+requirements:
+  - id: P8-02-R1
+    text: "MUST write C11.md: prompt template versioned, output grammar (constrained JSON via GBNF), citation validation (every value must map to span text by offset or exact substring), abstention, limits, injection resistance tests, evaluation gate showing improvement over rule-based proposals on the eval sets (design §14: 'must improve a measured task before it earns a dependency or storage budget')."
+  - id: P8-02-R2
+    text: "MUST implement ProposalValidator (pure Kotlin) rejecting uncited or non-substring values, and map proposals to DERIVED fact revisions with methodId 'llm-<model>-<prompt-version>' and fact_inputs to the OCR spans' extracted facts where they exist."
+  - id: P8-02-R3
+    text: "MUST prove the model cannot act: no tool interface exists; injection fixtures produce no side effects (test)."
+files_touched: [docs/capabilities/C11.md, vault understanding/*, app ui]
+tdd:
+  red:
+    - name: ProposalValidatorTest.rejectsUncitedValues
+    - name: InjectionTest.modelOutputCannotChangeStateOrPermissions
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["Full suites; eval"], evidence_required: ["Eval comparison"]}
+acceptance_criteria:
+  - "Spec approved after adversarial review; validator and injection tests green; feature remains disabled until P8-03."
+  - "Spec reviewed by an adversarial reviewer against design §4/§6/§14; findings resolved in the same PR."
+docs_to_update: [docs/capabilities/C11.md, docs/THREAT_MODEL.md]
+risks: ["Small models hallucinate; citation validation is the hard gate."]
+rollback: "Disable."

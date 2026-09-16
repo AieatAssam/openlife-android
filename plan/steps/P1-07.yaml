@@ -1,0 +1,91 @@
+id: P1-07
+title: Optional app lock (ADR-0004)
+phase: P1
+status: todo
+depends_on: [P0-07, P1-06]
+estimate: L
+owner: agent
+closes_findings: [F-16]
+
+summary: >
+  Add an opt-in app lock using BiometricPrompt (BIOMETRIC_STRONG or
+  DEVICE_CREDENTIAL) that gates every content-bearing screen after a
+  configurable timeout, with honest copy about what it does and does not
+  protect. Settle the open design question with ADR-0004.
+
+rationale: >
+  Design §3 says the app-lock requirement must be settled before real-user
+  distribution. Auth-bound Keystore keys would change key lifecycle and risk
+  permanent loss; a gate resolves the "already-unlocked phone" threat at the
+  UI level without that risk.
+
+ethos_check:
+  - "P7: copy says the lock is an access gate, not encryption; data is not more encrypted with the lock on."
+  - "P2: no new permissions (USE_BIOMETRIC is a normal permission; declare it and document in PERMISSIONS.md)."
+
+requirements:
+  - id: P1-07-R1
+    text: "MUST add androidx.biometric:biometric (pinned) and AppLockPolicy stored in a private SharedPreferences file `app_lock` (enabled flag, timeout seconds in {0, 30, 300, 900}); default disabled; onboarding offers enabling it after the first-run explanation."
+  - id: P1-07-R2
+    text: "MUST gate MainActivity content, IntakeActivity preview/save, and (P4) notification-opened detail screens: when locked, a LockScreen composable is shown and BiometricPrompt is launched; content composables are not composed while locked (no bytes loaded)."
+  - id: P1-07-R3
+    text: "MUST lock on process start and when the app has been in background longer than the timeout (tracked via ProcessLifecycleOwner in OpenLifeApp with a monotonic clock, never wall clock)."
+  - id: P1-07-R4
+    text: "MUST handle BiometricManager.canAuthenticate results: if no credential is enrolled, the lock cannot be enabled (explain); if the device credential is removed later, the lock falls back to 'cannot verify; content stays locked' with instructions, never silently unlocking."
+  - id: P1-07-R5
+    text: "MUST keep import intake usable: an ACTION_SEND arriving while locked shows the lock first, then continues to preview (the stream open happens only after unlock)."
+  - id: P1-07-R6
+    text: "MUST NOT bind Keystore keys to authentication in this step (setUserAuthenticationRequired stays false); ADR-0004 records why and the revisit condition."
+  - id: P1-07-R7
+    text: "MUST keep FLAG_SECURE on the lock screen and ensure the lock screen itself shows no content-derived text."
+
+constraints:
+  - "Allowed authenticators: setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL) on API 30+; on API 29 setAllowedAuthenticators(BIOMETRIC_WEAK or DEVICE_CREDENTIAL) (the STRONG|CREDENTIAL combination is unsupported below API 30); the deprecated setDeviceCredentialAllowed is not used."
+  - "No custom PIN implementation in OpenLife (a homegrown PIN store would be a weaker, second credential)."
+
+design_decisions:
+  - "Timeout default when enabled: 0 (lock immediately on background). Options are fixed to avoid a free-form field."
+
+files_touched:
+  - gradle/libs.versions.toml, app/build.gradle.kts
+  - app/src/main/AndroidManifest.xml (USE_BIOMETRIC)
+  - app/src/main/java/org/openlife/app/lock/{AppLockPolicy.kt,AppLockState.kt,LockScreen.kt,BiometricGate.kt}
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt (ProcessLifecycleOwner)
+  - app/src/main/java/org/openlife/app/MainActivity.kt, intake/IntakeActivity.kt
+  - app/src/main/java/org/openlife/app/ui/FirstRun.kt (offer step)
+  - docs/decisions/0004-app-lock.md, docs/PERMISSIONS.md
+  - app/src/test/java/org/openlife/app/lock/AppLockStateTest.kt
+  - app/src/androidTest/java/org/openlife/app/lock/AppLockFlowTest.kt
+
+tdd:
+  red:
+    - name: AppLockStateTest.locksOnStartWhenEnabled
+    - name: AppLockStateTest.locksAfterBackgroundLongerThanTimeoutUsingMonotonicClock
+    - name: AppLockStateTest.doesNotLockWhenDisabled
+    - name: AppLockFlowTest.lockedMainActivityComposesNoContentAndNoBytesAreLoaded (assert loadReadyBytes not invoked via a counting seam)
+    - name: AppLockFlowTest.shareIntentWhileLockedOpensStreamOnlyAfterUnlock (test-only authenticator seam that auto-succeeds/fails)
+    - name: AppLockFlowTest.enablingWithoutEnrolledCredentialIsRefusedWithExplanation
+    - name: "ManifestBoundaryTest updated: USE_BIOMETRIC is the only new permission"
+  green:
+    - "Implement policy, gate, screens with a `BiometricAuthenticator` interface (real: BiometricPrompt; test: scripted)."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew detekt :app:test && ./gradlew :app:connectedDebugAndroidTest"
+    - "Manual on emulator: `adb emu finger touch 1` after enrolling a fingerprint; and lock-screen PIN path via `adb shell locksettings set-pin 1234`."
+  evidence_required:
+    - "Tests; manual transcript for both authenticator types on API 29 and API 36 legs (CI can run the credential path with locksettings)."
+
+acceptance_criteria:
+  - "With the lock enabled, no image bytes are decrypted until authentication succeeds."
+  - "Copy in onboarding, Settings, and PRIVACY_POLICY.md describes the lock as an access gate."
+
+docs_to_update:
+  - docs/decisions/0004-app-lock.md
+  - docs/THREAT_MODEL.md (Access policy section resolved)
+  - docs/PERMISSIONS.md, docs/PRIVACY_POLICY.md
+
+risks:
+  - "BiometricPrompt on API 29 with device credential has quirks; the compat path is tested on the API 29 CI leg."
+rollback: "Feature flag off by default; remove Settings entry."

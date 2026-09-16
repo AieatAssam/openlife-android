@@ -1,0 +1,89 @@
+id: P1-06
+title: Vault-unavailable UX and explicit Reset vault (ADR-0005)
+phase: P1
+status: todo
+depends_on: [P0-07]
+estimate: M
+owner: agent
+closes_findings: [F-08]
+
+summary: >
+  Give the vault-unavailable state a real screen that distinguishes
+  temporary from unrecoverable causes, offers retry, and, behind a separate
+  two-step confirmation in Settings, an explicit Reset vault that deletes
+  all app-owned data and the Keystore wrapping key. Write ADR-0005.
+
+rationale: >
+  Design §10 requires a separate, explicit Reset vault action and forbids
+  destructive recovery on the error path. Today VaultAccess.Unavailable
+  renders one line of text with no action, so a user with a broken key file
+  is stuck forever.
+
+ethos_check:
+  - "P7: permanent loss is explained before the action; reset is never the default error action."
+  - "No automatic key regeneration on any path (C0-R17/R18 preserved)."
+
+requirements:
+  - id: P1-06-R1
+    text: "MUST extend VaultBootstrapResult.Unavailable with a typed `cause` enum: KEYSTORE_TEMPORARILY_UNAVAILABLE (KeyStoreException/ProviderException during key access, device locked), KEY_FILE_CORRUPT, KEY_UNWRAP_FAILED (wrapper present but authentication failed), DATABASE_WITHOUT_KEY, DATABASE_OPEN_FAILED (SQLCipher open/migration error), STORAGE_IO_ERROR; the existing string reasons become these enums; the UI maps each to resource copy and a retry-ability flag."
+  - id: P1-06-R2
+    text: "MUST make bootstrap retryable: OpenLifeApp.vault() caches Unavailable only for non-retryable causes and re-attempts bootstrap on the next call for retryable ones; a `retryVault()` function clears any cached Unavailable."
+  - id: P1-06-R3
+    text: "MUST add VaultUnavailableScreen: cause explanation, 'Try again' (retryable causes), 'What this means' expandable text, and a link to Settings > Reset vault (never a direct Reset button on this screen)."
+  - id: P1-06-R4
+    text: "MUST add VaultResetRepository.resetVault(): under the mutation queue, write and fsync a durable marker file noBackupFilesDir/vault/RESET_IN_PROGRESS first, close the Room database, delete artefacts, database files (db, wal, shm), the key file, then the Keystore alias, then remove the marker last; keep the first-run acknowledgement, clear app-lock settings; the app then bootstraps a fresh empty vault on next access."
+  - id: P1-06-R5
+    text: "MUST require two confirmations: a dialog that names consequences and requires typing the word RESET (resource string, localisable), then a second confirm button; the action is unavailable while an import is in progress (tryAcquire busy -> explain)."
+  - id: P1-06-R6
+    text: "MUST close all open plaintext (viewer/list caches) before reset, cancel scheduled work (P4-04 adds reminders: that step extends reset to cancel alarms and notifications), and MUST NOT delete anything outside noBackupFilesDir/vault plus the app-lock preferences file."
+  - id: P1-06-R7
+    text: "MUST record the bootstrap failure cause counts only (no identifiers) in a diagnostics screen line under Settings > About (P1-08)."
+
+constraints:
+  - "Reset must be idempotent under interruption: while the RESET_IN_PROGRESS marker exists, VaultBootstrapper returns Unavailable(RESET_INCOMPLETE) and the UI offers 'Finish reset', which re-runs the deletion sequence; the marker is removed only after the alias deletion step. Without the marker the existing design §10 rules apply unchanged (a key file with no database is a legal interrupted fresh bootstrap)."
+  - "Never log the reason strings that include exception messages; only the enum."
+
+design_decisions:
+  - "Order of deletion inside reset: marker, artefacts, database files, key file, Keystore alias, marker removal. The marker, not file presence, is what distinguishes an interrupted reset from an interrupted fresh bootstrap."
+  - "Honest limit to document: per-source DEKs live only in the encrypted database, so database corruption is total loss even when blob files are intact; there is no per-blob key file by design (no recovery feature, P7)."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/storage/VaultBootstrapper.kt
+  - vault/src/main/java/org/openlife/vault/repository/VaultResetRepository.kt
+  - vault/src/main/java/org/openlife/vault/crypto/KeystoreWrapper.kt (deleteWrappingKey)
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt, VaultAccess.kt
+  - app/src/main/java/org/openlife/app/ui/VaultUnavailableScreen.kt, settings/ResetVaultFlow.kt
+  - docs/decisions/0005-vault-reset.md
+  - tests in vault androidTest and app androidTest
+
+tdd:
+  red:
+    - name: VaultBootstrapperTest.eachFailureModeReportsItsTypedCause
+    - name: VaultResetRepositoryTest.resetRemovesArtefactsDatabaseKeyFileAndKeystoreAliasThenFreshBootstrapSucceeds
+    - name: VaultResetRepositoryTest.interruptedResetLeavesMarkerAndBootstrapReportsResetIncompleteUntilFinishResetSucceeds
+    - name: VaultResetRepositoryTest.resetIsRefusedWhileAnImportIsInProgress
+    - name: app VaultUnavailableFlowTest.corruptKeyFileShowsUnrecoverableCopyWithoutResetButtonAndSettingsResetRequiresTypedConfirmation
+    - name: app VaultUnavailableFlowTest.temporaryKeystoreFailureOffersRetryAndSucceedsAfterRetry (inject a failing KeystoreWrapper once via a test seam on OpenLifeApp)
+  green:
+    - "Implement enum causes, retry, reset repository, screens."
+  refactor:
+    - "Replace string reasons everywhere with the enum."
+
+verification:
+  commands:
+    - "./gradlew detekt :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "Manual: corrupt database.key with `run-as` + dd; launch; confirm copy; Settings > Reset; confirm fresh vault imports."
+  evidence_required:
+    - "Tests; manual transcript."
+
+acceptance_criteria:
+  - "A corrupted key file leads to an explained, non-destructive screen; reset only from Settings with typed confirmation; afterwards a fresh vault works."
+
+docs_to_update:
+  - docs/decisions/0005-vault-reset.md
+  - docs/THREAT_MODEL.md (reset paragraph; what reset does not guarantee; database corruption is total loss because DEKs are stored only in the database)
+  - docs/capabilities/C0.md (C0-R36 reset)
+
+risks:
+  - "Keystore alias deletion failing on some OEMs: treat as non-fatal, next bootstrap generates a new key only because no key file exists (documented)."
+rollback: "Hide the Settings entry; keep typed causes."

@@ -1,0 +1,23 @@
+id: P4-08
+title: C3 acceptance
+phase: P4
+status: todo
+depends_on: [P4-05, P4-06, P4-07]
+estimate: M
+owner: agent+owner
+summary: "Complete the C3 gate: matrix C3-01..C3-14, security review (new permissions, receivers, notification content, PendingIntent flags/mutability, exported receiver), provenance review (reminder -> record -> fact -> span -> source; stale propagation; deletion), handoff and owner acceptance. This is the last capability before v1.0.0."
+requirements:
+  - id: P4-08-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P4-08-R1
+    text: "MUST produce docs/verification/C3.md, docs/reviews/C3-security-review.md (explicitly covering PendingIntent FLAG_IMMUTABLE, receiver export rules, permission rationale, notification extras inspection), docs/reviews/C3-provenance-review.md, docs/verification/C3-handoff.md."
+  - id: P4-08-R2
+    text: "MUST re-run the threat-model comparison for the whole app (C0-C3) and update docs/THREAT_MODEL.md's matrix with rows for reminders and notifications."
+  - id: P4-08-R3
+    text: "MUST record owner acceptance."
+verification: {commands: ["Full suites and CI legs; device scripts"], evidence_required: ["Docs"]}
+acceptance_criteria: ["Owner acceptance recorded."]
+docs_to_update: [docs/verification/C3.md, docs/reviews/*, docs/THREAT_MODEL.md]
+tdd: {red: [], green: [], refactor: []}
+risks: []
+rollback: "None."

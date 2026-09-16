@@ -1,0 +1,26 @@
+id: P5-01
+title: Release readiness package
+phase: P5
+status: todo
+depends_on: [P4-08]
+estimate: M
+owner: agent
+summary: "Assemble everything a public v1.0.0 needs: final privacy policy and permissions rationale, threat model v1.0, F-Droid metadata with synthetic screenshots, Play data-safety answers (for optional later listing), CHANGELOG, README release section, and a release checklist document that P5-05 executes."
+requirements:
+  - id: P5-01-R1
+    text: "MUST finalise docs/PRIVACY_POLICY.md and publish it at a stable URL chosen by the owner (GitHub Pages from docs/ or the raw repository URL); the About screen text matches."
+  - id: P5-01-R2
+    text: "MUST capture screenshots with synthetic content only via a debug build with FLAG_SECURE temporarily disabled through a debug-only BuildConfig flag (never in release) using the eval fixtures; store under fastlane/metadata/android/en-US/images/phoneScreenshots/."
+  - id: P5-01-R3
+    text: "MUST write docs/release/CHECKLIST.md: version bump, changelog, verification metadata refreshed, SBOM/licence report regenerated, CI green on both legs, release smoke passed, reproducible build check (P5-03) passed, signed APK fingerprint matches README, tag, GitHub Release with SHA-256SUMS, F-Droid merge request."
+  - id: P5-01-R4
+    text: "MUST write docs/release/DATA_SAFETY.md answering Play's data-safety form honestly (no collection, no sharing, on-device encryption, no deletion request mechanism needed because no server) for optional later use, including the SCHEDULE_EXACT_ALARM policy declaration and the F-Droid AntiFeatures review (expected: none)."
+  - id: P5-01-R5
+    text: "MUST update README 'Where things stand' to describe v1.0.0 scope (C0-C3) and limits (no backup; local-only; what 'verified' means)."
+files_touched: [docs/PRIVACY_POLICY.md, docs/PERMISSIONS.md, docs/THREAT_MODEL.md, docs/release/*, fastlane/*, README.md, CHANGELOG.md]
+tdd: {red: ["NoHardcodedUiStringsTest and boundary tests remain green; screenshot script asserts release builds cannot disable FLAG_SECURE (BuildConfig check test)"], green: ["Docs and assets"], refactor: []}
+verification: {commands: ["bash scripts/plan-check.sh; ./gradlew :app:test"], evidence_required: ["Links; screenshots committed"]}
+acceptance_criteria: ["Checklist complete except the owner-only items."]
+docs_to_update: [all listed]
+risks: []
+rollback: "Docs."

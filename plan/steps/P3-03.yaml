@@ -1,0 +1,53 @@
+id: P3-03
+title: Typed extractors (pure Kotlin, versioned rules)
+phase: P3
+status: todo
+depends_on: [P3-01]
+estimate: L
+owner: agent
+
+summary: >
+  Implement deterministic extractors for dates, times, money, URLs, emails,
+  and phone numbers over OCR span text, returning candidates with character
+  offsets, canonical values, ambiguity flags, and rule versions; pure Kotlin
+  with exhaustive JVM tests and property tests.
+
+ethos_check:
+  - "Conservative interpretation: ambiguity is surfaced, never resolved by guessing; currency is never inferred from a bare symbol."
+
+requirements:
+  - id: P3-03-R1
+    text: "MUST implement DateExtractor (numeric d/m/y and m/d/y with ambiguity detection when both readings are valid dates; month names in English; ISO; two-digit years flagged ambiguous), TimeExtractor (12h with am/pm, 24h, ranges as two times), MoneyExtractor (amount with grouping and decimal separators locale-agnostic where unambiguous; symbol->currency mapping only for symbols with a single ISO code ($ is ambiguous -> null unless a code like USD/CAD appears in the same or adjacent span), URL/Email/Phone extractors with normalisation and a phone validation that accepts 7-15 digits with optional +country code)."
+  - id: P3-03-R2
+    text: "MUST return ExtractedCandidate(kind, rawText, spanId, startOffset, endOffset, canonicalValue, ambiguity: List<Alternative>, ruleId, ruleVersion) and never touch persistence or Android APIs."
+  - id: P3-03-R3
+    text: "MUST bound work: regex-free scanning or RE2-style safe patterns (no catastrophic backtracking: test each pattern against 10k-char adversarial strings under 50 ms)."
+  - id: P3-03-R4
+    text: "MUST treat text as untrusted: extraction of a URL never resolves, opens, or normalises via java.net.URL connection; use a hand-written parser."
+  - id: P3-03-R5
+    text: "MUST version rules: RULES_VERSION per extractor; any change bumps the version and the eval set (P3-06) records results per version."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/facts/extract/*
+  - vault/src/test/java/org/openlife/vault/facts/extract/* (table-driven tests with fixtures in vault/src/test/resources/facts/)
+
+tdd:
+  red:
+    - name: DateExtractorTest.tableDriven (100+ cases incl. 03/04/2026 -> two candidates CLARIFICATION, 2026-09-16 -> unambiguous, 31/04 -> invalid -> none)
+    - name: TimeExtractorTest.tableDriven
+    - name: MoneyExtractorTest.symbolWithoutCodeYieldsNullCurrency
+    - name: MoneyExtractorTest.decimalStringNeverUsesBinaryFloat (asserts canonical string equality for 0.1+0.2-style cases)
+    - name: UrlEmailPhoneExtractorTest.tableDriven
+    - name: ExtractorSafetyTest.adversarialInputsCompleteUnder50ms
+    - name: ExtractorPropertyTest.offsetsAlwaysSliceToRawText (random strings)
+  green: ["Implement."]
+  refactor: ["Common tokenizer for span text."]
+
+verification:
+  commands: ["./gradlew :vault:test"]
+  evidence_required: ["Test counts; timing output"]
+acceptance_criteria:
+  - "All table cases pass; no pattern exceeds the time bound; no Android dependency in the package."
+docs_to_update: [docs/capabilities/C2.md (rule versions table)]
+risks: ["Locale variety; keep English/ISO for v0.3.0 and record."]
+rollback: "Pure functions; no persistence impact."

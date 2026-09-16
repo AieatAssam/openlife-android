@@ -1,0 +1,65 @@
+id: P1-10
+title: Accessibility automation and TalkBack runbook
+phase: P1
+status: todo
+depends_on: [P0-07, P1-08]
+estimate: M
+owner: agent
+
+summary: >
+  Make accessibility checks mechanical: enable Compose/Espresso accessibility
+  checks in instrumented tests, add semantics tests for every screen, raise
+  Lint's Accessibility category to error, and write the TalkBack manual
+  runbook the owner executes on a physical device.
+
+rationale: >
+  C0-16's TalkBack leg is recorded as a gap. The sandbox cannot run
+  TalkBack, but the AccessibilityChecks framework catches touch-target,
+  contrast, and label issues automatically, and a runbook makes the manual
+  leg repeatable.
+
+ethos_check:
+  - "Design §3: 'Preserve accessibility and test TalkBack'."
+
+requirements:
+  - id: P1-10-R1
+    text: "MUST enable Compose accessibility checks (ComposeTestRule.enableAccessibilityChecks(), ATF-backed, Compose UI test 1.8+) in a shared rule used by every Compose screen test; failures are errors, with a documented suppression list (empty target). Espresso AccessibilityChecks is used only for any remaining View-based surface (none expected)."
+  - id: P1-10-R2
+    text: "MUST add semantics tests per screen (list, viewer, intake states, first-run, settings, about, lock, vault-unavailable) asserting: every actionable node has a label, focus order follows reading order (traversal index where needed), state changes announce via liveRegion where the existing viewer pattern is used, minimum 48dp touch targets."
+  - id: P1-10-R3
+    text: "MUST set lint Accessibility category to error (P0-03 left it at warning)."
+  - id: P1-10-R4
+    text: "MUST write docs/runbooks/talkback.md: enable TalkBack, walk each flow (share, picker, preview/save, list, viewer, delete, settings, lock), expected announcements, pass/fail table to paste into docs/verification/C0.md; owner action OA-3."
+  - id: P1-10-R5
+    text: "MUST verify large text 2.0x and display size 'largest' via the LargeFontLayoutTest from P0-07 extended to the new screens."
+
+files_touched:
+  - gradle/libs.versions.toml, app/build.gradle.kts
+  - app/src/androidTest/java/org/openlife/app/a11y/{AccessibilityRule.kt,ScreenSemanticsTest.kt}
+  - app/lint.xml
+  - docs/runbooks/talkback.md
+
+tdd:
+  red:
+    - name: ScreenSemanticsTest.everyScreenPassesAccessibilityChecks (parameterised over screen composables with synthetic state)
+    - name: ScreenSemanticsTest.viewerEvidenceAnnouncementIsPoliteLiveRegion
+  green:
+    - "Fix any flagged nodes (touch targets, labels, contrast in theme)."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew lint :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Test counts; runbook committed; owner TalkBack results when available."
+
+acceptance_criteria:
+  - "AccessibilityChecks pass on both CI legs; runbook exists; C0-16 row cites both."
+
+docs_to_update:
+  - docs/verification/C0.md (C0-16)
+  - docs/THREAT_MODEL.md (accessibility sentence)
+
+risks:
+  - "Material3 default contrast in dynamic colour can fail checks; adjust theme tokens rather than suppress."
+rollback: "Disable checks; keep tests."

@@ -1,0 +1,37 @@
+id: P4-01
+title: C3 specification and ADR-0009
+phase: P4
+status: todo
+depends_on: [P3-08]
+estimate: M
+owner: agent+owner
+owner_action: OA-4
+
+summary: >
+  Write docs/capabilities/C3.md (event record + one local reminder) and
+  ADR-0009 (scheduling mechanism, permissions, timezone and DST model,
+  notification content policy), then obtain owner approval.
+
+requirements:
+  - id: P4-01-R1
+    text: "MUST specify Record and Action models: event_records (id, sourceId), event_record_revisions (id, recordId, revisionNo, titleFactRevisionId NULL, titleUserText NULL, dateFactRevisionId, timeFactRevisionId NULL, zoneId NULL, status DRAFT|CONFIRMED|STALE|REJECTED, createdAt, supersedes), reminders (id, recordRevisionId, triggerLocalDateTime, zoneId, exact BOOLEAN, status SCHEDULED|SUSPENDED|FIRED|DISMISSED|CANCELLED|UNSCHEDULED_PERMISSION, scheduledEpochMillis, lastComputedAt)."
+  - id: P4-01-R2
+    text: "MUST specify: every field of a confirmed event references a CONFIRMED fact revision or a USER text with attribution; an event cannot be confirmed from an unreviewed extracted date; a communication gate: if source.userContentKind is null or COMMUNICATION and assessmentState is NOT_ASSESSED, the proposal is shown with 'not assessed' explanation and the user must answer the content-kind question before confirming (design §6)."
+  - id: P4-01-R3
+    text: "MUST specify time semantics (ADR-0009): reminders are stored as local date-time + zone id; the epoch instant is recomputed on schedule, boot, TIMEZONE_CHANGED, TIME_SET, and app start; DST gaps move forward to the next valid instant and overlaps take the earlier offset, both disclosed in the UI when applicable; date-only events default the reminder to 09:00 local on the event day, user-adjustable; reminders in the past are refused with an explanation."
+  - id: P4-01-R4
+    text: "MUST specify scheduling: AlarmManager.setAndAllowWhileIdle (window up to ~10 min) by default; setExactAndAllowWhileIdle only if the user enables 'exact' on a reminder and SCHEDULE_EXACT_ALARM is granted (API 31+; requested via ACTION_REQUEST_SCHEDULE_EXACT_ALARM at that moment; revocation broadcast ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED handled by downgrading to inexact and marking the reminder 'inexact'); RECEIVE_BOOT_COMPLETED receiver reschedules all SCHEDULED reminders from the database; no WorkManager; notifications: channel 'reminders', VISIBILITY_PRIVATE with a generic public version, text 'You have a reminder' + nothing else; tapping opens the event detail behind the app lock; POST_NOTIFICATIONS requested when the first reminder is enabled with a denial path that leaves the event confirmed and reminder status UNSCHEDULED_PERMISSION."
+  - id: P4-01-R5
+    text: "MUST specify staleness: a correction or new revision of any referenced fact marks the event revision STALE and every SCHEDULED reminder SUSPENDED (alarm cancelled) until the user reviews; deletion of the source cancels alarms and removes records/reminders in the same transaction."
+  - id: P4-01-R6
+    text: "MUST specify test matrix C3-01..C3-14 including reboot, timezone change, DST, permission denial, doze, exact revocation, kill during scheduling, notification content inspection, deletion cascade, accessibility."
+  - id: P4-01-R7
+    text: "MUST list exclusions: recurrence, calendar integration, invitations, snooze beyond one built-in 'remind me in 1 hour', multiple reminders per event (one only in C3)."
+
+files_touched: [docs/capabilities/C3.md, docs/decisions/0009-reminder-scheduling.md, docs/PERMISSIONS.md]
+tdd: {red: [], green: ["Docs"], refactor: []}
+verification: {commands: ["bash scripts/plan-check.sh"], evidence_required: ["Owner approval line"]}
+acceptance_criteria: ["Adversarial review of the spec against design §4, §6, §12, §14 recorded and resolved."]
+docs_to_update: [docs/README.md]
+risks: []
+rollback: "Docs."

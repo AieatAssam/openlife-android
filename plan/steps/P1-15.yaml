@@ -1,0 +1,77 @@
+id: P1-15
+title: Read leases versus mutations, transactional deletion, verified duplicates
+phase: P1
+status: todo
+depends_on: [P1-09]
+estimate: M
+owner: agent
+closes_findings: [F-29, F-31, F-32, F-49]
+
+summary: >
+  Implement the design's read-lease semantics so authenticated reads never
+  make an import report "busy" but still exclude deletion, make deletion's
+  final row removal one transaction, and verify the existing blob before
+  discarding a duplicate import.
+
+rationale: >
+  SourceViewRepository takes the same exclusive mutex as imports, so
+  scrolling a list of thumbnails while sharing an image yields "Another
+  import is already in progress". Design §11: "View operations acquire a
+  compatible read lease so deletion cannot race plaintext delivery" and §9:
+  duplicates require "verified bytes".
+
+requirements:
+  - id: P1-15-R1
+    text: "MUST replace MutationQueue's single Mutex with an explicit lease model: `withReadLease {}` (many concurrent readers, blocked only while a mutation that targets deletion/reset holds the write lock) and `withMutation {}` / `tryMutation {}` (exclusive); the Busy decision for a new import is based on an `importInProgress` flag set by prepareImport and cleared by save/cancel/cleanup, not on the lock state."
+  - id: P1-15-R2
+    text: "MUST keep deletion and reset exclusive with respect to reads (they wait for active read leases to finish and block new ones)."
+  - id: P1-15-R3
+    text: "MUST wrap DeletionRepository's OCR-row deletion and source-row deletion in database.withTransaction (and any future dependent tables via the P3+ cascade contract)."
+  - id: P1-15-R4
+    text: "MUST authenticate the existing READY duplicate before discarding the new stage; if authentication fails with a genuine tag/digest error, mark the existing row CORRUPT and proceed to save the new import; if transient, return SaveResult.Failed(Transient) without discarding."
+  - id: P1-15-R5
+    text: "MUST add the missing kill-during-deletion evidence: a DELETING row whose blob deletion is interrupted (simulated by ArtefactFileOps throwing after marking) is resumed by recovery; plus a host-driven runbook entry for a real kill -9 during deletion of a large blob."
+
+constraints:
+  - "Keep the API surface small: three functions on MutationQueue; no third-party concurrency library."
+
+design_decisions:
+  - "Implement with a kotlinx.coroutines Mutex for writers plus an atomic reader count and a Mutex-guarded gate for 'writer waiting' to avoid writer starvation."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/repository/MutationQueue.kt
+  - vault/src/main/java/org/openlife/vault/repository/{ImportRepository.kt,DeletionRepository.kt,SourceViewRepository.kt,RecoveryRepository.kt,OcrRepository.kt}
+  - vault/src/test/java/org/openlife/vault/repository/MutationQueueTest.kt
+  - vault androidTest ImportRepositoryTest, DeletionRepositoryTest, EnvelopeTamperingThroughRepositoryTest
+
+tdd:
+  red:
+    - name: MutationQueueTest.concurrentReadLeasesDoNotBlockEachOther
+    - name: MutationQueueTest.mutationWaitsForActiveReadLeasesAndBlocksNewOnes
+    - name: MutationQueueTest.readLeaseDoesNotMakeTryMutationBusy
+    - name: ImportRepositoryTest.prepareIsNotBusyWhileAViewerReadIsInFlight
+    - name: EnvelopeTamperingThroughRepositoryTest.deletionWaitsForAnActiveViewerRead (existing test adapted)
+    - name: DeletionRepositoryTest.rowRemovalIsAtomicAcrossOcrAndSourceTables (fault-inject between statements via a DAO wrapper; assert both-or-neither)
+    - name: ImportRepositoryTest.duplicateWithTamperedExistingBlobSavesNewAndMarksExistingCorrupt
+    - name: RecoveryRepositoryTest.deletionInterruptedAfterMarkingIsResumed
+  green:
+    - "Implement lease model and transaction."
+  refactor:
+    - "Remove tryAcquire; all callers use withReadLease/withMutation/tryMutation."
+
+verification:
+  commands:
+    - "./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Tests; manual: scroll a 30-item list while sharing -> preview appears, no Busy."
+
+acceptance_criteria:
+  - "Sharing while thumbnails load never reports Busy; deletion still cannot overlap a plaintext read."
+
+docs_to_update:
+  - docs/capabilities/C0.md (C0-R24, C0-R29 wording)
+  - docs/verification/C0.md (C0-14 kill-during-deletion leg)
+
+risks:
+  - "Writer starvation under continuous reads; the writer-waiting gate prevents it (tested)."
+rollback: "Restore single mutex."

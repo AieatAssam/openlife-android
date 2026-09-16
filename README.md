@@ -17,7 +17,7 @@ anything it later figures out back to the evidence that supports it. Nothing
 leaves your phone: no cloud processing, no accounts, no sync, no background
 access to your photos, storage, contacts, or messages.
 
-The full product and engineering spec lives in `openlife-design-v0.2.md` at
+The full product and engineering spec lives in `openlife-design-v0.3.md` at
 the repo root — that's the source of truth. Everything under `docs/` is a
 working restatement of pieces of it, kept up to date as the app is built.
 
@@ -29,6 +29,10 @@ the app is killed or the phone reboots, and delete it. That's the whole
 feature set today — no OCR, no extracted facts, no reminders, no export.
 `docs/capabilities/C0.md` spells out exactly what's in and out of scope, and
 §5 of the design doc lays out what's planned after this.
+
+The path from here to a production release is tracked in `plan/plan.yaml`
+(phases, steps, decisions, review findings); each step has a full TDD brief
+under `plan/steps/`. Run `scripts/plan-status.sh` to see what is runnable.
 
 ## Repository layout
 

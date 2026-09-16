@@ -1,0 +1,41 @@
+id: P2-09
+title: C1 acceptance and v0.2.0
+phase: P2
+status: todo
+depends_on: [P2-05, P2-06, P2-07, P2-08, P1-12]
+estimate: M
+owner: agent+owner
+
+summary: >
+  Complete the C1 gate: verification matrix with every row backed by this
+  phase's commits, security and provenance reviews for C1, dependency and
+  manifest re-inspection after ML Kit removal, handoff, owner acceptance,
+  tag v0.2.0.
+
+requirements:
+  - id: P2-09-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P2-09-R1
+    text: "MUST rewrite docs/verification/C1.md with rows C1-01..C1-12 (adding: persisted state, lifecycle/cancellation, evaluation gate, search, assessment scaffold, evidence geometry) each with command, result, CI URL, commit."
+  - id: P2-09-R2
+    text: "MUST write docs/reviews/C1-security-review.md and docs/reviews/C1-provenance-review.md against the actual code: engine receives only authenticated bytes; spans immutable; corrections attributed; deletion cascade including FTS and span reviews; inert rendering; no network; asset digest verification."
+  - id: P2-09-R3
+    text: "MUST write docs/verification/C1-handoff.md (build id, dependencies, device matrix, results, limitations, reviewer decisions) and obtain owner acceptance (OA-4 style sign-off recorded)."
+  - id: P2-09-R4
+    text: "MUST bump VERSION to 0.2.0, update CHANGELOG, fastlane changelog, tag."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleRelease; CI API 29/36 runs; bash scripts/release-smoke.sh"
+  evidence_required:
+    - "Matrix; review docs; tag."
+
+acceptance_criteria:
+  - "Owner acceptance recorded; v0.2.0 published as a signed pre-release."
+
+docs_to_update:
+  - docs/verification/C1.md, docs/verification/C1-handoff.md, docs/reviews/C1-*.md, docs/capabilities/C1.md, CHANGELOG.md, README.md
+
+tdd: {red: [], green: [], refactor: []}
+risks: []
+rollback: "Untag."

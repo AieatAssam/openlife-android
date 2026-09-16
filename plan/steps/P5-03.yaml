@@ -1,0 +1,26 @@
+id: P5-03
+title: Reproducible build verification
+phase: P5
+status: todo
+depends_on: [P0-06, P5-01]
+estimate: M
+owner: agent
+summary: "Establish whether the release APK is reproducible: build the same tag twice in clean containers (CI job and a documented local Docker/Nix recipe), compare unsigned APK contents, and either claim reproducibility with evidence or document exactly what differs. Required by P6 before any reproducibility claim; also required for F-Droid reproducible builds."
+requirements:
+  - id: P5-03-R1
+    text: "MUST add .github/workflows/reproducible.yml: two independent jobs build `assembleRelease` for the tag with pinned JDK/SDK/build-tools, upload unsigned APKs; a third job compares with `apkdiff`-style comparison (unzip, sort, sha256 per entry; ignore signature block) and posts a summary."
+  - id: P5-03-R2
+    text: "MUST document docs/release/REPRODUCIBLE_BUILDS.md: exact toolchain (JDK 21 build, Gradle wrapper checksum, AGP, build-tools 37.0.0, NDK none), environment variables, the comparison method, and the current status (reproducible / not, with the list of differing entries and causes such as timestamps in resources, BuildConfig GIT_COMMIT, R8 non-determinism)."
+  - id: P5-03-R3
+    text: "MUST make the build deterministic where under our control: no build timestamps, sorted resources, `android.enableR8.fullMode` deterministic mapping, `BuildConfig.GIT_COMMIT` injected from the tag not the working tree."
+files_touched: [.github/workflows/reproducible.yml, scripts/apk-compare.sh, docs/release/REPRODUCIBLE_BUILDS.md, app/build.gradle.kts]
+tdd: {red: ["Comparison job fails on first run; each differing entry gets a fix or a documented cause"], green: ["Identical or documented"], refactor: []}
+verification:
+  commands: ["gh workflow run reproducible.yml --ref v1.0.0-rc1"]
+  evidence_required:
+    - "Comparison output"
+    - "gh commands need GitHub authentication, which the sandbox may lack; then the run URL is owner/CI evidence pasted by whoever has access."
+acceptance_criteria: ["README claims reproducibility only if the comparison is byte-identical; otherwise it states what differs."]
+docs_to_update: [README.md, docs/release/REPRODUCIBLE_BUILDS.md]
+risks: []
+rollback: "Docs."

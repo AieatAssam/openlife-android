@@ -1,0 +1,53 @@
+id: P3-01
+title: C2 specification and ADR-0008
+phase: P3
+status: todo
+depends_on: [P2-09]
+estimate: M
+owner: agent+owner
+owner_action: OA-4
+
+summary: >
+  Write docs/capabilities/C2.md as a full engineering specification (inputs,
+  user decisions, entities, states, trust boundaries, failure behaviour,
+  limits, exclusions, MUST requirements with IDs) and ADR-0008 conservative
+  interpretation rules, then obtain owner approval before implementation.
+
+rationale: >
+  Design §5: "Later rows require a full engineering specification before
+  work begins." C2 introduces the Fact revision object, the first
+  provenance object beyond Source, so its model must be exact.
+
+ethos_check:
+  - "P3: every fact references evidence or inputs; user facts are labelled; missing stays missing."
+  - "P4: no fact triggers any action; URLs/phones/emails remain inert."
+
+requirements:
+  - id: P3-01-R1
+    text: "MUST specify the Fact model exactly: fact (stable identity per subject: sourceId + factKind + ordinal), fact_revisions (id, factId, revisionNo, origin EXTRACTED|DERIVED|USER, kind DATE|TIME|DATETIME|MONEY|URL|EMAIL|PHONE, valueJson (typed, canonical), status UNREVIEWED|CONFIRMED|REJECTED|CLARIFICATION_NEEDED|STALE, confidence REAL NULL, methodId, methodVersion, locale, timezone, createdAt, supersedesRevisionId NULL), fact_evidence (revisionId, ocrSpanId, sourceId, regionSnapshot NULL) for EXTRACTED, fact_inputs (revisionId, inputRevisionId) for DERIVED with an acyclicity rule, review_events (id, revisionId, decision, createdAt, note NULL)."
+  - id: P3-01-R2
+    text: "MUST specify canonical value encodings (ADR-0008): DATE as ISO-8601 local date; TIME as HH:mm[:ss] local; DATETIME only when both appear in one evidenced span; MONEY as {amount: decimal string, currency: ISO-4217 or null, rawSymbol}; URL/EMAIL/PHONE as normalised text plus raw text; ambiguous date candidates as {candidates:[...]} with status CLARIFICATION_NEEDED."
+  - id: P3-01-R3
+    text: "MUST specify staleness: a new OCR revision or a correction on a span referenced by a fact revision marks that revision STALE and creates no replacement automatically; re-extraction is user-triggered; confirmed facts that go stale are shown with both old and new context."
+  - id: P3-01-R4
+    text: "MUST specify limits: max 500 fact revisions per source, max 64 candidates per kind per revision, extraction deadline 5 s, extractor rules versioned as `rules-<kind>-v<n>`."
+  - id: P3-01-R5
+    text: "MUST specify the C2 test matrix rows C2-01..C2-12 (extraction correctness per kind, ambiguity handling, evidence linking, review flows, user facts, deletion cascade, staleness, inertness of links, no-network, accessibility, performance, evaluation gate)."
+  - id: P3-01-R6
+    text: "MUST list exclusions: no link opening, no clipboard, no record creation, no calendar, no currency conversion, no date inference from context (e.g. 'next Tuesday' is DERIVED only in C3 with explicit anchor and remains unimplemented in C2)."
+  - id: P3-01-R7
+    text: "MUST obtain owner approval recorded at the top of C2.md with the date."
+
+files_touched:
+  - docs/capabilities/C2.md
+  - docs/decisions/0008-conservative-interpretation.md
+
+tdd: {red: [], green: ["Documents only"], refactor: []}
+verification:
+  commands: ["bash scripts/plan-check.sh"]
+  evidence_required: ["Owner approval line in C2.md"]
+acceptance_criteria:
+  - "Spec reviewed by an adversarial reviewer (subagent or second agent) for gaps against design §4 and §14; findings resolved in the same PR."
+docs_to_update: [docs/README.md]
+risks: []
+rollback: "Docs."

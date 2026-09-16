@@ -1,0 +1,74 @@
+id: P2-01
+title: Persisted OCR state in the viewer
+phase: P2
+status: todo
+depends_on: [P0-07, P2-02]
+estimate: M
+owner: agent
+closes_findings: [F-04]
+
+summary: >
+  Make the viewer show what the database holds: the latest OCR revision per
+  source (any state), its spans, user corrections, review state, and
+  stale/cancelled explanations, reloaded after process restart. OcrViewModel
+  becomes a thin layer over Room flows instead of an in-memory map.
+
+rationale: >
+  OCR results exist only in OcrViewModel memory today; after a restart the
+  viewer offers "Extract text" again although a READY revision exists,
+  corrections are never displayed, and review state is invisible. C1-R5
+  requires inspect/accept/correct/reject against persisted revisions.
+
+ethos_check:
+  - "P3: corrections are shown as attributed USER revisions beside the immutable OCR text, never replacing it."
+
+requirements:
+  - id: P2-01-R1
+    text: "MUST add OcrDao.observeLatestRevisionForSource(sourceId): Flow<OcrRevisionEntity?> (ORDER BY startedAt DESC LIMIT 1), observeSpans(revisionId), observeUserRevisions(revisionId); OcrRepository exposes observeOcrView(sourceId): Flow<OcrView?> combining revision, spans, corrections (by span), and review state."
+  - id: P2-01-R2
+    text: "MUST rewrite OcrViewModel to derive OcrUiState from observeOcrView plus a transient Running marker for the active job; Ready carries spans with their corrections (latest correction per span, plus a whole-revision correction if spanId is null) and the review state."
+  - id: P2-01-R3
+    text: "MUST show in the viewer: OCR text per span with its latest correction rendered as 'Corrected by you: …' under the original; review state chip (Unreviewed/Accepted/Rejected); engine id and model version; extraction time; failure/stale/cancelled explanation from the persisted failureReason; a 'Run again' action that creates a new revision (previous revisions remain and are listed in a 'History' expander)."
+  - id: P2-01-R4
+    text: "MUST clear OCR text from memory on onStop (OcrViewModel.clearTransient) and rely on the flow to repopulate on return; on source deletion the flow emits null and the UI shows nothing (F-38 handled here for the UI; P2-02 handles the repository side)."
+  - id: P2-01-R5
+    text: "MUST keep text rendering inert: plain Text, no selection, no linkify, no clipboard."
+
+constraints:
+  - "No new tables; schema v2 already stores everything needed."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/storage/OcrDao.kt
+  - vault/src/main/java/org/openlife/vault/repository/OcrRepository.kt (observeOcrView, OcrView model in vault/ocr)
+  - app/src/main/java/org/openlife/app/ui/{OcrViewModel.kt,OcrUiState.kt,ViewerScreen.kt}
+  - vault androidTest OcrRepositoryTest; app androidTest ViewerScreenC1Test, OcrPersistenceFlowTest
+
+tdd:
+  red:
+    - name: OcrRepositoryTest.observeOcrViewEmitsLatestRevisionSpansAndCorrections
+    - name: OcrRepositoryTest.observeOcrViewEmitsNullAfterSourceDeletion
+    - name: app androidTest OcrPersistenceFlowTest.readyRevisionIsShownAfterViewModelRecreationWithoutRerunning
+    - name: ViewerScreenC1Test.correctionIsShownBesideImmutableOcrTextAndReviewChipReflectsState
+    - name: ViewerScreenC1Test.runAgainCreatesANewRevisionAndKeepsHistory
+    - name: OcrViewModelTest (JVM with fake repository flows).clearTransientDropsTextAndFlowRepopulates
+  green:
+    - "Implement DAO flows, combined view, ViewModel, UI."
+  refactor:
+    - "Remove the Map<UUID, OcrUiState> and per-source job map in favour of a single active job keyed by source."
+
+verification:
+  commands:
+    - "./gradlew :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "Manual: run OCR, kill the process (`adb shell am kill org.openlife`), reopen the viewer: text and review state are present."
+  evidence_required:
+    - "Tests; manual transcript."
+
+acceptance_criteria:
+  - "Persisted OCR state is visible after restart; corrections and review state are displayed; no text remains in memory after onStop."
+
+docs_to_update:
+  - docs/capabilities/C1.md (C1-R5 evidence)
+  - docs/verification/C1.md (C1-05 row)
+
+risks: []
+rollback: "Keep old in-memory path behind the same interface."

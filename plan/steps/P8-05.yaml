@@ -1,0 +1,19 @@
+id: P8-05
+title: Acceptance and v3.0.0
+phase: P8
+status: todo
+depends_on: [P8-03, P8-04]
+estimate: M
+owner: agent+owner
+summary: "C11/C12 verification, security review of the native runtime and model import surface, provenance review (citations), independent review request for the native code, handoff, owner acceptance, v3.0.0 release."
+requirements:
+  - id: P8-05-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P8-04-R1
+    text: "MUST produce the docs and run the checklists; the native runtime build reproducibility is part of P5-03's workflow extended here."
+tdd: {red: [], green: [], refactor: []}
+verification: {commands: ["Full suites; CI; checklists"], evidence_required: ["Docs; tag"]}
+acceptance_criteria: ["Owner acceptance recorded."]
+docs_to_update: [docs/verification/*, docs/reviews/*, CHANGELOG.md]
+risks: []
+rollback: "Untag."

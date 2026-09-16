@@ -1,7 +1,7 @@
 # OpenLife product principles
 
-Source of truth: `openlife-design-v0.2.md` at the repository root (design document,
-version 0.2, 13 September 2026). This file restates the non-negotiable principles
+Source of truth: `openlife-design-v0.3.md` at the repository root (design document,
+version 0.3, 16 September 2026). This file restates the non-negotiable principles
 from Section 2 of that document so they are easy to reference from code review and
 `AGENTS.md`. If this file and the design document ever disagree, the design
 document governs; fix this file.

@@ -1,0 +1,34 @@
+id: P3-06
+title: Facts evaluation set and metrics
+phase: P3
+status: todo
+depends_on: [P3-04]
+estimate: M
+owner: agent
+
+summary: >
+  Extend the eval module with a facts set: synthetic OCR-like text and images
+  with ground-truth facts; measure precision/recall per kind, wrong-value
+  rate, clarification correctness, and specifically wrong actionable dates.
+
+requirements:
+  - id: P3-06-R1
+    text: "MUST add eval/facts/v1 with 200 text cases (JVM, fast) and 30 image cases (instrumented, through OCR) with truth per kind; metrics per rule version written to docs/verification/facts-eval.md."
+  - id: P3-06-R2
+    text: "MUST define the gate: date precision >= 0.97 (a wrong date is worse than a missed one), recall >= 0.85; money precision >= 0.95; URL/email/phone precision >= 0.95; 100% of ambiguous d/m cases flagged CLARIFICATION_NEEDED; zero currency inferred from a bare symbol."
+  - id: P3-06-R3
+    text: "MUST run the JVM part in `:vault:test` (fast) so every change checks it; the image part is @Slow on main-branch CI."
+
+files_touched: [eval/facts/v1/*, vault/src/test/.../facts/eval/*, docs/verification/facts-eval.md]
+tdd:
+  red:
+    - name: FactsEvalTest.gateThresholdsAreMet (RED until extractors reach the bar)
+  green: ["Tune extractors within the conservative rules; never loosen thresholds without an ADR."]
+  refactor: []
+verification:
+  commands: ["./gradlew :vault:test", "./gradlew :vault:connectedDebugAndroidTest --tests '*FactsImageEval*'"]
+  evidence_required: ["Metrics table"]
+acceptance_criteria: ["Gate met and recorded."]
+docs_to_update: [docs/verification/facts-eval.md, docs/capabilities/C2.md]
+risks: []
+rollback: "Eval remains."

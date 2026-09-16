@@ -1,0 +1,59 @@
+id: P2-07
+title: Communication assessment state scaffold
+phase: P2
+status: todo
+depends_on: [P2-01]
+estimate: S
+owner: agent
+closes_findings: [F-17]
+
+summary: >
+  Add the explicit assessment state design §6 requires from C1 onward, plus
+  an optional user content-kind label, without implementing any assessment
+  logic yet.
+
+rationale: >
+  "From C1 onward, maintain an explicit assessment state for
+  communication-like or uncertain content." C3 must refuse actionable
+  proposals from unassessed communication-like content; the state has to
+  exist first.
+
+requirements:
+  - id: P2-07-R1
+    text: "MUST add to `sources` (next schema version per plan.yaml conventions.schema_migrations) columns `assessmentState` TEXT NOT NULL DEFAULT 'NOT_ASSESSED' (values NOT_APPLICABLE, NOT_ASSESSED, INCONCLUSIVE, CONCERNS_FOUND, NO_INDICATORS_FOUND) and `userContentKind` TEXT NULL (COMMUNICATION, NOT_COMMUNICATION), `assessmentMethodVersion` TEXT NULL."
+  - id: P2-07-R2
+    text: "MUST default existing and new sources to NOT_ASSESSED; NOT_APPLICABLE is set only by a future C10 rule; nothing in C1 sets NO_INDICATORS_FOUND."
+  - id: P2-07-R3
+    text: "MUST expose a 'Is this a message or request from someone?' user label control in the viewer details (Yes / No / Not sure -> null) stored as userContentKind with a USER attribution timestamp column `userContentKindAt`; copy states that the label is routing context, not proof of safety."
+  - id: P2-07-R4
+    text: "MUST show the assessment state in the viewer as 'Safety check: not assessed in this version' with a plain explanation."
+
+files_touched:
+  - vault storage: SourceEntity, migration, schema JSON, SourceMapper, Source model
+  - app viewer details section
+  - vault androidTest OcrDatabaseTest/SourceDatabaseTest migration; app ViewerScreen test
+
+tdd:
+  red:
+    - name: SourceDatabaseTest.migrationAddsAssessmentColumnsWithNotAssessedDefaultAndPreservesRows
+    - name: ViewerScreenTest.userContentKindLabelPersistsWithTimestampAndShowsRoutingCopy
+    - name: ReadyInvariantTest still passes (triggers untouched by ALTER TABLE ADD COLUMN)
+  green:
+    - "Implement."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Tests; schema JSON diff."
+
+acceptance_criteria:
+  - "Every source carries an assessment state; the user label is optional and attributed."
+
+docs_to_update:
+  - docs/capabilities/C1.md (new requirement C1-R9 assessment state)
+  - docs/THREAT_MODEL.md (communication safety paragraph)
+
+risks: []
+rollback: "Columns remain unused."

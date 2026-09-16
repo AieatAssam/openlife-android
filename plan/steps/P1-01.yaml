@@ -1,0 +1,90 @@
+id: P1-01
+title: Abandoned stage cleanup on intake teardown and foreground recovery
+phase: P1
+status: todo
+depends_on: [P0-07, P1-15]
+estimate: M
+owner: agent
+closes_findings: [F-01]
+
+summary: >
+  Guarantee that a STAGED import which the user walks away from is cancelled
+  promptly, not left on disk until the next process start. Add cleanup on
+  IntakeViewModel teardown when no Save completed, and an idempotent
+  "light recovery" pass whenever MainActivity comes to the foreground.
+
+rationale: >
+  IntakeActivity is declared noHistory, so backgrounding during preview
+  finishes the activity. The ViewModel is then cleared, but onCleared only
+  closes the stream; the STAGED row and encrypted .stage file remain.
+  RecoveryRepository.recover() runs once per process (OpenLifeApp.vault()
+  caches), so a long-lived process accumulates stage files. Design §11:
+  "Any failure before a usable preview cancels the stage" and §8: "Clean
+  abandoned staging after unlocking the database."
+
+ethos_check:
+  - "P7 honest recoverability: no silent leftovers; cleanup is idempotent and never touches READY rows."
+  - "No behaviour change to Save semantics; success is still only after READY commit."
+
+requirements:
+  - id: P1-01-R1
+    text: "MUST cancel the STAGED import from IntakeViewModel.onCleared when the ViewModel holds a sourceId and the last state is not Saved/Duplicate/Cancelled; the cancellation runs on an application-scoped coroutine (not viewModelScope, which is already cancelled) and is fire-and-forget but awaited by tests through a testable hook."
+  - id: P1-01-R2
+    text: "MUST treat a STAGED row that is not the active import as abandoned in a new RecoveryRepository.cleanAbandonedStages(activeSourceId: UUID?) method that removes stage/blob files and the row for every other STAGED row; it never deletes READY, DELETING, or CORRUPT rows and never removes unreferenced files (that remains full recover())."
+  - id: P1-01-R3
+    text: "MUST call cleanAbandonedStages from MainActivity onStart (through SourceListViewModel) under the mutation queue using tryAcquire semantics: if an import is in progress, skip silently."
+  - id: P1-01-R4
+    text: "MUST keep the existing full recover() at first vault access unchanged."
+  - id: P1-01-R5
+    text: "MUST NOT cancel a stage while IntakeActivity is merely rotated: configuration changes keep the ViewModel; only a real clear triggers cleanup (verified by test)."
+
+constraints:
+  - "The application-scoped cleanup coroutine must use SupervisorJob + Dispatchers.IO and be owned by OpenLifeApp (expose `appScope`), with no other use in this step."
+  - "Log nothing beyond counts (existing RecoveryReport pattern)."
+
+design_decisions:
+  - "Because ACTION_SEND arrival can happen while MainActivity is foregrounded, the foreground pass uses tryAcquire and treats 'busy' as 'try again next foreground'."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt (appScope)
+  - app/src/main/java/org/openlife/app/ui/IntakeViewModel.kt
+  - app/src/main/java/org/openlife/app/ui/SourceListViewModel.kt
+  - app/src/main/java/org/openlife/app/MainActivity.kt
+  - vault/src/main/java/org/openlife/vault/repository/RecoveryRepository.kt
+  - vault/src/main/java/org/openlife/vault/repository/ImportRepository.kt (expose activeStagedSourceId if needed)
+
+tdd:
+  red:
+    - name: vault androidTest RecoveryRepositoryTest.cleanAbandonedStagesRemovesOtherStagedRowsButKeepsTheActiveOne
+      asserts: "Two STAGED rows with stage files; call cleanAbandonedStages(active=A); A remains with file, B row and file are gone; READY row untouched."
+    - name: RecoveryRepositoryTest.cleanAbandonedStagesLeavesRowWhenFileCannotBeRemoved
+      asserts: "Blocked stage path -> row retained, method returns count 0 for that row, no exception."
+    - name: app androidTest IntakeAndListFlowTest.clearingTheIntakeViewModelWithAnUnsavedPreviewCancelsTheStage
+      asserts: "Start import to Preview; clear the ViewModelStore (ActivityScenario.moveToState(DESTROYED) with isFinishing); await hook; no STAGED row remains and stage file is gone."
+    - name: IntakeAndListFlowTest.recreatingTheIntakeActivityKeepsTheStage
+      asserts: "scenario.recreate(); STAGED row still present and Preview restored."
+    - name: IntakeAndListFlowTest.foregroundingMainActivityCleansAbandonedStages
+      asserts: "Insert an abandoned STAGED row directly; launch MainActivity; await; row gone."
+  green:
+    - "Implement appScope, onCleared cancellation, cleanAbandonedStages, onStart hook."
+  refactor:
+    - "Share the remove-both-files helper between ImportRepository.cancelStage and RecoveryRepository (single private function in ArtefactFileOps)."
+
+verification:
+  commands:
+    - "./gradlew detekt :vault:test :app:test"
+    - "./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Test names and counts; a manual run: share, background during preview, `run-as org.openlife ls files/../no_backup/vault/artefacts` shows no .stage after returning to the list."
+
+acceptance_criteria:
+  - "After abandoning a preview, no .stage file remains once MainActivity is foregrounded, without a process restart."
+  - "Rotation during preview does not lose the stage."
+
+docs_to_update:
+  - docs/capabilities/C0.md (C0-R12 evidence list)
+  - docs/verification/C0.md (C0-04 row)
+
+risks:
+  - "onCleared runs on the main thread; keep it non-blocking."
+rollback: "Remove the hooks; full recovery at process start still exists."

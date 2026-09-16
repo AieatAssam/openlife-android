@@ -1,0 +1,86 @@
+id: P1-02
+title: Photo Picker route hardening and single-document fallback
+phase: P1
+status: todo
+depends_on: [P0-07, P1-13]
+estimate: M
+owner: agent
+closes_findings: [F-02, F-34, F-35, F-47]
+
+summary: >
+  Move the Photo Picker result handling off the main thread, pass the
+  picked URI to IntakeActivity without pre-resolving its MIME type on the UI
+  thread, handle picker unavailability, and document and test the AndroidX
+  contract's single-document fallback on devices without the system picker.
+
+rationale: >
+  MainActivity's picker callback calls contentResolver.getType(uri) on the
+  main thread, the same class of ANR that was fixed in IntakeActivity for
+  C0-17. Design §8 also requires that any fallback route be documented and
+  tested with the same one-item, temporary-grant policy (R3).
+
+ethos_check:
+  - "P2 explicit narrow intake: the fallback must still be a single explicitly selected item with a one-shot grant, no persistable permission."
+
+requirements:
+  - id: P1-02-R1
+    text: "MUST NOT call ContentResolver from the main thread anywhere in app/src/main. The StrictMode policy and the instrumented StrictMode test rule are owned by P1-13 (penaltyLog + logcat-scanning rule); this step's PhotoPickerRouteTest uses that rule."
+  - id: P1-02-R2
+    text: "MUST forward the picked URI to IntakeActivity with `type = \"image/*\"` (no ContentResolver call on the main thread) plus the one-shot nonce from R6; the provider type is resolved on Dispatchers.IO inside the intake flow as today. Superseded detail: no null-MIME special case is needed once R7 accepts image/*."
+  - id: P1-02-R3
+    text: "MUST handle ActivityResultContracts.PickVisualMedia.isPhotoPickerAvailable(context)==false by using the same contract (which falls back to a single-document system picker intent with image/* when neither the platform picker nor the GMS backport is available; the pinned androidx.activity source decides whether that is ACTION_OPEN_DOCUMENT or ACTION_GET_CONTENT — the step reads the pinned source, records the answer in C0.md, and tests that route on the API 29 CI leg) and MUST document this route in docs/capabilities/C0.md as the single-document fallback with the same one-item/temporary-grant policy; MUST assert no takePersistableUriPermission call exists."
+  - id: P1-02-R4
+    text: "MUST show a resource-string error if the picker returns a URI whose provider reports a non-JPEG/PNG type (e.g. HEIC/WebP) with copy that names the two supported formats."
+  - id: P1-02-R5
+    text: "MUST run IntakeActivityTest.slowProviderOpenStaysResponsive equivalent for the picker path: a `slow-6000.jpg` URI forwarded with EXTRA_INTAKE_KIND=PHOTO_PICKER keeps MainActivity responsive."
+  - id: P1-02-R6
+    text: "MUST make the recorded IntakeKind unspoofable (F-34): an external ACTION_SEND can never persist PHOTO_PICKER. Decision: MainActivity no longer forwards through the exported activity's public intent path; it stores a one-shot random nonce in OpenLifeApp (process memory) and passes it as EXTRA_PICKER_NONCE; IntakeActivity records PHOTO_PICKER only when the extra equals and consumes the nonce, otherwise SHARE. A test launches IntakeActivity directly with EXTRA_INTAKE_KIND=PHOTO_PICKER and asserts the saved row's intakeKind is SHARE."
+  - id: P1-02-R7
+    text: "MUST accept an intent-level MIME of image/*, image/jpeg, image/jpg, or image/png (F-35); the decisive checks remain provider getType (must be image/jpeg or image/png, with image/jpg normalised) and the byte signature. A wildcard intent type with a provider type of image/webp is rejected with the format copy. Validator tests cover image/* + jpeg provider -> Valid, image/* + webp provider -> rejected, text/plain -> rejected."
+  - id: P1-02-R8
+    text: "MUST add the Photo Picker cloud-provider explanation at intake (F-47, design §3 R3): the preview screen's explanatory text for PHOTO_PICKER imports states that a picked item may come from a cloud media provider that OpenLife does not control, and that OpenLife itself never uploads; string resource, asserted by IntakeScreenTest."
+
+constraints:
+  - "No READ_MEDIA_IMAGES permission; the picker and OPEN_DOCUMENT grants are the only access."
+
+design_decisions:
+  - "Validator change is explicit: PHOTO_PICKER-kind forwarded intents skip the sender-MIME check (the app itself is the sender) but still require the read grant flag and a content:// scheme and still reject own-authority URIs."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/MainActivity.kt
+  - app/src/main/java/org/openlife/app/intake/IntakeActivity.kt
+  - app/src/main/java/org/openlife/app/intake/IntakeIntentValidator.kt
+  - app/src/main/java/org/openlife/app/intake/IntentShape.kt (add isForwardedPickerIntent)
+  - app/src/test/java/org/openlife/app/intake/IntakeIntentValidatorTest.kt
+  - app/src/androidTest/java/org/openlife/app/intake/PhotoPickerRouteTest.kt
+  - docs/capabilities/C0.md
+
+tdd:
+  red:
+    - name: IntakeIntentValidatorTest.forwardedPickerIntentWithoutSenderMimeIsAcceptedOnlyWhenMarkedAndExplicit
+    - name: IntakeIntentValidatorTest.forwardedPickerIntentStillRequiresReadGrantAndContentScheme
+    - name: PhotoPickerRouteTest.pickerForwardingDoesNotTouchContentResolverOnMainThread
+      asserts: "Under the P1-13 StrictMode rule, forwarding a slow provider URI logs no main-thread violation and MainActivity stays responsive."
+    - name: PhotoPickerRouteTest.unsupportedPickedTypeIsExplainedAndNothingIsStaged
+  green:
+    - "Implement the forwarding change and validator branch."
+  refactor:
+    - "Collapse duplicated rejection copy into IntakeRejectionReason string resources."
+
+verification:
+  commands:
+    - "./gradlew detekt :app:test && ./gradlew :app:connectedDebugAndroidTest"
+    - "Manual: on the emulator, tap + and pick an image; confirm preview; also test with a WebP in the picker (adb push a .webp into /sdcard/Pictures then media scan) -> explained rejection."
+  evidence_required:
+    - "Tests; uiautomator dump of the rejection copy."
+
+acceptance_criteria:
+  - "StrictMode main-thread disk/network violations do not occur during the full instrumented suite."
+  - "Picker path is documented as one of the two supported routes with its fallback."
+
+docs_to_update:
+  - docs/capabilities/C0.md (C0-R1 note on fallback)
+  - docs/THREAT_MODEL.md (Photo Picker paragraph)
+
+risks: []
+rollback: "Revert forwarding change; keep tests marked @Ignore with reason."

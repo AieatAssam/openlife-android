@@ -1,0 +1,77 @@
+id: P1-05
+title: Storage-space precheck and storage-unavailable handling
+phase: P1
+status: todo
+depends_on: [P0-07]
+estimate: M
+owner: agent
+closes_findings: [F-15]
+
+summary: >
+  Check free space before staging an import, surface a "storage unavailable"
+  category when it is insufficient or when any write fails with ENOSPC, and
+  add fault tests for full-disk conditions on both the artefact and database
+  paths.
+
+rationale: >
+  Design §9 names "storage unavailable" as an error category and §13 C0-10
+  requires fill-storage testing. Today an ENOSPC during stage write is
+  reported as a generic "Import failed"; during the READY commit, SQLCipher
+  may throw SQLiteFullException which is caught as a generic failure with
+  the row left STAGED (correct) but unexplained.
+
+ethos_check:
+  - "P7 honest limits: the user is told why an import cannot proceed and that nothing was saved."
+
+requirements:
+  - id: P1-05-R1
+    text: "MUST add a StorageSpace seam (interface with `availableBytes(dir)`, default StatFs) to ImportRepository; prepareImport returns PrepareResult.Rejected(STORAGE_UNAVAILABLE) before creating the STAGED row when available < 2 * ImportLimits.MAX_ORIGINAL_BYTES + 8 MiB."
+  - id: P1-05-R2
+    text: "MUST map IOException whose message or cause indicates ENOSPC (android.system.ErrnoException with OsConstants.ENOSPC, or SQLiteFullException) to a distinct PrepareResult/SaveResult variant StorageUnavailable, with UI copy from resources."
+  - id: P1-05-R3
+    text: "MUST keep recovery semantics: a STAGED row left by a storage failure is cleaned by P1-01/recover(); a READY commit failure after rename remains recoverable (existing test)."
+  - id: P1-05-R4
+    text: "MUST add fault tests via ArtefactFileOps throwing ErrnoException(ENOSPC) at writeAndSync and at syncDirectory, and a database-level test that injects a DAO wrapper seam throwing SQLiteFullException on the READY update (extending the existing commit-failure seam used by saveCommitFailureReturnsFailed...)."
+  - id: P1-05-R5
+    text: "SHOULD attempt a real full-disk run on the CI emulator: `adb shell fallocate` a file in /data until df shows < 4 MiB free, run an import via the smoke script, expect the storage-unavailable message, then delete the filler. Record as pass or as gap with the reason."
+
+constraints:
+  - "Never delete anything to free space automatically."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/repository/StorageSpace.kt
+  - vault/src/main/java/org/openlife/vault/repository/ImportRepository.kt
+  - vault/src/main/java/org/openlife/vault/repository/PrepareResult.kt, SaveResult.kt, ImageValidationResult.kt (reason enum extension or new variant)
+  - app/src/main/java/org/openlife/app/ui/IntakeViewModel.kt, IntakeScreen.kt, res/values/strings.xml
+  - vault/src/androidTest/java/org/openlife/vault/repository/ImportRepositoryTest.kt
+  - scripts/full-disk-check.sh
+
+tdd:
+  red:
+    - name: ImportRepositoryTest.insufficientFreeSpaceIsRejectedBeforeAnyRowOrFileIsCreated
+    - name: ImportRepositoryTest.enospcDuringStageWriteReportsStorageUnavailableAndCleansTheRow
+    - name: ImportRepositoryTest.enospcDuringDirectorySyncLeavesRecoverableStateAndReportsStorageUnavailable
+    - name: ImportRepositoryTest.sqliteFullOnReadyCommitLeavesStagedAndReportsStorageUnavailable
+    - name: IntakeScreenTest.storageUnavailableStateExplainsAndOffersDone
+  green:
+    - "Implement seam, mapping, UI."
+  refactor:
+    - "Unify the error classification into one `IoFailureClassifier` used by import, save, and deletion."
+
+verification:
+  commands:
+    - "./gradlew :vault:test :app:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "bash scripts/full-disk-check.sh (CI or local emulator)"
+  evidence_required:
+    - "Tests; full-disk script output or documented gap."
+
+acceptance_criteria:
+  - "A full disk never produces a false 'Saved on this device' and the user sees the storage explanation."
+
+docs_to_update:
+  - docs/capabilities/C0.md (C0-R35 storage unavailable)
+  - docs/verification/C0.md (C0-10 row: full-storage leg)
+
+risks:
+  - "StatFs on some filesystems reports optimistic values; the precheck is a courtesy, the ENOSPC mapping is the guarantee."
+rollback: "Remove precheck; keep mapping."

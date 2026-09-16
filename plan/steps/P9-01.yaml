@@ -1,0 +1,20 @@
+id: P9-01
+title: Update, review, and incident policies
+phase: P9
+status: todo
+depends_on: [P5-05]
+estimate: S
+owner: agent+owner
+summary: "Write the sustainment policies so the app stays trustworthy without telemetry: dependency update cadence and verification refresh, yearly targetSdk bump with a re-run of the platform matrix, quarterly self-review of the threat model, security incident response (SECURITY.md process, fix SLA, advisory publication), release support window, and how user-reported issues are triaged without collecting content."
+requirements:
+  - id: P9-01-R1
+    text: "MUST write docs/POLICIES.md covering: dependency updates (monthly review; every bump repeats affected suites and refreshes verification metadata, SBOM, licence report), Android target updates (within 6 months of a new stable API, with CI legs updated), security review cadence (quarterly self-review + independent review per major), incident response (acknowledge 3 days, fix 30 days, advisory in CHANGELOG and GitHub Security Advisories), supported versions (latest minor of the latest two majors), deprecation of engines/models with migration notes."
+  - id: P9-01-R2
+    text: "MUST add a quarterly checklist issue template and a `scripts/quarterly-review.sh` that prints outdated dependencies (offline from lockfile timestamps is not possible; the script prints the pinned set and the last review date for manual comparison)."
+files_touched: [docs/POLICIES.md, .github/ISSUE_TEMPLATE/quarterly-review.yml, scripts/quarterly-review.sh]
+tdd: {red: [], green: ["Docs"], refactor: []}
+verification: {commands: ["bash scripts/plan-check.sh"], evidence_required: ["Docs merged; first review executed"]}
+acceptance_criteria: ["Policies exist and the first quarterly review is logged."]
+docs_to_update: [README.md]
+risks: []
+rollback: "Docs."

@@ -1,0 +1,29 @@
+id: P4-05
+title: Stale propagation and deletion cascade for records and actions
+phase: P4
+status: todo
+depends_on: [P4-03, P4-04]
+estimate: M
+owner: agent
+summary: "Wire the end-to-end chain: a correction anywhere upstream (OCR span correction, fact revision, event field) suspends the reminder and marks the event stale in one logical update; source deletion cancels alarms and removes everything; review of the replacement restores scheduling explicitly."
+requirements:
+  - id: P4-05-R1
+    text: "MUST implement the propagation in one transaction per trigger with the alarm cancellation executed after commit via the canceller seam (idempotent; re-run on next app start for any SUSPENDED reminder that still has a PendingIntent)."
+  - id: P4-05-R2
+    text: "MUST show stale events with both old and new values and a 'Review and reschedule' action that creates a new event revision referencing the new fact revision and re-schedules."
+  - id: P4-05-R3
+    text: "MUST add fault tests: kill between commit and cancellation (constructed state) -> startup reconciliation cancels; deletion while the notification is showing -> notification removed."
+files_touched: [vault repositories, app reminders, UI]
+tdd:
+  red:
+    - name: PropagationTest.spanCorrectionSuspendsReminderAndMarksEventStaleInOneUpdate
+    - name: PropagationTest.reviewAndRescheduleCreatesNewRevisionAndSchedules
+    - name: PropagationTest.startupReconcilesSuspendedRemindersWithLivePendingIntents
+    - name: DeletionFlowTest.deletingSourceRemovesNotificationAndAlarm
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"], evidence_required: ["Tests"]}
+acceptance_criteria: ["Design §4 'stale in the same logical update' holds and is tested."]
+docs_to_update: [docs/capabilities/C3.md, docs/reviews (C3 provenance review input)]
+risks: []
+rollback: "None; correctness step."

@@ -1,0 +1,49 @@
+id: P1-12
+title: C0 acceptance refresh and v0.1.0
+phase: P1
+status: todo
+depends_on: [P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08, P1-09, P1-10, P1-11, P1-13, P1-14, P1-15, P1-16, P0-06, P0-08]
+estimate: M
+owner: agent+owner
+
+summary: >
+  Re-run the complete C0 matrix on the hardened code, refresh the
+  verification record, security self-review, provenance review and handoff,
+  update the capability spec with the new requirements (R34-R36, lock,
+  reset), and tag v0.1.0.
+
+requirements:
+  - id: P1-12-R1
+    text: "MUST re-run every C0-01..C0-17 row and record command, result, commit, and device/CI URL; no row may cite evidence older than this step's commit range except physical-device rows awaiting OA-3, which stay 'gap (owner action OA-3)'; evidence must be newer than baseline commit 6df9151 (the last handoff cites 0519e86)."
+  - id: P1-12-R2
+    text: "MUST write docs/reviews/C0-security-self-review-v2.md re-deriving every threat-matrix row against the hardened code, listing every review finding F-01..F-49 whose closing step is in P0/P1 with its closure evidence, and the P2-owned findings as open known limitations."
+  - id: P1-12-R3
+    text: "MUST update docs/capabilities/C0.md with C0-R34 (orientation), C0-R35 (storage unavailable), C0-R36 (reset), C0-R37 (app lock), and re-map evidence."
+  - id: P1-12-R4
+    text: "MUST update CHANGELOG.md and VERSION to 0.1.0; tag after owner sign-off recorded in docs/verification/C0-handoff.md 'Acceptance' section with date and name/role."
+  - id: P1-12-R5
+    text: "MUST NOT mark C0 accepted for public distribution if OA-1 (signing) is incomplete; v0.1.0 may still be tagged as an unsigned pre-release with that stated. v0.1.0 is a tester pre-release in any case (ML Kit still present); CHANGELOG states this."
+  - id: P1-12-R6
+    text: "MUST add ReleasedSchemaUpgradeTest (SQLCipher factory) that opens a database fixture created at the v0.1.0 schema and upgrades through all migrations to the current version, asserting row counts and that the READY-invariant triggers survive; every later acceptance step (P2-09, P3-08, P4-08, P6-06, P7-06, P8-05) adds its release's fixture to this test."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleRelease"
+    - "./gradlew :app:connectedDebugAndroidTest :vault:connectedDebugAndroidTest (local API 36) + CI API 29/36 runs"
+    - "bash scripts/release-smoke.sh"
+  evidence_required:
+    - "Full matrix table; run URLs; APK fingerprint if signed."
+
+acceptance_criteria:
+  - "Owner signs the handoff; tag exists; release workflow produced artefacts."
+
+docs_to_update:
+  - docs/verification/C0.md, docs/verification/C0-handoff.md, docs/reviews/*, docs/capabilities/C0.md, CHANGELOG.md, README.md
+
+risks: []
+rollback: "Untag."
+tdd:
+  red:
+    - name: ReleasedSchemaUpgradeTest.v0_1_0FixtureUpgradesToCurrentWithRowsAndTriggersIntact
+  green: ["Commit the fixture and the test."]
+  refactor: []

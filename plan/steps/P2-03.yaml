@@ -1,0 +1,91 @@
+id: P2-03
+title: Open-source OCR engine behind the seam (ADR-0003)
+phase: P2
+status: todo
+depends_on: [P2-02, P0-02, P1-03]
+estimate: L
+owner: agent
+closes_findings: [F-09, F-40]
+
+summary: >
+  Add a fully open-source, telemetry-free OCR engine implementation
+  (tesseract4android with a vendored, pinned English fast model) as a second
+  OcrEngine in the registry, selectable by configuration, without removing
+  ML Kit yet. Write ADR-0003.
+
+rationale: >
+  P1 forbids telemetry SDKs and P6 requires auditable components. ML Kit's
+  bundled artefact carries Google's datatransport stack and closed-source
+  models, blocks F-Droid inclusion, and cannot be audited. The engine seam
+  from C1 exists precisely so this swap does not touch provenance rows.
+
+ethos_check:
+  - "P1/P6: new dependency is Apache-2.0, offline, with no network code paths; the model file is pinned by SHA-256 and its provenance recorded."
+  - "P3: coordinates and confidence semantics are preserved; nullable stays nullable."
+
+requirements:
+  - id: P2-03-R1
+    text: "MUST add cz.adaptech.tesseract4android:tesseract4android-openmp (pinned; verification metadata updated) and vendor tessdata_fast eng.traineddata (Apache-2.0) under vault/src/main/assets/tessdata/ with docs/decisions/0003-ocr-engine.md recording upstream URL, commit/tag, SHA-256, size, and licence."
+  - id: P2-03-R2
+    text: "MUST implement TesseractOcrEngine: copies the asset to a private tessdata dir on first use (verifying SHA-256 before use; refusing on mismatch), sets OEM LSTM only, PSM auto, page iterator at TEXTLINE level producing spans with bounding boxes in the oriented bitmap coordinates mapped through OcrCoordinateMapper, line confidence stored per R6 (never rendered as a percentage), cancellation via TessBaseAPI.stop() from invokeOnCancellation, bitmap recycle after end()."
+  - id: P2-03-R3
+    text: "MUST keep ML Kit registered but not selected by default in this step; selection is a compile-time constant in OpenLifeApp until P2-05 removes ML Kit."
+  - id: P2-03-R4
+    text: "MUST update proguard keep rules for the JNI classes (com.googlecode.tesseract.android.**, com.googlecode.leptonica.android.**), run scripts/check-16kb-alignment.sh on the release APK (16 KB page-size alignment of libtesseract/libleptonica/libjpeg etc.; if the pinned artefact is not aligned, build it from source with the NDK flag -Wl,-z,max-page-size=16384 as a vendored module and record in the ADR), and record APK size per ABI in docs/verification/C1.md."
+  - id: P2-03-R5
+    text: "MUST set the shipped ABI set explicitly (ndk.abiFilters / bundle splits): arm64-v8a, armeabi-v7a, x86_64; x86 dropped; recorded in the ADR. Later native additions (P8-01) must either build for the same set or gate their feature on Build.SUPPORTED_ABIS."
+  - id: P2-03-R6
+    text: "MUST apply the confidence rule to both engines (governing rule, design §4: no displayed percentage without calibration evidence): a value is stored in `confidence` only if P2-04's evaluation shows a monotonic relation between the engine's score buckets and CER (recorded in ocr-eval.md); otherwise null. Tesseract's per-line mean score and ML Kit's float are both subject to this; the UI never renders a percentage, at most 'engine score: high/medium/low' buckets (F-40)."
+  - id: P2-03-R7
+    text: "MUST add the engine's memory and time measurements on the CI emulator for the evaluation fixtures (P2-04 defines them): peak PSS, duration per image."
+
+constraints:
+  - "No runtime download of traineddata; the asset ships in the APK."
+  - "No network permission; the boundary tests stay green."
+
+design_decisions:
+  - "tessdata_fast over tessdata_best: 4x faster on mobile with acceptable accuracy for screenshots and printed receipts; the evaluation gate decides."
+  - "Language: eng only in v0.2.0; adding languages is a per-language decision record (asset size and licence)."
+
+files_touched:
+  - gradle/libs.versions.toml, vault/build.gradle.kts, gradle/verification-metadata.xml
+  - vault/src/main/assets/tessdata/eng.traineddata
+  - vault/src/main/java/org/openlife/vault/ocr/TesseractOcrEngine.kt
+  - vault/src/main/java/org/openlife/vault/ocr/TessdataInstaller.kt (asset copy + SHA-256 verify)
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt (registry)
+  - app/proguard-rules.pro
+  - docs/decisions/0003-ocr-engine.md
+  - vault androidTest TesseractOcrEngineTest, TessdataInstallerTest
+
+tdd:
+  red:
+    - name: TessdataInstallerTest.refusesToUseTraineddataWhoseDigestDoesNotMatch
+    - name: TessdataInstallerTest.installsOnceAndIsIdempotent
+    - name: TesseractOcrEngineTest.extractsSyntheticLatinTextWithLineRegionsInSourcePixels
+    - name: TesseractOcrEngineTest.cancellationStopsRecognitionAndRecyclesAfterCompletion
+    - name: TesseractOcrEngineTest.rotatedInputRegionsMapBack (shares the fixture with P1-03)
+    - name: "OcrEngineContractTest (JVM) extended: both engines satisfy the contract via a fake bridge where possible"
+    - name: DependencyBoundaryTest still passes with the new artefact (no networking coordinates)
+  green:
+    - "Implement engine and installer."
+  refactor:
+    - "Move orientation/bitmap prep shared by both engines into OcrBitmapPreparer."
+
+verification:
+  commands:
+    - "./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest --tests 'org.openlife.vault.ocr.*'"
+    - "./gradlew assembleRelease && ls -l app/build/outputs/apk/release/"
+  evidence_required:
+    - "Tests; APK size; asset digest; ADR."
+
+acceptance_criteria:
+  - "Tesseract engine passes contract tests; asset digest verified; ADR written; ML Kit still present but unselected."
+
+docs_to_update:
+  - docs/decisions/0003-ocr-engine.md (new), docs/decisions/0002 (superseded note)
+  - docs/capabilities/C1.md (engine section)
+  - docs/verification/C1.md (C1-04, C1-07)
+
+risks:
+  - "Tesseract accuracy on photographed receipts may fall below ML Kit; the gate in P2-04 decides, with RapidOCR/ONNX as the recorded fallback."
+rollback: "Unregister the engine; asset removed."

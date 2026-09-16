@@ -1,0 +1,22 @@
+id: P4-06
+title: Device tests for reboot, timezone, DST, permission denial
+phase: P4
+status: todo
+depends_on: [P4-04]
+estimate: M
+owner: agent
+summary: "Turn the C3 platform behaviours into repeatable evidence: scripted emulator runs for reboot rescheduling, timezone change, DST boundary, doze, exact-alarm revocation, and notification-content inspection; plus the physical-device runbook additions."
+requirements:
+  - id: P4-06-R1
+    text: "MUST add scripts/reminder-device-checks.sh: schedules a reminder via a debug-only test intent (never shipped: src/debug), then exercises `adb reboot`, `adb shell service call alarm` / `setprop persist.sys.timezone`, `adb shell cmd deviceidle force-idle`, `adb shell appops set org.openlife SCHEDULE_EXACT_ALARM deny`, and captures `dumpsys alarm | grep org.openlife` and `dumpsys notification` (redaction on) outputs into docs/verification/C3-device.md."
+  - id: P4-06-R2
+    text: "MUST run the script in the API 36 CI leg on main (Slow) and record results; API 29 leg records the pre-33 notification path (no runtime permission)."
+  - id: P4-06-R3
+    text: "MUST extend docs/runbooks/physical-device.md with the OEM background-restriction checks and expected outcomes."
+files_touched: [scripts/reminder-device-checks.sh, app/src/debug (test intent receiver), docs/verification/C3-device.md, docs/runbooks/physical-device.md]
+tdd: {red: ["Script assertions fail until behaviours are implemented (run after P4-04)."], green: ["Record outputs"], refactor: []}
+verification: {commands: ["bash scripts/reminder-device-checks.sh"], evidence_required: ["Transcripts"]}
+acceptance_criteria: ["Every C3 platform row has an artefact."]
+docs_to_update: [docs/verification/C3.md]
+risks: ["Emulator doze behaviour differs from OEMs; disclosed."]
+rollback: "Docs/scripts."

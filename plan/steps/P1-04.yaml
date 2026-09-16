@@ -1,0 +1,67 @@
+id: P1-04
+title: Bounded thumbnail cache and list memory budget
+phase: P1
+status: todo
+depends_on: [P0-07]
+estimate: S
+owner: agent
+closes_findings: [F-06]
+
+summary: >
+  Bound the in-memory thumbnail cache by entry count and bytes, evicting
+  least-recently-used bitmaps, and verify list scrolling at 200 sources stays
+  within a recorded memory budget.
+
+rationale: >
+  SensitiveContentCache is an unbounded map; each thumbnail is roughly
+  160 KB, so a few hundred sources push tens of megabytes and the process
+  toward OOM. Design §12: "no unbounded list thumbnails".
+
+ethos_check:
+  - "No plaintext cache on disk remains the rule; the bound applies to memory only."
+
+requirements:
+  - id: P1-04-R1
+    text: "MUST make SensitiveContentCache LRU with maxEntries=64 and maxBytes=16 MiB (bitmap.allocationByteCount), evicting via the existing onEvict recycle callback; generation semantics unchanged."
+  - id: P1-04-R2
+    text: "MUST keep negative results (null) cached but not counted toward bytes, capped by the same entry limit."
+  - id: P1-04-R3
+    text: "MUST add an instrumented list test with 200 distinct sources scrolling end-to-end asserting no OOM and PSS delta under 60 MB measured via Debug.getPss before/after (recorded, threshold documented)."
+  - id: P1-04-R4
+    text: "MUST decode thumbnails with inPreferredConfig=RGB_565 to halve memory (no alpha needed for thumbnails)."
+  - id: P1-04-R5
+    text: "MUST clear the cache from Application.onTrimMemory for TRIM_MEMORY_UI_HIDDEN and TRIM_MEMORY_RUNNING_LOW (P1-16 extends this to OCR transient text); tested via `adb shell am send-trim-memory org.openlife RUNNING_LOW` in the device script and a JVM policy test."
+
+constraints:
+  - "Keep the class generic and JVM-testable (no android.graphics in the cache itself; size function injected)."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/ui/SensitiveContentCache.kt
+  - app/src/main/java/org/openlife/app/ui/SourceListViewModel.kt
+  - app/src/test/java/org/openlife/app/ui/SensitiveContentCacheTest.kt
+  - app/src/androidTest/java/org/openlife/app/ui/ListMemoryBudgetTest.kt
+
+tdd:
+  red:
+    - name: SensitiveContentCacheTest.evictsLeastRecentlyUsedWhenEntryLimitExceeded
+    - name: SensitiveContentCacheTest.evictsWhenByteBudgetExceeded
+    - name: SensitiveContentCacheTest.getRefreshesRecency
+    - name: ListMemoryBudgetTest.twoHundredSourcesScrollWithinBudget
+  green:
+    - "Implement with LinkedHashMap(accessOrder=true) and a size function."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew :app:test && ./gradlew :app:connectedDebugAndroidTest --tests org.openlife.app.ui.ListMemoryBudgetTest"
+  evidence_required:
+    - "PSS numbers before/after."
+
+acceptance_criteria:
+  - "Cache never exceeds configured limits; list of 200 items scrolls without crash."
+
+docs_to_update:
+  - docs/verification/C0.md (C0-17 list-at-volume leg)
+
+risks: []
+rollback: "Revert to unbounded map."

@@ -1,0 +1,29 @@
+id: P4-07
+title: Agenda and event detail screens with evidence chain
+phase: P4
+status: todo
+depends_on: [P4-03]
+estimate: M
+owner: agent
+summary: "Add an Agenda tab (upcoming events by date, stale and unscheduled states visible) and an Event detail screen that walks the chain: reminder -> event fields -> fact revisions -> spans -> source image region, plus reminder controls."
+requirements:
+  - id: P4-07-R1
+    text: "MUST add bottom navigation with Items (existing list), Agenda, Search; Agenda groups events by date with status chips (Scheduled / Inexact / Suspended: needs review / No notification permission / Fired)."
+  - id: P4-07-R2
+    text: "MUST make the Event detail show each field with origin and a 'Show evidence' action that opens the viewer with the span selected; reminder toggle, time picker (defaults per ADR-0009), 'exact' switch that triggers the permission request at that moment with explanation."
+  - id: P4-07-R3
+    text: "MUST open the detail from a notification tap behind the app lock and clear the notification; a stale event opened from a notification shows the review flow first."
+files_touched: [app navigation, ui/agenda/*, ui/events/EventDetailScreen.kt, tests]
+tdd:
+  red:
+    - name: AgendaScreenTest.groupsByDateAndShowsEveryStatus
+    - name: EventDetailTest.evidenceNavigationOpensViewerWithSpanSelected
+    - name: EventDetailTest.exactSwitchRequestsPermissionAtPointOfUseAndDowngradesOnDenial
+    - name: NotificationTapTest.opensDetailBehindLockAndClearsNotification
+  green: ["Implement."]
+  refactor: []
+verification: {commands: ["./gradlew :app:test && ./gradlew :app:connectedDebugAndroidTest"], evidence_required: ["Tests; accessibility checks"]}
+acceptance_criteria: ["Return from a reminder to the original image region in at most three taps (design §1)."]
+docs_to_update: [docs/capabilities/C3.md]
+risks: []
+rollback: "Hide tabs."

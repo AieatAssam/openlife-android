@@ -1,0 +1,50 @@
+id: P2-05
+title: Engine switch and ML Kit removal
+phase: P2
+status: todo
+depends_on: [P2-04]
+estimate: S
+owner: agent+owner
+owner_action: OA-2
+
+summary: >
+  Select the open-source engine as the only registered engine, remove the
+  ML Kit dependency and its manifest permission removals, drop the
+  dependency-boundary exception, and re-verify the manifest, dependency
+  inventory, and APK footprint.
+
+requirements:
+  - id: P2-05-R1
+    text: "MUST require the recorded owner acknowledgement of ADR-0003 (OA-2) before merging; the PR description links it."
+  - id: P2-05-R2
+    text: "MUST remove com.google.mlkit:text-recognition, MlKitOcrEngine, MlKitOcrEngineTest, the `tools:node=remove` lines for INTERNET/ACCESS_NETWORK_STATE (they must no longer be needed: the boundary test proves the merged manifest has neither without the removal directive), the datatransport exception in DependencyBoundaryTest, and update verification-metadata, SBOM, and licence report."
+  - id: P2-05-R3
+    text: "MUST keep existing OCR revisions readable: engineId 'mlkit-latin' rows remain valid history; the viewer labels them by engine id; no migration is required."
+  - id: P2-05-R4
+    text: "MUST record the new release APK size per ABI and the removed transitive dependency list in docs/verification/C1.md."
+
+tdd:
+  red:
+    - name: DependencyBoundaryTest.noExceptionsRemainInTheDenylistAllowlist (fails while the ML Kit exception exists)
+    - name: ManifestBoundaryTest passes with the tools:node=remove lines deleted
+    - name: OcrRepositoryTest.legacyMlKitRevisionsRemainViewable (seed a row with engineId mlkit-latin)
+  green:
+    - "Remove the dependency and code."
+  refactor:
+    - "Delete Google transport references from comments and docs."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleRelease && ./gradlew :app:cyclonedxBom generateLicenseReport"
+    - "./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+  evidence_required:
+    - "Dependency diff (before/after `dependencies --configuration releaseRuntimeClasspath`), APK sizes, owner acknowledgement link."
+
+acceptance_criteria:
+  - "No Google ML Kit or datatransport coordinate in any configuration; APK smaller; all suites green."
+
+docs_to_update:
+  - docs/decisions/0002-c1-ocr-engine-proposal.md (superseded by 0003), docs/capabilities/C1.md, docs/verification/C1.md, docs/THREAT_MODEL.md, README.md
+
+risks: []
+rollback: "Re-add dependency (verification metadata retains checksums in history)."

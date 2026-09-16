@@ -1,6 +1,6 @@
 # OpenLife threat model
 
-Source of truth: `openlife-design-v0.2.md`, Section 3. This file restates it for
+Source of truth: `openlife-design-v0.3.md`, Section 3. This file restates it for
 implementation and review reference and records the controls actually built for
 Capability 0. Update it in the same change that changes behaviour it describes.
 
@@ -82,4 +82,4 @@ affects the key lifecycle design. Tracked in `docs/decisions/0001-c0-defaults.md
 
 ## References
 
-Numbered references (R1–R9) match Section 16 of `openlife-design-v0.2.md`.
+Numbered references (R1–R9) match Section 16 of `openlife-design-v0.3.md`.

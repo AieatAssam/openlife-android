@@ -1,0 +1,57 @@
+id: P1-11
+title: API-29 CI evidence, physical-device and backup-transfer runbooks
+phase: P1
+status: todo
+depends_on: [P0-04, P0-07, P1-02, P1-07]
+estimate: M
+owner: agent+owner
+
+summary: >
+  Turn the API-29 CI leg into recorded C0 evidence, and write the two
+  runbooks that need a physical device: reboot/backup/device-transfer
+  checks and the baseline performance measurement. Owner executes them
+  (OA-3) and pastes results into docs/verification.
+
+rationale: >
+  The C0 handoff lists API 29, physical device, backup/transfer, and
+  release-build performance as open gates. CI closes API 29; the rest need
+  hardware the sandbox does not have.
+
+requirements:
+  - id: P1-11-R1
+    text: "MUST update docs/verification/C0.md with the API-29 CI run URL and per-suite counts, changing the C0-16 lowest-API leg from gap to pass (or listing exact failures with owning steps)."
+  - id: P1-11-R2
+    text: "MUST write docs/runbooks/physical-device.md: install signed release APK, share/picker imports, reboot persistence, `bmgr` backup attempt (`adb shell bmgr backupnow org.openlife` with a transport; expect exclusion), device-to-device transfer via the OEM tool if available (expect no OpenLife data), `adb backup` refusal, screenshot/recents behaviour, performance timings (prepare 4 MiB cold/warm, reopen) with logcat timestamp method from C0.md, peak PSS; a results table template."
+  - id: P1-11-R3
+    text: "MUST write docs/runbooks/release-performance.md for measuring the release (minified) build on the CI emulator too, so numbers exist even before hardware."
+  - id: P1-11-R4
+    text: "MUST add a `Slow` test annotation and mark tests over 20 s so PR runs stay fast while main runs everything (P0-04 wiring)."
+
+files_touched:
+  - docs/verification/C0.md
+  - docs/runbooks/physical-device.md
+  - docs/runbooks/release-performance.md
+  - app/src/androidTest/java/org/openlife/test/Slow.kt (annotation, shared via a small `testing` source set or duplicated in vault)
+
+tdd:
+  red: []
+  green:
+    - "Documentation and annotation."
+  refactor: []
+
+verification:
+  commands:
+    - "gh run view <api29 run> --json conclusion"
+  evidence_required:
+    - "gh commands need GitHub authentication, which the sandbox may lack; then the run URL is owner/CI evidence pasted by whoever has access."
+    - "Run URLs; runbooks reviewed."
+
+acceptance_criteria:
+  - "C0.md shows API 29 as passed-in-CI with a URL; runbooks are complete enough for the owner to execute without asking questions."
+
+docs_to_update:
+  - docs/verification/C0.md, docs/verification/C0-handoff.md
+
+risks:
+  - "Owner availability; the step's agent part is done when the runbooks and CI evidence are in; the owner part is tracked as OA-3."
+rollback: "Docs only."

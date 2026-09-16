@@ -1,0 +1,473 @@
+# OpenLife production plan — master tracking file.
+#
+# Consumers: coding agents (GPT-5.6 Luna via AGENTS.md, Claude Sonnet 5 via
+# CLAUDE.md) and the owner. This file tracks phases, steps, status, and
+# dependencies. Each step has a companion file under plan/steps/<id>.yaml
+# with the complete TDD-mode implementation brief. Agents edit ONLY the
+# `status`, `started`, `completed`, `evidence`, and `notes` fields here;
+# everything else changes only through a reviewed plan revision.
+#
+# Reading order for a new agent: AGENTS.md (or CLAUDE.md) -> this file ->
+# the step file for the first `todo` step whose depends_on are all `done`.
+
+schema_version: 1
+project: OpenLife
+plan_version: 1.1.0
+plan_date: 2026-09-16   # 1.1.0: design v0.3, ADR-0015 local VLM tier, visual identity (P0-09), phase P10
+plan_author: Claude Fable 5.1 (planning session), reviewed by adversarial subagents
+baseline_commit: 6df9151
+governing_documents:
+  - openlife-design-v0.3.md            # product + engineering design; governs on conflict
+  - docs/PRODUCT_PRINCIPLES.md         # P1..P7 restated
+  - docs/THREAT_MODEL.md
+  - AGENTS.md                          # normative rules + GPT-5.6 Luna workflow
+  - CLAUDE.md                          # sandbox notes + Claude Sonnet 5 workflow
+  - docs/capabilities/C0.md
+  - docs/capabilities/C1.md
+  - docs/design/VISUAL_IDENTITY.md     # interface identity brief (subordinate to the design)
+  - docs/decisions/                    # ADRs; new ADRs are created by steps below
+
+ethos:
+  summary: >
+    Private, on-device memory for information a person deliberately gives it.
+    Provenance before intelligence. User confirms consequences. Small complete
+    capabilities. Open source and auditable. Honest limits. No INTERNET, no
+    telemetry, no cloud, no backup, no export, no background access.
+  non_negotiables:
+    - No INTERNET permission in any shipped variant; no networking, analytics, crash-reporting, or remote-model SDK in the dependency graph.
+    - Only explicit, single-item intake (share grant or system Photo Picker/single-document picker). No broad storage, media, contacts, SMS, notification-listener, or accessibility-service access.
+    - Every extracted or derived value is linked to navigable evidence; user assertions are labelled USER; missing stays missing.
+    - The user confirms records and reminders; imports never trigger external actions; no clipboard, share, browser, calendar, or intent egress of content.
+    - Original bytes are immutable while retained; derived data carries its own version; corrections are attributable revisions.
+    - No plaintext user content in logs, saved instance state, notifications, recents, crash files, caches, or backups.
+    - Destructive recovery is never automatic; migrations are never destructive; vault reset is an explicit, separately confirmed action.
+    - Never claim a test ran or an audit happened when it did not; "gap" is a legitimate status.
+
+conventions:
+  status_values: [todo, in_progress, blocked, review, done, waived]
+  status_rules:
+    - "todo -> in_progress when an agent starts the step (set `started`)."
+    - "in_progress -> review when all acceptance_criteria in the step file are met and verification commands passed; record `evidence` (commit hash, test counts, device)."
+    - "review -> done only by the owner or a reviewing agent that did not implement the step."
+    - "blocked requires a `notes` entry naming the blocking step or owner decision."
+    - "waived requires an owner decision recorded as an ADR under docs/decisions/."
+  estimate_scale:
+    S: "under half a day of agent work"
+    M: "one to two days"
+    L: "three to five days"
+    XL: "more than a week; must be split before starting if it exceeds two weeks"
+  tdd_protocol:
+    - "Boundary or regression tests that already pass on the current tree prove RED by a recorded mutation: add the forbidden thing, watch the test fail, revert; the evidence field names the mutation."
+    - "For instrumented tests, RED must be an assertion failure, not a compile error (a missing symbol breaks the whole test APK): add the minimal stub signature throwing TODO() first so the suite compiles, then assert. Run one class with ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=<fqcn>."
+    - "RED: write the tests named in the step file's tdd.red list first; run them; confirm they fail for the intended reason (compile error or assertion), never because of a typo."
+    - "GREEN: write the smallest implementation that makes them pass without weakening validation, recovery, or evidence."
+    - "REFACTOR: remove duplication and stale comments; keep behaviour; re-run the affected suites."
+    - "VERIFY: run every command in the step file's verification.commands; paste real results into `evidence`."
+    - "DOCUMENT: update the docs listed in docs_to_update in the same change; never leave the spec behind the code."
+    - "Do not mark a step done with a skipped required test; record it as a gap in docs/verification/ and set status to review with a note."
+  branch_and_commit:
+    - "One branch per step: plan/<step-id>-<slug>. Commits on that branch at each TDD phase (RED, GREEN, REFACTOR) are expected and need no further permission; each commit builds and passes the JVM suites. Pushing, merging to main, tagging, and any force-push require the owner."
+    - "Commit message subject: '<step-id>: <imperative summary>'. Body lists tests added and docs updated."
+  schema_migrations:
+    - "Room schema versions are assigned at merge time, not in the step file: the merging step takes (current @Database version + 1), names its Migration accordingly, exports the schema JSON, copies it to vault/src/androidTest/assets, and adds a migration test from the previous version. Step files that say 'next schema version' mean exactly this."
+    - "Every migration is additive (CREATE TABLE / ADD COLUMN / CREATE INDEX / triggers). Dropping or rewriting a table requires an ADR and a data-preserving copy strategy tested on SQLCipher."
+    - "Two steps that both add a migration cannot be merged in the same window without one rebasing onto the other; a migration PR must not merge while another migration PR is open; the second to merge renumbers. Step files never hardcode a version number."
+    - "Upgrade-path tests: from P1-12 on, every release keeps its schema JSON, and a test upgrades a database created at each released version through all migrations to the current one (SQLCipher factory), asserting row counts and READY triggers survive."
+  native_libraries:
+    - "Every shipped .so (SQLCipher, and later Tesseract/llama) must be 16 KB page-size aligned (Android 15+ requirement for targetSdk 35+; Play requires it). scripts/check-16kb-alignment.sh (P0-06) inspects the release APK's libs with the SDK's `check_elf_alignment` logic and fails CI on misalignment; the CI API-36 leg additionally runs on a 16 KB page-size emulator image when available."
+  environment_notes:
+    - "Emulator launch command, resource limits, and known flakes are in CLAUDE.md. Re-run a connectedAndroidTest that fails with DeadSystemException or 'Can't find service' before blaming the code."
+    - "No physical device exists in the sandbox. Steps that need one are marked owner_action and produce a runbook the owner executes."
+
+release_train:
+  - id: v0.1.0
+    name: Trusted Core hardened
+    contains: [P0, P1]
+    gate: "C0 acceptance refreshed (P1-12); API-29 CI leg green; every finding whose step is in P0/P1 closed; P2-owned findings listed as known limitations in CHANGELOG 0.1.0. v0.1.0 is a signed pre-release for testers only; real-user distribution begins at v0.2.0 once ML Kit is removed."
+  - id: v0.2.0
+    name: Text provenance complete
+    contains: [P2]
+    gate: "C1 acceptance (P2-09) with the open-source OCR engine and ML Kit removed. First release suitable for real users."
+  - id: v0.3.0
+    name: Typed facts
+    contains: [P3]
+    gate: "C2 acceptance (P3-08)."
+  - id: v1.0.0
+    name: First useful release (C0-C3)
+    contains: [P4, P5]
+    gate: "C3 acceptance (P4-08), release readiness (P5-01..P5-04) and owner sign-off."
+  - id: v1.1.0
+    name: Receipt to return/warranty (C4-C7)
+    contains: [P6]
+    gate: "P6-06."
+  - id: v1.2.0
+    name: Optional local vision-model OCR tier (C1b)
+    contains: [P10]
+    gate: "P10-03."
+  - id: v2.0.0
+    name: Documents and communications (C8-C10)
+    contains: [P7]
+    gate: "P7-06."
+  - id: v3.0.0
+    name: Local understanding and grounded recall (C11-C12)
+    contains: [P8]
+    gate: "P8-05."
+
+decisions_made_by_this_plan:
+  # Calls the plan makes so no decision is left hanging. Each becomes an ADR
+  # written by the named step; the ADR records the reasoning below verbatim
+  # plus any environment facts discovered while implementing.
+  - id: ADR-0003
+    title: Replace ML Kit with an open-source, telemetry-free OCR engine before v0.2.0
+    call: >
+      Adopt tesseract4android (cz.adaptech.tesseract4android:tesseract4android-openmp,
+      Apache-2.0) with the tessdata_fast `eng.traineddata` model vendored into
+      vault/src/main/assets and pinned by SHA-256, behind the existing OcrEngine
+      seam. ML Kit is removed once the evaluation gate in P2-04 passes.
+      Fallback if the gate fails: RapidOCR ONNX models (Apache-2.0) via
+      onnxruntime-android (MIT). Both are fully offline and open source.
+    why: >
+      P1 forbids any telemetry SDK; the bundled ML Kit artefact ships a
+      datatransport/telemetry stack that is only inert because INTERNET is
+      stripped. P6 requires auditable, open-source components; ML Kit is
+      closed-source and its terms block F-Droid distribution. This reverses
+      decision 0002's engine choice while keeping every C1 boundary it set.
+    owner_visibility: "Reversal of an owner-approved engine choice; the ADR must be acknowledged by the owner before P2-05 removes ML Kit."
+    written_by: P2-03
+  - id: ADR-0004
+    title: App lock is an optional BiometricPrompt gate, not authentication-bound keys, for v1.0
+    call: >
+      Add an opt-in app lock using androidx.biometric BiometricPrompt with
+      BIOMETRIC_STRONG or DEVICE_CREDENTIAL, a configurable re-lock timeout
+      (default: immediately on background), enforced on every content-bearing
+      screen and on notification taps. Keystore keys stay non-auth-bound in
+      v1.0. Copy states plainly that the lock is an access gate against an
+      already-unlocked phone and does not add cryptographic protection.
+    why: >
+      Auth-bound keys risk permanent vault loss on credential changes and
+      complicate reminder delivery paths (P7). A gate resolves the open
+      design question in §3 without changing key lifecycle. Revisit
+      auth-bound keys only with a tested key-migration path.
+    written_by: P1-07
+  - id: ADR-0005
+    title: Vault-unavailable recovery UX and explicit Reset vault
+    call: >
+      Distinguish 'temporarily unavailable' (retry, reboot advice) from
+      'unrecoverable' (wrapper cannot unwrap, key missing) in the UI. Provide
+      Settings > Reset vault with a two-step confirmation that names the
+      permanent-loss consequence and deletes all app-owned files and the
+      Keystore alias. Reset is never offered as the primary error action.
+    written_by: P1-06
+  - id: ADR-0006
+    title: UI foundation
+    call: >
+      Material 3 with light/dark themes and a FIXED OpenLife palette (dynamic
+      colour OFF; amended 2026-09-16 by docs/design/VISUAL_IDENTITY.md so the
+      app is recognisable rather than recoloured per device), edge-to-edge via
+      enableEdgeToEdge with inset-aware scaffolds, predictive back with
+      BackHandler, Navigation Compose with type-safe routes, all user-visible
+      text in string resources, bundled OFL typefaces (IBM Plex Sans/Mono,
+      Fraunces), the folded-corner keyhole mark as adaptive icon, Android 12+
+      splash screen API. No third-party UI libraries.
+    written_by: P0-07
+  - id: ADR-0007
+    title: Release engineering
+    call: >
+      JDK 21 everywhere (CI and docs). Gradle dependency verification
+      (sha256 + pgp where available) enforced in CI. CycloneDX SBOM and a
+      licence report produced per release. detekt with formatting rules as
+      the single static-analysis tool. R8 minify + resource shrinking on
+      release with explicit keep rules and a release-variant instrumented
+      smoke run. Release signing from CI secrets; upload key generated by the
+      owner via runbook. Distribution order: GitHub Releases (signed APK),
+      then F-Droid (after ML Kit removal), Google Play optional after v1.0.
+      Versioning: semver versionName; versionCode = major*10000 + minor*100 + patch.
+      Play (optional, after v1.0) implies Play App Signing: a Play install shows Google's
+      distribution certificate, so the About/README fingerprint copy states that the
+      upload-key fingerprint applies to GitHub and F-Droid builds only.
+    written_by: P0-02, P0-03, P0-04, P0-05, P0-06
+  - id: ADR-0008
+    title: Conservative interpretation rules for typed facts
+    call: >
+      Dates with two plausible day/month readings produce a CLARIFICATION_NEEDED
+      fact with both candidates; the device locale is a display hint only.
+      Date-only values are stored as ISO local dates, never instants. Times
+      are stored as local times; a timezone is attached only when confirmed.
+      Money is stored as a decimal string plus an ISO-4217 code that is null
+      unless the source shows an unambiguous code or a symbol that maps to a
+      single currency in the source's evidenced context. URLs, emails, and
+      phone numbers are stored as text and rendered inert (no link, no copy).
+    written_by: P3-01
+  - id: ADR-0009
+    title: Reminder scheduling mechanism
+    call: >
+      AlarmManager.setAndAllowWhileIdle windowed alarms by default; exact
+      alarms only if the user grants SCHEDULE_EXACT_ALARM at the point of
+      enabling 'exact' on a reminder. RECEIVE_BOOT_COMPLETED receiver
+      reschedules from the database. TIMEZONE_CHANGED and TIME_SET trigger
+      recomputation. POST_NOTIFICATIONS requested when the first reminder is
+      enabled; denial leaves the event confirmed and visibly unscheduled.
+      Notification content is generic and opens the detail screen behind the
+      app lock. No WorkManager, no foreground service, no calendar writes.
+    written_by: P4-01
+  - id: ADR-0010
+    title: Local text search
+    call: >
+      SQLite FTS5 external-content tables over OCR span text, corrections,
+      fact values, and record titles, inside the SQLCipher database. If the
+      pinned SQLCipher build lacks FTS5 (checked by a test), fall back to a
+      trigram LIKE index. Search results always link to source and span.
+    written_by: P2-08
+  - id: ADR-0011
+    title: PDF rendering (C9)
+    call: >
+      Platform android.graphics.pdf.PdfRenderer only; pages rendered to
+      bounded bitmaps; text obtained by the OCR pipeline per page so evidence
+      coordinates are page pixels on every supported API; 32 MiB and 50-page
+      limits; no JavaScript, attachments, or external resource loading is
+      possible because no PDF viewer engine is embedded.
+    written_by: P7-02
+  - id: ADR-0012
+    title: Communication safety assessment (C10)
+    call: >
+      Rule-based indicator detection versioned in the repository (urgency
+      phrasing, credential or payment requests, link text vs. visible URL
+      mismatch, sender-label inconsistencies). States per design §6. Never
+      claims sender verification or live reputation checks.
+    written_by: P7-03
+  - id: ADR-0013
+    title: Local model runtime (C11/C12)
+    call: >
+      llama.cpp via a pinned JNI build with a Qwen2.5-1.5B-Instruct GGUF Q4
+      model (Apache-2.0) imported explicitly by the user through the system
+      single-document picker and accepted only if its SHA-256 matches the
+      allowlist in the repository. No bundled download, no cloud fallback.
+      The feature is optional and off until a model is imported.
+    written_by: P8-01
+  - id: ADR-0015
+    title: Local vision-language models as an optional, grounded OCR tier
+    call: >
+      Written already as docs/decisions/0015-local-vision-model-ocr-tier.md
+      (owner agreed in principle 2026-09-16). Tesseract stays the baseline;
+      a user-imported, OSI-licensed VLM (candidates: Qwen3-VL-2B, dots.ocr,
+      PaddleOCR-VL, DeepSeek-OCR; LFM2.5-VL and MiniCPM excluded on licence)
+      runs in-process on the llama.cpp runtime; every line must be grounded
+      either by model boxes or by alignment to Tesseract line boxes; enabled
+      only after beating Tesseract on the evaluation set within a device
+      budget. Phase P10, release v1.2.0.
+    written_by: P10-01
+  - id: ADR-0014
+    title: Document expiry scope (C8)
+    call: >
+      One document type: a 'user-declared expiring document'. The user picks a
+      category label (passport, ID card, licence, insurance, membership,
+      other) as a USER fact; extraction proposes only the expiry date fact
+      with evidence. No identity-field extraction.
+    written_by: P7-01
+
+phases:
+  - id: P0
+    title: Engineering foundation
+    goal: >
+      Make the repository releasable: verified dependencies, SBOM, static
+      analysis, a CI matrix that covers minSdk, real signing and versioning,
+      R8, and a production UI foundation (theme, navigation, strings, icon).
+    exit_gate: "All P0 steps done; CI green on API 29 and API 36; release APK builds minified and signed from CI secrets."
+    steps:
+      - {id: P0-01, title: Plan conventions and status tooling, file: steps/P0-01.yaml, status: todo, depends_on: [], estimate: S, owner: agent}
+      - {id: P0-02, title: Dependency verification, SBOM, licence report, file: steps/P0-02.yaml, status: todo, depends_on: [P0-01], estimate: M, owner: agent}
+      - {id: P0-03, title: Static analysis and lint policy, file: steps/P0-03.yaml, status: todo, depends_on: [P0-01], estimate: M, owner: agent}
+      - {id: P0-04, title: CI matrix with API 29 and API 36 legs, file: steps/P0-04.yaml, status: todo, depends_on: [P0-02, P0-03], estimate: M, owner: agent}
+      - {id: P0-05, title: Release signing, versioning, changelog, F-Droid metadata skeleton, file: steps/P0-05.yaml, status: todo, depends_on: [P0-04], estimate: M, owner: agent+owner}
+      - {id: P0-06, title: R8 minification and release-variant smoke, file: steps/P0-06.yaml, status: todo, depends_on: [P0-05], estimate: M, owner: agent}
+      - {id: P0-07, title: UI foundation (theme, edge-to-edge, navigation, strings, icon, splash), file: steps/P0-07.yaml, status: todo, depends_on: [P0-03], estimate: L, owner: agent}
+      - {id: P0-08, title: Documentation hygiene and public-repo files, file: steps/P0-08.yaml, status: todo, depends_on: [P0-01], estimate: S, owner: agent}
+      - {id: P0-09, title: Visual identity assets and brand components, file: steps/P0-09.yaml, status: todo, depends_on: [P0-07], estimate: M, owner: agent}
+  - id: P1
+    title: C0 hardening
+    goal: >
+      Close every defect and gap found in the review of the C0 implementation
+      and settle the open C0 decisions (app lock, vault reset) so C0 can be
+      accepted for the v0.1.0 tester pre-release.
+    exit_gate: "P1-12 done: C0 verification matrix has no 'partial' row that is closable in CI, and remaining gaps are owner-actioned physical-device items."
+    steps:
+      - {id: P1-01, title: Abandoned stage cleanup on intake teardown and foreground recovery, file: steps/P1-01.yaml, status: todo, depends_on: [P0-07, P1-15], estimate: M, owner: agent}
+      - {id: P1-02, title: Photo Picker route hardening and single-document fallback, file: steps/P1-02.yaml, status: todo, depends_on: [P0-07, P1-13], estimate: M, owner: agent}
+      - {id: P1-03, title: Display orientation from EXIF, file: steps/P1-03.yaml, status: todo, depends_on: [P0-07], estimate: M, owner: agent}
+      - {id: P1-04, title: Bounded thumbnail cache and list memory budget, file: steps/P1-04.yaml, status: todo, depends_on: [P0-07], estimate: S, owner: agent}
+      - {id: P1-05, title: Storage-space precheck and storage-unavailable handling, file: steps/P1-05.yaml, status: todo, depends_on: [P0-07], estimate: M, owner: agent}
+      - {id: P1-06, title: Vault-unavailable UX and explicit Reset vault (ADR-0005), file: steps/P1-06.yaml, status: todo, depends_on: [P0-07], estimate: M, owner: agent}
+      - {id: P1-07, title: Optional app lock (ADR-0004), file: steps/P1-07.yaml, status: todo, depends_on: [P0-07, P1-06], estimate: L, owner: agent}
+      - {id: P1-08, title: Settings and About screens, file: steps/P1-08.yaml, status: todo, depends_on: [P1-06, P1-07, P0-02], estimate: M, owner: agent}
+      - {id: P1-09, title: Repository and crypto hardening, file: steps/P1-09.yaml, status: todo, depends_on: [P0-03], estimate: M, owner: agent}
+      - {id: P1-10, title: Accessibility automation and TalkBack runbook, file: steps/P1-10.yaml, status: todo, depends_on: [P0-07, P1-08], estimate: M, owner: agent}
+      - {id: P1-11, title: API-29 CI evidence, physical-device and backup-transfer runbooks, file: steps/P1-11.yaml, status: todo, depends_on: [P0-04, P0-07, P1-02, P1-07], estimate: M, owner: agent+owner}
+      - {id: P1-13, title: Threading and lifecycle correctness, file: steps/P1-13.yaml, status: todo, depends_on: [P0-07, P0-03, P1-09], estimate: L, owner: agent}
+      - {id: P1-14, title: Bootstrap and recovery robustness, file: steps/P1-14.yaml, status: todo, depends_on: [P1-06, P1-13], estimate: M, owner: agent}
+      - {id: P1-16, title: Adaptive layout, multi-window, and low-memory behaviour, file: steps/P1-16.yaml, status: todo, depends_on: [P0-07, P1-13, P1-04], estimate: M, owner: agent}
+      - {id: P1-15, title: Read leases versus mutations, transactional deletion, verified duplicates, file: steps/P1-15.yaml, status: todo, depends_on: [P1-09], estimate: M, owner: agent}
+      - {id: P1-12, title: C0 acceptance refresh and v0.1.0, file: steps/P1-12.yaml, status: todo, depends_on: [P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08, P1-09, P1-10, P1-11, P1-13, P1-14, P1-15, P1-16, P0-06, P0-08], estimate: M, owner: agent+owner}
+  - id: P2
+    title: C1 completion (text provenance)
+    goal: >
+      Make OCR results durable and reviewable in the UI, replace the
+      closed-source engine with an open-source one that passes a measured
+      evaluation gate, add local search, and accept C1.
+    exit_gate: "P2-09 done."
+    steps:
+      - {id: P2-01, title: Persisted OCR state in the viewer, file: steps/P2-01.yaml, status: todo, depends_on: [P0-07, P2-02], estimate: M, owner: agent}
+      - {id: P2-02, title: OCR engine lifecycle, cancellation, and memory hygiene, file: steps/P2-02.yaml, status: todo, depends_on: [P1-09], estimate: M, owner: agent}
+      - {id: P2-03, title: Open-source OCR engine behind the seam (ADR-0003), file: steps/P2-03.yaml, status: todo, depends_on: [P2-02, P0-02, P1-03], estimate: L, owner: agent}
+      - {id: P2-04, title: OCR evaluation set and gate, file: steps/P2-04.yaml, status: todo, depends_on: [P2-03], estimate: M, owner: agent}
+      - {id: P2-05, title: Engine switch and ML Kit removal, file: steps/P2-05.yaml, status: todo, depends_on: [P2-04], estimate: S, owner: agent+owner}
+      - {id: P2-06, title: Evidence viewer UX, file: steps/P2-06.yaml, status: todo, depends_on: [P2-01, P1-03], estimate: L, owner: agent}
+      - {id: P2-07, title: Communication assessment state scaffold, file: steps/P2-07.yaml, status: todo, depends_on: [P2-01], estimate: S, owner: agent}
+      - {id: P2-08, title: Local text search (ADR-0010), file: steps/P2-08.yaml, status: todo, depends_on: [P2-01], estimate: M, owner: agent}
+      - {id: P2-09, title: C1 acceptance and v0.2.0, file: steps/P2-09.yaml, status: todo, depends_on: [P2-05, P2-06, P2-07, P2-08, P1-12], estimate: M, owner: agent+owner}
+  - id: P3
+    title: C2 typed facts
+    goal: "Dates, times, money, URLs, emails and phone numbers with evidence, uncertainty, review, and conservative interpretation."
+    exit_gate: "P3-08 done."
+    steps:
+      - {id: P3-01, title: C2 specification and ADR-0008, file: steps/P3-01.yaml, status: todo, depends_on: [P2-09], estimate: M, owner: agent+owner}
+      - {id: P3-02, title: Fact model, schema, migration, cascade, file: steps/P3-02.yaml, status: todo, depends_on: [P3-01], estimate: M, owner: agent}
+      - {id: P3-03, title: Typed extractors (pure Kotlin, versioned rules), file: steps/P3-03.yaml, status: todo, depends_on: [P3-01], estimate: L, owner: agent}
+      - {id: P3-04, title: Extraction pipeline from OCR revisions with evidence links and staleness, file: steps/P3-04.yaml, status: todo, depends_on: [P3-02, P3-03], estimate: M, owner: agent}
+      - {id: P3-05, title: Facts UI with origin badges, review, user-provided facts, inert values, file: steps/P3-05.yaml, status: todo, depends_on: [P3-04], estimate: L, owner: agent}
+      - {id: P3-06, title: Facts evaluation set and metrics, file: steps/P3-06.yaml, status: todo, depends_on: [P3-04], estimate: M, owner: agent}
+      - {id: P3-07, title: Facts in local search, file: steps/P3-07.yaml, status: todo, depends_on: [P3-04, P2-08], estimate: S, owner: agent}
+      - {id: P3-08, title: C2 acceptance and v0.3.0, file: steps/P3-08.yaml, status: todo, depends_on: [P3-05, P3-06, P3-07], estimate: M, owner: agent+owner}
+  - id: P4
+    title: C3 event and reminder
+    goal: "One reviewed event with source-linked title, date, optional time, and one local reminder that survives reboot and timezone changes."
+    exit_gate: "P4-08 done."
+    steps:
+      - {id: P4-01, title: C3 specification and ADR-0009, file: steps/P4-01.yaml, status: todo, depends_on: [P3-08], estimate: M, owner: agent+owner}
+      - {id: P4-02, title: Record and action schema with dependency edges and staleness, file: steps/P4-02.yaml, status: todo, depends_on: [P4-01], estimate: M, owner: agent}
+      - {id: P4-03, title: Event proposal and confirmation UI with communication gate, file: steps/P4-03.yaml, status: todo, depends_on: [P4-02, P2-07], estimate: L, owner: agent}
+      - {id: P4-04, title: Reminder scheduling, notifications, permissions, reboot and timezone handling, file: steps/P4-04.yaml, status: todo, depends_on: [P4-02], estimate: L, owner: agent}
+      - {id: P4-05, title: Stale propagation and deletion cascade for records and actions, file: steps/P4-05.yaml, status: todo, depends_on: [P4-03, P4-04], estimate: M, owner: agent}
+      - {id: P4-06, title: Device tests for reboot, timezone, DST, permission denial, file: steps/P4-06.yaml, status: todo, depends_on: [P4-04], estimate: M, owner: agent}
+      - {id: P4-07, title: Agenda and event detail screens with evidence chain, file: steps/P4-07.yaml, status: todo, depends_on: [P4-03], estimate: M, owner: agent}
+      - {id: P4-08, title: C3 acceptance, file: steps/P4-08.yaml, status: todo, depends_on: [P4-05, P4-06, P4-07], estimate: M, owner: agent+owner}
+  - id: P5
+    title: Release v1.0.0 (first useful release)
+    goal: "Ship C0-C3 to real users with honest public documentation and independent review."
+    exit_gate: "v1.0.0 tag published; F-Droid submission filed."
+    steps:
+      - {id: P5-01, title: Release readiness package, file: steps/P5-01.yaml, status: todo, depends_on: [P4-08], estimate: M, owner: agent}
+      - {id: P5-02, title: Independent security review request and triage, file: steps/P5-02.yaml, status: todo, depends_on: [P5-01], estimate: M, owner: agent+owner}
+      - {id: P5-03, title: Reproducible build verification, file: steps/P5-03.yaml, status: todo, depends_on: [P0-06, P5-01], estimate: M, owner: agent}
+      - {id: P5-04, title: Beta on physical devices and exit criteria, file: steps/P5-04.yaml, status: todo, depends_on: [P5-01, P5-03], estimate: L, owner: owner+agent}
+      - {id: P5-05, title: v1.0.0 tag, GitHub Release, F-Droid submission, file: steps/P5-05.yaml, status: todo, depends_on: [P5-02, P5-04], estimate: S, owner: agent+owner}
+  - id: P6
+    title: Receipt path (C4-C7)
+    goal: "Receipt -> purchase -> purchased item -> explicitly evidenced return or warranty deadline."
+    exit_gate: "P6-06 done; v1.1.0 released."
+    steps:
+      - {id: P6-01, title: C4 purchase specification and schema, file: steps/P6-01.yaml, status: todo, depends_on: [P4-08, P5-02], estimate: M, owner: agent+owner}
+      - {id: P6-02, title: C4 purchase proposals and UI, file: steps/P6-02.yaml, status: todo, depends_on: [P6-01], estimate: L, owner: agent}
+      - {id: P6-03, title: C5 purchased item, file: steps/P6-03.yaml, status: todo, depends_on: [P6-02], estimate: M, owner: agent}
+      - {id: P6-04, title: C6 return deadline with reviewed counting rules, file: steps/P6-04.yaml, status: todo, depends_on: [P6-03], estimate: L, owner: agent}
+      - {id: P6-05, title: C7 warranty coverage, file: steps/P6-05.yaml, status: todo, depends_on: [P6-03], estimate: M, owner: agent}
+      - {id: P6-06, title: Receipt-path evaluation, acceptance, v1.1.0, file: steps/P6-06.yaml, status: todo, depends_on: [P6-04, P6-05], estimate: M, owner: agent+owner}
+  - id: P7
+    title: Documents and communications (C8-C10)
+    goal: "Expiring documents, bounded PDFs, and communication safety assessment."
+    exit_gate: "P7-04 done; v2.0.0 released."
+    steps:
+      - {id: P7-01, title: C8 document expiry (ADR-0014), file: steps/P7-01.yaml, status: todo, depends_on: [P6-06], estimate: L, owner: agent}
+      - {id: P7-02, title: C9 bounded PDF import (ADR-0011), file: steps/P7-02.yaml, status: todo, depends_on: [P6-06], estimate: L, owner: agent}
+      - {id: P7-03, title: C10 specification and assessment model (ADR-0012), file: steps/P7-03.yaml, status: todo, depends_on: [P6-06], estimate: L, owner: agent}
+      - {id: P7-04, title: C10 indicator rules and evaluation, file: steps/P7-04.yaml, status: todo, depends_on: [P7-03], estimate: L, owner: agent}
+      - {id: P7-05, title: C10 assessment UI and proposal gates, file: steps/P7-05.yaml, status: todo, depends_on: [P7-04, P7-02], estimate: M, owner: agent}
+      - {id: P7-06, title: C8-C10 acceptance and v2.0.0, file: steps/P7-06.yaml, status: todo, depends_on: [P7-01, P7-02, P7-05], estimate: M, owner: agent+owner}
+  - id: P8
+    title: Local understanding and grounded recall (C11-C12)
+    goal: "Optional on-device semantic proposals and cited local answers."
+    exit_gate: "P8-04 done; v3.0.0 released."
+    steps:
+      - {id: P8-01, title: Local model runtime and explicit artefact import (ADR-0013), file: steps/P8-01.yaml, status: todo, depends_on: [P5-05], estimate: L, owner: agent+owner}
+      - {id: P8-02, title: C11 specification and proposal validator, file: steps/P8-02.yaml, status: todo, depends_on: [P8-01], estimate: L, owner: agent}
+      - {id: P8-03, title: C11 evaluation gate and enablement, file: steps/P8-03.yaml, status: todo, depends_on: [P8-02], estimate: L, owner: agent}
+      - {id: P8-04, title: C12 grounded recall, file: steps/P8-04.yaml, status: todo, depends_on: [P8-01, P3-07, P8-03], estimate: L, owner: agent}
+      - {id: P8-05, title: Acceptance and v3.0.0, file: steps/P8-05.yaml, status: todo, depends_on: [P8-03, P8-04], estimate: M, owner: agent+owner}
+  - id: P10
+    title: Local vision-model OCR tier (C1b, ADR-0015)
+    goal: "An optional, user-imported, OSI-licensed vision-language model improves OCR text quality with every line grounded; enabled only when it measurably beats the baseline within the device budget."
+    exit_gate: "P10-03 done; v1.2.0 released."
+    steps:
+      - {id: P10-01, title: Candidate evaluation on device and allowlist (ADR-0015), file: steps/P10-01.yaml, status: todo, depends_on: [P8-01, P2-04, P6-06], estimate: L, owner: agent+owner}
+      - {id: P10-02, title: Grounded VLM OCR engine (hybrid alignment) behind the seam, file: steps/P10-02.yaml, status: todo, depends_on: [P10-01], estimate: L, owner: agent}
+      - {id: P10-03, title: C1b acceptance and v1.2.0, file: steps/P10-03.yaml, status: todo, depends_on: [P10-02], estimate: M, owner: agent+owner}
+  - id: P9
+    title: Sustainment
+    goal: "Keep the app trustworthy after release without telemetry."
+    exit_gate: "Policy documents merged and first quarterly review executed."
+    steps:
+      - {id: P9-01, title: Update, review, and incident policies, file: steps/P9-01.yaml, status: todo, depends_on: [P5-05], estimate: S, owner: agent+owner}
+      - {id: P9-02, title: Wrapping-key rotation procedure, file: steps/P9-02.yaml, status: todo, depends_on: [P5-05], estimate: M, owner: agent}
+
+owner_actions_required:
+  # Things only the owner can do. Each is referenced from a step.
+  - {id: OA-1, text: "Generate the release upload keystore per docs/runbooks/signing.md and add it to CI secrets.", step: P0-05}
+  - {id: OA-2, text: "Acknowledge ADR-0003 (OCR engine replacement) before ML Kit is removed.", step: P2-05}
+  - {id: OA-3, text: "Provide at least one physical Android device on API 29-31 and one on the current API for the runbooks in P1-11 and P5-04.", step: P1-11}
+  - {id: OA-4, text: "Approve each capability specification (C2..C12) before its implementation steps begin (design §5).", step: "P3-01, P4-01, P6-01, P7-01, P7-02, P7-03, P8-01, P8-02, P10-01"}
+  - {id: OA-5, text: "Commission or request an independent security review before v1.0.0.", step: P5-02}
+  - {id: OA-6, text: "File the F-Droid inclusion request and, optionally, the Play listing.", step: P5-05}
+
+review_findings_index:
+  # Findings from the planning-session review of the current implementation
+  # (commit 6df9151). Each is closed by the named step. Adversarial subagent
+  # findings are appended under the same scheme by P0-01 if they arrive later.
+  - {id: F-01, severity: high, text: "Abandoned STAGED rows/files persist until next process start; IntakeActivity is noHistory and IntakeViewModel.onCleared never cancels the stage.", step: P1-01}
+  - {id: F-02, severity: medium, text: "MainActivity calls contentResolver.getType on the main thread in the Photo Picker callback (same ANR class as the fixed intake bug).", step: P1-02}
+  - {id: F-03, severity: high, text: "No BackHandler: back from the viewer exits the app on predictive-back targets.", step: P0-07}
+  - {id: F-04, severity: high, text: "OCR results are in-memory only; persisted revisions, corrections, and review state are never reloaded after process restart.", step: P2-01}
+  - {id: F-05, severity: high, text: "MlKitOcrEngine does not cancel the recognizer task on coroutine cancellation and recycles the bitmap while the task may still run.", step: P2-02}
+  - {id: F-06, severity: medium, text: "Thumbnail cache is unbounded; memory grows with list size.", step: P1-04}
+  - {id: F-07, severity: medium, text: "EXIF orientation is never read; camera photos display rotated and OCR regions map wrongly.", step: P1-03}
+  - {id: F-08, severity: high, text: "No Reset vault action; VaultUnavailable state has no path forward (design §10).", step: P1-06}
+  - {id: F-09, severity: high, text: "ML Kit bundles a telemetry transport SDK; violates P1 wording and blocks F-Droid.", step: P2-03}
+  - {id: F-10, severity: high, text: "Release build is unminified and debug-signed; no dependency verification metadata; no SBOM; no licence report.", step: "P0-02, P0-05, P0-06"}
+  - {id: F-11, severity: medium, text: "All UI strings hardcoded; default system icon; no dark theme; edge-to-edge not handled on targetSdk 37.", step: P0-07}
+  - {id: F-12, severity: low, text: "SourceViewRepository has a default MutationQueue() parameter that silently breaks read/mutation serialisation if used.", step: P1-09}
+  - {id: F-13, severity: medium, text: "ArtefactAuthenticator reads the whole artefact file before any length bound is applied.", step: P1-09}
+  - {id: F-14, severity: medium, text: "Provider-read deadline closes the stream from another thread; design says cooperative cancellation. Needs an explicit, tested decision.", step: P1-09}
+  - {id: F-15, severity: medium, text: "No storage-space precheck; full-disk behaviour untested (design §13 C0-10).", step: P1-05}
+  - {id: F-16, severity: medium, text: "App lock decision still open; design requires it settled before real-user distribution.", step: P1-07}
+  - {id: F-17, severity: medium, text: "Communication assessment state required from C1 onward (design §6) is absent.", step: P2-07}
+  - {id: F-18, severity: low, text: "Stale 'Stage N' comments and placeholder wording in manifest, Vault.kt, SourceDao.", step: P0-08}
+  - {id: F-19, severity: medium, text: "CI never runs minSdk 29; local sandbox cannot; a CI emulator can.", step: P0-04}
+  - {id: F-20, severity: medium, text: "No Settings/About surface for licences, security level, version, or privacy explanation (P6, P7).", step: P1-08}
+  - {id: F-21, severity: low, text: "Plaintext OCR input bytes (up to 16 MiB) are not zeroed after use.", step: P2-02}
+  - {id: F-22, severity: medium, text: "No local search although design permits it from C1.", step: P2-08}
+  # --- Findings from the adversarial code-audit subagent (2026-09-16), verified against the tree ---
+  - {id: F-23, severity: high, text: "Save, cancel, delete, viewer/preview loads, and OCR run execute file I/O, AES-GCM, SHA-256 and bitmap decodes on Dispatchers.Main (viewModelScope / produceState / remember); only prepareImport and thumbnails leave Main.", step: P1-13}
+  - {id: F-24, severity: high, text: "OpenLifeApp.vault() has no try/catch around database creation and recovery; a corrupt database, wrong key, or downgrade crashes the app at startup instead of yielding VaultUnavailable.", step: P1-14}
+  - {id: F-25, severity: high, text: "Startup recovery decrypts every READY blob and marks CORRUPT on any exception including transient Keystore/IO errors; CORRUPT is permanent; cold start is O(total artefact bytes). Design §11 says authenticate on first read.", step: P1-14}
+  - {id: F-26, severity: high, text: "KeystoreWrapper.unwrap calls wrappingKey(), which generates a replacement key when the alias is missing (design §10 forbids silent key creation).", step: P1-14}
+  - {id: F-27, severity: high, text: "Viewer evidence overlay scales the region to the 320dp box, not the letterboxed image rect, and ignores orientation; highlights are wrong whenever aspect ratios differ.", step: P2-06}
+  - {id: F-28, severity: high, text: "Deleting from the list recycles the thumbnail bitmap while the row may still be composed (recycled-bitmap crash); SensitiveContentCache.put evicts a possibly on-screen bitmap.", step: P1-13}
+  - {id: F-29, severity: medium, text: "Viewer/thumbnail reads take the exclusive mutation mutex, so prepareImport's tryAcquire returns Busy during any decrypt; design §11 asks for a read lease that excludes only deletion.", step: P1-15}
+  - {id: F-30, severity: medium, text: "OCR final commit (revision READY + span insert) is not in one transaction; cancellation during capture orphans a RUNNING row; markFailed is not NonCancellable.", step: P2-02}
+  - {id: F-31, severity: medium, text: "DeletionRepository removes OCR rows and the source row in two statements rather than one transaction (C0-R24 wording).", step: P1-15}
+  - {id: F-32, severity: medium, text: "Duplicate detection discards the new stage without authenticating the existing blob (design §9 'verified bytes').", step: P1-15}
+  - {id: F-33, severity: medium, text: "A READY source whose blob fails authentication at view time shows 'Verifying…' forever; list caches a silent negative; nothing marks CORRUPT on a genuine tag/digest failure at read.", step: P1-13}
+  - {id: F-34, severity: medium, text: "EXTRA_INTAKE_KIND is sender-controlled: any external share can record route PHOTO_PICKER (design §8/§9 acquisition metadata must not be spoofable).", step: P1-02}
+  - {id: F-35, severity: medium, text: "Shares declared as image/* (common) are rejected at intent level; MainActivity's own fallback type is image/*; image/jpg variants also fail. Design §8 only requires provider type + magic bytes.", step: P1-02}
+  - {id: F-36, severity: medium, text: "VaultAccess.Unavailable is cached for the process lifetime even for transient causes.", step: P1-06}
+  - {id: F-37, severity: medium, text: "Rotation during 'Preparing…' before the lifecycleScope open completes cancels the open; the recreated activity skips validation and stays Preparing forever with no Cancel control.", step: P1-13}
+  - {id: F-38, severity: medium, text: "OcrViewModel keeps Ready(spans) text for deleted sources and across onStop (C0-R32 background scrub does not cover OCR text).", step: P2-02}
+  - {id: F-39, severity: low, text: "backup_rules.xml comment claims an explicit no_backup exclusion in data_extraction_rules.xml that does not exist.", step: P0-08}
+  - {id: F-40, severity: low, text: "ML Kit line confidence is a primitive float; a 0.0 sentinel may be persisted as a real confidence (C1-R4).", step: P2-03}
+  - {id: F-41, severity: low, text: "Nested equal 15s timeouts: the engine's inner TimeoutCancellationException propagates through the repository as a CancellationException and kills the ViewModel job; UI stuck at Extracting.", step: P2-02}
+  - {id: F-42, severity: low, text: "Engine decode/empty-span IllegalArgumentExceptions are misclassified as LIMIT_EXCEEDED.", step: P2-02}
+  - {id: F-43, severity: low, text: "Side effects during composition: IntakeScreen calls onDone() for Cancelled inside composition; MainActivity assigns navigation state during composition.", step: P1-13}
+  - {id: F-44, severity: low, text: "'Open existing' starts MainActivity without FLAG_ACTIVITY_NEW_TASK, creating a second instance inside the sharing app's task.", step: P1-13}
+  - {id: F-45, severity: low, text: "Migration test runs on the plaintext framework helper, not SQLCipher, and does not assert READY-invariant triggers survive migration; VaultTest name says version one.", step: P1-14}
+  - {id: F-46, severity: low, text: "docs/verification/C0.md C0-11 cites a non-existent AesGcmCodec.AuthenticationFailedException; release workflow comment claims minification that is off.", step: P0-08}
+  - {id: F-47, severity: low, text: "No copy anywhere explains the Photo Picker cloud-provider caveat at intake (design §3 R3, §8 step 2).", step: P1-02}
+  - {id: F-48, severity: low, text: "RecoveryReport counts are logged on every start in release builds; make debug-only.", step: P0-08}
+  - {id: F-49, severity: low, text: "No runnable test for: C0-R29 Busy from the UI, C0-R30 deadline end-to-end, C0-14 delete-while-viewing clears the viewer, kill-during-deletion, C1-R7 deletion while OCR UI is displayed.", step: "P1-13, P1-15, P2-02"}

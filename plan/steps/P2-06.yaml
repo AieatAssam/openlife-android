@@ -1,0 +1,78 @@
+id: P2-06
+title: Evidence viewer UX
+phase: P2
+status: todo
+depends_on: [P2-01, P1-03]
+estimate: L
+owner: agent
+closes_findings: [F-27]
+
+summary: >
+  Make evidence navigation correct and usable: draw region highlights on the
+  letterboxed, orientation-corrected image rect, support pinch-zoom and pan,
+  tap a span to highlight and scroll the image to it, tap a region to select
+  its span, and provide correction and review interactions per span and per
+  revision with clear origin labelling.
+
+rationale: >
+  The overlay currently scales regions to the 320dp box rather than the
+  fitted image, so highlights are wrong on nearly every image. C1-R4/R5
+  require that opening an evidence link reveals the region with context.
+
+ethos_check:
+  - "P3: extracted, corrected (USER), and stale values are visually distinct; no value is shown as established."
+
+requirements:
+  - id: P2-06-R1
+    text: "MUST implement a pure function `EvidenceGeometry.regionToCanvas(region, sourceW, sourceH, orientation, canvasSize, contentScale=Fit, zoom, pan): Rect` with JVM tests covering letterboxing on both axes and all eight orientations."
+  - id: P2-06-R2
+    text: "MUST add a zoomable image composable (transformable state: scale 1-8x, pan clamped to content bounds) using only Compose foundation; double-tap toggles 1x/3x; the overlay uses the same transform."
+  - id: P2-06-R3
+    text: "MUST support span->region (tap 'Show region' or the span text row) and region->span (tap inside the image selects the smallest containing region) with the selected span announced via liveRegion; each drawn region is also a semantics node (Role.Button, contentDescription = a short preview of the span text) so screen-reader users can reach regions directly."
+  - id: P2-06-R4
+    text: "MUST show ungrounded spans (no region) in a separate 'Text without a location' section with an explanation; they cannot be selected as evidence."
+  - id: P2-06-R5
+    text: "MUST provide per-span actions: Correct (creates a USER revision, shown under the original) and Reject span (per-span review metadata in a new table `ocr_span_reviews(id, spanId, reviewState, createdAt)` added in the next schema version per plan.yaml conventions.schema_migrations, with cascade); revision-level review stays as is."
+  - id: P2-06-R6
+    text: "MUST render a 'Extracted by <engine> · unreviewed' provenance line and distinct styles: extracted (normal), corrected (USER badge), rejected (strikethrough with 'rejected' label), stale (greyed with explanation)."
+  - id: P2-06-R7
+    text: "MUST keep memory bounded: the zoomable image uses the sampled bitmap (<=4M px); zooming does not re-decode at full size in v0.2.0 (record as a limitation with a later step if needed)."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/ui/evidence/{EvidenceGeometry.kt,ZoomableEvidenceImage.kt}
+  - app/src/main/java/org/openlife/app/ui/ViewerScreen.kt (split into ViewerScreen + OcrPanel)
+  - vault next schema version: OcrSpanReviewEntity, migration, DAO, exported schema JSON, androidTest asset
+  - app/src/test/java/org/openlife/app/ui/evidence/EvidenceGeometryTest.kt
+  - app/src/androidTest ViewerScreenC1Test (extended), EvidenceNavigationTest
+
+tdd:
+  red:
+    - name: EvidenceGeometryTest.letterboxedWideImageMapsRegionIntoFittedRect (100x1000 image in 1000x320 canvas)
+    - name: EvidenceGeometryTest.letterboxedTallImageMapsRegion
+    - name: EvidenceGeometryTest.rotate90MapsRegionThroughDisplayTransform
+    - name: EvidenceGeometryTest.zoomAndPanApplyAfterFit
+    - name: EvidenceNavigationTest.tappingInsideARegionSelectsItsSpanAndAnnounces
+    - name: EvidenceNavigationTest.tappingASpanHighlightsItsRegionWithinTheImageBounds (assert overlay rect within image rect via semantics test tags)
+    - name: OcrDatabaseTest.migrationAddsSpanReviewsAndCascades
+    - name: ViewerScreenC1Test.rejectedSpanIsStruckThroughAndLabelled
+  green:
+    - "Implement geometry, zoomable image, panel, schema v3."
+  refactor: []
+
+verification:
+  commands:
+    - "./gradlew :app:test :vault:test && ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "Manual on emulator with a tall screenshot and a wide receipt: highlight sits on the text."
+  evidence_required:
+    - "Tests; manual transcript (uiautomator dumps cannot show overlays; use a debug-only bounds log behind BuildConfig.DEBUG that prints rects, removed before merge or kept debug-only)."
+
+acceptance_criteria:
+  - "Highlights align with text for arbitrary aspect ratios and orientations; span and region selection work both ways; per-span review persists across restart."
+
+docs_to_update:
+  - docs/capabilities/C1.md (C1-R4/R5 evidence, span reviews table)
+  - docs/verification/C1.md (C1-05)
+
+risks:
+  - "Gesture handling conflicts with vertical scroll of the viewer column; put the image in a fixed-height area with nested scroll disabled while zoomed."
+rollback: "Keep geometry fix; drop zoom."

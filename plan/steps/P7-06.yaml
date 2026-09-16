@@ -1,0 +1,21 @@
+id: P7-06
+title: C8-C10 acceptance and v2.0.0
+phase: P7
+status: todo
+depends_on: [P7-01, P7-02, P7-05]
+estimate: M
+owner: agent+owner
+summary: "C8, C9, C10 verification matrices, security reviews (PDF parsing surface, new intake type, assessment wording), provenance reviews (page-level evidence, concern evidence), handoff, owner acceptance, and release v2.0.0 through the checklist including an updated independent-review request for the PDF surface."
+requirements:
+  - id: P7-06-R0
+    text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
+  - id: P7-04-R1
+    text: "MUST produce per-capability docs and update THREAT_MODEL, PRIVACY_POLICY (PDF and communication content), PERMISSIONS (none new)."
+  - id: P7-04-R2
+    text: "MUST run the reproducible-build and release checklists; tag v2.0.0."
+tdd: {red: [], green: [], refactor: []}
+verification: {commands: ["Full suites; CI; checklists"], evidence_required: ["Docs; tag"]}
+acceptance_criteria: ["Owner acceptance recorded."]
+docs_to_update: [docs/verification/*, docs/reviews/*, CHANGELOG.md]
+risks: []
+rollback: "Untag."
