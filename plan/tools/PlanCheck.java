@@ -1,36 +1,394 @@
 import org.yaml.snakeyaml.Yaml;
-import java.nio.file.*; import java.util.*;
-public class PlanCheck {
-  public static void main(String[] a) throws Exception {
-    Path root = Paths.get(a[0]); Yaml yaml = new Yaml(); int errors = 0;
-    Map<String,Object> plan;
-    try (var in = Files.newInputStream(root.resolve("plan.yaml"))) { plan = yaml.load(in); }
-    Map<String,List<String>> deps = new LinkedHashMap<>(); Map<String,String> files = new LinkedHashMap<>();
-    for (Object p : (List<Object>) plan.get("phases")) { Map<String,Object> ph=(Map<String,Object>)p;
-      for (Object s : (List<Object>) ph.get("steps")) { Map<String,Object> st=(Map<String,Object>)s;
-        String id=(String)st.get("id"); files.put(id,(String)st.get("file"));
-        List<String> d=(List<String>)st.get("depends_on"); deps.put(id,d==null?List.of():d);
-        if(!ph.get("id").equals(id.split("-")[0])) { System.out.println("ERR phase mismatch "+id); errors++; }
-      } }
-    String[] required={"id","title","phase","status","depends_on","estimate","owner","summary","requirements","tdd","verification","acceptance_criteria","docs_to_update","risks","rollback"};
-    for (var e : files.entrySet()) { Path f=root.resolve(e.getValue());
-      if(!Files.exists(f)){System.out.println("ERR missing file "+f); errors++; continue;}
-      Map<String,Object> st; try (var in=Files.newInputStream(f)) { st=yaml.load(in);} catch(Exception ex){System.out.println("ERR yaml "+f+": "+ex.getMessage().split("\n")[0]); errors++; continue;}
-      if(!e.getKey().equals(st.get("id"))){System.out.println("ERR id mismatch "+f); errors++;}
-      for(String k:required) if(!st.containsKey(k)){System.out.println("ERR "+f+" missing key "+k); errors++;}
-      List<String> d=(List<String>)st.get("depends_on"); if(d!=null && !d.equals(deps.get(e.getKey()))){System.out.println("WARN depends_on differs from plan.yaml in "+f+" "+d+" vs "+deps.get(e.getKey()));}
-      for(String dep: deps.get(e.getKey())) if(!files.containsKey(dep)){System.out.println("ERR unknown dep "+dep+" in "+e.getKey()); errors++;}
-    }
-    // cycle check
-    Map<String,Integer> state=new HashMap<>();
-    for(String id:deps.keySet()) if(dfs(id,deps,state)){System.out.println("ERR cycle at "+id); errors++;}
-    // findings: every finding step exists
-    for(Object o:(List<Object>)plan.get("review_findings_index")){Map<String,Object> f=(Map<String,Object>)o; for(String s:((String)f.get("step")).split(",")){ if(!files.containsKey(s.trim())){System.out.println("ERR finding "+f.get("id")+" names unknown step "+s); errors++;}}}
-    // runnable
-    System.out.println("steps="+files.size()+" errors="+errors);
-    List<String> runnable=new ArrayList<>(); for(var e:deps.entrySet()) if(e.getValue().isEmpty()) runnable.add(e.getKey());
-    System.out.println("runnable now: "+runnable);
-    System.exit(errors==0?0:1);
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Validates the repository plan without adding a runtime dependency to Android modules. */
+public final class PlanCheck {
+  private static final Set<String> PLAN_KEYS = Set.of(
+      "schema_version", "plan_version", "plan_date", "baseline_commit",
+      "governing_documents", "ethos", "conventions", "release_train",
+      "decisions_made_by_this_plan", "phases", "owner_actions_required",
+      "review_findings_index");
+  private static final Set<String> STEP_KEYS = Set.of(
+      "id", "title", "phase", "status", "depends_on", "estimate", "owner",
+      "summary", "requirements", "tdd", "verification", "acceptance_criteria",
+      "docs_to_update", "risks", "rollback");
+  private static final Set<String> STATUSES = Set.of(
+      "todo", "in_progress", "blocked", "review", "done", "waived");
+
+  private final Path root;
+  private final boolean json;
+  private final Yaml yaml = new Yaml();
+  private final List<String> errors = new ArrayList<>();
+  private final List<String> warnings = new ArrayList<>();
+  private final LinkedHashMap<String, StepRef> steps = new LinkedHashMap<>();
+  private final Map<String, Object> plan = new LinkedHashMap<>();
+
+  private PlanCheck(Path root, boolean json) {
+    this.root = root.toAbsolutePath().normalize();
+    this.json = json;
   }
-  static boolean dfs(String n, Map<String,List<String>> g, Map<String,Integer> st){ Integer s=st.get(n); if(s!=null) return s==1; st.put(n,1); for(String m:g.getOrDefault(n,List.of())) if(dfs(m,g,st)) return true; st.put(n,2); return false; }
+
+  public static void main(String[] args) {
+    boolean json = false;
+    String rootArg = ".";
+    for (String arg : args) {
+      if ("--json".equals(arg)) {
+        json = true;
+      } else if (arg.startsWith("--")) {
+        System.err.println("unknown option: " + arg);
+        System.exit(2);
+      } else if (".".equals(rootArg)) {
+        rootArg = arg;
+      } else {
+        System.err.println("expected one plan directory, got: " + arg);
+        System.exit(2);
+      }
+    }
+
+    PlanCheck checker = new PlanCheck(Paths.get(rootArg), json);
+    checker.run();
+    checker.printReport();
+    System.exit(checker.errors.isEmpty() ? 0 : 1);
+  }
+
+  private void run() {
+    Path planFile = root.resolve("plan.yaml");
+    Object document = load(planFile);
+    if (!(document instanceof Map<?, ?>)) {
+      error(planFile, "document", "must be a YAML map");
+      return;
+    }
+    for (String key : PLAN_KEYS) {
+      if (!((Map<?, ?>) document).containsKey(key)) {
+        error(planFile, key, "missing key");
+      }
+    }
+    copyStringKeyedMap(document, plan);
+    collectPlanSteps(planFile);
+    validateReferencedFiles();
+    validateAllStepFiles();
+    validateDependencies();
+    validateFindings();
+  }
+
+  private void collectPlanSteps(Path planFile) {
+    Object phasesValue = plan.get("phases");
+    if (!(phasesValue instanceof List<?> phases)) {
+      error(planFile, "phases", "must be a list");
+      return;
+    }
+    Set<String> phaseIds = new HashSet<>();
+    for (Object phaseValue : phases) {
+      if (!(phaseValue instanceof Map<?, ?> phase)) {
+        error(planFile, "phases[]", "must contain maps");
+        continue;
+      }
+      String phaseId = string(phase.get("id"));
+      if (phaseId == null) {
+        error(planFile, "phases[].id", "missing or not a string");
+        continue;
+      }
+      if (!phaseIds.add(phaseId)) {
+        error(planFile, "phases[].id", "duplicate phase " + phaseId);
+      }
+      Object phaseStepsValue = phase.get("steps");
+      if (!(phaseStepsValue instanceof List<?> phaseSteps)) {
+        error(planFile, "phases[" + phaseId + "].steps", "must be a list");
+        continue;
+      }
+      for (Object stepValue : phaseSteps) {
+        if (!(stepValue instanceof Map<?, ?> step)) {
+          error(planFile, "phases[" + phaseId + "].steps[]", "must contain maps");
+          continue;
+        }
+        String id = string(step.get("id"));
+        if (id == null) {
+          error(planFile, "phases[" + phaseId + "].steps[].id", "missing or not a string");
+          continue;
+        }
+        if (!id.matches("[A-Z][0-9]+-[0-9]{2}")) {
+          error(planFile, "step " + id + ".id", "must match <phase>-<nn>");
+        }
+        if (!id.startsWith(phaseId + "-")) {
+          error(planFile, "step " + id + ".id", "phase prefix does not match " + phaseId);
+        }
+        if (steps.containsKey(id)) {
+          error(planFile, "step " + id + ".id", "duplicate step id");
+          continue;
+        }
+        String file = string(step.get("file"));
+        if (file == null) {
+          error(planFile, "step " + id + ".file", "missing or not a string");
+          file = "steps/" + id + ".yaml";
+        }
+        List<String> dependencies = stringList(step.get("depends_on"), planFile, "step " + id + ".depends_on");
+        String status = string(step.get("status"));
+        if (status == null || !STATUSES.contains(status)) {
+          error(planFile, "step " + id + ".status", "must be one of " + STATUSES);
+        }
+        steps.put(id, new StepRef(id, phaseId, file, dependencies == null ? List.of() : dependencies, status));
+      }
+    }
+  }
+
+  private void validateReferencedFiles() {
+    for (StepRef step : steps.values()) {
+      Path file = root.resolve(step.file).normalize();
+      if (!file.startsWith(root.resolve("steps").normalize())) {
+        error(root.resolve("plan.yaml"), "step " + step.id + ".file", "must stay under steps/");
+      }
+      if (!step.file.equals("steps/" + step.id + ".yaml")) {
+        error(root.resolve("plan.yaml"), "step " + step.id + ".file", "must be steps/" + step.id + ".yaml");
+      }
+      if (!Files.isRegularFile(file)) {
+        error(file, "file", "missing step file referenced by plan.yaml");
+      }
+    }
+  }
+
+  private void validateAllStepFiles() {
+    Path stepsDir = root.resolve("steps");
+    if (!Files.isDirectory(stepsDir)) {
+      error(stepsDir, "directory", "missing steps directory");
+      return;
+    }
+    try (DirectoryStream<Path> files = Files.newDirectoryStream(stepsDir, "*.yaml")) {
+      for (Path file : files) {
+        Object document = load(file);
+        if (!(document instanceof Map<?, ?> step)) {
+          error(file, "document", "must be a YAML map");
+          continue;
+        }
+        for (String key : STEP_KEYS) {
+          if (!step.containsKey(key)) {
+            error(file, key, "missing key");
+          }
+        }
+        String filenameId = file.getFileName().toString().replaceFirst("\\.yaml$", "");
+        String id = string(step.get("id"));
+        if (id == null) {
+          continue;
+        }
+        if (!filenameId.equals(id)) {
+          error(file, "id", "does not match filename " + filenameId);
+        }
+        StepRef ref = steps.get(id);
+        if (ref == null) {
+          error(file, "id", "is not referenced by plan.yaml");
+          continue;
+        }
+        List<String> fileDeps = stringList(step.get("depends_on"), file, "depends_on");
+        if (fileDeps != null && !fileDeps.equals(ref.dependencies)) {
+          error(file, "depends_on", "does not match plan.yaml for " + id);
+        }
+        String status = string(step.get("status"));
+        if (status != null && !STATUSES.contains(status)) {
+          error(file, "status", "must be one of " + STATUSES);
+        }
+      }
+    } catch (IOException ex) {
+      error(stepsDir, "directory", "cannot enumerate step files: " + ex.getMessage());
+    }
+  }
+
+  private void validateDependencies() {
+    for (StepRef step : steps.values()) {
+      for (String dependency : step.dependencies) {
+        if (!steps.containsKey(dependency)) {
+          error(root.resolve("plan.yaml"), "step " + step.id + ".depends_on", "unknown dependency " + dependency);
+        }
+      }
+    }
+    Map<String, Integer> state = new HashMap<>();
+    Deque<String> stack = new ArrayDeque<>();
+    Set<String> reported = new HashSet<>();
+    for (String id : steps.keySet()) {
+      findCycle(id, state, stack, reported);
+    }
+  }
+
+  private void findCycle(String id, Map<String, Integer> state, Deque<String> stack, Set<String> reported) {
+    Integer previous = state.get(id);
+    if (previous != null) {
+      if (previous == 1) {
+        List<String> path = new ArrayList<>(stack);
+        int start = path.indexOf(id);
+        if (start >= 0) {
+          path = path.subList(start, path.size());
+          path.add(id);
+        }
+        String cycle = String.join(" -> ", path);
+        if (reported.add(cycle)) {
+          error(root.resolve("plan.yaml"), "depends_on", "dependency cycle " + cycle);
+        }
+      }
+      return;
+    }
+    state.put(id, 1);
+    stack.addLast(id);
+    StepRef step = steps.get(id);
+    if (step != null) {
+      for (String dependency : step.dependencies) {
+        if (steps.containsKey(dependency)) {
+          findCycle(dependency, state, stack, reported);
+        }
+      }
+    }
+    stack.removeLast();
+    state.put(id, 2);
+  }
+
+  private void validateFindings() {
+    Object findingsValue = plan.get("review_findings_index");
+    if (!(findingsValue instanceof List<?> findings)) {
+      return;
+    }
+    for (Object findingValue : findings) {
+      if (!(findingValue instanceof Map<?, ?> finding)) {
+        error(root.resolve("plan.yaml"), "review_findings_index[]", "must contain maps");
+        continue;
+      }
+      String findingId = string(finding.get("id"));
+      String closingSteps = string(finding.get("step"));
+      if (closingSteps == null) {
+        error(root.resolve("plan.yaml"), "review_findings_index[].step", "missing or not a string");
+        continue;
+      }
+      for (String step : closingSteps.split(",")) {
+        if (!steps.containsKey(step.trim())) {
+          error(root.resolve("plan.yaml"), "finding " + findingId + ".step", "unknown step " + step.trim());
+        }
+      }
+    }
+  }
+
+  private Object load(Path file) {
+    if (!Files.isRegularFile(file)) {
+      return null;
+    }
+    try (InputStream input = Files.newInputStream(file)) {
+      return yaml.load(input);
+    } catch (Exception ex) {
+      error(file, "YAML", firstLine(ex.getMessage()));
+      return null;
+    }
+  }
+
+  private List<String> stringList(Object value, Path file, String key) {
+    if (!(value instanceof List<?> list)) {
+      error(file, key, "must be a list");
+      return null;
+    }
+    List<String> result = new ArrayList<>();
+    for (Object item : list) {
+      String itemString = string(item);
+      if (itemString == null) {
+        error(file, key, "must contain strings");
+        return null;
+      }
+      result.add(itemString);
+    }
+    return result;
+  }
+
+  private static void copyStringKeyedMap(Object value, Map<String, Object> destination) {
+    if (!(value instanceof Map<?, ?> map)) {
+      return;
+    }
+    for (Map.Entry<?, ?> entry : map.entrySet()) {
+      if (entry.getKey() instanceof String key) {
+        destination.put(key, entry.getValue());
+      }
+    }
+  }
+
+  private static String string(Object value) {
+    return value instanceof String ? (String) value : null;
+  }
+
+  private void error(Path file, String key, String message) {
+    errors.add(file + ": " + key + ": " + message);
+  }
+
+  private void printReport() {
+    List<String> runnable = new ArrayList<>();
+    for (StepRef step : steps.values()) {
+      if ("todo".equals(step.status) && step.dependencies.stream()
+          .allMatch(dependency -> steps.containsKey(dependency) && "done".equals(steps.get(dependency).status))) {
+        runnable.add(step.id);
+      }
+    }
+    if (json) {
+      System.out.println("{\"valid\":" + errors.isEmpty()
+          + ",\"steps\":" + steps.size()
+          + ",\"errors\":[" + jsonArray(errors)
+          + "],\"warnings\":[" + jsonArray(warnings)
+          + "],\"runnable\":[" + jsonArray(runnable) + "]}");
+      return;
+    }
+    for (String error : errors) {
+      System.out.println("ERR " + error);
+    }
+    for (String warning : warnings) {
+      System.out.println("WARN " + warning);
+    }
+    System.out.println("steps=" + steps.size() + " errors=" + errors.size());
+    System.out.println("runnable now: " + runnable);
+  }
+
+  private static String jsonArray(List<String> values) {
+    List<String> quoted = new ArrayList<>();
+    for (String value : values) {
+      quoted.add("\"" + jsonEscape(value) + "\"");
+    }
+    return String.join(",", quoted);
+  }
+
+  private static String jsonEscape(String value) {
+    return value.replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r");
+  }
+
+  private static String firstLine(String value) {
+    if (value == null) {
+      return "unknown parse error";
+    }
+    return value.split("\\R", 2)[0];
+  }
+
+  private static final class StepRef {
+    private final String id;
+    private final String phase;
+    private final String file;
+    private final List<String> dependencies;
+    private final String status;
+
+    private StepRef(String id, String phase, String file, List<String> dependencies, String status) {
+      this.id = id;
+      this.phase = phase;
+      this.file = file;
+      this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies));
+      this.status = status;
+    }
+  }
 }
