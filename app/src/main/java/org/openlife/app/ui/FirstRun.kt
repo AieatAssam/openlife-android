@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -38,7 +40,13 @@ object FirstRunPreferences {
 fun FirstRunExplanationScreen(onContinue: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            // Keep the explanation reachable when the user enables a large
+            // accessibility font. The screen is intentionally scrollable
+            // instead of relying on a particular viewport height.
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Text("Before you import anything", style = MaterialTheme.typography.headlineSmall)

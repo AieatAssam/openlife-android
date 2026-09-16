@@ -29,14 +29,14 @@ place; the underlying evidence lives in `docs/verification/C0.md` and
 
 | Suite | Count | Result |
 | --- | --- | --- |
-| `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree (`./gradlew :app:test :vault:test assembleDebug lint`, 2026-09-15) |
-| `:app:connectedDebugAndroidTest` | 23 | all pass on `dev36` (2026-09-15): the 21-test C0 baseline plus 2 C1 viewer tests for inert text, evidence selection, and correction/review |
-| `:vault:connectedDebugAndroidTest` | 70 | all pass on `dev36` (2026-09-15): 6 Keystore, 1 bundled-engine, 8 deletion, 4 envelope, 21 import, 6 OCR repository, 11 recovery, 4 OCR database (including v1→v2 migration), 4 READY-invariant, and 5 bootstrap cases |
+| `:app:test` + `:vault:test` (JVM unit) | — | all pass on the current tree (`./gradlew :app:test :vault:test assembleDebug lint`, 2026-09-16) |
+| `:app:connectedDebugAndroidTest` | 28 | all pass on `dev36` (2026-09-16): the 21-test C0 baseline plus 4 accessibility-semantics tests, 1 packaged backup-boundary test, and 2 C1 viewer tests |
+| `:vault:connectedDebugAndroidTest` | 71 | all pass on `dev36` (2026-09-16): 6 Keystore, 1 bundled-engine, 8 deletion, 4 envelope, 21 import, 6 OCR repository, 12 recovery, 4 OCR database (including v1→v2 migration), 4 READY-invariant, and 5 bootstrap cases |
 | `:app:assembleDebug` / `lint` | — | passed on the current tree on 2026-09-15 |
 
 The JVM suites, build/lint sweep, vault connected suite, and app connected
-suite were re-run on the current tree on 2026-09-15. The final app run passed
-all 23 tests and the final vault run passed all 70 tests on `dev36`; earlier
+suite were re-run on the current tree on 2026-09-16. The final app run passed
+all 28 tests and the final vault run passed all 71 tests on `dev36`; earlier
 package-manager/process instability is retained in the environment
 limitations rather than used to downgrade these completed runs.
 

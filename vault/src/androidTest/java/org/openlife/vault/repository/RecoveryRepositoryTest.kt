@@ -17,10 +17,11 @@ import org.junit.runner.RunWith
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
+import org.openlife.vault.model.SourceState
+import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevision
 import org.openlife.vault.ocr.OcrRevisionState
-import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
@@ -170,6 +171,44 @@ class RecoveryRepositoryTest {
 
         assertEquals(1, report.markedStaleOcrRevisions)
         assertEquals(OcrRevisionState.STALE, db.ocrDao().findRevision(revisionId.toString())!!.toDomain().state)
+    }
+
+    @Test
+    fun runningOcrRevisionIsMarkedStaleAfterFreshDatabaseReopen(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val revisionId = UUID.randomUUID()
+        db.ocrDao().insertRevision(
+            OcrRevision(
+                id = revisionId,
+                sourceId = id,
+                state = OcrRevisionState.RUNNING,
+                engineId = "test-engine",
+                modelVersion = "test",
+                orientation = Orientation.NORMAL,
+                sourceDigest = ByteArray(32) { 4 },
+                startedAt = 1,
+                extractedAt = null,
+                reviewState = OcrReviewState.UNREVIEWED,
+                failureReason = null,
+                charCount = 0,
+                spanCount = 0,
+            ).toEntity(),
+        )
+
+        // Closing the database models the durable boundary at an abrupt
+        // process death: the in-flight engine has no opportunity to publish a
+        // result or run OcrRepository's cooperative cancellation callback.
+        db.close()
+        val restartedWrapper = KeystoreWrapper(alias)
+        val restarted = VaultBootstrapper.bootstrap(paths, restartedWrapper) as VaultBootstrapResult.Ready
+        db = OpenLifeDatabaseFactory.create(context, paths, restarted.databaseSecret)
+        val report = RecoveryRepository(paths, db, restartedWrapper, MutationQueue()).recover()
+
+        assertEquals(1, report.markedStaleOcrRevisions)
+        val recovered = db.ocrDao().findRevision(revisionId.toString())!!.toDomain()
+        assertEquals(OcrRevisionState.STALE, recovered.state)
+        assertEquals(OcrFailureReason.PROCESS_RESTART, recovered.failureReason)
+        assertEquals(0, db.ocrDao().findSpans(revisionId.toString()).size)
     }
 
     @Test

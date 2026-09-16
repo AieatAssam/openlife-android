@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -75,7 +78,10 @@ private fun DuplicateContent(
     onOpenExisting: (UUID) -> Unit,
     onCancel: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("This matches something already saved. Not imported again.")
             Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
@@ -92,14 +98,18 @@ private fun DuplicateContent(
 
 @Composable
 private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onCancel: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+    Column(
+        // Intake details and actions must remain reachable at large font
+        // scales; scrolling is preferable to clipping the confirmation row.
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+    ) {
         val bitmap = remember(state.previewBytes) { state.previewBytes?.let(SampledBitmapDecoder::decode) }
         DisposableEffect(bitmap) {
             onDispose {
                 if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
             }
         }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
             if (bitmap != null) {
                 Image(bitmap = bitmap.asImageBitmap(), contentDescription = "Selected image preview")
             } else {
@@ -121,7 +131,10 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
 
 @Composable
 private fun CenteredMessage(text: String) {
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text)
         }
@@ -130,7 +143,10 @@ private fun CenteredMessage(text: String) {
 
 @Composable
 private fun TerminalMessage(text: String, onDone: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text)
             Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {

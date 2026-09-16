@@ -138,7 +138,7 @@ private fun SourceRow(
                 val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, source.id, thumbnailGeneration) {
                     value = loadThumbnail(source.id)
                 }
-                bitmap?.let { Image(it.asImageBitmap(), contentDescription = null) }
+                bitmap?.let { Image(it.asImageBitmap(), contentDescription = "Saved image thumbnail") }
             }
         }
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {

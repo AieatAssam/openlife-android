@@ -41,6 +41,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
@@ -105,7 +108,11 @@ fun ViewerScreen(
                         source.state == SourceState.CORRUPT -> Text("This item's saved content is unreadable.")
                         bytes == null -> Text("Verifying…")
                         decoded == null -> Text("This item's saved content is unreadable.")
-                        else -> Image(decoded.asImageBitmap(), contentDescription = null)
+                        // A generic description preserves privacy while still
+                        // giving a screen reader a useful stop in the source
+                        // evidence flow. OCR text and evidence actions below
+                        // provide the accessible detail.
+                        else -> Image(decoded.asImageBitmap(), contentDescription = "Saved image")
                     }
                     if (decoded != null && selectedRegion != null && source.width != null && source.height != null) {
                         val sourceWidth = source.width!!
@@ -124,6 +131,19 @@ fun ViewerScreen(
                             )
                         }
                     }
+                }
+                if (selectedRegion != null) {
+                    // TalkBack does not receive visual Canvas changes by
+                    // itself. Announce the result of the evidence action as a
+                    // polite live region while keeping the untrusted image
+                    // content inert.
+                    Text(
+                        "Evidence region highlighted",
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 DetailsSection(source = source, verified = verified)
                 OcrSection(
