@@ -299,7 +299,7 @@ phases:
       - {id: P1-06, title: Vault-unavailable UX and explicit Reset vault (ADR-0005), file: steps/P1-06.yaml, status: todo, depends_on: [P0-07], estimate: M, owner: agent}
       - {id: P1-07, title: Optional app lock (ADR-0004), file: steps/P1-07.yaml, status: todo, depends_on: [P0-07, P1-06], estimate: L, owner: agent}
       - {id: P1-08, title: Settings and About screens, file: steps/P1-08.yaml, status: todo, depends_on: [P1-06, P1-07, P0-02], estimate: M, owner: agent}
-      - {id: P1-09, title: Repository and crypto hardening, file: steps/P1-09.yaml, status: todo, depends_on: [P0-03], estimate: M, owner: agent}
+      - {id: P1-09, title: Repository and crypto hardening, file: steps/P1-09.yaml, status: in_progress, started: 2026-09-17, depends_on: [P0-03], estimate: M, owner: agent}
       - {id: P1-10, title: Accessibility automation and TalkBack runbook, file: steps/P1-10.yaml, status: todo, depends_on: [P0-07, P1-08], estimate: M, owner: agent}
       - {id: P1-11, title: API-29 CI evidence, physical-device and backup-transfer runbooks, file: steps/P1-11.yaml, status: todo, depends_on: [P0-04, P0-07, P1-02, P1-07], estimate: M, owner: agent+owner}
       - {id: P1-13, title: Threading and lifecycle correctness, file: steps/P1-13.yaml, status: todo, depends_on: [P0-07, P0-03, P1-09], estimate: L, owner: agent}
