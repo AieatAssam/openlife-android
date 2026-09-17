@@ -63,12 +63,12 @@ plan_flow_fields() {
 
 plan_field() {
   local key="$1"
-  awk -F'|' -v wanted="$key" '$1 == wanted { value = $0; sub(/^[^|]*\|/, "", value); sub(/^"/, "", value); sub(/"$/, "", value); print value; exit }'
+  awk -F'|' -v wanted="$key" 'BEGIN { single = sprintf("%c", 39) } $1 == wanted { value = $0; sub(/^[^|]*\|/, "", value); if (substr(value, 1, 1) == "\"") { sub(/^"/, "", value); sub(/"$/, "", value) } else if (substr(value, 1, 1) == single) { sub("^" single, "", value); sub(single "$", "", value) } print value; exit }'
 }
 
 plan_step_lines() {
   local plan="$1" line id status dep
-  sed -nE '/^[[:space:]]+-[[:space:]]+\{id:[[:space:]]*"?P[0-9]+-[0-9]+"?,/p' "$plan" \
+  sed -nE '/^[[:space:]]+-[[:space:]]+\{id:/p' "$plan" \
     | while IFS= read -r line; do
         fields=$(plan_flow_fields <<<"$line")
         id=$(plan_field id <<<"$fields")
