@@ -69,6 +69,24 @@ set -e
 assert_nonzero "plan-check rejects a missing required key" "$TMP/missing-key.out" "$missing_key_status"
 assert_contains "missing-key diagnostic names file and key" "P0-01.yaml: owner: missing key" "$(<"$TMP/missing-key.out")"
 
+cp -R "$ROOT/plan" "$TMP/plan-missing-requirement-id"
+sed -i '0,/^  - id: P0-01-R1$/s//  -/' "$TMP/plan-missing-requirement-id/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-missing-requirement-id" >"$TMP/missing-requirement-id.out" 2>&1
+missing_requirement_id_status=$?
+set -e
+assert_nonzero "plan-check rejects a missing requirement id" "$TMP/missing-requirement-id.out" "$missing_requirement_id_status"
+assert_contains "missing-requirement-id diagnostic names key" "requirements[0].id: missing key" "$(<"$TMP/missing-requirement-id.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-missing-verification-command"
+sed -i '0,/^  commands:$/s//  wrong_commands:/' "$TMP/plan-missing-verification-command/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-missing-verification-command" >"$TMP/missing-verification-command.out" 2>&1
+missing_verification_command_status=$?
+set -e
+assert_nonzero "plan-check rejects a missing verification command list" "$TMP/missing-verification-command.out" "$missing_verification_command_status"
+assert_contains "missing-verification-command diagnostic names key" "verification.commands: missing key" "$(<"$TMP/missing-verification-command.out")"
+
 bash "$ROOT/scripts/plan-check.sh" "$ROOT/plan" >"$TMP/real.out"
 assert_contains "plan-check accepts the real plan" "errors=0" "$(<"$TMP/real.out")"
 
