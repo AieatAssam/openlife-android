@@ -48,6 +48,33 @@ class BoundedStreamReaderTest {
         assertEquals(1, result.bytes.size)
     }
 
+    @Test
+    fun deadlineCallbackStopsReadingBetweenChunksWithTypedException() {
+        val chunk = ByteArray(64 * 1024)
+        val stream = object : InputStream() {
+            private var reads = 0
+
+            override fun read(): Int = 0
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                reads++
+                chunk.copyInto(buffer, offset, 0, minOf(chunk.size, length))
+                return minOf(chunk.size, length)
+            }
+        }
+        var deadlineChecks = 0
+
+        val failure = assertThrows(ReadDeadlineExceededException::class.java) {
+            BoundedStreamReader.read(stream) {
+                deadlineChecks++
+                deadlineChecks > 1
+            }
+        }
+
+        assertTrue(failure.message?.contains("deadline") == true)
+        assertTrue("deadline must be checked between chunks", deadlineChecks >= 2)
+    }
+
     /**
      * A stream whose read() blocks until closed from another thread,
      * simulating a provider that never delivers bytes (design §12 /

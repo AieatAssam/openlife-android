@@ -22,6 +22,10 @@ import javax.crypto.spec.SecretKeySpec
 private const val DEK_LENGTH_BYTES = 32
 private const val SCHEMA_ARTEFACT_VERSION = 1
 
+fun interface PlaintextBufferObserver {
+    fun onReleased(bytes: ByteArray)
+}
+
 /**
  * The "Prepare and preview" and "Save" halves of design §11
  * (STAGED -> READY). Startup recovery is [RecoveryRepository].
@@ -43,6 +47,7 @@ class ImportRepository(
     private val mutationQueue: MutationQueue,
     private val clock: () -> Long = System::currentTimeMillis,
     private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
+    private val plaintextBufferObserver: PlaintextBufferObserver = PlaintextBufferObserver { },
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 

@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
 
 import kotlinx.coroutines.runBlocking
@@ -43,6 +44,31 @@ class IntakeAndListFlowTest {
         override fun close() {
             closed = true
             delegate.close()
+        }
+    }
+
+    private class DeadlineInputStream : InputStream() {
+        @Volatile var closeCalls = 0
+        @Volatile var closed = false
+        @Volatile var ownerThreadId: Long? = null
+        @Volatile var closeThreadId: Long? = null
+        private var chunksRemaining = 400
+
+        override fun read(): Int = 0
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            ownerThreadId = Thread.currentThread().id
+            Thread.sleep(1_000)
+            if (closed) throw IOException("synthetic deadline close")
+            if (chunksRemaining-- == 0) return -1
+            java.util.Arrays.fill(buffer, offset, offset + minOf(length, 64 * 1024), 0)
+            return minOf(length, 64 * 1024)
+        }
+
+        override fun close() {
+            closeCalls++
+            closeThreadId = Thread.currentThread().id
+            closed = true
         }
     }
 
@@ -173,6 +199,19 @@ class IntakeAndListFlowTest {
     }
 
     @Test
+    fun readDeadlineProducesFailedStateAndReleasesTheDescriptorOnTheOwningThread(): Unit = runBlocking {
+        val stream = DeadlineInputStream()
+        val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
+
+        intakeViewModel.startImport(stream, "image/jpeg", IntakeKind.SHARE)
+        awaitState(intakeViewModel, timeoutMs = 30_000) { it is IntakeUiState.Failed }
+
+        assertTrue("provider descriptor must be released", stream.closed)
+        assertEquals("the owner must close once after cooperative deadline failure", 1, stream.closeCalls)
+        assertEquals("the stream must be closed by its owning read thread", stream.ownerThreadId, stream.closeThreadId)
+    }
+
+    @Test
     fun sampledPreviewDecoderStaysWithinPixelBudget(): Unit {
         val bitmap = Bitmap.createBitmap(3000, 2000, Bitmap.Config.ARGB_8888)
         val encoded = ByteArrayOutputStream().also { output ->
@@ -238,9 +277,13 @@ class IntakeAndListFlowTest {
         awaitState(intake) { it is IntakeUiState.Cancelled }
     }
 
-    private suspend fun awaitState(viewModel: IntakeViewModel, predicate: (IntakeUiState) -> Boolean): IntakeUiState {
+    private suspend fun awaitState(
+        viewModel: IntakeViewModel,
+        timeoutMs: Long = 30_000,
+        predicate: (IntakeUiState) -> Boolean,
+    ): IntakeUiState {
         var last: IntakeUiState = viewModel.state.value
-        awaitCondition {
+        awaitCondition(timeoutMs) {
             last = viewModel.state.value
             predicate(last)
         }

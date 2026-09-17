@@ -48,6 +48,21 @@ class SourceEgressBoundaryTest {
         assertTrue("source boundary violations: $violations", violations.isEmpty())
     }
 
+    @Test
+    fun noRepositoryConstructsItsOwnMutationQueue() {
+        val violations = sourceFiles().flatMap { file ->
+            if (file.fileName.toString() == "OpenLifeApp.kt") return@flatMap emptyList()
+            Files.readAllLines(file).mapIndexedNotNull { index, line ->
+                if (line.contains("MutationQueue()")) {
+                    "$file:${index + 1}: repository constructs its own MutationQueue"
+                } else {
+                    null
+                }
+            }
+        }
+        assertTrue("mutation queue ownership violations: $violations", violations.isEmpty())
+    }
+
     private fun sourceFiles(): List<Path> = sourceRoots.flatMap { root ->
         Files.walk(root).use { stream ->
             stream.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }

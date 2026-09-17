@@ -169,6 +169,29 @@ class ImportRepositoryTest {
     }
 
     @Test
+    fun plaintextBufferIsZeroedAfterPrepare(): Unit = runBlocking {
+        var releasedBuffer: ByteArray? = null
+        val observingRepository = ImportRepository(
+            paths = paths,
+            database = db,
+            keystoreWrapper = wrapper,
+            bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
+            mutationQueue = MutationQueue(),
+            plaintextBufferObserver = PlaintextBufferObserver { releasedBuffer = it },
+        )
+
+        val result = observingRepository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()),
+            "image/jpeg",
+            IntakeKind.SHARE,
+        )
+
+        assertTrue(result is PrepareResult.Prepared)
+        assertTrue("the test seam must expose the released plaintext buffer", releasedBuffer != null)
+        assertTrue("plaintext buffer must be zeroed before release", releasedBuffer!!.all { it == 0.toByte() })
+    }
+
+    @Test
     fun stageFileDecryptsBackToTheExactOriginalBytes(): Unit = runBlocking {
         val original = syntheticJpegBytes()
         val prepared = repository.prepareImport(
