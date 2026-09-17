@@ -19,7 +19,7 @@ other change is a plan revision and must be reviewed.
 | `phases[]` | `id`, `title`, `goal`, `exit_gate`, `steps[]`. |
 | `phases[].steps[]` | One-line flow map: `id`, `title`, `file`, `status`, `depends_on`, `estimate`, `owner`; tracking fields `started`, `completed`, `evidence`, `notes` may be added by agents. |
 | `owner_actions_required` | Items only the owner can do, each linked to a step. |
-| `review_findings_index` | Every defect or gap found in review (`F-*`) with severity and the step that closes it. |
+| `review_findings_index` | Every defect or gap found in review (`F-*`) with `severity`, `text`, and the step that closes it. |
 
 Step ids are `<phase>-<nn>`; the phase prefix must match the enclosing phase.
 
@@ -41,6 +41,8 @@ Optional keys: `closes_findings`, `owner_action`, `rationale`, `ethos_check`,
 - `verification`: `commands` (exact commands to run) and `evidence_required`
   (what to paste into plan.yaml `evidence`); both keys are required lists of
   strings.
+- Review findings require string keys `id` (`F-<n>`), `severity`, `text`, and
+  `step`; a comma-separated `step` value names multiple closing steps.
 - `depends_on` must equal the list in plan.yaml for the same id.
 - The lifecycle `status` in `plan/plan.yaml` is authoritative. The companion
   step-file `status` is a required, schema-checked field retained in the brief
