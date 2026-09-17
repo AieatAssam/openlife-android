@@ -68,7 +68,7 @@ plan_field() {
 
 plan_step_lines() {
   local plan="$1" line id status dep
-  sed -nE '/^[[:space:]]+-[[:space:]]+\{id:/p' "$plan" \
+  sed -nE "/^[[:space:]]+-[[:space:]]+\\{id:[[:space:]]*(P[0-9]+-[0-9][0-9]|\"P[0-9]+-[0-9][0-9]\"|'P[0-9]+-[0-9][0-9]'),/p" "$plan" \
     | while IFS= read -r line; do
         fields=$(plan_flow_fields <<<"$line")
         id=$(plan_field id <<<"$fields")
