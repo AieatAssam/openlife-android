@@ -52,6 +52,17 @@ Ground rules for contributing changes are in `AGENTS.md`.
 ./gradlew connectedDebugAndroidTest   # needs a running emulator or device
 ```
 
+Release dependency checks are offline after the pinned artefacts have been
+cached:
+
+```bash
+./gradlew --offline :app:writeReleaseRuntimeClasspath :app:test :app:cyclonedxBom generateLicenseReport
+```
+
+The build enforces `gradle/verification-metadata.xml`, writes the release SBOM
+to `app/build/reports/bom/bom.json`, and refreshes the committed runtime
+licence inventory at `docs/generated/THIRD_PARTY_LICENSES.md`.
+
 ## Licence
 
 Apache License 2.0 — see `LICENSE`. That covers the source code here; it

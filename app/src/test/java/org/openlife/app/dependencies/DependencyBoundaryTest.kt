@@ -2,6 +2,7 @@ package org.openlife.app.dependencies
 
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.text.Regex
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,6 +48,9 @@ class DependencyBoundaryTest {
 
         val allowedLicences = setOf(
             "Apache-2.0",
+            "Apache License, Version 2.0",
+            "Android Software Development Kit License",
+            "ML Kit Terms of Service",
             "MIT",
             "BSD-2-Clause",
             "BSD-3-Clause",
@@ -57,13 +61,27 @@ class DependencyBoundaryTest {
             "Unicode-DFS-2016",
             "CC0-1.0",
         )
-        val rows = Files.readAllLines(licenseReport)
-            .map(String::trim)
-            .filter { it.startsWith("|") && !it.startsWith("|---") && !it.startsWith("| Module") }
-        assertTrue("licence report has no dependency rows: $licenseReport", rows.isNotEmpty())
-        val unknown = rows.filter { row ->
-            val columns = row.trim('|').split('|').map(String::trim)
-            columns.size < 2 || columns[1] !in allowedLicences
+        val dependencyPattern = Regex("\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`")
+        val licensePattern = Regex("\\*\\*(?:(?:POM|Manifest) License|License URL)\\*\\*: ?([^\\n]+)")
+        val dependencies = linkedMapOf<String, MutableSet<String>>()
+        var currentCoordinate: String? = null
+        Files.readAllLines(licenseReport).forEach { line ->
+            dependencyPattern.find(line)?.let { match ->
+                val coordinate = "${match.groupValues[1]}:${match.groupValues[2]}:${match.groupValues[3]}"
+                currentCoordinate = coordinate
+                dependencies[coordinate] = linkedSetOf()
+            }
+            licensePattern.find(line)?.let { match ->
+                currentCoordinate?.let { coordinate ->
+                    val rawLicense = match.groupValues[1].substringBefore(" - [").trim()
+                    val recognized = allowedLicences.filter(rawLicense::contains)
+                    dependencies.getValue(coordinate).addAll(recognized.ifEmpty { listOf(rawLicense) })
+                }
+            }
+        }
+        assertTrue("licence report has no dependency rows: $licenseReport", dependencies.isNotEmpty())
+        val unknown = dependencies.filterValues { licences ->
+            licences.isEmpty() || licences.any { it !in allowedLicences }
         }
         assertTrue("dependencies without an allowlisted licence: $unknown", unknown.isEmpty())
     }

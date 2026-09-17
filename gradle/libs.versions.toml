@@ -17,6 +17,8 @@ espresso = "3.7.0"
 androidxTestRunner = "1.7.0"
 uiautomator = "2.4.0"
 mlkitTextRecognition = "16.0.1"
+cyclonedx = "3.4.1"
+dependencyLicenseReport = "3.1.4"
 
 [libraries]
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -56,3 +58,5 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
+dependency-license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "dependencyLicenseReport" }

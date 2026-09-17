@@ -42,7 +42,7 @@ adversary.
 | Copied storage or accidental backup | Encrypted artefacts and database, Keystore wrapping, backup exclusions | File count and ciphertext sizes may remain observable |
 | Corruption or interrupted writes | Authenticated encryption, staged commit, deterministic recovery | Failed media or lost keys may make content unrecoverable |
 | Screenshot or shoulder surfing | Secure windows, protected recents, explicit foreground/background content scrubbing, no content notifications | An external camera and compromised OS remain possible |
-| Compromised dependency or release | Minimal dependency set, locked artefacts, manifest and egress checks | Source availability alone does not prove binary integrity |
+| Compromised dependency or release | Gradle SHA-256 dependency verification fails on unverified bytes; the release classpath denylist, CycloneDX SBOM, committed licence inventory, and manifest/egress checks make resolved release inputs auditable | Source availability alone does not prove binary integrity; ML Kit's documented transport exception expires at P2-05 |
 | Resource exhaustion by a provider | Byte and pixel ceilings, bounded preview, cancellable I/O | In-process native decoding cannot guarantee a hard time bound |
 
 `FLAG_SECURE` is required on all content-bearing windows and dialogs (R6). It
