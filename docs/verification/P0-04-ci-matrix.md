@@ -21,7 +21,12 @@ Branch: `plan/P0-04-ci-matrix`
   release workflow. Review GREEN commit `5ed757d` narrows the retry classifier
   to assertion-shaped output and pins the release workflow's checkout,
   reusable Gradle setup, artifact uploads, and GitHub Release action.
-- `scripts/tests/p0-04-ci-workflow.sh` — `16 passed, 0 failed`.
+- Review RED commit `0a0a60c` added executable behavior checks for bare and
+  parenthesized instrumentation failures. Review GREEN commit `628fae1`
+  extracts `scripts/ci/connected-test-failure-is-assertion.sh`; synthetic
+  infrastructure output is retryable while both assertion forms are
+  terminal.
+- `scripts/tests/p0-04-ci-workflow.sh` — `18 passed, 0 failed`.
 - `bash scripts/tests/run.sh` — `45 passed, 0 failed`; `scripts/plan-check.sh`
   reports `steps=77 errors=0`.
 - `./gradlew detekt lint :app:test :vault:test assembleDebug` — `BUILD
