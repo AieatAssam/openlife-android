@@ -129,7 +129,7 @@ class IntakeActivity : ComponentActivity() {
         // LaunchedEffect (the main/Compose thread) blocks the entire UI for
         // as long as the provider takes to answer. A ~6s test provider
         // delay reproduced a real Android ANR ("Input dispatching timed
-        // out... Waited 5000ms") during Stage 8's C0-17 pass; the 15s
+        // out... Waited 5000ms") during the performance investigation; the 15s
         // cooperative-cancellation deadline in IntakeViewModel.startImport
         // only covers reading an *already-opened* stream, not this open
         // call itself. Dispatching to Dispatchers.IO keeps the open call

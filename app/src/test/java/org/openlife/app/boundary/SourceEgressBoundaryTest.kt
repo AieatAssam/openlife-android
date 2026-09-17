@@ -21,14 +21,18 @@ class SourceEgressBoundaryTest {
         val files = sourceFiles()
         val violations = mutableListOf<String>()
         files.forEach { file ->
-            Files.readAllLines(file).forEachIndexed { index, line ->
+            val lines = Files.readAllLines(file)
+            val recoveryLogIsDebugOnly = file == recoveryLogFile && lines.any {
+                it.trim() == "if (BuildConfig.DEBUG) {"
+            }
+            lines.forEachIndexed { index, line ->
                 val location = "$file:${index + 1}"
                 if (line.contains("ClipboardManager") || line.contains("WebView")) {
                     violations += "$location: clipboard or WebView reference"
                 }
-                if (line.contains("android.util.Log") &&
-                    (file != recoveryLogFile || line.trim() != ALLOWED_RECOVERY_LOG)
-                ) {
+                val allowlistedRecoveryLog = file == recoveryLogFile &&
+                    line.trim() == ALLOWED_RECOVERY_LOG && recoveryLogIsDebugOnly
+                if (line.contains("android.util.Log") && !allowlistedRecoveryLog) {
                     violations += "$location: unallowlisted Log reference"
                 }
                 if (line.contains("startActivity") && !file.startsWith(intakeRoot) && file != mainActivity) {

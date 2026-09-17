@@ -11,11 +11,8 @@
     <exclude domain="database" path="." />
     <exclude domain="sharedpref" path="." />
     <exclude domain="external" path="." />
-    <!--
-      no_backup (noBackupFilesDir, where the vault actually lives) is not a
-      valid domain for the legacy full-backup-content schema — it is already
-      excluded from legacy Auto Backup by definition, unlike the modern
-      data_extraction_rules.xml device-transfer path, which can reach it and
-      so excludes it explicitly there.
-    -->
+    <!-- The vault is under noBackupFilesDir. Its protection relies on the
+         platform default for that directory plus allowBackup=false; this
+         legacy schema has no no_backup domain. Physical device-transfer
+         behaviour remains a verification gap. -->
 </full-backup-content>

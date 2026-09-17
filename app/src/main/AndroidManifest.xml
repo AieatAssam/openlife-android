@@ -22,12 +22,8 @@
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!--
-          Placeholder launcher activity for Stage 0. It is replaced by the
-          real source-list UI in Stage 7. Exported because Android requires
-          the LAUNCHER activity to be (design §11: "unless Android requires
-          otherwise").
-        -->
+        <!-- The launcher opens the current source-list UI. It is exported
+             because Android requires a launcher activity to be reachable. -->
         <activity
             android:name=".MainActivity"
             android:exported="true">

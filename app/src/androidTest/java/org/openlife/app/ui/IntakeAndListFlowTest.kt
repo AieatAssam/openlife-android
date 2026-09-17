@@ -19,7 +19,7 @@ import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.repository.DeleteResult
 
 /**
- * Exercises the real seam between the Stage 7 ViewModels, `OpenLifeApp`'s
+ * Exercises the real seam between the ViewModels, `OpenLifeApp`'s
  * cached vault access, and the actual repositories - the wiring this stage
  * added, as opposed to logic already covered by the vault module's own
  * tests. Deliberately drives the ViewModels directly rather than clicking

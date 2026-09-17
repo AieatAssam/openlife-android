@@ -7,9 +7,8 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Minimal Stage 2 access needed to prove the schema and its READY invariant
- * work end to end. Import/save/recovery/deletion queries land in Stage 3+
- * alongside the repository that owns the mutation queue (design §11-§12).
+ * Room access for source rows and the READY invariant. The repositories own
+ * import, save, recovery, and deletion mutations (design §11-§12).
  */
 @Dao
 interface SourceDao {

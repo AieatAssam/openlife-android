@@ -17,7 +17,7 @@ import java.util.UUID
  * Never infers that missing data means "safe to delete" or "safe to
  * recreate" (design §11): a `READY` row with an unreadable blob becomes
  * `CORRUPT`, not deleted; a `CORRUPT` row is retained until a user
- * confirms deletion (Stage 5); orphaned files are removed only after every
+ * confirms deletion; orphaned files are removed only after every
  * row has been reconciled successfully.
  */
 class RecoveryRepository(
@@ -82,7 +82,7 @@ class RecoveryRepository(
                 }
 
                 SourceState.CORRUPT -> {
-                    // Retained until a user confirms deletion (Stage 5); no
+                    // Retained until a user confirms deletion; no
                     // automatic action.
                 }
             }

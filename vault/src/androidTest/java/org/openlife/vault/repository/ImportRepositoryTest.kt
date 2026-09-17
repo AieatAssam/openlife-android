@@ -144,7 +144,7 @@ class ImportRepositoryTest {
         assertEquals(original.size.toLong(), prepared.byteCount)
 
         val row = db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain()
-        assertEquals(SourceState.STAGED, row.state) // not READY until an explicit Save (Stage 4)
+        assertEquals(SourceState.STAGED, row.state) // not READY until an explicit Save
         assertEquals(expectedDigest.toList(), row.sha256!!.toList())
         assertTrue(paths.stageFile(prepared.sourceId).exists())
     }

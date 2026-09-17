@@ -33,6 +33,10 @@ feature set today — no OCR, no extracted facts, no reminders, no export.
 The path from here to a production release is tracked in `plan/plan.yaml`
 (phases, steps, decisions, review findings); each step has a full TDD brief
 under `plan/steps/`. Run `scripts/plan-status.sh` to see what is runnable.
+Start with [`docs/README.md`](docs/README.md) for the documentation index,
+[`docs/PRODUCT_PRINCIPLES.md`](docs/PRODUCT_PRINCIPLES.md) for the product
+rules, [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the privacy boundary,
+and [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md) for the public policy.
 
 ## Repository layout
 

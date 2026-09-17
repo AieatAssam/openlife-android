@@ -5,8 +5,8 @@ import java.io.FileOutputStream
 import java.nio.file.StandardOpenOption
 
 /**
- * Small durability helpers shared by the key file (Stage 2) and the
- * artefact stage/save/recovery paths (Stage 3+). Design §9/§11 require the
+ * Small durability helpers shared by the key file and the artefact
+ * stage/save/recovery paths. Design §9/§11 require the
  * wrapped-secret file and staged/renamed artefacts to be synchronised, not
  * just written, before the next step treats them as durable.
  */

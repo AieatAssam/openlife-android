@@ -25,8 +25,8 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
-      # Release APK/AAB: minified/shrunk per the release build type,
-      # currently also debug-signed (see app/build.gradle.kts) so it's
+      # Release APK/AAB: built with the current release build type,
+      # currently also debug-signed (see app/build.gradle.kts) so it is
       # installable for internal testing without a real keystore secret.
       # Not store-distribution signing - see
       # docs/decisions/0001-c0-defaults.md's pending pre-distribution

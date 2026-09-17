@@ -3,9 +3,10 @@
   Android 12+ data-extraction rules, covering both cloud backup and
   device-to-device transfer separately, as required by
   docs/THREAT_MODEL.md / design R2. Vault content already lives under
-  noBackupFilesDir, which is excluded from both by default; these exclusions
-  are stated explicitly rather than relied on implicitly, and the shipping
-  configuration must still be tested per-manufacturer where feasible.
+  noBackupFilesDir. Its protection relies on the platform default for that
+  directory plus allowBackup=false; the rules below exclude ordinary app-data
+  domains. Physical device-transfer behaviour remains a verification gap and
+  must be checked per manufacturer where feasible.
 -->
 <data-extraction-rules>
     <cloud-backup>
