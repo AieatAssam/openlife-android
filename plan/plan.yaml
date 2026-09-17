@@ -281,7 +281,7 @@ phases:
       - {id: P0-05, title: Release signing, versioning, changelog, F-Droid metadata skeleton, file: steps/P0-05.yaml, status: todo, depends_on: [P0-04], estimate: M, owner: agent+owner}
       - {id: P0-06, title: R8 minification and release-variant smoke, file: steps/P0-06.yaml, status: todo, depends_on: [P0-05], estimate: M, owner: agent}
       - {id: P0-07, title: UI foundation (theme, edge-to-edge, navigation, strings, icon, splash), file: steps/P0-07.yaml, status: todo, depends_on: [P0-03], estimate: L, owner: agent}
-      - {id: P0-08, title: Documentation hygiene and public-repo files, file: steps/P0-08.yaml, status: todo, depends_on: [P0-01], estimate: S, owner: agent}
+      - {id: P0-08, title: Documentation hygiene and public-repo files, file: steps/P0-08.yaml, status: in_progress, started: 2026-09-17, depends_on: [P0-01], estimate: S, owner: agent}
       - {id: P0-09, title: Visual identity assets and brand components, file: steps/P0-09.yaml, status: todo, depends_on: [P0-07], estimate: M, owner: agent}
   - id: P1
     title: C0 hardening
