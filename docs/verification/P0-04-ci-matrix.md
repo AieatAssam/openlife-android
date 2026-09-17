@@ -13,10 +13,15 @@ Branch: `plan/P0-04-ci-matrix`
 - GREEN implementation adds the SHA-pinned JDK-21 workflow, API-29/API-36
   matrix, KVM emulator legs, assertion-aware one-retry wrapper, filtered
   logcat and 30-day artefacts, release inspection, and a CI contract test.
-- REFACTOR extracts the three-job JDK/cache setup into
+- REFACTOR commit `69b6d99` extracts the three-job JDK/cache setup into
   `.github/actions/gradle-setup/action.yml`; its third-party actions remain
   pinned by full SHA and the contract test covers the composite action.
-- `scripts/tests/p0-04-ci-workflow.sh` — `13 passed, 0 failed`.
+- `scripts/tests/p0-04-ci-workflow.sh` — `14 passed, 0 failed`.
+- `bash scripts/tests/run.sh` — `45 passed, 0 failed`; `scripts/plan-check.sh`
+  reports `steps=77 errors=0`.
+- `./gradlew detekt lint :app:test :vault:test assembleDebug` — `BUILD
+  SUCCESSFUL`, 114 actionable tasks; Detekt, lint, app/vault JVM tests, and
+  debug assembly passed.
 - `./gradlew assembleRelease` — `BUILD SUCCESSFUL` in 5m 59s; the build ran
   dependency verification, release dependency audit, SBOM/licence tasks, and
   produced the release APK.
