@@ -114,6 +114,13 @@ sed -i 's/title: Plan conventions and status tooling/title: "Plan conventions; f
 title_collision_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-title-collision")"
 assert_not_contains "plan-status ignores status text inside a title" $'--- runnable (todo, all deps done) ---\nP0-01' "$title_collision_output"
 
+cp -R "$ROOT/plan" "$TMP/plan-status-quoted-structural"
+sed -i 's/{id: P0-01, title:/{id: "P0-01", title:/' "$TMP/plan-status-quoted-structural/plan.yaml"
+sed -i 's/file: steps\/P0-01.yaml, status:/file: "steps\/P0-01.yaml", status:/' "$TMP/plan-status-quoted-structural/plan.yaml"
+quoted_structural_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-quoted-structural")"
+assert_contains "plan-status preserves quoted structural fields" "P0-01   review" "$quoted_structural_output"
+assert_not_contains "quoted structural fields do not create a runnable step" $'--- runnable (todo, all deps done) ---\nP0-01' "$quoted_structural_output"
+
 cp -R "$ROOT/plan" "$TMP/plan-phase-mismatch"
 sed -i '0,/^phase: P0$/s//phase: P1/' "$TMP/plan-phase-mismatch/steps/P0-01.yaml"
 set +e
@@ -175,6 +182,25 @@ missing_finding_severity_status=$?
 set -e
 assert_nonzero "plan-check rejects incomplete review finding metadata" "$TMP/missing-finding-severity.out" "$missing_finding_severity_status"
 assert_contains "finding-severity diagnostic names key" "finding F-01.severity: missing key" "$(<"$TMP/missing-finding-severity.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-done-without-evidence"
+sed -i 's/status: review/status: done/' "$TMP/plan-done-without-evidence/plan.yaml"
+sed -i 's/, evidence: "[^"]*"//' "$TMP/plan-done-without-evidence/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-done-without-evidence" >"$TMP/done-without-evidence.out" 2>&1
+done_without_evidence_status=$?
+set -e
+assert_nonzero "plan-check rejects done without evidence" "$TMP/done-without-evidence.out" "$done_without_evidence_status"
+assert_contains "done-evidence diagnostic names key" "step P0-01.evidence: required when status is done" "$(<"$TMP/done-without-evidence.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-owner-action-unknown-step"
+sed -i '0,/step: P0-05/s//step: P99-99/' "$TMP/plan-owner-action-unknown-step/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-owner-action-unknown-step" >"$TMP/owner-action-unknown-step.out" 2>&1
+owner_action_unknown_step_status=$?
+set -e
+assert_nonzero "plan-check rejects an owner action with an unknown step" "$TMP/owner-action-unknown-step.out" "$owner_action_unknown_step_status"
+assert_contains "owner-action diagnostic names step" "owner action OA-1.step: unknown step P99-99" "$(<"$TMP/owner-action-unknown-step.out")"
 
 cp -R "$ROOT/plan" "$TMP/plan-symlink"
 mv "$TMP/plan-symlink/steps/P0-01.yaml" "$TMP/plan-symlink/steps/P0-01.real.yaml"
