@@ -3,15 +3,19 @@
 # Emits id|status|comma-separated-dependencies for each one-line step map.
 # plan-status uses the records to report; plan-check uses the same parser as a
 # lightweight flow-map preflight before its full YAML validation.
-plan_strip_quoted() {
+plan_flow_fields() {
   awk '
     {
+      start = index($0, "{")
+      line = substr($0, start + 1)
+      sub(/[}][[:space:]]*$/, "", line)
       quote = ""
       escaped = 0
-      output = ""
+      depth = 0
+      field = ""
       single = sprintf("%c", 39)
-      for (i = 1; i <= length($0); i++) {
-        character = substr($0, i, 1)
+      for (i = 1; i <= length(line); i++) {
+        character = substr(line, i, 1)
         if (quote != "") {
           if (quote == "\"" && character == "\\" && !escaped) {
             escaped = 1
@@ -20,27 +24,56 @@ plan_strip_quoted() {
           } else if (character == quote) {
             quote = ""
           }
-          output = output " "
+          field = field character
         } else if (character == "\"" || character == single) {
           quote = character
-          output = output " "
+          field = field character
+        } else if (character == "[" || character == "{") {
+          depth++
+          field = field character
+        } else if (character == "]" || character == "}") {
+          depth--
+          field = field character
+        } else if (character == "," && depth == 0) {
+          print_field(field)
+          field = ""
         } else {
-          output = output character
+          field = field character
         }
       }
-      print output
+      print_field(field)
+    }
+    function print_field(value, separator, key, content) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      separator = index(value, ":")
+      if (separator == 0) {
+        return
+      }
+      key = substr(value, 1, separator - 1)
+      content = substr(value, separator + 1)
+      sub(/^[[:space:]]+/, "", key)
+      sub(/[[:space:]]+$/, "", key)
+      sub(/^[[:space:]]+/, "", content)
+      sub(/[[:space:]]+$/, "", content)
+      print key "|" content
     }
   '
 }
 
+plan_field() {
+  local key="$1"
+  awk -F'|' -v wanted="$key" '$1 == wanted { value = $0; sub(/^[^|]*\|/, "", value); sub(/^"/, "", value); sub(/"$/, "", value); print value; exit }'
+}
+
 plan_step_lines() {
   local plan="$1" line id status dep
-  sed -nE '/^[[:space:]]+-[[:space:]]+\{id:[[:space:]]*P[0-9]+-[0-9]+,/p' "$plan" \
+  sed -nE '/^[[:space:]]+-[[:space:]]+\{id:[[:space:]]*"?P[0-9]+-[0-9]+"?,/p' "$plan" \
     | while IFS= read -r line; do
-        plain_line=$(plan_strip_quoted <<<"$line")
-        id=$(sed -nE 's/.*\{id:[[:space:]]*([A-Z0-9]+-[0-9]+),.*/\1/p' <<<"$plain_line")
-        status=$(sed -nE 's/.*file:[[:space:]]*steps\/P[0-9]+-[0-9]+\.yaml,[[:space:]]*status:[[:space:]]*([a-z_]+).*/\1/p' <<<"$plain_line")
-        dep=$(sed -nE 's/.*depends_on:[[:space:]]*\[([^]]*)\].*/\1/p' <<<"$plain_line" | tr -d '[:space:]')
+        fields=$(plan_flow_fields <<<"$line")
+        id=$(plan_field id <<<"$fields")
+        status=$(plan_field status <<<"$fields")
+        dep=$(plan_field depends_on <<<"$fields" | tr -d '[][:space:]')
         printf '%s|%s|%s\n' "$id" "$status" "$dep"
       done
 }

@@ -95,6 +95,7 @@ public final class PlanCheck {
     validateReferencedFiles();
     validateAllStepFiles();
     validateDependencies();
+    validateOwnerActions();
     validateFindings();
   }
 
@@ -195,6 +196,12 @@ public final class PlanCheck {
         String status = string(step.get("status"));
         if (status != null && !STATUSES.contains(status)) {
           error(planFile, "step " + id + ".status", "must be one of " + STATUSES);
+        }
+        if ("done".equals(status)) {
+          Object evidence = step.get("evidence");
+          if (!(evidence instanceof String) || ((String) evidence).isBlank()) {
+            error(planFile, "step " + id + ".evidence", "required when status is done");
+          }
         }
         steps.put(id, new StepRef(id, phaseId, file, dependencies == null ? List.of() : dependencies, status));
       }
@@ -467,6 +474,41 @@ public final class PlanCheck {
       for (String step : closingSteps.split(",")) {
         if (!steps.containsKey(step.trim())) {
           error(root.resolve("plan.yaml"), "finding " + findingId + ".step", "unknown step " + step.trim());
+        }
+      }
+    }
+  }
+
+  private void validateOwnerActions() {
+    Object actionsValue = plan.get("owner_actions_required");
+    if (!(actionsValue instanceof List<?> actions)) {
+      return;
+    }
+    for (Object actionValue : actions) {
+      if (!(actionValue instanceof Map<?, ?> action)) {
+        error(root.resolve("plan.yaml"), "owner_actions_required[]", "must contain maps");
+        continue;
+      }
+      String actionId = string(action.get("id"));
+      String actionPath = actionId == null ? "owner action <unknown>" : "owner action " + actionId;
+      for (String key : List.of("id", "text", "step")) {
+        if (!action.containsKey(key)) {
+          error(root.resolve("plan.yaml"), actionPath + "." + key, "missing key");
+        }
+      }
+      requireType(action, "id", String.class, root.resolve("plan.yaml"), actionPath + ".id");
+      requireType(action, "text", String.class, root.resolve("plan.yaml"), actionPath + ".text");
+      requireType(action, "step", String.class, root.resolve("plan.yaml"), actionPath + ".step");
+      if (actionId != null && !actionId.matches("OA-[0-9]+")) {
+        error(root.resolve("plan.yaml"), actionPath + ".id", "must match OA-<n>");
+      }
+      String closingSteps = string(action.get("step"));
+      if (closingSteps == null) {
+        continue;
+      }
+      for (String step : closingSteps.split(",")) {
+        if (!steps.containsKey(step.trim())) {
+          error(root.resolve("plan.yaml"), actionPath + ".step", "unknown step " + step.trim());
         }
       }
     }
