@@ -42,10 +42,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.vault.model.Source
@@ -83,69 +83,119 @@ fun ViewerScreen(
 
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = {
-            TopAppBar(
-                title = { Text(sourceLabel(source)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.viewer_back_content_description),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onDeleteRequested) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.viewer_delete_content_description),
-                        )
-                    }
-                },
-            )
-        },
+        topBar = { ViewerTopBar(source, onBack, onDeleteRequested) },
     ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                ViewerImage(source, bytes, selectedRegion)
-                if (selectedRegion != null) {
-                    // TalkBack does not receive visual Canvas changes by
-                    // itself. Announce the result of the evidence action as a
-                    // polite live region while keeping the untrusted image
-                    // content inert.
-                    Text(
-                        stringResource(R.string.viewer_evidence_region_highlighted),
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                DetailsSection(source = source, verified = verified)
-                OcrSection(
-                    source = source,
-                    state = ocrState,
-                    onExtractText = onExtractText,
-                    onCancel = onCancelOcr,
-                    onSelectRegion = { selectedRegion = it },
-                    onCorrect = { span ->
-                        correctingSpan = span
-                        correctionText = span.text
-                    },
-                    onReview = onReview,
-                )
-            }
-        }
+        ViewerContent(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            source = source,
+            bytes = bytes,
+            selectedRegion = selectedRegion,
+            verified = verified,
+            ocrState = ocrState,
+            onExtractText = onExtractText,
+            onCancelOcr = onCancelOcr,
+            onSelectRegion = { selectedRegion = it },
+            onCorrect = { span ->
+                correctingSpan = span
+                correctionText = span.text
+            },
+            onReview = onReview,
+        )
     }
 
-    correctingSpan?.let { span ->
+    ViewerCorrectionDialog(
+        span = correctingSpan,
+        correctionText = correctionText,
+        onCorrectionTextChange = { correctionText = it },
+        onDismiss = { correctingSpan = null },
+        onSave = onCorrect,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Unit) {
+    TopAppBar(
+        title = { Text(sourceLabel(source)) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.viewer_back_content_description),
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.viewer_delete_content_description),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun ViewerContent(
+    modifier: Modifier,
+    source: Source,
+    bytes: ByteArray?,
+    selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?,
+    verified: Boolean,
+    ocrState: OcrUiState,
+    onExtractText: () -> Unit,
+    onCancelOcr: () -> Unit,
+    onSelectRegion: (org.openlife.vault.ocr.OcrEvidenceRegion) -> Unit,
+    onCorrect: (OcrSpan) -> Unit,
+    onReview: (OcrReviewState) -> Unit,
+) {
+    Surface(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            ViewerImage(source, bytes, selectedRegion)
+            if (selectedRegion != null) {
+                // TalkBack does not receive visual Canvas changes by itself.
+                // Announce the evidence action as a polite live region while
+                // keeping the untrusted image content inert.
+                Text(
+                    stringResource(R.string.viewer_evidence_region_highlighted),
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            DetailsSection(source = source, verified = verified)
+            OcrSection(
+                source = source,
+                state = ocrState,
+                onExtractText = onExtractText,
+                onCancel = onCancelOcr,
+                onSelectRegion = onSelectRegion,
+                onCorrect = onCorrect,
+                onReview = onReview,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ViewerCorrectionDialog(
+    span: OcrSpan?,
+    correctionText: String,
+    onCorrectionTextChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (OcrSpan, String) -> Unit,
+) {
+    span?.let { currentSpan ->
         AlertDialog(
-            onDismissRequest = { correctingSpan = null },
+            onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.viewer_correct_title)) },
             text = {
                 OutlinedTextField(
                     value = correctionText,
-                    onValueChange = { correctionText = it },
+                    onValueChange = onCorrectionTextChange,
                     label = { Text(stringResource(R.string.viewer_correction_label)) },
                     singleLine = false,
                 )
@@ -153,13 +203,13 @@ fun ViewerScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (correctionText.isNotEmpty()) onCorrect(span, correctionText)
-                        correctingSpan = null
+                        if (correctionText.isNotEmpty()) onSave(currentSpan, correctionText)
+                        onDismiss()
                     },
                 ) { Text(stringResource(R.string.viewer_save_correction)) }
             },
             dismissButton = {
-                TextButton(onClick = { correctingSpan = null }) { Text(stringResource(R.string.cancel_action)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
             },
         )
     }

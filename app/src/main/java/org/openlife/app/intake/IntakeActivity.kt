@@ -7,8 +7,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -25,8 +25,8 @@ import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
-import org.openlife.app.ui.IntakeScreen
 import org.openlife.app.ui.IntakeRejectionMessage
+import org.openlife.app.ui.IntakeScreen
 import org.openlife.app.ui.IntakeUiState
 import org.openlife.app.ui.IntakeViewModel
 import org.openlife.app.ui.applySecureWindow
@@ -235,13 +235,19 @@ class IntakeActivity : ComponentActivity() {
 
 private fun describeIntentRejection(reason: IntakeRejectionReason): IntakeRejectionMessage = when (reason) {
     IntakeRejectionReason.WRONG_ACTION -> IntakeRejectionMessage.UNSUPPORTED_ACTION
+
     IntakeRejectionReason.NO_CANDIDATE -> IntakeRejectionMessage.NO_IMAGE
+
     IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES -> IntakeRejectionMessage.MULTIPLE_ITEMS
+
     IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> IntakeRejectionMessage.UNSUPPORTED_SOURCE
+
     IntakeRejectionReason.OWN_AUTHORITY,
     IntakeRejectionReason.MALFORMED_URI,
     -> IntakeRejectionMessage.INVALID_SOURCE
+
     IntakeRejectionReason.MISSING_READ_GRANT -> IntakeRejectionMessage.MISSING_READ_ACCESS
+
     IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> IntakeRejectionMessage.UNSUPPORTED_OR_MISSING_TYPE
 }
 

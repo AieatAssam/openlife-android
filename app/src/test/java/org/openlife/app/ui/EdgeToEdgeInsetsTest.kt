@@ -1,9 +1,9 @@
 package org.openlife.app.ui
 
-import java.nio.file.Files
-import java.nio.file.Path
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Path
 
 class EdgeToEdgeInsetsTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
@@ -14,7 +14,10 @@ class EdgeToEdgeInsetsTest {
             "app/src/main/java/org/openlife/app/MainActivity.kt",
             "app/src/main/java/org/openlife/app/intake/IntakeActivity.kt",
         ).map { Files.readString(projectDir.resolve(it)) }
-        assertTrue("every activity must opt into edge-to-edge", activitySources.all { it.contains("enableEdgeToEdge()") })
+        assertTrue(
+            "every activity must opt into edge-to-edge",
+            activitySources.all { it.contains("enableEdgeToEdge()") },
+        )
 
         val screenSources = Files.walk(projectDir.resolve("app/src/main/java/org/openlife/app/ui")).use { paths ->
             paths.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }

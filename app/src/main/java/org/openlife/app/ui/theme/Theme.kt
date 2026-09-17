@@ -6,10 +6,7 @@ import androidx.compose.runtime.Composable
 
 /** Fixed OpenLife identity: wallpaper/dynamic colour is intentionally disabled. */
 @Composable
-fun OpenLifeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun OpenLifeTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (darkTheme) OpenLifeDarkColors else OpenLifeLightColors,
         typography = OpenLifeTypography,

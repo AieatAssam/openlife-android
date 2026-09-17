@@ -153,7 +153,10 @@ private fun SourceRow(
                     value = loadThumbnail(source.id)
                 }
                 bitmap?.let {
-                    Image(it.asImageBitmap(), contentDescription = stringResource(R.string.saved_image_thumbnail_content_description))
+                    Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = stringResource(R.string.saved_image_thumbnail_content_description),
+                    )
                 }
             }
         }
@@ -170,8 +173,11 @@ private fun SourceRow(
             Icon(
                 Icons.Filled.Delete,
                 contentDescription = stringResource(
-                    if (deletionPending) R.string.retry_deletion_content_description
-                    else R.string.delete_content_description,
+                    if (deletionPending) {
+                        R.string.retry_deletion_content_description
+                    } else {
+                        R.string.delete_content_description
+                    },
                 ),
             )
         }

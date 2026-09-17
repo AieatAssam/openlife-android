@@ -194,10 +194,12 @@ private fun formatBytes(bytes: Long): String = when {
         R.string.intake_size_megabytes,
         bytes / BYTES_PER_MEBIBYTE.toDouble(),
     )
+
     bytes >= BYTES_PER_KIBIBYTE -> stringResource(
         R.string.intake_size_kilobytes,
         bytes / BYTES_PER_KIBIBYTE.toDouble(),
     )
+
     else -> stringResource(R.string.intake_size_bytes, bytes)
 }
 

@@ -1,11 +1,11 @@
 package org.openlife.app.ui
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.stream.Collectors
-import java.util.regex.Pattern
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.regex.Pattern
+import java.util.stream.Collectors
 
 class NoHardcodedUiStringsTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
