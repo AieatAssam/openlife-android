@@ -62,9 +62,27 @@ bash "$ROOT/scripts/plan-check.sh" "$ROOT/plan" >"$TMP/real.out"
 assert_contains "plan-check accepts the real plan" "errors=0" "$(<"$TMP/real.out")"
 
 cp -R "$ROOT/plan" "$TMP/plan-status"
-sed -i 's#status: in_progress, started: 2026-09-16, depends_on:#status: todo, depends_on:#' "$TMP/plan-status/plan.yaml"
+sed -i -E 's/status: (in_progress|review),/status: todo,/' "$TMP/plan-status/plan.yaml"
 status_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status")"
 assert_contains "plan-status lists P0-01 as runnable" $'--- runnable (todo, all deps done) ---\nP0-01' "$status_output"
+
+cp -R "$ROOT/plan" "$TMP/plan-missing-phase-key"
+sed -i '/^    title: Engineering foundation$/d' "$TMP/plan-missing-phase-key/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-missing-phase-key" >"$TMP/missing-phase-key.out" 2>&1
+missing_phase_key_status=$?
+set -e
+assert_nonzero "plan-check rejects a missing phase key" "$TMP/missing-phase-key.out" "$missing_phase_key_status"
+assert_contains "missing-phase-key diagnostic names key" "phases[P0].title: missing key" "$(<"$TMP/missing-phase-key.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-missing-master-key"
+sed -i 's/, owner: agent}/}/' "$TMP/plan-missing-master-key/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-missing-master-key" >"$TMP/missing-master-key.out" 2>&1
+missing_master_key_status=$?
+set -e
+assert_nonzero "plan-check rejects a missing master-step key" "$TMP/missing-master-key.out" "$missing_master_key_status"
+assert_contains "missing-master-key diagnostic names key" "step P0-01.owner: missing key" "$(<"$TMP/missing-master-key.out")"
 
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
