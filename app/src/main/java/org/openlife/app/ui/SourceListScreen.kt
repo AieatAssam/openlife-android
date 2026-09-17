@@ -1,6 +1,5 @@
 package org.openlife.app.ui
 
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,9 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
-import java.util.UUID
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,9 +60,9 @@ fun SourceListScreen(
                     IconButton(onClick = onImportFromPhotoPicker) {
                         Icon(Icons.Filled.Add, contentDescription = "Import from photos")
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (state) {
@@ -70,7 +70,10 @@ fun SourceListScreen(
                     Text("Loading…")
                 }
 
-                is SourceListUiState.VaultUnavailable -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                is SourceListUiState.VaultUnavailable -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text("The vault is unavailable: ${state.reason}")
                 }
 
@@ -135,7 +138,11 @@ private fun SourceRow(
             if (source.state == SourceState.CORRUPT || deletionPending) {
                 Icon(Icons.Filled.Warning, contentDescription = "Content unavailable")
             } else {
-                val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, source.id, thumbnailGeneration) {
+                val bitmap by produceState<android.graphics.Bitmap?>(
+                    initialValue = null,
+                    source.id,
+                    thumbnailGeneration,
+                ) {
                     value = loadThumbnail(source.id)
                 }
                 bitmap?.let { Image(it.asImageBitmap(), contentDescription = "Saved image thumbnail") }

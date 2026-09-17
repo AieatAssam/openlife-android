@@ -55,6 +55,12 @@
             </intent-filter>
         </activity>
 
+        <!-- ProfileInstaller's exported receiver is not part of OpenLife's
+             boundary; release must expose only the two intentional activities. -->
+        <receiver
+            android:name="${profileInstallerReceiverClass}"
+            tools:node="remove" />
+
     </application>
 
 </manifest>

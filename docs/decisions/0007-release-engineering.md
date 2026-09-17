@@ -54,3 +54,26 @@ The implementation and verification commands are defined in
 `plan/steps/P0-02.yaml`. The checksum corruption check is a documented CI
 manual check because it must mutate a disposable verification fixture rather
 than the committed metadata.
+
+## Static analysis and boundary enforcement
+
+P0-03 makes Detekt the repository's single Kotlin static-analysis entry point.
+The committed `config/detekt/detekt.yml` uses official Kotlin formatting with a
+120-column limit, permits the Compose convention of capitalized composable
+names, and keeps the complexity limits at LongMethod 80 lines and
+CyclomaticComplexMethod 15. The Detekt 2.x formatting ruleset is provided by
+`dev.detekt:detekt-rules-ktlint-wrapper`; no separate ktlint plugin is used.
+There is no Detekt baseline, and the root `detekt` task runs both shipped
+modules without type resolution.
+
+Android Lint is configured in both modules with `abortOnError`,
+`warningsAsErrors`, and `checkReleaseBuilds` enabled. Security, Correctness,
+and Performance findings therefore fail the build; Accessibility remains an
+explicit warning until P1-10. `app/lint.xml` contains only the documented
+version-advisory suppressions for the pinned dependency policy and the
+profileinstaller merge-marker `MissingClass`; `vault/lint.xml` contains no
+suppression. The release-manifest boundary test depends on complete release
+manifest processing and rejects broad permissions or exported components
+outside the two intentional activities. The source boundary test rejects
+logging, clipboard/WebView channels, and outbound intent actions outside the
+named intake/same-app paths.

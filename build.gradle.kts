@@ -10,6 +10,12 @@ plugins {
     alias(libs.plugins.dependency.license.report) apply false
 }
 
+tasks.register("detekt") {
+    group = "verification"
+    description = "Run detekt for every shipped Kotlin module."
+    dependsOn(":app:detekt", ":vault:detekt")
+}
+
 tasks.register("generateLicenseReport") {
     dependsOn(":app:generateLicenseReport")
 }

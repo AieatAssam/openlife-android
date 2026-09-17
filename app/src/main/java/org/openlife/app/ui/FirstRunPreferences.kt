@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
 
 /**
  * Design §8: "First-run explanation must state that the vault has no sync
@@ -32,7 +33,9 @@ object FirstRunPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_ACKNOWLEDGED, false)
 
     fun setAcknowledged(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_ACKNOWLEDGED, true).apply()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+            putBoolean(KEY_ACKNOWLEDGED, true)
+        }
     }
 }
 
@@ -54,11 +57,11 @@ fun FirstRunExplanationScreen(onContinue: () -> Unit) {
                 Text(
                     "OpenLife keeps what you import only on this device. There is no cloud " +
                         "backup and no sync — uninstalling the app or losing this device can " +
-                        "permanently lose everything you've saved here."
+                        "permanently lose everything you've saved here.",
                 )
                 Text(
                     "Anyone who can unlock this device can open OpenLife. There is no " +
-                        "separate app passcode in this version."
+                        "separate app passcode in this version.",
                 )
             }
             Button(modifier = Modifier.padding(top = 24.dp), onClick = onContinue) {

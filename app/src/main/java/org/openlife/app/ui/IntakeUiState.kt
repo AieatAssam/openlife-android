@@ -1,7 +1,7 @@
 package org.openlife.app.ui
 
-import java.util.UUID
 import org.openlife.vault.model.ImageFormat
+import java.util.UUID
 
 sealed interface IntakeUiState {
     data object Preparing : IntakeUiState

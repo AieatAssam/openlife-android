@@ -7,8 +7,6 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import java.io.InputStream
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,6 +22,8 @@ import org.openlife.vault.repository.ImageRejectionReason
 import org.openlife.vault.repository.ImportLimits
 import org.openlife.vault.repository.PrepareResult
 import org.openlife.vault.repository.SaveResult
+import java.io.InputStream
+import java.util.UUID
 
 private fun describeImageRejection(reason: ImageRejectionReason): String = when (reason) {
     ImageRejectionReason.EXCEEDS_BYTE_LIMIT -> "the file is too large"
@@ -44,10 +44,8 @@ private const val KEY_SOURCE_ID = "org.openlife.app.ui.IntakeViewModel.sourceId"
  * re-authenticates the stage from disk rather than trusting anything held
  * in memory across the recreation.
  */
-class IntakeViewModel(
-    private val application: OpenLifeApp,
-    private val savedStateHandle: SavedStateHandle,
-) : ViewModel() {
+class IntakeViewModel(private val application: OpenLifeApp, private val savedStateHandle: SavedStateHandle) :
+    ViewModel() {
 
     private val _state = MutableStateFlow<IntakeUiState>(IntakeUiState.Preparing)
     val state: StateFlow<IntakeUiState> = _state
@@ -82,6 +80,7 @@ class IntakeViewModel(
                             closeQuietly(input)
                             _state.value = IntakeUiState.VaultUnavailable(access.reason)
                         }
+
                         is VaultAccess.Ready -> {
                             val result = withContext(Dispatchers.IO) {
                                 // Cooperative cancellation: closing the descriptor is
@@ -124,12 +123,20 @@ class IntakeViewModel(
                 } else {
                     val previewBytes = access.viewRepository.loadStagePreviewBytes(result.sourceId)
                     IntakeUiState.Preview(
-                        result.sourceId, result.format, result.width, result.height, result.byteCount, previewBytes
+                        result.sourceId,
+                        result.format,
+                        result.width,
+                        result.height,
+                        result.byteCount,
+                        previewBytes,
                     )
                 }
             }
+
             is PrepareResult.Rejected -> IntakeUiState.Rejected(describeImageRejection(result.reason))
+
             PrepareResult.Busy -> IntakeUiState.Busy
+
             PrepareResult.Failed -> IntakeUiState.Failed
         }
     }
@@ -138,6 +145,7 @@ class IntakeViewModel(
         viewModelScope.launch {
             when (val access = application.vault()) {
                 is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
+
                 is VaultAccess.Ready -> {
                     val source = access.viewRepository.findSource(id)
                     if (source == null || source.state != SourceState.STAGED) {
@@ -146,7 +154,12 @@ class IntakeViewModel(
                     }
                     val previewBytes = access.viewRepository.loadStagePreviewBytes(id)
                     _state.value = IntakeUiState.Preview(
-                        id, source.mimeType!!, source.width!!, source.height!!, source.byteCount!!, previewBytes
+                        id,
+                        source.mimeType!!,
+                        source.width!!,
+                        source.height!!,
+                        source.byteCount!!,
+                        previewBytes,
                     )
                 }
             }
@@ -164,6 +177,7 @@ class IntakeViewModel(
             _state.value = IntakeUiState.Saving(id)
             when (val access = application.vault()) {
                 is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
+
                 is VaultAccess.Ready -> {
                     _state.value = when (val result = access.importRepository.saveImport(id)) {
                         is SaveResult.Saved -> IntakeUiState.Saved(id)

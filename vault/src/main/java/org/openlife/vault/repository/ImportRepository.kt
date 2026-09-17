@@ -1,10 +1,5 @@
 package org.openlife.vault.repository
 
-import java.io.IOException
-import java.io.InputStream
-import java.security.SecureRandom
-import java.util.UUID
-import javax.crypto.spec.SecretKeySpec
 import org.openlife.vault.crypto.AesGcmCodec
 import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeCodec
@@ -18,6 +13,11 @@ import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
+import java.io.IOException
+import java.io.InputStream
+import java.security.SecureRandom
+import java.util.UUID
+import javax.crypto.spec.SecretKeySpec
 
 private const val DEK_LENGTH_BYTES = 32
 private const val SCHEMA_ARTEFACT_VERSION = 1
@@ -50,9 +50,8 @@ class ImportRepository(
         inputStream: InputStream,
         declaredMimeType: String,
         intakeKind: IntakeKind,
-    ): PrepareResult =
-        mutationQueue.tryAcquire { prepareImportLocked(inputStream, declaredMimeType, intakeKind) }
-            ?: PrepareResult.Busy
+    ): PrepareResult = mutationQueue.tryAcquire { prepareImportLocked(inputStream, declaredMimeType, intakeKind) }
+        ?: PrepareResult.Busy
 
     private suspend fun prepareImportLocked(
         inputStream: InputStream,
@@ -85,7 +84,7 @@ class ImportRepository(
 
             val read = try {
                 BoundedStreamReader.read(inputStream)
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 cancelStage(sourceId)
                 return PrepareResult.Failed
             }
@@ -106,10 +105,10 @@ class ImportRepository(
                 val artefactEnvelope = AesGcmCodec.encrypt(
                     read.bytes,
                     SecretKeySpec(dek, "AES"),
-                    EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId)
+                    EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId),
                 )
                 fileOps.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 cancelStage(sourceId)
                 return PrepareResult.Failed
             }
@@ -190,7 +189,7 @@ class ImportRepository(
             val blobFile = paths.blobFile(sourceId)
             if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
             fileOps.syncDirectory(paths.artefactsDir)
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             return@acquire SaveResult.Failed
         }
 

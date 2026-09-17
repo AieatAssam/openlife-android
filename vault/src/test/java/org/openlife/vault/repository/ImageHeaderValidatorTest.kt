@@ -1,10 +1,10 @@
 package org.openlife.vault.repository
 
-import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.model.ImageFormat
+import java.io.ByteArrayOutputStream
 
 /**
  * Pure-JVM tests against synthetic fixtures built in-test (never real
@@ -16,12 +16,26 @@ class ImageHeaderValidatorTest {
 
     private fun be16(value: Int) = byteArrayOf((value shr 8).toByte(), value.toByte())
     private fun be32(value: Long) = byteArrayOf(
-        (value shr 24).toByte(), (value shr 16).toByte(), (value shr 8).toByte(), value.toByte()
+        (value shr 24).toByte(),
+        (value shr 16).toByte(),
+        (value shr 8).toByte(),
+        value.toByte(),
     )
 
     private fun syntheticPng(width: Long, height: Long, animated: Boolean = false): ByteArray {
         val out = ByteArrayOutputStream()
-        out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 0x0D, 0x0A, 0x1A, 0x0A))
+        out.write(
+            byteArrayOf(
+                0x89.toByte(),
+                'P'.code.toByte(),
+                'N'.code.toByte(),
+                'G'.code.toByte(),
+                0x0D,
+                0x0A,
+                0x1A,
+                0x0A,
+            ),
+        )
 
         out.write(be32(13)) // IHDR length
         out.write("IHDR".toByteArray(Charsets.US_ASCII))
@@ -181,7 +195,10 @@ class ImageHeaderValidatorTest {
     @Test
     fun byteCountAtLimitPlusOneIsRejected() {
         val padded = syntheticPng(10, 10) + ByteArray((ImportLimits.MAX_ORIGINAL_BYTES).toInt())
-        assertTrue(padded.size.toLong() == ImportLimits.MAX_ORIGINAL_BYTES + 1 || padded.size.toLong() > ImportLimits.MAX_ORIGINAL_BYTES)
+        assertTrue(
+            padded.size.toLong() == ImportLimits.MAX_ORIGINAL_BYTES + 1 ||
+                padded.size.toLong() > ImportLimits.MAX_ORIGINAL_BYTES,
+        )
         val result = ImageHeaderValidator.validate("image/png", padded)
         assertEquals(ImageValidationResult.Rejected(ImageRejectionReason.EXCEEDS_BYTE_LIMIT), result)
     }

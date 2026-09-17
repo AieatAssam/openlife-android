@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +14,7 @@ import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRunResult
+import java.util.UUID
 
 class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
     private val _states = MutableStateFlow<Map<UUID, OcrUiState>>(emptyMap())
@@ -33,8 +33,11 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
                     sourceId,
                     OcrUiState.Ready(sourceId, result.revisionId, result.spans),
                 )
+
                 is OcrRunResult.Failed -> setState(sourceId, OcrUiState.Failed(sourceId, result.reason))
+
                 is OcrRunResult.Cancelled -> setState(sourceId, OcrUiState.Cancelled(sourceId))
+
                 is OcrRunResult.Stale -> setState(sourceId, OcrUiState.Stale(sourceId))
             }
         }
@@ -45,14 +48,14 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
         setState(sourceId, OcrUiState.Cancelled(sourceId))
     }
 
-    fun correct(sourceId: UUID, revisionId: UUID, spanId: UUID, correctedText: String) {
+    fun correct(revisionId: UUID, spanId: UUID, correctedText: String) {
         viewModelScope.launch {
             val access = application.vault() as? VaultAccess.Ready ?: return@launch
             access.ocrRepository.addCorrection(revisionId, spanId, correctedText)
         }
     }
 
-    fun review(sourceId: UUID, revisionId: UUID, reviewState: OcrReviewState) {
+    fun review(revisionId: UUID, reviewState: OcrReviewState) {
         viewModelScope.launch {
             val access = application.vault() as? VaultAccess.Ready ?: return@launch
             access.ocrRepository.setReviewState(revisionId, reviewState)

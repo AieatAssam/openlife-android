@@ -19,6 +19,7 @@ uiautomator = "2.4.0"
 mlkitTextRecognition = "16.0.1"
 cyclonedx = "3.4.1"
 dependencyLicenseReport = "3.1.4"
+detekt = "2.0.0-alpha.6"
 
 [libraries]
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,6 +52,7 @@ androidx-test-runner = { group = "androidx.test", name = "runner", version.ref =
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+detekt-rules-ktlint-wrapper = { group = "dev.detekt", name = "detekt-rules-ktlint-wrapper", version.ref = "detekt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -60,3 +62,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 dependency-license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "dependencyLicenseReport" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }

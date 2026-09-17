@@ -82,7 +82,7 @@ class with
 
 ```bash
 scripts/plan-check.sh                       # plan files valid
-./gradlew detekt lint :app:test :vault:test assembleDebug   # every change (detekt from P0-03 on)
+./gradlew detekt lint :app:test :vault:test assembleDebug   # every change (detekt/lint from P0-03 on)
 ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest  # emulator/device
 ```
 

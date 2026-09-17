@@ -18,23 +18,35 @@ object SampledBitmapDecoder {
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
         var sampleSize = initialSampleSize(bounds.outWidth, bounds.outHeight)
-        while (true) {
+        var decoded: Bitmap? = null
+        var exhausted = false
+        while (decoded == null && !exhausted) {
             val bitmap = BitmapFactory.decodeByteArray(
                 bytes,
                 0,
                 bytes.size,
                 BitmapFactory.Options().apply { inSampleSize = sampleSize },
-            ) ?: return null
-
-            val pixelCount = bitmap.width.toLong() * bitmap.height.toLong()
-            if (pixelCount <= ImportLimits.MAX_PREVIEW_PIXELS) return bitmap
-
-            // A codec may round up despite inSampleSize. Recycle that result
-            // before retrying so a hostile image cannot accumulate bitmaps.
-            bitmap.recycle()
-            if (sampleSize > Int.MAX_VALUE / 2) return null
-            sampleSize *= 2
+            )
+            if (bitmap == null) {
+                exhausted = true
+            } else {
+                val pixelCount = bitmap.width.toLong() * bitmap.height.toLong()
+                if (pixelCount <= ImportLimits.MAX_PREVIEW_PIXELS) {
+                    decoded = bitmap
+                } else {
+                    // A codec may round up despite inSampleSize. Recycle that
+                    // result before retrying so a hostile image cannot
+                    // accumulate bitmaps.
+                    bitmap.recycle()
+                    if (sampleSize > Int.MAX_VALUE / 2) {
+                        exhausted = true
+                    } else {
+                        sampleSize *= 2
+                    }
+                }
+            }
         }
+        return decoded
     }
 
     private fun initialSampleSize(width: Int, height: Int): Int {

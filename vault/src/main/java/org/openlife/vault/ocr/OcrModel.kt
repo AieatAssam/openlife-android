@@ -1,7 +1,5 @@
 package org.openlife.vault.ocr
 
-import kotlin.math.max
-import kotlin.math.min
 import org.openlife.vault.model.Orientation
 
 /** Limits for one local OCR operation and its persisted derived output. */
@@ -15,12 +13,7 @@ object OcrLimits {
 }
 
 /** A rectangle in a declared image coordinate system. Right/bottom are exclusive. */
-data class OcrEvidenceRegion(
-    val left: Int,
-    val top: Int,
-    val right: Int,
-    val bottom: Int,
-) {
+data class OcrEvidenceRegion(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     init {
         require(left >= 0 && top >= 0) { "Evidence coordinates cannot be negative" }
         require(right >= left && bottom >= top) { "Evidence rectangle must be ordered" }
@@ -28,11 +21,7 @@ data class OcrEvidenceRegion(
 }
 
 /** Engine output before it receives a revision/span identity. */
-data class OcrSpanDraft(
-    val text: String,
-    val confidence: Float?,
-    val region: OcrEvidenceRegion?,
-) {
+data class OcrSpanDraft(val text: String, val confidence: Float?, val region: OcrEvidenceRegion?) {
     init {
         require(text.isNotEmpty()) { "OCR spans cannot be empty" }
         if (confidence != null) {
@@ -100,15 +89,11 @@ object OcrCoordinateMapper {
         Orientation.TRANSPOSE,
         Orientation.TRANSVERSE,
         -> true
+
         else -> false
     }
 
-    private fun transform(
-        point: Point,
-        width: Int,
-        height: Int,
-        orientation: Orientation,
-    ): Point = when (orientation) {
+    private fun transform(point: Point, width: Int, height: Int, orientation: Orientation): Point = when (orientation) {
         Orientation.NORMAL -> point
         Orientation.ROTATE_90 -> Point(point.y, width - point.x)
         Orientation.ROTATE_180 -> Point(width - point.x, height - point.y)

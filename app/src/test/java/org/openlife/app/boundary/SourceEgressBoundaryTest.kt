@@ -1,10 +1,10 @@
 package org.openlife.app.boundary
 
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
-import org.junit.Assert.assertTrue
-import org.junit.Test
 
 class SourceEgressBoundaryTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))

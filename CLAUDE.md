@@ -60,7 +60,7 @@ Claude-specific reminders:
 
 ```bash
 scripts/plan-check.sh
-./gradlew detekt lint :app:test :vault:test assembleDebug     # every change (detekt exists from P0-03)
+./gradlew detekt lint :app:test :vault:test assembleDebug     # every change (detekt/lint enforced from P0-03)
 ./gradlew :vault:test :app:test                                # fast loop
 ./gradlew connectedDebugAndroidTest                            # emulator must be booted first (below)
 bash scripts/release-smoke.sh app/build/outputs/apk/release/*.apk   # from P0-06 on

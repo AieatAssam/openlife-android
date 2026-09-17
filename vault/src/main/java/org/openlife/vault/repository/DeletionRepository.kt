@@ -1,11 +1,11 @@
 package org.openlife.vault.repository
 
-import java.util.UUID
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
+import java.util.UUID
 
 /**
  * Design §12 "Deletion contract". Deleting a Source is app-level deletion —
@@ -60,5 +60,4 @@ class DeletionRepository(
         database.sourceDao().deleteById(sourceId.toString())
         DeleteResult.Deleted
     }
-
 }

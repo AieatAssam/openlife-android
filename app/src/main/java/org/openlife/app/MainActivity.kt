@@ -1,6 +1,7 @@
 package org.openlife.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.MutableStateFlow
-import java.util.UUID
 import org.openlife.app.intake.IntakeActivity
 import org.openlife.app.ui.DeleteConfirmationDialog
 import org.openlife.app.ui.FirstRunExplanationScreen
@@ -27,6 +27,7 @@ import org.openlife.app.ui.ViewerScreen
 import org.openlife.app.ui.applySecureWindow
 import org.openlife.app.ui.sourceLabel
 import org.openlife.vault.model.IntakeKind
+import java.util.UUID
 
 private sealed interface Screen {
     data object List : Screen
@@ -68,133 +69,167 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySecureWindow()
+        setContent { MainContent() }
+    }
 
-        setContent {
-            var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
-            var screen by rememberSaveable(stateSaver = ScreenSaver) {
-                mutableStateOf<Screen>(openSourceIdFrom(intent)?.let { Screen.Viewer(it) } ?: Screen.List)
-            }
-            val requestedSourceId by openSourceRequests.collectAsState()
-            val epoch by backgroundEpoch.collectAsState()
-            val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
-            val ocrStates by ocrViewModel.states.collectAsState()
+    @androidx.compose.runtime.Composable
+    private fun MainContent() {
+        var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this@MainActivity)) }
+        var screen by rememberSaveable(stateSaver = ScreenSaver) {
+            mutableStateOf<Screen>(openSourceIdFrom(intent)?.let { Screen.Viewer(it) } ?: Screen.List)
+        }
+        val requestedSourceId by openSourceRequests.collectAsState()
+        val epoch by backgroundEpoch.collectAsState()
+        val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
+        val ocrStates by ocrViewModel.states.collectAsState()
+        val listState by viewModel.state.collectAsState()
 
-            androidx.compose.runtime.LaunchedEffect(epoch) {
-                if (epoch > 0L) screen = Screen.List
-            }
-            androidx.compose.runtime.LaunchedEffect(requestedSourceId) {
-                requestedSourceId?.let {
-                    screen = Screen.Viewer(it)
-                    openSourceRequests.value = null
-                }
-            }
-
-            val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-                if (uri != null) {
-                    startActivity(
-                        Intent(this, IntakeActivity::class.java).apply {
-                            action = Intent.ACTION_SEND
-                            type = contentResolver.getType(uri) ?: "image/*"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            putExtra(IntakeActivity.EXTRA_INTAKE_KIND, IntakeKind.PHOTO_PICKER.name)
-                            // Forward the Picker's one-shot read grant to the
-                            // exported intake activity. IntakeActivity checks
-                            // this flag before opening the URI.
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                    )
-                }
-            }
-
-            MaterialTheme {
-                if (!acknowledged) {
-                    FirstRunExplanationScreen(
-                        onContinue = {
-                            FirstRunPreferences.setAcknowledged(this)
-                            acknowledged = true
-                        }
-                    )
-                } else {
-                    when (val current = screen) {
-                        Screen.List -> {
-                            val state by viewModel.state.collectAsState()
-                            SourceListScreen(
-                                state = state,
-                                loadThumbnail = viewModel::loadThumbnail,
-                                thumbnailGeneration = thumbnailGeneration,
-                                onOpen = { screen = Screen.Viewer(it) },
-                                onDelete = { viewModel.delete(it) {} },
-                                onImportFromPhotoPicker = {
-                                    pickMedia.launch(
-                                        androidx.activity.result.PickVisualMediaRequest(
-                                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                                        )
-                                    )
-                                },
-                            )
-                        }
-
-                        is Screen.Viewer -> {
-                            val listState = viewModel.state.collectAsState().value
-                            val source = (listState as? SourceListUiState.Loaded)
-                                ?.sources?.find { it.id == current.sourceId }
-                            if (source == null) {
-                                if (listState is SourceListUiState.Loaded) {
-                                    screen = Screen.List
-                                } else {
-                                    SourceListScreen(
-                                        state = listState,
-                                        loadThumbnail = viewModel::loadThumbnail,
-                                        thumbnailGeneration = thumbnailGeneration,
-                                        onOpen = { screen = Screen.Viewer(it) },
-                                        onDelete = { viewModel.delete(it) {} },
-                                        onImportFromPhotoPicker = {
-                                            pickMedia.launch(
-                                                androidx.activity.result.PickVisualMediaRequest(
-                                                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                                                )
-                                            )
-                                        },
-                                    )
-                                }
-                            } else {
-                                var pendingDelete by remember { mutableStateOf(false) }
-                                ViewerScreen(
-                                    source = source,
-                                    loadBytes = { viewModelLoadReadyBytes(current.sourceId) },
-                                    onBack = { screen = Screen.List },
-                                    onDeleteRequested = { pendingDelete = true },
-                                    ocrState = ocrStates[current.sourceId] ?: org.openlife.app.ui.OcrUiState.Idle,
-                                    onExtractText = { ocrViewModel.run(current.sourceId) },
-                                    onCancelOcr = { ocrViewModel.cancel(current.sourceId) },
-                                    onCorrect = { span, correctedText ->
-                                        val ready = ocrStates[current.sourceId] as? org.openlife.app.ui.OcrUiState.Ready
-                                        if (ready != null) {
-                                            ocrViewModel.correct(current.sourceId, ready.revisionId, span.id, correctedText)
-                                        }
-                                    },
-                                    onReview = { reviewState ->
-                                        val ready = ocrStates[current.sourceId] as? org.openlife.app.ui.OcrUiState.Ready
-                                        if (ready != null) ocrViewModel.review(current.sourceId, ready.revisionId, reviewState)
-                                    },
-                                )
-                                if (pendingDelete) {
-                                    DeleteConfirmationDialog(
-                                        itemLabel = sourceLabel(source),
-                                        onConfirm = {
-                                            pendingDelete = false
-                                            viewModel.delete(current.sourceId) {}
-                                            screen = Screen.List
-                                        },
-                                        onDismiss = { pendingDelete = false },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+        androidx.compose.runtime.LaunchedEffect(epoch) {
+            if (epoch > 0L) screen = Screen.List
+        }
+        androidx.compose.runtime.LaunchedEffect(requestedSourceId) {
+            requestedSourceId?.let {
+                screen = Screen.Viewer(it)
+                openSourceRequests.value = null
             }
         }
+
+        val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let(::forwardPickedUri)
+        }
+        val launchPhotoPicker = {
+            pickMedia.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                ),
+            )
+        }
+
+        MaterialTheme {
+            if (!acknowledged) {
+                FirstRunExplanationScreen(
+                    onContinue = {
+                        FirstRunPreferences.setAcknowledged(this@MainActivity)
+                        acknowledged = true
+                    },
+                )
+            } else {
+                MainNavigation(
+                    screen = screen,
+                    listState = listState,
+                    thumbnailGeneration = thumbnailGeneration,
+                    ocrStates = ocrStates,
+                    onScreenChange = { screen = it },
+                    onImportFromPhotoPicker = launchPhotoPicker,
+                )
+            }
+        }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun MainNavigation(
+        screen: Screen,
+        listState: SourceListUiState,
+        thumbnailGeneration: Long,
+        ocrStates: Map<UUID, org.openlife.app.ui.OcrUiState>,
+        onScreenChange: (Screen) -> Unit,
+        onImportFromPhotoPicker: () -> Unit,
+    ) {
+        when (screen) {
+            Screen.List -> SourceListScreen(
+                state = listState,
+                loadThumbnail = viewModel::loadThumbnail,
+                thumbnailGeneration = thumbnailGeneration,
+                onOpen = { onScreenChange(Screen.Viewer(it)) },
+                onDelete = { viewModel.delete(it) {} },
+                onImportFromPhotoPicker = onImportFromPhotoPicker,
+            )
+
+            is Screen.Viewer -> ViewerContent(
+                sourceId = screen.sourceId,
+                listState = listState,
+                thumbnailGeneration = thumbnailGeneration,
+                ocrStates = ocrStates,
+                onScreenChange = onScreenChange,
+                onImportFromPhotoPicker = onImportFromPhotoPicker,
+            )
+        }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun ViewerContent(
+        sourceId: UUID,
+        listState: SourceListUiState,
+        thumbnailGeneration: Long,
+        ocrStates: Map<UUID, org.openlife.app.ui.OcrUiState>,
+        onScreenChange: (Screen) -> Unit,
+        onImportFromPhotoPicker: () -> Unit,
+    ) {
+        val source = (listState as? SourceListUiState.Loaded)?.sources?.find { it.id == sourceId }
+        if (source == null) {
+            if (listState is SourceListUiState.Loaded) {
+                onScreenChange(Screen.List)
+            } else {
+                SourceListScreen(
+                    state = listState,
+                    loadThumbnail = viewModel::loadThumbnail,
+                    thumbnailGeneration = thumbnailGeneration,
+                    onOpen = { onScreenChange(Screen.Viewer(it)) },
+                    onDelete = { viewModel.delete(it) {} },
+                    onImportFromPhotoPicker = onImportFromPhotoPicker,
+                )
+            }
+            return
+        }
+
+        var pendingDelete by remember { mutableStateOf(false) }
+        ViewerScreen(
+            source = source,
+            loadBytes = { viewModelLoadReadyBytes(sourceId) },
+            onBack = { onScreenChange(Screen.List) },
+            onDeleteRequested = { pendingDelete = true },
+            ocrState = ocrStates[sourceId] ?: org.openlife.app.ui.OcrUiState.Idle,
+            onExtractText = { ocrViewModel.run(sourceId) },
+            onCancelOcr = { ocrViewModel.cancel(sourceId) },
+            onCorrect = { span, correctedText ->
+                val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
+                if (ready != null) {
+                    ocrViewModel.correct(ready.revisionId, span.id, correctedText)
+                }
+            },
+            onReview = { reviewState ->
+                val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
+                if (ready != null) {
+                    ocrViewModel.review(ready.revisionId, reviewState)
+                }
+            },
+        )
+        if (pendingDelete) {
+            DeleteConfirmationDialog(
+                itemLabel = sourceLabel(source),
+                onConfirm = {
+                    pendingDelete = false
+                    viewModel.delete(sourceId) {}
+                    onScreenChange(Screen.List)
+                },
+                onDismiss = { pendingDelete = false },
+            )
+        }
+    }
+
+    private fun forwardPickedUri(uri: Uri) {
+        startActivity(
+            Intent(this, IntakeActivity::class.java).apply {
+                action = Intent.ACTION_SEND
+                type = contentResolver.getType(uri) ?: "image/*"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(IntakeActivity.EXTRA_INTAKE_KIND, IntakeKind.PHOTO_PICKER.name)
+                // Forward the Picker's one-shot read grant to the exported
+                // intake activity. IntakeActivity checks this flag before
+                // opening the URI.
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            },
+        )
     }
 
     private suspend fun viewModelLoadReadyBytes(sourceId: UUID): ByteArray? =
@@ -223,5 +258,5 @@ private val ScreenSaver = androidx.compose.runtime.saveable.Saver<Screen, String
         } else {
             Screen.Viewer(UUID.fromString(raw.removePrefix("viewer:")))
         }
-    }
+    },
 )

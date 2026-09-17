@@ -39,11 +39,11 @@ data class SourceEntity(
             intakeKind == other.intakeKind &&
             mimeType == other.mimeType &&
             byteCount == other.byteCount &&
-            (sha256?.contentEquals(other.sha256) ?: (other.sha256 == null)) &&
+            sha256.contentEqualsOrNull(other.sha256) &&
             width == other.width &&
             height == other.height &&
             orientation == other.orientation &&
-            (wrappedDek?.contentEquals(other.wrappedDek) ?: (other.wrappedDek == null)) &&
+            wrappedDek.contentEqualsOrNull(other.wrappedDek) &&
             artefactVersion == other.artefactVersion
     }
 
@@ -62,4 +62,9 @@ data class SourceEntity(
         result = 31 * result + (artefactVersion ?: 0)
         return result
     }
+}
+
+private fun ByteArray?.contentEqualsOrNull(other: ByteArray?): Boolean = when {
+    this == null -> other == null
+    else -> other != null && contentEquals(other)
 }

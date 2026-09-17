@@ -19,7 +19,7 @@ fun DeleteConfirmationDialog(itemLabel: String, onConfirm: () -> Unit, onDismiss
         text = {
             Text(
                 "This removes OpenLife's copy of this item from this device. " +
-                    "There is no undo, and no backup to restore it from."
+                    "There is no undo, and no backup to restore it from.",
             )
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Delete") } },

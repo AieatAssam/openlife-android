@@ -1,24 +1,25 @@
 package org.openlife.app.ui
 
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -32,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,47 +91,13 @@ fun ViewerScreen(
                     IconButton(onClick = onDeleteRequested) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete")
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-                    val decoded = remember(bytes) { bytes?.let(SampledBitmapDecoder::decode) }
-                    DisposableEffect(decoded) {
-                        onDispose {
-                            if (decoded != null && !decoded.isRecycled) decoded.recycle()
-                        }
-                    }
-                    when {
-                        source.state == SourceState.CORRUPT -> Text("This item's saved content is unreadable.")
-                        bytes == null -> Text("Verifying…")
-                        decoded == null -> Text("This item's saved content is unreadable.")
-                        // A generic description preserves privacy while still
-                        // giving a screen reader a useful stop in the source
-                        // evidence flow. OCR text and evidence actions below
-                        // provide the accessible detail.
-                        else -> Image(decoded.asImageBitmap(), contentDescription = "Saved image")
-                    }
-                    if (decoded != null && selectedRegion != null && source.width != null && source.height != null) {
-                        val sourceWidth = source.width!!
-                        val sourceHeight = source.height!!
-                        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                            val region = selectedRegion!!
-                            val left = region.left.toFloat() / sourceWidth * size.width
-                            val top = region.top.toFloat() / sourceHeight * size.height
-                            val right = region.right.toFloat() / sourceWidth * size.width
-                            val bottom = region.bottom.toFloat() / sourceHeight * size.height
-                            drawRect(
-                                color = Color.Yellow,
-                                topLeft = Offset(left, top),
-                                size = Size(right - left, bottom - top),
-                                style = Stroke(width = 4f),
-                            )
-                        }
-                    }
-                }
+                ViewerImage(source, bytes, selectedRegion)
                 if (selectedRegion != null) {
                     // TalkBack does not receive visual Canvas changes by
                     // itself. Announce the result of the evidence action as a
@@ -188,6 +154,47 @@ fun ViewerScreen(
 }
 
 @Composable
+private fun ViewerImage(source: Source, bytes: ByteArray?, selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?) {
+    Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
+        val decoded = remember(bytes) { bytes?.let(SampledBitmapDecoder::decode) }
+        DisposableEffect(decoded) {
+            onDispose {
+                if (decoded != null && !decoded.isRecycled) decoded.recycle()
+            }
+        }
+        when {
+            source.state == SourceState.CORRUPT -> Text("This item's saved content is unreadable.")
+
+            bytes == null -> Text("Verifying…")
+
+            decoded == null -> Text("This item's saved content is unreadable.")
+
+            // A generic description preserves privacy while still giving a
+            // screen reader a useful stop in the source evidence flow.
+            else -> Image(decoded.asImageBitmap(), contentDescription = "Saved image")
+        }
+        val hasDimensions = source.width != null && source.height != null
+        if (decoded != null && selectedRegion != null && hasDimensions) {
+            val sourceWidth = source.width!!
+            val sourceHeight = source.height!!
+            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                val region = selectedRegion
+                val left = region.left.toFloat() / sourceWidth * size.width
+                val top = region.top.toFloat() / sourceHeight * size.height
+                val right = region.right.toFloat() / sourceWidth * size.width
+                val bottom = region.bottom.toFloat() / sourceHeight * size.height
+                drawRect(
+                    color = Color.Yellow,
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, bottom - top),
+                    style = Stroke(width = 4f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun OcrSection(
     source: Source,
     state: OcrUiState,
@@ -203,11 +210,13 @@ private fun OcrSection(
             OcrUiState.Idle -> Button(onClick = onExtractText, enabled = source.state == SourceState.READY) {
                 Text("Extract text on this device")
             }
+
             is OcrUiState.Running -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Extracting locally…")
                 Spacer(Modifier.width(8.dp))
                 TextButton(onClick = onCancel) { Text("Cancel") }
             }
+
             is OcrUiState.Ready -> {
                 if (state.spans.isEmpty()) Text("No Latin text was found.")
                 state.spans.forEach { span ->
@@ -224,8 +233,11 @@ private fun OcrSection(
                     TextButton(onClick = { onReview(OcrReviewState.REJECTED) }) { Text("Reject") }
                 }
             }
+
             is OcrUiState.Failed -> Text("Text extraction was not accepted: ${ocrFailureMessage(state.reason)}")
+
             is OcrUiState.Cancelled -> Text("Text extraction cancelled.")
+
             is OcrUiState.Stale -> Text("Text extraction is stale because the source changed or was deleted.")
         }
         Spacer(Modifier.height(4.dp))
@@ -259,7 +271,7 @@ private fun DetailsSection(source: Source, verified: Boolean) {
                 source.state == SourceState.CORRUPT -> "Unreadable — not verified"
                 verified -> "Verified against the saved copy"
                 else -> "Not yet verified"
-            }
+            },
         )
         Text(
             "Verification confirms this is the exact copy OpenLife saved. It does not confirm " +

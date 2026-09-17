@@ -1,8 +1,8 @@
 package org.openlife.vault.storage
 
-import java.io.File
 import org.openlife.vault.crypto.Envelope
 import org.openlife.vault.crypto.EnvelopeCodec
+import java.io.File
 
 /**
  * Reads and writes the wrapped-database-secret envelope at

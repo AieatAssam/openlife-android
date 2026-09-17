@@ -56,7 +56,7 @@ object IntakeIntentValidator {
 
         val parsed = try {
             URI(candidate)
-        } catch (e: URISyntaxException) {
+        } catch (_: URISyntaxException) {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.MALFORMED_URI)
         }
 
@@ -71,8 +71,10 @@ object IntakeIntentValidator {
         // from becoming a same-app confused-deputy vector by default.
         val authority = parsed.authority
         if (authority != null &&
-            (authority.equals(ownPackageName, ignoreCase = true) ||
-                authority.startsWith("$ownPackageName.", ignoreCase = true))
+            (
+                authority.equals(ownPackageName, ignoreCase = true) ||
+                    authority.startsWith("$ownPackageName.", ignoreCase = true)
+            )
         ) {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY)
         }
@@ -91,7 +93,6 @@ object IntakeIntentValidator {
         isSupportedMimeType(intentMimeType) &&
             intentMimeType.equals(providerMimeType, ignoreCase = true)
 
-    private fun isSupportedMimeType(mimeType: String?): Boolean =
-        mimeType.equals("image/jpeg", ignoreCase = true) ||
-            mimeType.equals("image/png", ignoreCase = true)
+    private fun isSupportedMimeType(mimeType: String?): Boolean = mimeType.equals("image/jpeg", ignoreCase = true) ||
+        mimeType.equals("image/png", ignoreCase = true)
 }

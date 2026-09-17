@@ -1,10 +1,10 @@
 package org.openlife.app.dependencies
 
-import java.nio.file.Files
-import java.nio.file.Path
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Path
 
 class DependencyBoundaryTest {
     private val projectDir: Path = Path.of(System.getProperty("openlife.projectDir", "."))
@@ -70,7 +70,9 @@ class DependencyBoundaryTest {
         assertTrue("licence report is missing: $licenseReport", Files.isRegularFile(licenseReport))
 
         val allowedLicences = fencedSection(policyDocument(), "Allowlisted licences")
-        val dependencyPattern = Regex("\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`")
+        val dependencyPattern = Regex(
+            "\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`",
+        )
         val licensePattern = Regex("\\*\\*(?:(?:POM|Manifest) License|License URL)\\*\\*: ?([^\\n]+)")
         val dependencies = linkedMapOf<String, MutableSet<String>>()
         var currentCoordinate: String? = null

@@ -6,6 +6,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.ocr.MlKitOcrEngine
+import org.openlife.vault.ocr.OcrEngineRegistry
 import org.openlife.vault.repository.AndroidBitmapSampler
 import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.ImportRepository
@@ -13,8 +15,6 @@ import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryRepository
 import org.openlife.vault.repository.SourceViewRepository
-import org.openlife.vault.ocr.MlKitOcrEngine
-import org.openlife.vault.ocr.OcrEngineRegistry
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult

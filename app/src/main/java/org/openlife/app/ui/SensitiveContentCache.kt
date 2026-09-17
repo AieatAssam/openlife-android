@@ -7,9 +7,7 @@ package org.openlife.app.ui
  * background. The eviction callback is responsible for releasing native
  * resources such as [android.graphics.Bitmap] instances.
  */
-internal class SensitiveContentCache<K, V>(
-    private val onEvict: (V) -> Unit,
-) {
+internal class SensitiveContentCache<K, V>(private val onEvict: (V) -> Unit) {
     private val values = mutableMapOf<K, V>()
     private var currentGeneration = 0L
 

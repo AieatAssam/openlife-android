@@ -2,6 +2,7 @@ package org.openlife.vault.crypto
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.util.UUID
 import javax.crypto.Cipher
@@ -45,7 +46,7 @@ class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
         val spec = KeyGenParameterSpec.Builder(
             alias,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
         )
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
@@ -78,11 +79,11 @@ class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
             cipher.init(
                 Cipher.DECRYPT_MODE,
                 wrappingKey(),
-                GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce)
+                GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce),
             )
             cipher.updateAAD(aadFor(domain, sourceId))
             return cipher.doFinal(envelope.ciphertext)
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
             throw EnvelopeAuthenticationException(e)
         }
     }

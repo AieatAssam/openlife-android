@@ -1,14 +1,14 @@
 package org.openlife.app.boundary
 
-import java.nio.file.Files
-import java.nio.file.Path
-import javax.xml.XMLConstants
-import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Document
 import org.w3c.dom.Element
+import java.nio.file.Files
+import java.nio.file.Path
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
 
 class ManifestBoundaryTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
@@ -73,13 +73,11 @@ class ManifestBoundaryTest {
         return factory.newDocumentBuilder().parse(releaseManifest.toFile())
     }
 
-    private fun elements(document: Document): List<Element> =
-        document.getElementsByTagName("*").let { nodes ->
-            (0 until nodes.length).map { nodes.item(it) as Element }
-        }
+    private fun elements(document: Document): List<Element> = document.getElementsByTagName("*").let { nodes ->
+        (0 until nodes.length).map { nodes.item(it) as Element }
+    }
 
-    private fun Element.childElements(name: String): List<Element> =
-        (0 until childNodes.length)
-            .mapNotNull { childNodes.item(it) as? Element }
-            .filter { it.localName == name }
+    private fun Element.childElements(name: String): List<Element> = (0 until childNodes.length)
+        .mapNotNull { childNodes.item(it) as? Element }
+        .filter { it.localName == name }
 }

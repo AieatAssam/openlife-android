@@ -1,5 +1,6 @@
 package org.openlife.vault.crypto
 
+import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -47,11 +48,11 @@ object AesGcmCodec {
             cipher.init(
                 Cipher.DECRYPT_MODE,
                 key,
-                GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce)
+                GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce),
             )
             cipher.updateAAD(aad)
             return cipher.doFinal(envelope.ciphertext)
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
             throw EnvelopeAuthenticationException(e)
         }
     }

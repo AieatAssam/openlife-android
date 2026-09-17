@@ -49,6 +49,7 @@ object EnvelopeFormat {
      */
     const val MAX_CIPHERTEXT_LENGTH = 32 * 1024 * 1024
 
-    const val HEADER_LENGTH_BYTES = 4 /* magic */ + 1 /* version */ + 1 /* nonce length */
+    // Magic, version, and nonce-length fields precede the nonce bytes.
+    const val HEADER_LENGTH_BYTES = 4 + 1 + 1
     const val CIPHERTEXT_LENGTH_FIELD_BYTES = 4
 }

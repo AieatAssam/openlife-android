@@ -24,6 +24,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.cyclonedx)
     alias(libs.plugins.dependency.license.report)
+    alias(libs.plugins.detekt)
 }
 
 tasks.withType<CyclonedxAggregateTask>().configureEach {
@@ -48,6 +49,8 @@ android {
         versionName = "0.0.1-c0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["profileInstallerReceiverClass"] =
+            "androidx.profileinstaller.ProfileInstallReceiver"
     }
 
     buildTypes {
@@ -77,6 +80,14 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        checkReleaseBuilds = true
+        lintConfig = file("lint.xml")
+        warning.add("Accessibility")
     }
 
     packaging {
@@ -110,6 +121,7 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    detektPlugins(libs.detekt.rules.ktlint.wrapper)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -209,7 +221,16 @@ licenseReport {
 tasks.withType<Test>().configureEach {
     dependsOn(writeReleaseRuntimeClasspath)
     dependsOn("checkLicense")
+    dependsOn("processReleaseMainManifest")
+    dependsOn("processReleaseManifest")
     systemProperty("openlife.projectDir", rootProject.projectDir.absolutePath)
+}
+
+detekt {
+    toolVersion = libs.versions.detekt.get()
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    buildUponDefaultConfig = true
+    autoCorrect = false
 }
 
 val releaseDependencyAudit = tasks.register("releaseDependencyAudit") {

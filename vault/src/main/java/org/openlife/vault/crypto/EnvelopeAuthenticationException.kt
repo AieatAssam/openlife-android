@@ -7,5 +7,4 @@ package org.openlife.vault.crypto
  * failure to react to; no path returns partial or unauthenticated plaintext
  * (design §10).
  */
-class EnvelopeAuthenticationException(cause: Throwable) :
-    Exception("envelope authentication failed", cause)
+class EnvelopeAuthenticationException(cause: Throwable) : Exception("envelope authentication failed", cause)

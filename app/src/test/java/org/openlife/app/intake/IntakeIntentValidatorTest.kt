@@ -37,7 +37,7 @@ class IntakeIntentValidatorTest {
                 extraStreamUri = "content://com.example.provider/image1",
                 hasReadUriPermission = false,
             ),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.MISSING_READ_GRANT), result)
     }
@@ -49,11 +49,11 @@ class IntakeIntentValidatorTest {
                 extraStreamUri = "content://com.example.provider/image1",
                 intentMimeType = "image/*",
             ),
-            ownPackage
+            ownPackage,
         )
         assertEquals(
             IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE),
-            result
+            result,
         )
     }
 
@@ -70,7 +70,7 @@ class IntakeIntentValidatorTest {
     fun singleContentUriInExtraStreamIsValid() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://com.example.provider/image1"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Valid("content://com.example.provider/image1"), result)
     }
@@ -79,7 +79,7 @@ class IntakeIntentValidatorTest {
     fun singleContentUriInDataIsValid() {
         val result = IntakeIntentValidator.validate(
             shape(dataUri = "content://com.example.provider/image1"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Valid("content://com.example.provider/image1"), result)
     }
@@ -91,7 +91,7 @@ class IntakeIntentValidatorTest {
         val uri = "content://com.example.provider/image1"
         val result = IntakeIntentValidator.validate(
             shape(dataUri = uri, extraStreamUri = uri, clipDataUris = listOf(uri)),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Valid(uri), result)
     }
@@ -100,7 +100,7 @@ class IntakeIntentValidatorTest {
     fun wrongActionIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(action = "android.intent.action.VIEW", extraStreamUri = "content://x/y"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.WRONG_ACTION), result)
     }
@@ -118,11 +118,11 @@ class IntakeIntentValidatorTest {
                 dataUri = "content://com.example.provider/image1",
                 extraStreamUri = "content://com.example.provider/image2",
             ),
-            ownPackage
+            ownPackage,
         )
         assertEquals(
             IntakeValidationResult.Rejected(IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES),
-            result
+            result,
         )
     }
 
@@ -132,14 +132,14 @@ class IntakeIntentValidatorTest {
             shape(
                 clipDataUris = listOf(
                     "content://com.example.provider/image1",
-                    "content://com.example.provider/image2"
-                )
+                    "content://com.example.provider/image2",
+                ),
             ),
-            ownPackage
+            ownPackage,
         )
         assertEquals(
             IntakeValidationResult.Rejected(IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES),
-            result
+            result,
         )
     }
 
@@ -147,7 +147,7 @@ class IntakeIntentValidatorTest {
     fun fileSchemeUriIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "file:///sdcard/DCIM/photo.jpg"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_URI_SCHEME), result)
     }
@@ -156,7 +156,7 @@ class IntakeIntentValidatorTest {
     fun httpSchemeUriIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "https://example.com/photo.jpg"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_URI_SCHEME), result)
     }
@@ -165,7 +165,7 @@ class IntakeIntentValidatorTest {
     fun uriPointingAtOwnAuthorityExactMatchIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://$ownPackage/vault/1.blob"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY), result)
     }
@@ -174,7 +174,7 @@ class IntakeIntentValidatorTest {
     fun ownAuthorityMatchIsCaseInsensitive() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://${ownPackage.uppercase()}/vault/1.blob"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY), result)
     }
@@ -183,7 +183,7 @@ class IntakeIntentValidatorTest {
     fun uriPointingAtASubAuthorityOfOwnPackageIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://$ownPackage.fileprovider/vault/1.blob"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY), result)
     }
@@ -194,7 +194,7 @@ class IntakeIntentValidatorTest {
         // check must not treat it as "our" authority.
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://$ownPackage.evil.provider/x"),
-            ownPackage
+            ownPackage,
         )
         // This *is* rejected by the startsWith("$ownPackageName.") rule,
         // which is intentionally conservative: any authority nested under
@@ -207,7 +207,7 @@ class IntakeIntentValidatorTest {
     fun malformedUriIsRejected() {
         val result = IntakeIntentValidator.validate(
             shape(extraStreamUri = "not a uri at all ::://"),
-            ownPackage
+            ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.MALFORMED_URI), result)
     }

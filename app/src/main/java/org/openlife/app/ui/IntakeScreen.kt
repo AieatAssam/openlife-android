@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -73,11 +72,7 @@ fun IntakeScreen(
 }
 
 @Composable
-private fun DuplicateContent(
-    existingSourceId: UUID,
-    onOpenExisting: (UUID) -> Unit,
-    onCancel: () -> Unit,
-) {
+private fun DuplicateContent(existingSourceId: UUID, onOpenExisting: (UUID) -> Unit, onCancel: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -162,13 +157,17 @@ private fun DoneAfterAcknowledging(onDone: () -> Unit) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         // Keep terminal feedback visible long enough for a slow first-run
         // device/provider boundary to render it before auto-returning.
-        kotlinx.coroutines.delay(5_000)
+        kotlinx.coroutines.delay(SUCCESS_MESSAGE_DURATION_MILLIS)
         onDone()
     }
 }
 
+private const val SUCCESS_MESSAGE_DURATION_MILLIS = 5_000L
+private const val BYTES_PER_KIBIBYTE = 1024L
+private const val BYTES_PER_MEBIBYTE = BYTES_PER_KIBIBYTE * BYTES_PER_KIBIBYTE
+
 private fun formatBytes(bytes: Long): String = when {
-    bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
-    bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
+    bytes >= BYTES_PER_MEBIBYTE -> "%.1f MB".format(bytes / BYTES_PER_MEBIBYTE.toDouble())
+    bytes >= BYTES_PER_KIBIBYTE -> "%.1f KB".format(bytes / BYTES_PER_KIBIBYTE.toDouble())
     else -> "$bytes B"
 }

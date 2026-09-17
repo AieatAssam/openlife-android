@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -86,7 +87,7 @@ class IntakeActivity : ComponentActivity() {
                         onContinue = {
                             FirstRunPreferences.setAcknowledged(this)
                             acknowledged = true
-                        }
+                        },
                     )
                 } else {
                     if (validation != null) {
@@ -94,8 +95,9 @@ class IntakeActivity : ComponentActivity() {
                             when (validation) {
                                 is IntakeValidationResult.Rejected ->
                                     viewModel.showRejected(describeIntentRejection(validation.reason))
+
                                 is IntakeValidationResult.Valid ->
-                                    startImportFromUri(Uri.parse(validation.uriString))
+                                    startImportFromUri(validation.uriString.toUri())
                             }
                         }
                     }
@@ -110,7 +112,7 @@ class IntakeActivity : ComponentActivity() {
                                 Intent(this, MainActivity::class.java).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                     putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
-                                }
+                                },
                             )
                             finish()
                         },
@@ -139,10 +141,10 @@ class IntakeActivity : ComponentActivity() {
             try {
                 val providerType = try {
                     contentResolver.getType(uri)
-                } catch (e: SecurityException) {
+                } catch (_: SecurityException) {
                     viewModel.showRejected("could not access the selected item; please select it again")
                     return@launch
-                } catch (e: java.io.FileNotFoundException) {
+                } catch (_: java.io.FileNotFoundException) {
                     viewModel.showRejected("could not access the selected item; please select it again")
                     return@launch
                 } ?: run {
@@ -156,13 +158,13 @@ class IntakeActivity : ComponentActivity() {
                 }
                 openedStream = try {
                     contentResolver.openInputStream(uri)
-                } catch (e: SecurityException) {
+                } catch (_: SecurityException) {
                     // Missing or expired URI grant (design §11 step 1: "If a
                     // share grant expires or a provider disappears, ask the
                     // user to select the item again").
                     viewModel.showRejected("could not access the selected item; please select it again")
                     return@launch
-                } catch (e: java.io.FileNotFoundException) {
+                } catch (_: java.io.FileNotFoundException) {
                     viewModel.showRejected("could not access the selected item; please select it again")
                     return@launch
                 }

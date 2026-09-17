@@ -1,9 +1,5 @@
 package org.openlife.vault.repository
 
-import java.io.File
-import java.io.IOException
-import java.security.MessageDigest
-import javax.crypto.spec.SecretKeySpec
 import org.openlife.vault.crypto.AesGcmCodec
 import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeAuthenticationException
@@ -11,6 +7,10 @@ import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.Source
+import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Shared by [ImportRepository] (Save-time recheck and stage/blob preview),
@@ -23,8 +23,7 @@ import org.openlife.vault.model.Source
  */
 class ArtefactAuthenticator(private val keystoreWrapper: KeystoreWrapper) {
 
-    fun authenticates(source: Source, artefactFile: File): Boolean =
-        decryptAndVerify(source, artefactFile) != null
+    fun authenticates(source: Source, artefactFile: File): Boolean = decryptAndVerify(source, artefactFile) != null
 
     /** Returns the authenticated, digest-verified plaintext, or null on any failure. */
     fun decryptAndVerify(source: Source, artefactFile: File): ByteArray? {
@@ -33,14 +32,14 @@ class ArtefactAuthenticator(private val keystoreWrapper: KeystoreWrapper) {
             val dek = keystoreWrapper.unwrap(
                 EnvelopeCodec.decode(source.wrappedDek!!),
                 EnvelopeDomain.SOURCE_KEY,
-                source.id
+                source.id,
             )
             try {
                 val envelope = EnvelopeCodec.decode(artefactFile.readBytes())
                 val plaintext = AesGcmCodec.decrypt(
                     envelope,
                     SecretKeySpec(dek, "AES"),
-                    EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, source.id)
+                    EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, source.id),
                 )
                 if (MessageDigest.isEqual(source.sha256, MessageDigest.getInstance("SHA-256").digest(plaintext))) {
                     plaintext
@@ -50,11 +49,11 @@ class ArtefactAuthenticator(private val keystoreWrapper: KeystoreWrapper) {
             } finally {
                 dek.fill(0)
             }
-        } catch (e: EnvelopeAuthenticationException) {
+        } catch (_: EnvelopeAuthenticationException) {
             null
-        } catch (e: EnvelopeCodec.MalformedEnvelopeException) {
+        } catch (_: EnvelopeCodec.MalformedEnvelopeException) {
             null
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             null
         }
     }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The profileinstaller receiver below is a tools:node="remove" merge marker.
+  The class is intentionally absent from this app's source; lint cannot resolve
+  a class that is removed before the packaged manifest is produced.
+  GradleDependency and NewerVersionAvailable stay ignored because dependency
+  versions are pinned by the release policy; upgrades require a reviewed
+  dependency decision and verification refresh.
+-->
+<lint>
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="MissingClass" severity="ignore" />
+</lint>

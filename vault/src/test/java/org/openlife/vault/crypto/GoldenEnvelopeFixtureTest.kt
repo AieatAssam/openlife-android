@@ -1,11 +1,11 @@
 package org.openlife.vault.crypto
 
-import java.nio.charset.StandardCharsets
-import java.util.HexFormat
-import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.nio.charset.StandardCharsets
+import java.util.HexFormat
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Pins the exact wire bytes of a v1 envelope so an accidental change to the
@@ -27,14 +27,14 @@ class GoldenEnvelopeFixtureTest {
 
     private val key = SecretKeySpec(
         HexFormat.of().parseHex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
-        "AES"
+        "AES",
     )
     private val plaintext = "OpenLife fixture plaintext for envelope tests".toByteArray(StandardCharsets.UTF_8)
     private val aad = EnvelopeAad.forDomain(EnvelopeDomain.ARTEFACT, version = 1)
 
     private fun readFixture(): ByteArray {
         val hex = requireNotNull(
-            javaClass.getResourceAsStream("/envelope/golden-artefact-v1.hex")
+            javaClass.getResourceAsStream("/envelope/golden-artefact-v1.hex"),
         ) { "golden fixture resource missing" }.bufferedReader().readText().trim()
         return HexFormat.of().parseHex(hex)
     }

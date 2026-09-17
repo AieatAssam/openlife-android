@@ -1,8 +1,8 @@
 package org.openlife.app.ui
 
+import org.openlife.vault.model.Source
 import java.text.DateFormat
 import java.util.Date
-import org.openlife.vault.model.Source
 
 /**
  * Design §8: "The list is ordered by import time and uses generic

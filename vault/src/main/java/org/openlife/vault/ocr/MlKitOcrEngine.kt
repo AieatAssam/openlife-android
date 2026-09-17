@@ -6,14 +6,13 @@ import android.graphics.Matrix
 import android.graphics.Rect
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import org.openlife.vault.model.Orientation
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Bundled, Latin-only ML Kit adapter. It owns no persistence and has no URI or
@@ -22,6 +21,14 @@ import org.openlife.vault.model.Orientation
  * cancelled task cannot retain a decoded bitmap.
  */
 class MlKitOcrEngine : OcrEngine {
+    private companion object {
+        const val ROTATE_90_DEGREES = 90f
+        const val ROTATE_180_DEGREES = 180f
+        const val ROTATE_270_DEGREES = 270f
+        const val UNIT_SCALE = 1f
+        const val FLIPPED_SCALE = -1f
+    }
+
     override val id: String = "mlkit-latin"
     override val modelVersion: String = "16.0.1"
 
@@ -42,7 +49,15 @@ class MlKitOcrEngine : OcrEngine {
                     OcrSpanDraft(
                         text = line.text,
                         confidence = line.confidence,
-                        region = line.boundingBox?.let { scaleRegion(it, display.width, display.height, scaleX, scaleY) }
+                        region = line.boundingBox?.let {
+                            scaleRegion(
+                                it,
+                                display.width,
+                                display.height,
+                                scaleX,
+                                scaleY,
+                            )
+                        }
                             ?.let {
                                 OcrCoordinateMapper.toSourcePixels(
                                     it,
@@ -91,19 +106,26 @@ class MlKitOcrEngine : OcrEngine {
         if (orientation == Orientation.NORMAL) return bitmap
         val matrix = Matrix()
         when (orientation) {
-            Orientation.ROTATE_90 -> matrix.setRotate(90f)
-            Orientation.ROTATE_180 -> matrix.setRotate(180f)
-            Orientation.ROTATE_270 -> matrix.setRotate(270f)
-            Orientation.FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
-            Orientation.FLIP_VERTICAL -> matrix.setScale(1f, -1f)
+            Orientation.ROTATE_90 -> matrix.setRotate(ROTATE_90_DEGREES)
+
+            Orientation.ROTATE_180 -> matrix.setRotate(ROTATE_180_DEGREES)
+
+            Orientation.ROTATE_270 -> matrix.setRotate(ROTATE_270_DEGREES)
+
+            Orientation.FLIP_HORIZONTAL -> matrix.setScale(FLIPPED_SCALE, UNIT_SCALE)
+
+            Orientation.FLIP_VERTICAL -> matrix.setScale(UNIT_SCALE, FLIPPED_SCALE)
+
             Orientation.TRANSPOSE -> {
-                matrix.setRotate(90f)
-                matrix.postScale(-1f, 1f)
+                matrix.setRotate(ROTATE_90_DEGREES)
+                matrix.postScale(FLIPPED_SCALE, UNIT_SCALE)
             }
+
             Orientation.TRANSVERSE -> {
-                matrix.setRotate(270f)
-                matrix.postScale(-1f, 1f)
+                matrix.setRotate(ROTATE_270_DEGREES)
+                matrix.postScale(FLIPPED_SCALE, UNIT_SCALE)
             }
+
             Orientation.NORMAL -> Unit
         }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
@@ -129,6 +151,7 @@ class MlKitOcrEngine : OcrEngine {
         Orientation.TRANSPOSE,
         Orientation.TRANSVERSE,
         -> true
+
         else -> false
     }
 

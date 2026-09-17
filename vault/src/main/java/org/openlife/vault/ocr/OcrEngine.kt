@@ -29,9 +29,7 @@ data class OcrEngineInput(
     }
 }
 
-data class OcrEngineOutput(
-    val spans: List<OcrSpanDraft>,
-)
+data class OcrEngineOutput(val spans: List<OcrSpanDraft>)
 
 enum class OcrScriptStatus {
     LATIN,
@@ -62,10 +60,7 @@ object OcrScriptPolicy {
 }
 
 /** Small explicit registry so later local alternatives can be configured. */
-class OcrEngineRegistry(
-    engines: List<OcrEngine>,
-    selectedEngineId: String,
-) {
+class OcrEngineRegistry(engines: List<OcrEngine>, selectedEngineId: String) {
     private val selectedEngine = engines.singleOrNull { it.id == selectedEngineId }
         ?: throw IllegalArgumentException("No configured local OCR engine named $selectedEngineId")
 
