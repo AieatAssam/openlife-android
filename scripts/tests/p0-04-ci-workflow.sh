@@ -6,7 +6,7 @@ WORKFLOW="$ROOT/.github/workflows/ci.yml"
 GRADLE_SETUP="$ROOT/.github/actions/gradle-setup/action.yml"
 RELEASE_WORKFLOW="$ROOT/.github/workflows/release.yml"
 RETRY_CLASSIFIER="$ROOT/scripts/ci/connected-test-failure-is-assertion.sh"
-CI_FILES=("$WORKFLOW" "$GRADLE_SETUP" "$RELEASE_WORKFLOW")
+CI_FILES=("$WORKFLOW" "$GRADLE_SETUP" "$RELEASE_WORKFLOW" "$RETRY_CLASSIFIER")
 pass=0
 fail=0
 
@@ -36,9 +36,9 @@ if [[ -x "$RETRY_CLASSIFIER" ]]; then
   printf '%s\n' 'INSTRUMENTATION_RESULT: shortMsg=Process crashed.' >"$classifier_tmp/infrastructure.log"
   printf '%s\n' 'INSTRUMENTATION_RESULT: shortMsg=Test failed: expected 1 but was 2' >"$classifier_tmp/assertion.log"
   printf '%s\n' 'INSTRUMENTATION_RESULT: shortMsg=(Test failed: expected 1 but was 2)' >"$classifier_tmp/assertion-paren.log"
-  if ! "$RETRY_CLASSIFIER" "$classifier_tmp/infrastructure.log" &&
-      "$RETRY_CLASSIFIER" "$classifier_tmp/assertion.log" &&
-      "$RETRY_CLASSIFIER" "$classifier_tmp/assertion-paren.log"; then
+  if "$RETRY_CLASSIFIER" "$classifier_tmp/infrastructure.log" ||
+      ! "$RETRY_CLASSIFIER" "$classifier_tmp/assertion.log" ||
+      ! "$RETRY_CLASSIFIER" "$classifier_tmp/assertion-paren.log"; then
     printf 'not ok - assertion classifier distinguishes infrastructure and assertion output\n' >&2
     fail=$((fail + 1))
   else
@@ -49,7 +49,7 @@ else
   printf 'not ok - assertion classifier distinguishes infrastructure and assertion output\nmissing: %s\n' "$RETRY_CLASSIFIER" >&2
   fail=$((fail + 1))
 fi
-if grep -Fq 'INSTRUMENTATION_RESULT: shortMsg=\((Test failed|Assertion|junit)' "$WORKFLOW"; then
+if grep -Fq 'INSTRUMENTATION_RESULT: shortMsg=[(]?' "$RETRY_CLASSIFIER"; then
   printf 'ok - retry classifier names assertion-shaped instrumentation failures\n'
   pass=$((pass + 1))
 else
