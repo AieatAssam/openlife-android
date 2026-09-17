@@ -104,6 +104,9 @@ sed -i -E 's/status: (in_progress|review),/status: todo,/' "$TMP/plan-status/pla
 status_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status")"
 assert_contains "plan-status lists P0-01 as runnable" $'--- runnable (todo, all deps done) ---\nP0-01' "$status_output"
 
+real_status_output="$(bash "$ROOT/scripts/plan-status.sh" "$ROOT/plan")"
+assert_not_contains "plan-status excludes review-finding entries" "F-47" "$real_status_output"
+
 cp -R "$ROOT/plan" "$TMP/plan-status-collision"
 sed -i 's/notes: "Acceptance criteria met; awaiting review by an agent other than the implementer\."/notes: "quoted status: todo, is not a field"/' "$TMP/plan-status-collision/plan.yaml"
 collision_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-collision")"
