@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/ci.yml"
 GRADLE_SETUP="$ROOT/.github/actions/gradle-setup/action.yml"
 RELEASE_WORKFLOW="$ROOT/.github/workflows/release.yml"
+RETRY_CLASSIFIER="$ROOT/scripts/ci/connected-test-failure-is-assertion.sh"
 CI_FILES=("$WORKFLOW" "$GRADLE_SETUP" "$RELEASE_WORKFLOW")
 pass=0
 fail=0
@@ -28,8 +29,27 @@ require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
 require "connected tests have a retry wrapper" 'attempt|retry'
 require "connected runner uses swiftshader without snapshots" 'no-snapshot.*no-window.*swiftshader_indirect'
-assertion_classifier="$(grep -F 'INSTRUMENTATION_RESULT: shortMsg=\((Test failed|Assertion|junit)' "$WORKFLOW" || true)"
-if [[ -n "$assertion_classifier" ]]; then
+require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
+if [[ -x "$RETRY_CLASSIFIER" ]]; then
+  classifier_tmp="$(mktemp -d)"
+  trap 'rm -rf "$classifier_tmp"' EXIT
+  printf '%s\n' 'INSTRUMENTATION_RESULT: shortMsg=Process crashed.' >"$classifier_tmp/infrastructure.log"
+  printf '%s\n' 'INSTRUMENTATION_RESULT: shortMsg=Test failed: expected 1 but was 2' >"$classifier_tmp/assertion.log"
+  printf '%s\n' 'INSTRUMENTATION_RESULT: shortMsg=(Test failed: expected 1 but was 2)' >"$classifier_tmp/assertion-paren.log"
+  if ! "$RETRY_CLASSIFIER" "$classifier_tmp/infrastructure.log" &&
+      "$RETRY_CLASSIFIER" "$classifier_tmp/assertion.log" &&
+      "$RETRY_CLASSIFIER" "$classifier_tmp/assertion-paren.log"; then
+    printf 'not ok - assertion classifier distinguishes infrastructure and assertion output\n' >&2
+    fail=$((fail + 1))
+  else
+    printf 'ok - assertion classifier distinguishes infrastructure and assertion output\n'
+    pass=$((pass + 1))
+  fi
+else
+  printf 'not ok - assertion classifier distinguishes infrastructure and assertion output\nmissing: %s\n' "$RETRY_CLASSIFIER" >&2
+  fail=$((fail + 1))
+fi
+if grep -Fq 'INSTRUMENTATION_RESULT: shortMsg=\((Test failed|Assertion|junit)' "$WORKFLOW"; then
   printf 'ok - retry classifier names assertion-shaped instrumentation failures\n'
   pass=$((pass + 1))
 else
