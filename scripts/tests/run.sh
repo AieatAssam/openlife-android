@@ -104,6 +104,12 @@ sed -i -E 's/status: (in_progress|review),/status: todo,/' "$TMP/plan-status/pla
 status_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status")"
 assert_contains "plan-status lists P0-01 as runnable" $'--- runnable (todo, all deps done) ---\nP0-01' "$status_output"
 
+cp -R "$ROOT/plan" "$TMP/plan-status-quoted-dependency"
+sed -i 's/status: review,/status: done,/' "$TMP/plan-status-quoted-dependency/plan.yaml"
+sed -i "s/depends_on: \[P0-01\]/depends_on: ['P0-01']/g" "$TMP/plan-status-quoted-dependency/plan.yaml"
+quoted_dependency_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-quoted-dependency")"
+assert_contains "plan-status recognizes quoted dependency items" $'--- runnable (todo, all deps done) ---\nP0-02' "$quoted_dependency_output"
+
 real_status_output="$(bash "$ROOT/scripts/plan-status.sh" "$ROOT/plan")"
 assert_not_contains "plan-status excludes review-finding entries" "F-47" "$real_status_output"
 
