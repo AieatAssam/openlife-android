@@ -121,6 +121,12 @@ quoted_structural_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-statu
 assert_contains "plan-status preserves quoted structural fields" "P0-01   review" "$quoted_structural_output"
 assert_not_contains "quoted structural fields do not create a runnable step" $'--- runnable (todo, all deps done) ---\nP0-01' "$quoted_structural_output"
 
+cp -R "$ROOT/plan" "$TMP/plan-status-single-quoted-structural"
+sed -i "s/{id: P0-01, title:/{id: 'P0-01', title:/" "$TMP/plan-status-single-quoted-structural/plan.yaml"
+sed -i "s/file: steps\/P0-01.yaml, status:/file: 'steps\/P0-01.yaml', status:/" "$TMP/plan-status-single-quoted-structural/plan.yaml"
+single_quoted_structural_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-single-quoted-structural")"
+assert_contains "plan-status preserves single-quoted structural fields" "P0-01   review" "$single_quoted_structural_output"
+
 cp -R "$ROOT/plan" "$TMP/plan-phase-mismatch"
 sed -i '0,/^phase: P0$/s//phase: P1/' "$TMP/plan-phase-mismatch/steps/P0-01.yaml"
 set +e
