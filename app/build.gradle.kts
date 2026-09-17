@@ -11,6 +11,9 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryMarkdownReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import org.cyclonedx.gradle.CyclonedxAggregateTask
+import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.tasks.testing.Test
 
@@ -26,6 +29,10 @@ tasks.withType<CyclonedxAggregateTask>().configureEach {
     jsonOutput.set(layout.buildDirectory.file("reports/bom/bom.json"))
     xmlOutput.unsetConvention()
     includeBomSerialNumber.set(false)
+}
+
+tasks.withType<CyclonedxDirectTask>().configureEach {
+    includeConfigs.set(listOf("releaseRuntimeClasspath"))
 }
 
 android {
@@ -117,8 +124,9 @@ val writeReleaseRuntimeClasspath = tasks.register("writeReleaseRuntimeClasspath"
     outputs.file(releaseClasspathReport)
     outputs.upToDateWhen { false }
     doLast {
-        val coordinates = configurations.getByName("releaseRuntimeClasspath")
-            .incoming.resolutionResult.allComponents
+        val resolutionResult = configurations.getByName("releaseRuntimeClasspath")
+            .incoming.resolutionResult
+        val coordinates = resolutionResult.allComponents
             .mapNotNull { component ->
                 component.moduleVersion?.let { id ->
                     "${id.group}:${id.name}:${id.version}"
@@ -126,12 +134,49 @@ val writeReleaseRuntimeClasspath = tasks.register("writeReleaseRuntimeClasspath"
             }
             .distinct()
             .sorted()
+        val denylistPaths = linkedSetOf<String>()
+        val visited = mutableSetOf<String>()
+        fun coordinate(component: ResolvedComponentResult): String? = component.moduleVersion?.let { id ->
+            "${id.group}:${id.name}:${id.version}"
+        }
+        fun visit(component: ResolvedComponentResult, path: List<String>) {
+            val componentKey = component.id.displayName
+            if (!visited.add(componentKey)) {
+                return
+            }
+            val componentCoordinate = coordinate(component)
+            val currentPath = if (componentCoordinate == null) {
+                path
+            } else {
+                path + componentCoordinate
+            }
+            component.dependencies.filterIsInstance<ResolvedDependencyResult>().forEach { dependency ->
+                val selected = dependency.selected
+                val selectedCoordinate = coordinate(selected)
+                if (selectedCoordinate != null) {
+                    val selectedPath = currentPath + selectedCoordinate
+                    if (selectedCoordinate.startsWith("com.google.firebase") ||
+                        selectedCoordinate.startsWith("com.google.android.datatransport")
+                    ) {
+                        denylistPaths += "denylist-path: ${selectedPath.joinToString(" -> ")}"
+                    }
+                    if (selectedCoordinate !in currentPath) {
+                        visit(selected, currentPath)
+                    }
+                } else {
+                    visit(selected, currentPath)
+                }
+            }
+        }
+        visit(resolutionResult.root, emptyList())
         releaseClasspathReport.get().asFile.apply {
             parentFile.mkdirs()
             writeText(
                 buildString {
                     appendLine("# Resolved releaseRuntimeClasspath coordinates")
                     coordinates.forEach(::appendLine)
+                    appendLine("# Denylist dependency paths")
+                    denylistPaths.sorted().forEach(::appendLine)
                 },
             )
         }
@@ -159,4 +204,16 @@ tasks.withType<Test>().configureEach {
     dependsOn(writeReleaseRuntimeClasspath)
     dependsOn("checkLicense")
     systemProperty("openlife.projectDir", rootProject.projectDir.absolutePath)
+}
+
+val releaseDependencyAudit = tasks.register("releaseDependencyAudit") {
+    group = "verification"
+    description = "Generate and validate all dependency audit artefacts for release."
+    dependsOn(writeReleaseRuntimeClasspath, "checkLicense", "generateLicenseReport", "cyclonedxBom")
+}
+
+tasks.configureEach {
+    if (name == "assembleRelease" || name == "bundleRelease") {
+        dependsOn(releaseDependencyAudit)
+    }
 }

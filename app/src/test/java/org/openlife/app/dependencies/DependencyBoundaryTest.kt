@@ -46,7 +46,10 @@ class DependencyBoundaryTest {
             .map(String::trim)
         val origin = policy.first { it.startsWith("origin:") }.substringAfter(':').trim()
         val lines = Files.readAllLines(classpathFile)
-        assertTrue("ML Kit exception origin is no longer present: $origin", lines.any { it == origin })
+        assertTrue(
+            "ML Kit exception origin is no longer present: $origin",
+            lines.any { it.startsWith("$origin:") },
+        )
 
         val denylisted = lines.filter { line -> exceptionCoordinates.any(line::startsWith) }
         assertTrue("the documented exception has no resolved coordinates", denylisted.isNotEmpty())
