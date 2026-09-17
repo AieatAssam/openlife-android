@@ -240,7 +240,6 @@ class IntakeViewModel(private val application: OpenLifeApp, private val savedSta
         // stream explicitly before allowing the ViewModel scope to finish.
         activeInputStream?.let { closeQuietly(it) }
         activeImportJob?.cancel()
-        super.onCleared()
     }
 
     companion object {

@@ -45,7 +45,10 @@ adversary.
 | Compromised dependency or release | Gradle SHA-256 dependency verification fails on unverified bytes; the release classpath denylist, CycloneDX SBOM, committed licence inventory, and manifest/egress checks make resolved release inputs auditable | Source availability alone does not prove binary integrity; ML Kit's documented transport exception expires at P2-05 |
 | Resource exhaustion by a provider | Byte and pixel ceilings, bounded preview, cancellable I/O | In-process native decoding cannot guarantee a hard time bound |
 
-`FLAG_SECURE` is required on all content-bearing windows and dialogs (R6). It
+`FLAG_SECURE` is required on all content-bearing windows and dialogs (R6).
+P0-07 applies the shared `applySecureWindow()` policy from both activities and
+keeps the static assertion in `SecureWindowTest` alongside the manifest
+predictive-back check. It
 helps prevent supported screenshots and non-secure display output, but is not
 universal protection against hostile devices. `MainActivity.onStop()` clears
 decoded list thumbnails and returns the viewer to the list; `IntakeActivity`
@@ -56,7 +59,9 @@ retained after a background transition. Protected recents remain an effect of
 `FLAG_SECURE` (`applySecureWindow()`), confirmed via `dumpsys window` showing
 no recents-thumbnail bitmap for the task. Every icon-only control carries a
 `contentDescription` and large-text rendering (1.3x/2.0x scale) was checked for clipping across every screen
-(`docs/verification/C0.md` C0-16); an actual TalkBack accessibility-service
+(`docs/verification/C0.md` C0-16); P0-07 adds deterministic Compose contracts
+for 2x font scale and forced RTL, while its final-tree connected run remains a
+documented device gap (`docs/verification/P0-07-ui-foundation.md`). An actual TalkBack accessibility-service
 run has not been performed in this environment and remains an open item
 (`docs/reviews/C0-security-self-review.md`), not a passed check.
 

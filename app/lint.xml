@@ -5,10 +5,13 @@
   a class that is removed before the packaged manifest is produced.
   GradleDependency and NewerVersionAvailable stay ignored because dependency
   versions are pinned by the release policy; upgrades require a reviewed
-  dependency decision and verification refresh.
+  dependency decision and verification refresh. ObsoleteSdkInt is ignored only
+  for the adaptive launcher resource directory: adaptive-icon XML is an API 26
+  resource type, while this app's minSdk 29 makes the qualifier redundant.
 -->
 <lint>
     <issue id="GradleDependency" severity="ignore" />
     <issue id="NewerVersionAvailable" severity="ignore" />
     <issue id="MissingClass" severity="ignore" />
+    <issue id="ObsoleteSdkInt" severity="ignore" />
 </lint>

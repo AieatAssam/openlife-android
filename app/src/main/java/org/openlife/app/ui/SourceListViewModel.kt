@@ -112,7 +112,6 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     override fun onCleared() {
         clearSensitiveContent()
-        super.onCleared()
     }
 
     companion object {

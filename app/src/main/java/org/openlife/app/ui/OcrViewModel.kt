@@ -69,7 +69,6 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
     override fun onCleared() {
         jobs.values.forEach(Job::cancel)
         jobs.clear()
-        super.onCleared()
     }
 
     companion object {
