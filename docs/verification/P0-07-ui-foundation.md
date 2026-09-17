@@ -33,17 +33,25 @@ descriptions, and RTL layout direction.
 
 ## Device and hosted gaps
 
-The required connected command was attempted against the local `dev36` API-36
-AVD. Gradle reported `DeviceException: No connected devices!`. A fresh retry
-started the AVD, but it remained online without `sys.boot_completed=1`; the
-package service did not become available for APK installation. Therefore no
-P0-07 connected test count or `uiautomator` bounds result is claimed here.
+The final-tree connected command was run on 2026-09-17:
 
-The required font-scale walk (`adb shell settings put system font_scale 2.0`,
-`uiautomator dump`/bounds inspection, and reset to `1.0`) could not run because
-there was no usable device. TalkBack and the hosted API-29/API-36 CI legs are
-also not locally executable; P0-04 records the owner-controlled hosted CI
-requirement. The previous API-36 C0 large-text evidence remains in
+```text
+./gradlew :app:connectedDebugAndroidTest
+BUILD FAILED — :app:connectedDebugAndroidTest
+com.android.builder.testing.api.DeviceException: No connected devices!
+```
+
+A fresh retry started the local `dev36` API-36 AVD, but it remained online
+without `sys.boot_completed=1`; the package service did not become available
+for APK installation. Therefore no P0-07 connected test count or `uiautomator`
+bounds result is claimed here.
+
+The required font-scale commands were also attempted and both returned
+`adb: no devices/emulators found` (set/reset return code 1); the
+`uiautomator dump`/bounds inspection could not run because there was no usable
+device. TalkBack and the hosted API-29/API-36 CI legs are also not locally
+executable; P0-04 records the owner-controlled hosted CI requirement. The
+previous API-36 C0 large-text evidence remains in
 `docs/verification/C0.md`, but is not presented as a final-tree P0-07 connected
 run.
 
