@@ -19,12 +19,16 @@ import java.util.Set;
 
 /** Validates the repository plan without adding a runtime dependency to Android modules. */
 public final class PlanCheck {
-  private static final Set<String> PLAN_KEYS = Set.of(
+  private static final List<String> PLAN_KEYS = List.of(
       "schema_version", "plan_version", "plan_date", "baseline_commit",
       "governing_documents", "ethos", "conventions", "release_train",
       "decisions_made_by_this_plan", "phases", "owner_actions_required",
       "review_findings_index");
-  private static final Set<String> STEP_KEYS = Set.of(
+  private static final List<String> PHASE_KEYS = List.of(
+      "id", "title", "goal", "exit_gate", "steps");
+  private static final List<String> MASTER_STEP_KEYS = List.of(
+      "id", "title", "file", "status", "depends_on", "estimate", "owner");
+  private static final List<String> STEP_KEYS = List.of(
       "id", "title", "phase", "status", "depends_on", "estimate", "owner",
       "summary", "requirements", "tdd", "verification", "acceptance_criteria",
       "docs_to_update", "risks", "rollback");
@@ -100,6 +104,12 @@ public final class PlanCheck {
         continue;
       }
       String phaseId = string(phase.get("id"));
+      String phasePath = phaseId == null ? "phases[]" : "phases[" + phaseId + "]";
+      for (String key : PHASE_KEYS) {
+        if (!phase.containsKey(key)) {
+          error(planFile, phasePath + "." + key, "missing key");
+        }
+      }
       if (phaseId == null) {
         error(planFile, "phases[].id", "missing or not a string");
         continue;
@@ -118,6 +128,12 @@ public final class PlanCheck {
           continue;
         }
         String id = string(step.get("id"));
+        String stepPath = id == null ? "step <unknown>" : "step " + id;
+        for (String key : MASTER_STEP_KEYS) {
+          if (!step.containsKey(key)) {
+            error(planFile, stepPath + "." + key, "missing key");
+          }
+        }
         if (id == null) {
           error(planFile, "phases[" + phaseId + "].steps[].id", "missing or not a string");
           continue;
@@ -137,9 +153,11 @@ public final class PlanCheck {
           error(planFile, "step " + id + ".file", "missing or not a string");
           file = "steps/" + id + ".yaml";
         }
-        List<String> dependencies = stringList(step.get("depends_on"), planFile, "step " + id + ".depends_on");
+        List<String> dependencies = step.containsKey("depends_on")
+            ? stringList(step.get("depends_on"), planFile, "step " + id + ".depends_on")
+            : List.of();
         String status = string(step.get("status"));
-        if (status == null || !STATUSES.contains(status)) {
+        if (status != null && !STATUSES.contains(status)) {
           error(planFile, "step " + id + ".status", "must be one of " + STATUSES);
         }
         steps.put(id, new StepRef(id, phaseId, file, dependencies == null ? List.of() : dependencies, status));
