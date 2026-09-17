@@ -3,12 +3,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/ci.yml"
+GRADLE_SETUP="$ROOT/.github/actions/gradle-setup/action.yml"
 pass=0
 fail=0
 
 require() {
   local label="$1" pattern="$2"
-  if grep -Eq "$pattern" "$WORKFLOW"; then
+  if grep -Eq "$pattern" "$WORKFLOW" "$GRADLE_SETUP"; then
     printf 'ok - %s\n' "$label"
     pass=$((pass + 1))
   else
@@ -18,6 +19,7 @@ require() {
 }
 
 require "JDK 21 is configured" 'java-version: *"?21"?'
+require "all jobs use the reusable Gradle setup action" '\./\.github/actions/gradle-setup'
 require "API 29 and API 36 matrix is declared" 'api-level: *\[29, *36\]'
 require "KVM is enabled" 'enable-kvm: *true'
 require "CI invokes plan-check" 'scripts/plan-check\.sh'
@@ -30,7 +32,7 @@ require "release APK inspection is wired" 'scripts/inspect-release-apk\.sh'
 require "push trigger is present" '^  push:'
 require "pull request trigger is present" '^  pull_request:'
 
-bad_refs="$(grep -E '^ *- uses: .+@' "$WORKFLOW" | grep -Ev '@[0-9a-f]{40}$' || true)"
+bad_refs="$(grep -hE '^ *- uses: .+@' "$WORKFLOW" "$GRADLE_SETUP" | grep -Ev '@[0-9a-f]{40}$' || true)"
 if [[ -z "$bad_refs" ]]; then
   printf 'ok - every third-party action is pinned by full commit SHA\n'
   pass=$((pass + 1))
