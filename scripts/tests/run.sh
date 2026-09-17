@@ -109,6 +109,20 @@ sed -i 's/notes: "Acceptance criteria met; awaiting review by an agent other tha
 collision_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-collision")"
 assert_not_contains "plan-status ignores status text inside notes" $'--- runnable (todo, all deps done) ---\nP0-01' "$collision_output"
 
+cp -R "$ROOT/plan" "$TMP/plan-status-title-collision"
+sed -i 's/title: Plan conventions and status tooling/title: "Plan conventions; file: steps\/P0-01.yaml, status: todo,"/' "$TMP/plan-status-title-collision/plan.yaml"
+title_collision_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-title-collision")"
+assert_not_contains "plan-status ignores status text inside a title" $'--- runnable (todo, all deps done) ---\nP0-01' "$title_collision_output"
+
+cp -R "$ROOT/plan" "$TMP/plan-phase-mismatch"
+sed -i '0,/^phase: P0$/s//phase: P1/' "$TMP/plan-phase-mismatch/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-phase-mismatch" >"$TMP/phase-mismatch.out" 2>&1
+phase_mismatch_status=$?
+set -e
+assert_nonzero "plan-check rejects a companion phase mismatch" "$TMP/phase-mismatch.out" "$phase_mismatch_status"
+assert_contains "phase-mismatch diagnostic names key" "phase: must be P0" "$(<"$TMP/phase-mismatch.out")"
+
 cp -R "$ROOT/plan" "$TMP/plan-missing-phase-key"
 sed -i '/^    title: Engineering foundation$/d' "$TMP/plan-missing-phase-key/plan.yaml"
 set +e
@@ -152,6 +166,37 @@ empty_json_status=$?
 set -e
 assert_nonzero "plan-check JSON rejects an empty plan" "$TMP/empty-json.out" "$empty_json_status"
 assert_contains "empty JSON failure remains machine-readable" '"valid":false' "$(<"$TMP/empty-json.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-missing-finding-severity"
+sed -i '0,/severity: high/s//severity_missing: high/' "$TMP/plan-missing-finding-severity/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-missing-finding-severity" >"$TMP/missing-finding-severity.out" 2>&1
+missing_finding_severity_status=$?
+set -e
+assert_nonzero "plan-check rejects incomplete review finding metadata" "$TMP/missing-finding-severity.out" "$missing_finding_severity_status"
+assert_contains "finding-severity diagnostic names key" "finding F-01.severity: missing key" "$(<"$TMP/missing-finding-severity.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-symlink"
+mv "$TMP/plan-symlink/steps/P0-01.yaml" "$TMP/plan-symlink/steps/P0-01.real.yaml"
+ln -s P0-02.yaml "$TMP/plan-symlink/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-symlink" >"$TMP/symlink.out" 2>&1
+symlink_status=$?
+set -e
+assert_nonzero "plan-check rejects symlinked step files" "$TMP/symlink.out" "$symlink_status"
+assert_contains "symlink diagnostic is present" "symlink" "$(<"$TMP/symlink.out")"
+
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$ROOT/plan" "$ROOT/plan" >"$TMP/check-two-paths.out" 2>&1
+two_check_paths_status=$?
+set -e
+assert_nonzero "plan-check rejects multiple plan paths" "$TMP/check-two-paths.out" "$two_check_paths_status"
+
+set +e
+bash "$ROOT/scripts/plan-status.sh" "$ROOT/plan" "$ROOT/plan" >"$TMP/status-two-paths.out" 2>&1
+two_status_paths_status=$?
+set -e
+assert_nonzero "plan-status rejects multiple plan paths" "$TMP/status-two-paths.out" "$two_status_paths_status"
 
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
