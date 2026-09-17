@@ -33,16 +33,15 @@ Branch: `plan/P0-08-documentation-hygiene`
 
 ## Instrumented-test gap
 
-The connected suites were attempted for the preceding Compose/receiver work
-and again remain dependent on the unavailable local device. The exact command
-was:
+The connected suites were rerun on the final tree after the `dev36` AVD
+successfully came online. The exact command was:
 
 ```text
 ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest
 ```
 
-The final-tree rerun reached both connected tasks and failed each with
-`DeviceException: No connected devices!`. An earlier bounded attempt with the
-available `dev36` AVD crashed during startup once and stayed
-`emulator-5554 offline` during a software-rendered retry. No passing
-instrumented result is claimed. CI API 29/API 36 execution remains required.
+`BUILD SUCCESSFUL` in 5m 56s on `dev36` (API 36); the app report contains
+28/28 passing tests and the vault report contains 71/71 passing tests, with
+zero failures, errors, or skips. The earlier unavailable-device attempts are
+superseded by this successful final-tree run. CI API 29/API 36 execution
+remains part of the broader P0-04 matrix.
