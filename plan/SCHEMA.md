@@ -56,6 +56,11 @@ described in plan.yaml `conventions.status_rules`. A step is `done` only
 when a reviewer other than the implementer confirms the acceptance criteria
 against the recorded evidence.
 
+The checker requires non-empty tracker `evidence` before a master-plan step
+may be marked `done`; `review` is the handoff state. Each
+`owner_actions_required[]` entry requires `id`, `text`, and `step`, and every
+step named there must exist in the plan.
+
 ## Tracking fields an agent may write in plan.yaml
 
 ```yaml
