@@ -28,14 +28,21 @@ require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
 require "connected tests have a retry wrapper" 'attempt|retry'
 require "connected runner uses swiftshader without snapshots" 'no-snapshot.*no-window.*swiftshader_indirect'
-require "retry classifier names assertion-shaped instrumentation failures" 'INSTRUMENTATION_RESULT: shortMsg=\((Test failed|Assertion|junit)'
+assertion_classifier="$(grep -F 'INSTRUMENTATION_RESULT: shortMsg=\((Test failed|Assertion|junit)' "$WORKFLOW" || true)"
+if [[ -n "$assertion_classifier" ]]; then
+  printf 'ok - retry classifier names assertion-shaped instrumentation failures\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - retry classifier names assertion-shaped instrumentation failures\n' >&2
+  fail=$((fail + 1))
+fi
 require "instrumented results retain artifacts for 30 days" 'retention-days: *30'
 require "filtered OpenLife logcat is uploaded" 'OpenLifeRecovery|org\.openlife'
 require "release APK inspection is wired" 'scripts/inspect-release-apk\.sh'
 require "push trigger is present" '^  push:'
 require "pull request trigger is present" '^  pull_request:'
 
-generic_short_msg="$(grep -E 'INSTRUMENTATION_RESULT: shortMsg=[^ (]' "$WORKFLOW" || true)"
+generic_short_msg="$(grep -F "INSTRUMENTATION_RESULT: shortMsg='" "$WORKFLOW" || true)"
 if [[ -z "$generic_short_msg" ]]; then
   printf 'ok - retry classifier does not treat every instrumentation shortMsg as an assertion\n'
   pass=$((pass + 1))
