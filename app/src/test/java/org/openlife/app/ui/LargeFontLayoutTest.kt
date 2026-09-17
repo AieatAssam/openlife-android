@@ -22,7 +22,11 @@ class LargeFontLayoutTest {
         ).map { Files.readString(projectDir.resolve(it)) }
         assertTrue(
             "every screen must use an inset-safe or scrollable action region",
-            sources.all { it.contains("verticalScroll") || it.contains("safeDrawingPadding()") },
+            sources.all {
+                it.contains("verticalScroll") ||
+                    it.contains("safeDrawingPadding()") ||
+                    it.contains("contentWindowInsets")
+            },
         )
     }
 }

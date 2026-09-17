@@ -7,9 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,9 +26,11 @@ import org.openlife.app.OpenLifeApp
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.IntakeScreen
+import org.openlife.app.ui.IntakeRejectionMessage
 import org.openlife.app.ui.IntakeUiState
 import org.openlife.app.ui.IntakeViewModel
 import org.openlife.app.ui.applySecureWindow
+import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.IntakeKind
 
 /**
@@ -64,7 +67,9 @@ class IntakeActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         applySecureWindow()
 
         // Validate only on a fresh launch. On a configuration-change
@@ -81,7 +86,7 @@ class IntakeActivity : ComponentActivity() {
 
         setContent {
             var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
-            MaterialTheme {
+            OpenLifeTheme {
                 if (!acknowledged) {
                     FirstRunExplanationScreen(
                         onContinue = {
@@ -142,18 +147,18 @@ class IntakeActivity : ComponentActivity() {
                 val providerType = try {
                     contentResolver.getType(uri)
                 } catch (_: SecurityException) {
-                    viewModel.showRejected("could not access the selected item; please select it again")
+                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
                     return@launch
                 } catch (_: java.io.FileNotFoundException) {
-                    viewModel.showRejected("could not access the selected item; please select it again")
+                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
                     return@launch
                 } ?: run {
-                    viewModel.showRejected("the selected item type did not match its contents")
+                    viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
                     return@launch
                 }
                 val normalizedProviderType = providerType.lowercase()
                 if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
-                    viewModel.showRejected("the selected item type did not match its contents")
+                    viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
                     return@launch
                 }
                 openedStream = try {
@@ -162,14 +167,14 @@ class IntakeActivity : ComponentActivity() {
                     // Missing or expired URI grant (design §11 step 1: "If a
                     // share grant expires or a provider disappears, ask the
                     // user to select the item again").
-                    viewModel.showRejected("could not access the selected item; please select it again")
+                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
                     return@launch
                 } catch (_: java.io.FileNotFoundException) {
-                    viewModel.showRejected("could not access the selected item; please select it again")
+                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
                     return@launch
                 }
                 val stream = openedStream ?: run {
-                    viewModel.showRejected("could not access the selected item; please select it again")
+                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
                     return@launch
                 }
                 val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
@@ -228,15 +233,16 @@ class IntakeActivity : ComponentActivity() {
     }
 }
 
-private fun describeIntentRejection(reason: IntakeRejectionReason): String = when (reason) {
-    IntakeRejectionReason.WRONG_ACTION -> "unsupported action"
-    IntakeRejectionReason.NO_CANDIDATE -> "no image was included"
-    IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES -> "more than one item was included"
-    IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> "unsupported source"
-    IntakeRejectionReason.OWN_AUTHORITY -> "invalid source"
-    IntakeRejectionReason.MALFORMED_URI -> "invalid source"
-    IntakeRejectionReason.MISSING_READ_GRANT -> "the selected item was not shared with read access"
-    IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> "unsupported or missing image type"
+private fun describeIntentRejection(reason: IntakeRejectionReason): IntakeRejectionMessage = when (reason) {
+    IntakeRejectionReason.WRONG_ACTION -> IntakeRejectionMessage.UNSUPPORTED_ACTION
+    IntakeRejectionReason.NO_CANDIDATE -> IntakeRejectionMessage.NO_IMAGE
+    IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES -> IntakeRejectionMessage.MULTIPLE_ITEMS
+    IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> IntakeRejectionMessage.UNSUPPORTED_SOURCE
+    IntakeRejectionReason.OWN_AUTHORITY,
+    IntakeRejectionReason.MALFORMED_URI,
+    -> IntakeRejectionMessage.INVALID_SOURCE
+    IntakeRejectionReason.MISSING_READ_GRANT -> IntakeRejectionMessage.MISSING_READ_ACCESS
+    IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> IntakeRejectionMessage.UNSUPPORTED_OR_MISSING_TYPE
 }
 
 private fun describeForTest(state: IntakeUiState): String = when (state) {
@@ -245,7 +251,7 @@ private fun describeForTest(state: IntakeUiState): String = when (state) {
     is IntakeUiState.Saving -> "Saving"
     is IntakeUiState.Saved -> "Saved on this device"
     is IntakeUiState.Duplicate -> "Not imported again"
-    is IntakeUiState.Rejected -> "Not imported: ${state.message}"
+    is IntakeUiState.Rejected -> "Not imported: ${state.message.name}"
     IntakeUiState.Busy -> "Another import is already in progress."
     IntakeUiState.Failed -> "Import failed"
     is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.reason}"

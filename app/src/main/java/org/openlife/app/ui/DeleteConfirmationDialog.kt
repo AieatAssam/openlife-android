@@ -4,6 +4,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import org.openlife.app.R
 
 /**
  * Design §8: "Delete names the selected item visually and states that it
@@ -15,14 +17,11 @@ import androidx.compose.runtime.Composable
 fun DeleteConfirmationDialog(itemLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete $itemLabel?") },
+        title = { Text(stringResource(R.string.delete_title, itemLabel)) },
         text = {
-            Text(
-                "This removes OpenLife's copy of this item from this device. " +
-                    "There is no undo, and no backup to restore it from.",
-            )
+            Text(stringResource(R.string.delete_explanation))
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.delete_action)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) } },
     )
 }

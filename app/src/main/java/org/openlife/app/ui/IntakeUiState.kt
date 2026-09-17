@@ -3,6 +3,24 @@ package org.openlife.app.ui
 import org.openlife.vault.model.ImageFormat
 import java.util.UUID
 
+enum class IntakeRejectionMessage {
+    FILE_TOO_LARGE,
+    UNSUPPORTED_FORMAT,
+    DECLARED_FORMAT_MISMATCH,
+    CORRUPT_CONTENT,
+    ANIMATED_NOT_SUPPORTED,
+    IMAGE_TOO_LARGE,
+    UNSUPPORTED_ACTION,
+    NO_IMAGE,
+    MULTIPLE_ITEMS,
+    UNSUPPORTED_SOURCE,
+    INVALID_SOURCE,
+    MISSING_READ_ACCESS,
+    UNSUPPORTED_OR_MISSING_TYPE,
+    ACCESS_RETRY,
+    TYPE_MISMATCH,
+}
+
 sealed interface IntakeUiState {
     data object Preparing : IntakeUiState
 
@@ -27,7 +45,7 @@ sealed interface IntakeUiState {
      * validation) into this one shared shape, so the ViewModel does not
      * need to depend on the intent-validation types and vice versa.
      */
-    data class Rejected(val message: String) : IntakeUiState
+    data class Rejected(val message: IntakeRejectionMessage) : IntakeUiState
 
     data object Busy : IntakeUiState
     data object Failed : IntakeUiState

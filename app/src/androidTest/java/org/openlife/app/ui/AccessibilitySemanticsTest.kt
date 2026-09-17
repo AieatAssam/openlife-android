@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream
 import java.util.UUID
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -20,6 +21,7 @@ import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import androidx.compose.ui.unit.LayoutDirection
 
 /**
  * Deterministic accessibility regressions for the Compose boundary.
@@ -135,6 +137,25 @@ class AccessibilitySemanticsTest {
             .assertIsDisplayed()
             .assertHasClickAction()
         composeRule.onNodeWithContentDescription("Retry deletion")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+    }
+
+    @Test
+    fun screensMirrorCorrectlyUnderForcedRtl() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                SourceListScreen(
+                    state = SourceListUiState.Loaded(emptyList()),
+                    loadThumbnail = { null },
+                    onOpen = {},
+                    onDelete = {},
+                    onImportFromPhotoPicker = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Import from photos")
             .assertIsDisplayed()
             .assertHasClickAction()
     }

@@ -1,6 +1,9 @@
 package org.openlife.app.ui
 
 import org.openlife.vault.model.Source
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import org.openlife.app.R
 import java.text.DateFormat
 import java.util.Date
 
@@ -9,5 +12,8 @@ import java.util.Date
  * labels." No filename, no sender-supplied text - only the app's own
  * import timestamp.
  */
-fun sourceLabel(source: Source): String =
-    "Imported ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(source.importedAt))}"
+@Composable
+fun sourceLabel(source: Source): String = stringResource(
+    R.string.source_imported,
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(source.importedAt)),
+)

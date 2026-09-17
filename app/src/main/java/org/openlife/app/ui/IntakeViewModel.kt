@@ -25,13 +25,13 @@ import org.openlife.vault.repository.SaveResult
 import java.io.InputStream
 import java.util.UUID
 
-private fun describeImageRejection(reason: ImageRejectionReason): String = when (reason) {
-    ImageRejectionReason.EXCEEDS_BYTE_LIMIT -> "the file is too large"
-    ImageRejectionReason.UNSUPPORTED_FORMAT -> "unsupported format"
-    ImageRejectionReason.DECLARED_FORMAT_MISMATCH -> "the file doesn't match its declared type"
-    ImageRejectionReason.CORRUPT_CONTENT -> "the file appears to be corrupt"
-    ImageRejectionReason.ANIMATED_NOT_SUPPORTED -> "animated images aren't supported"
-    ImageRejectionReason.EXCEEDS_DIMENSION_LIMIT -> "the image is too large"
+private fun describeImageRejection(reason: ImageRejectionReason): IntakeRejectionMessage = when (reason) {
+    ImageRejectionReason.EXCEEDS_BYTE_LIMIT -> IntakeRejectionMessage.FILE_TOO_LARGE
+    ImageRejectionReason.UNSUPPORTED_FORMAT -> IntakeRejectionMessage.UNSUPPORTED_FORMAT
+    ImageRejectionReason.DECLARED_FORMAT_MISMATCH -> IntakeRejectionMessage.DECLARED_FORMAT_MISMATCH
+    ImageRejectionReason.CORRUPT_CONTENT -> IntakeRejectionMessage.CORRUPT_CONTENT
+    ImageRejectionReason.ANIMATED_NOT_SUPPORTED -> IntakeRejectionMessage.ANIMATED_NOT_SUPPORTED
+    ImageRejectionReason.EXCEEDS_DIMENSION_LIMIT -> IntakeRejectionMessage.IMAGE_TOO_LARGE
 }
 
 private const val KEY_SOURCE_ID = "org.openlife.app.ui.IntakeViewModel.sourceId"
@@ -191,7 +191,7 @@ class IntakeViewModel(private val application: OpenLifeApp, private val savedSta
     }
 
     /** For a rejection that happens before any Prepare call, e.g. invalid intent shape. */
-    fun showRejected(message: String) {
+    fun showRejected(message: IntakeRejectionMessage) {
         _state.value = IntakeUiState.Rejected(message)
     }
 

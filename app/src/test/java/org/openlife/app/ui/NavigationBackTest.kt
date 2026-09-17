@@ -12,16 +12,17 @@ class NavigationBackTest {
 
     @Test
     fun backFromViewerReturnsToListInsteadOfFinishing() {
-        val source = Files.readString(mainActivity)
-        assertTrue("MainActivity must host Navigation Compose", source.contains("NavHost"))
+        val source = Files.readString(projectDir.resolve("app/src/main/java/org/openlife/app/navigation/OpenLifeNavHost.kt"))
+        assertTrue("the navigation host must use Navigation Compose", source.contains("NavHost"))
         assertTrue("Viewer must be a typed navigation destination", source.contains("composable<Routes.Viewer>"))
         assertTrue("Viewer back must pop the navigation stack", source.contains("popBackStack"))
     }
 
     @Test
     fun backFromListFinishesActivity() {
-        val source = Files.readString(mainActivity)
-        assertTrue("the list must be the navigation start destination", source.contains("startDestination = Routes.List"))
-        assertFalse("the hand-rolled Screen stack must be removed", source.contains("sealed interface Screen"))
+        val activitySource = Files.readString(mainActivity)
+        val hostSource = Files.readString(projectDir.resolve("app/src/main/java/org/openlife/app/navigation/OpenLifeNavHost.kt"))
+        assertTrue("the list must be the navigation start destination", hostSource.contains("startDestination = Routes.List"))
+        assertFalse("the hand-rolled Screen stack must be removed", activitySource.contains("sealed interface Screen"))
     }
 }
