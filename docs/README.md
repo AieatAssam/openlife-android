@@ -28,4 +28,5 @@ One line is provided for every tracked documentation file under `docs/`.
 - [`verification/C0-handoff.md`](verification/C0-handoff.md) — Capability 0 handoff record.
 - [`verification/C1.md`](verification/C1.md) — Capability 1 verification record.
 - [`verification/P0-03-static-analysis.md`](verification/P0-03-static-analysis.md) — P0-03 static-analysis verification and device gap.
+- [`verification/P0-04-ci-matrix.md`](verification/P0-04-ci-matrix.md) — P0-04 CI matrix, release APK inspection, and pending CI run evidence.
 - [`verification/P0-08-documentation-hygiene.md`](verification/P0-08-documentation-hygiene.md) — P0-08 documentation-hygiene verification and device gap.

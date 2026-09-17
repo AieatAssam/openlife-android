@@ -2,70 +2,74 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build-lint-unit-test:
     name: Build, lint, unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
+          cache: gradle
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda
 
-      - name: Assemble debug
-        run: ./gradlew assembleDebug
+      - name: Validate plan
+        run: scripts/plan-check.sh
 
-      - name: Lint
-        run: ./gradlew lint
+      - name: Static analysis, lint, JVM tests, and debug build
+        run: ./gradlew detekt lint :app:test :vault:test assembleDebug
 
-      - name: Unit tests
-        run: ./gradlew :app:test :vault:test
-
-      - name: Upload lint reports
+      - name: Upload static-analysis, lint, and JVM reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: lint-reports
+          name: jvm-and-static-reports
+          retention-days: 30
+          if-no-files-found: warn
           path: |
+            app/build/reports/detekt/**
+            vault/build/reports/detekt/**
             app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.xml
             vault/build/reports/lint-results-*.html
-          if-no-files-found: ignore
-
-      - name: Upload unit test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          path: |
+            vault/build/reports/lint-results-*.xml
             app/build/reports/tests/**
             vault/build/reports/tests/**
-          if-no-files-found: ignore
 
   instrumented-tests:
-    name: Instrumented tests (emulator)
+    name: Instrumented tests (API ${{ matrix.api-level }})
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 36]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
+          cache: gradle
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda
 
       - name: Enable KVM
         run: |
@@ -73,26 +77,94 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # API 34 rather than the app's minSdk (29): a faster, widely-cached
-      # image for routine CI signal. minSdk 29 is not verified by this
-      # workflow - see docs/decisions/0001-c0-defaults.md item 4, which
-      # already records that gap for local development too.
-      - name: Run instrumented tests
-        uses: reactivecircus/android-emulator-runner@v2
+      - name: Run connected tests with one retry for infrastructure flakes
+        uses: reactivecircus/android-emulator-runner@31f424d05a8bea0229d0feab746260472ef8e34d
         with:
-          api-level: 34
+          api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
           profile: pixel_7
+          enable-kvm: true
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest :vault:connectedDebugAndroidTest
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            set -o pipefail
+            trap 'adb logcat -d 2>/dev/null | grep -E "org\\.openlife|OpenLifeRecovery" > "logcat-openlife-${{ matrix.api-level }}.txt" || true' EXIT
+            for attempt in 1 2; do
+              output="connected-attempt-${{ matrix.api-level }}-${attempt}.log"
+              set +e
+              ./gradlew :app:connectedDebugAndroidTest :vault:connectedDebugAndroidTest 2>&1 | tee "$output"
+              status=${PIPESTATUS[0]}
+              set -e
+              if [[ "$status" -eq 0 ]]; then
+                exit 0
+              fi
+              if grep -Eiq 'There were failing tests|AssertionError|junit\.framework\.AssertionFailedError|INSTRUMENTATION_RESULT: shortMsg=' "$output"; then
+                echo "connected test assertion failure; not retrying" >&2
+                exit "$status"
+              fi
+              if [[ "$attempt" -eq 2 ]]; then
+                exit "$status"
+              fi
+              timeout 60s adb wait-for-device || true
+            done
 
-      - name: Upload instrumented test results
+      - name: Capture filtered OpenLife logcat
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          adb logcat -d 2>/dev/null | grep -E 'org\.openlife|OpenLifeRecovery' > "logcat-openlife-${{ matrix.api-level }}.txt" || true
+
+      - name: Upload instrumented results and logcat
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: instrumented-test-results
+          name: instrumented-results-api-${{ matrix.api-level }}
+          retention-days: 30
+          if-no-files-found: warn
           path: |
             app/build/outputs/androidTest-results/**
             vault/build/outputs/androidTest-results/**
-          if-no-files-found: ignore
+            app/build/reports/androidTests/**
+            vault/build/reports/androidTests/**
+            connected-attempt-${{ matrix.api-level }}-*.log
+            logcat-openlife-${{ matrix.api-level }}.txt
+
+  release-inspection:
+    name: Release APK boundary inspection
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda
+
+      - name: Assemble release APK
+        run: ./gradlew assembleRelease
+
+      - name: Inspect release APK boundary and size
+        run: |
+          scripts/inspect-release-apk.sh app/build/outputs/apk/release/app-release.apk | tee release-inspection.txt
+          apk_size_bytes="$(awk -F= '$1 == "APK_SIZE_BYTES" { print $2; exit }' release-inspection.txt)"
+          {
+            echo "## Release APK"
+            echo
+            echo "- Boundary inspection: pass"
+            echo "- APK size: ${apk_size_bytes} bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release inspection report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-apk-inspection
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            release-inspection.txt
+            app/build/outputs/apk/release/app-release.apk

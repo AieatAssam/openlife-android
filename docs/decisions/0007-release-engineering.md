@@ -80,3 +80,15 @@ named intake/same-app paths.
 The app module's `lint` task also depends on its JVM boundary suite, ensuring
 the standard `lint` command exercises the same manifest and source-egress
 assertions as `:app:test`.
+
+## CI matrix (P0-04)
+
+The CI workflow uses Temurin JDK 21 in every job, runs the plan/static-analysis
+and dependency-verification build command, and executes connected tests on
+API 29 and API 36 `google_apis` x86_64 Pixel 7 emulators with KVM enabled.
+Third-party actions are pinned to full commit SHAs. Instrumented reports,
+filtered OpenLife logcat, lint/Detekt reports, and release-inspection output
+are retained as 30-day artefacts. The connected runner retries once only for
+infrastructure-shaped failures; assertion-shaped failures stop immediately.
+An authenticated workflow URL is not recorded until the owner runs the
+workflow from a pushed ref.

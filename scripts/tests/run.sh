@@ -251,5 +251,17 @@ assert_nonzero "plan-status rejects multiple plan paths" "$TMP/status-two-paths.
 stage_comments="$(grep -rn --exclude-dir=build 'Stage [0-9]' "$ROOT/app" "$ROOT/vault" || true)"
 assert_not_contains "app and vault have no implementation-stage comments" "Stage " "$stage_comments"
 
+set +e
+bash "$ROOT/scripts/tests/p0-04-ci-workflow.sh" >"$TMP/p0-04-ci-workflow.out" 2>&1
+ci_workflow_status=$?
+set -e
+if [[ "$ci_workflow_status" -eq 0 ]]; then
+  printf 'ok - P0-04 CI workflow contract passes\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - P0-04 CI workflow contract passes\n%s\n' "$(<"$TMP/p0-04-ci-workflow.out")" >&2
+  fail=$((fail + 1))
+fi
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]

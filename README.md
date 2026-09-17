@@ -2,6 +2,8 @@
 
 ![status](https://img.shields.io/badge/status-work--in--progress-orange?style=for-the-badge)
 
+[![CI](https://github.com/AieatAssam/openlife-android/actions/workflows/ci.yml/badge.svg)](https://github.com/AieatAssam/openlife-android/actions/workflows/ci.yml)
+
 > [!WARNING]
 > ## 🚧 Work in progress — not ready for real use 🚧
 >
