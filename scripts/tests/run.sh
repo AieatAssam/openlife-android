@@ -248,8 +248,8 @@ two_status_paths_status=$?
 set -e
 assert_nonzero "plan-status rejects multiple plan paths" "$TMP/status-two-paths.out" "$two_status_paths_status"
 
-stage_comments="$(grep -rn 'Stage [0-9]' "$ROOT/app/src" "$ROOT/vault/src" || true)"
-assert_not_contains "shipped source has no implementation-stage comments" "Stage " "$stage_comments"
+stage_comments="$(grep -rn --exclude-dir=build 'Stage [0-9]' "$ROOT/app" "$ROOT/vault" || true)"
+assert_not_contains "app and vault have no implementation-stage comments" "Stage " "$stage_comments"
 
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
