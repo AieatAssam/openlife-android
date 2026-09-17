@@ -16,7 +16,12 @@ Branch: `plan/P0-04-ci-matrix`
 - REFACTOR commit `69b6d99` extracts the three-job JDK/cache setup into
   `.github/actions/gradle-setup/action.yml`; its third-party actions remain
   pinned by full SHA and the contract test covers the composite action.
-- `scripts/tests/p0-04-ci-workflow.sh` — `14 passed, 0 failed`.
+- Review RED commit `ea6202c` added regression checks after review found a
+  generic instrumentation `shortMsg` classifier and unpinned actions in the
+  release workflow. Review GREEN commit `5ed757d` narrows the retry classifier
+  to assertion-shaped output and pins the release workflow's checkout,
+  reusable Gradle setup, artifact uploads, and GitHub Release action.
+- `scripts/tests/p0-04-ci-workflow.sh` — `16 passed, 0 failed`.
 - `bash scripts/tests/run.sh` — `45 passed, 0 failed`; `scripts/plan-check.sh`
   reports `steps=77 errors=0`.
 - `./gradlew detekt lint :app:test :vault:test assembleDebug` — `BUILD
