@@ -16,6 +16,7 @@ import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.tasks.testing.Test
+import java.util.ArrayDeque
 
 plugins {
     alias(libs.plugins.android.application)
@@ -135,40 +136,45 @@ val writeReleaseRuntimeClasspath = tasks.register("writeReleaseRuntimeClasspath"
             .distinct()
             .sorted()
         val denylistPaths = linkedSetOf<String>()
-        val visited = mutableSetOf<String>()
         fun coordinate(component: ResolvedComponentResult): String? = component.moduleVersion?.let { id ->
             "${id.group}:${id.name}:${id.version}"
         }
-        fun visit(component: ResolvedComponentResult, path: List<String>) {
-            val componentKey = component.id.displayName
-            if (!visited.add(componentKey)) {
-                return
-            }
-            val componentCoordinate = coordinate(component)
-            val currentPath = if (componentCoordinate == null) {
-                path
-            } else {
-                path + componentCoordinate
-            }
-            component.dependencies.filterIsInstance<ResolvedDependencyResult>().forEach { dependency ->
-                val selected = dependency.selected
-                val selectedCoordinate = coordinate(selected)
-                if (selectedCoordinate != null) {
-                    val selectedPath = currentPath + selectedCoordinate
-                    if (selectedCoordinate.startsWith("com.google.firebase") ||
-                        selectedCoordinate.startsWith("com.google.android.datatransport")
-                    ) {
-                        denylistPaths += "denylist-path: ${selectedPath.joinToString(" -> ")}"
-                    }
-                    if (selectedCoordinate !in currentPath) {
-                        visit(selected, currentPath)
-                    }
+        fun shortestPathTo(target: ResolvedComponentResult): List<String>? {
+            val queue = ArrayDeque<Pair<ResolvedComponentResult, List<String>>>()
+            val visited = mutableSetOf<String>()
+            queue.add(resolutionResult.root to emptyList())
+            while (queue.isNotEmpty()) {
+                val (component, path) = queue.removeFirst()
+                if (!visited.add(component.id.displayName)) {
+                    continue
+                }
+                val componentCoordinate = coordinate(component)
+                val currentPath = if (componentCoordinate == null) {
+                    path
                 } else {
-                    visit(selected, currentPath)
+                    path + componentCoordinate
+                }
+                if (component.id.displayName == target.id.displayName) {
+                    return currentPath
+                }
+                component.dependencies.filterIsInstance<ResolvedDependencyResult>().forEach { dependency ->
+                    queue.add(dependency.selected to currentPath)
                 }
             }
+            return null
         }
-        visit(resolutionResult.root, emptyList())
+        resolutionResult.allComponents
+            .filter { component ->
+                coordinate(component)?.let { selectedCoordinate ->
+                    selectedCoordinate.startsWith("com.google.firebase") ||
+                        selectedCoordinate.startsWith("com.google.android.datatransport")
+                } == true
+            }
+            .forEach { component ->
+                shortestPathTo(component)?.let { path ->
+                    denylistPaths += "denylist-path: ${path.joinToString(" -> ")}"
+                }
+            }
         releaseClasspathReport.get().asFile.apply {
             parentFile.mkdirs()
             writeText(
