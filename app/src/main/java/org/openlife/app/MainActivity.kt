@@ -136,12 +136,10 @@ class MainActivity : ComponentActivity() {
         onImportFromPhotoPicker: () -> Unit,
     ) {
         when (screen) {
-            Screen.List -> SourceListScreen(
-                state = listState,
-                loadThumbnail = viewModel::loadThumbnail,
+            Screen.List -> SourceList(
+                listState = listState,
                 thumbnailGeneration = thumbnailGeneration,
-                onOpen = { onScreenChange(Screen.Viewer(it)) },
-                onDelete = { viewModel.delete(it) {} },
+                onScreenChange = onScreenChange,
                 onImportFromPhotoPicker = onImportFromPhotoPicker,
             )
 
@@ -170,12 +168,10 @@ class MainActivity : ComponentActivity() {
             if (listState is SourceListUiState.Loaded) {
                 onScreenChange(Screen.List)
             } else {
-                SourceListScreen(
-                    state = listState,
-                    loadThumbnail = viewModel::loadThumbnail,
+                SourceList(
+                    listState = listState,
                     thumbnailGeneration = thumbnailGeneration,
-                    onOpen = { onScreenChange(Screen.Viewer(it)) },
-                    onDelete = { viewModel.delete(it) {} },
+                    onScreenChange = onScreenChange,
                     onImportFromPhotoPicker = onImportFromPhotoPicker,
                 )
             }
@@ -215,6 +211,23 @@ class MainActivity : ComponentActivity() {
                 onDismiss = { pendingDelete = false },
             )
         }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun SourceList(
+        listState: SourceListUiState,
+        thumbnailGeneration: Long,
+        onScreenChange: (Screen) -> Unit,
+        onImportFromPhotoPicker: () -> Unit,
+    ) {
+        SourceListScreen(
+            state = listState,
+            loadThumbnail = viewModel::loadThumbnail,
+            thumbnailGeneration = thumbnailGeneration,
+            onOpen = { onScreenChange(Screen.Viewer(it)) },
+            onDelete = { viewModel.delete(it) {} },
+            onImportFromPhotoPicker = onImportFromPhotoPicker,
+        )
     }
 
     private fun forwardPickedUri(uri: Uri) {
