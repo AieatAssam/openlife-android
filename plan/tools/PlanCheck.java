@@ -210,6 +210,10 @@ public final class PlanCheck {
       if (!step.file.equals("steps/" + step.id + ".yaml")) {
         error(root.resolve("plan.yaml"), "step " + step.id + ".file", "must be steps/" + step.id + ".yaml");
       }
+      if (Files.isSymbolicLink(file)) {
+        error(file, "file", "symlink is not allowed");
+        continue;
+      }
       if (!Files.isRegularFile(file)) {
         error(file, "file", "missing step file referenced by plan.yaml");
       }
@@ -222,8 +226,16 @@ public final class PlanCheck {
       error(stepsDir, "directory", "missing steps directory");
       return;
     }
+    if (Files.isSymbolicLink(stepsDir)) {
+      error(stepsDir, "directory", "symlink is not allowed");
+      return;
+    }
     try (DirectoryStream<Path> files = Files.newDirectoryStream(stepsDir, "*.yaml")) {
       for (Path file : files) {
+        if (Files.isSymbolicLink(file)) {
+          error(file, "file", "symlink is not allowed");
+          continue;
+        }
         Object document = load(file);
         if (!(document instanceof Map<?, ?> step)) {
           error(file, "document", "must be a YAML map");
@@ -247,6 +259,10 @@ public final class PlanCheck {
         if (ref == null) {
           error(file, "id", "is not referenced by plan.yaml");
           continue;
+        }
+        String phase = string(step.get("phase"));
+        if (phase != null && !phase.equals(ref.phase)) {
+          error(file, "phase", "must be " + ref.phase);
         }
         List<String> fileDeps = stringList(step.get("depends_on"), file, "depends_on");
         if (fileDeps != null && !fileDeps.equals(ref.dependencies)) {
@@ -429,7 +445,20 @@ public final class PlanCheck {
         error(root.resolve("plan.yaml"), "review_findings_index[]", "must contain maps");
         continue;
       }
-      String findingId = string(finding.get("id"));
+      String findingId = findingIdOrUnknown(finding);
+      for (String key : List.of("id", "severity", "text", "step")) {
+        if (!finding.containsKey(key)) {
+          error(root.resolve("plan.yaml"), "finding " + findingId + "." + key, "missing key");
+        }
+      }
+      requireType(finding, "id", String.class, root.resolve("plan.yaml"), "finding " + findingId + ".id");
+      requireType(finding, "severity", String.class, root.resolve("plan.yaml"), "finding " + findingId + ".severity");
+      requireType(finding, "text", String.class, root.resolve("plan.yaml"), "finding " + findingId + ".text");
+      requireType(finding, "step", String.class, root.resolve("plan.yaml"), "finding " + findingId + ".step");
+      String normalizedFindingId = string(finding.get("id"));
+      if (normalizedFindingId != null && !normalizedFindingId.matches("F-[0-9]+")) {
+        error(root.resolve("plan.yaml"), "finding " + normalizedFindingId + ".id", "must match F-<n>");
+      }
       String closingSteps = string(finding.get("step"));
       if (closingSteps == null) {
         error(root.resolve("plan.yaml"), "review_findings_index[].step", "missing or not a string");
@@ -441,6 +470,11 @@ public final class PlanCheck {
         }
       }
     }
+  }
+
+  private static String findingIdOrUnknown(Map<?, ?> finding) {
+    String id = string(finding.get("id"));
+    return id == null ? "<unknown>" : id;
   }
 
   private Object load(Path file) {
@@ -564,12 +598,14 @@ public final class PlanCheck {
 
   private static final class StepRef {
     private final String id;
+    private final String phase;
     private final String file;
     private final List<String> dependencies;
     private final String status;
 
     private StepRef(String id, String phase, String file, List<String> dependencies, String status) {
       this.id = id;
+      this.phase = phase;
       this.file = file;
       this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies));
       this.status = status;

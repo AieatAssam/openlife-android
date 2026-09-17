@@ -8,11 +8,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/lib/plan.sh"
 PLAN_ROOT="$ROOT/plan"
 JSON=""
+PLAN_ARG_SET=0
 for arg in "$@"; do
   case "$arg" in
     --json) JSON=1 ;;
     --*) echo "unknown option: $arg" >&2; exit 2 ;;
-    *) PLAN_ROOT="$arg" ;;
+    *)
+      [ "$PLAN_ARG_SET" -eq 0 ] || { echo "expected one plan directory, got: $arg" >&2; exit 2; }
+      PLAN_ROOT="$arg"
+      PLAN_ARG_SET=1
+      ;;
   esac
 done
 PLAN="$PLAN_ROOT/plan.yaml"

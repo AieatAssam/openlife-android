@@ -7,11 +7,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/lib/plan.sh"
 JSON=""
 PLAN_ROOT="$ROOT/plan"
+PLAN_ARG_SET=0
 for arg in "$@"; do
   case "$arg" in
     --json) JSON="--json" ;;
     --*) echo "unknown option: $arg" >&2; exit 2 ;;
-    *) PLAN_ROOT="$arg" ;;
+    *)
+      [ "$PLAN_ARG_SET" -eq 0 ] || { echo "expected one plan directory, got: $arg" >&2; exit 2; }
+      PLAN_ROOT="$arg"
+      PLAN_ARG_SET=1
+      ;;
   esac
 done
 GRADLE_CACHE="${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper/dists"
