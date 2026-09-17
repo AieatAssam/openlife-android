@@ -13,6 +13,7 @@ class LargeFontLayoutTest {
         val accessibilityTest = Files.readString(
             projectDir.resolve("app/src/androidTest/java/org/openlife/app/ui/AccessibilitySemanticsTest.kt"),
         )
+        assertTrue("the 1.3x density override must be exercised", accessibilityTest.contains("fontScale = 1.3f"))
         assertTrue("the 2x density override must be exercised", accessibilityTest.contains("fontScale = 2f"))
         val sources = listOf(
             "app/src/main/java/org/openlife/app/ui/FirstRunPreferences.kt",

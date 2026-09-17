@@ -26,10 +26,12 @@ Status: implementation complete; handoff pending owner review
 | `git diff --check` | pass after generated-report cleanup |
 
 The unit contracts cover typed Navigation Compose routes, back-stack shape,
-edge-to-edge/inset declarations, secure windows, resource-only UI strings,
-large-font coverage hooks, and forced RTL coverage. `AccessibilitySemanticsTest`
-also contains Compose checks for 2x font scale, accessible actions, privacy
-descriptions, and RTL layout direction.
+deep-link loading guards, edge-to-edge/inset declarations, secure windows, and
+resource-only UI strings. `AccessibilitySemanticsTest` contains Compose checks
+for 1.3x/2x font scale on first-run, intake, list, and viewer actions, a
+400x700dp window with a simulated 48dp bottom inset, privacy descriptions, and
+forced RTL geometry. Instrumented `NavigationBackTest` and `SecureWindowTest`
+now exercise Espresso/activity behavior when a device is available.
 
 ## Device and hosted gaps
 

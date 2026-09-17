@@ -13,5 +13,8 @@
     <issue id="GradleDependency" severity="ignore" />
     <issue id="NewerVersionAvailable" severity="ignore" />
     <issue id="MissingClass" severity="ignore" />
-    <issue id="ObsoleteSdkInt" severity="ignore" />
+    <issue id="ObsoleteSdkInt" severity="error">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+        <ignore path="src/main/res/mipmap-anydpi-v26/ic_launcher.xml" />
+    </issue>
 </lint>

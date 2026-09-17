@@ -18,7 +18,7 @@ internal val ErrorInkDark = Color(0xFFF2B8B5)
 
 val OpenLifeLightColors = androidx.compose.material3.lightColorScheme(
     primary = Vermilion,
-    onPrimary = Paper,
+    onPrimary = RaisedPaper,
     primaryContainer = VermilionContainer,
     onPrimaryContainer = Ink,
     secondary = MutedInk,

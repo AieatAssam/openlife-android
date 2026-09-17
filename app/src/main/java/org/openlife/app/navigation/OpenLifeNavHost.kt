@@ -58,8 +58,17 @@ fun OpenLifeNavHost(
             val route = entry.toRoute<Routes.Viewer>()
             val sourceId = remember(route.sourceId) { runCatching { UUID.fromString(route.sourceId) }.getOrNull() }
             val source = (listState as? SourceListUiState.Loaded)?.sources?.find { it.id == sourceId }
-            if (source == null) {
-                LaunchedEffect(listState) { navController.popBackStack() }
+            if (listState !is SourceListUiState.Loaded) {
+                SourceListScreen(
+                    state = listState,
+                    loadThumbnail = loadThumbnail,
+                    thumbnailGeneration = thumbnailGeneration,
+                    onOpen = { id -> navController.navigate(Routes.Viewer(id.toString())) },
+                    onDelete = { id -> delete(id) {} },
+                    onImportFromPhotoPicker = onImportFromPhotoPicker,
+                )
+            } else if (source == null) {
+                LaunchedEffect(route.sourceId) { navController.popBackStack() }
             } else {
                 ViewerScreen(
                     source = source,

@@ -76,17 +76,21 @@ class MainActivity : ComponentActivity() {
         val listState by viewModel.state.collectAsState()
         val initialSourceId = remember { openSourceIdFrom(intent) }
 
-        LaunchedEffect(initialSourceId) {
-            initialSourceId?.let { navController.navigate(Routes.Viewer(it.toString())) }
-        }
-        LaunchedEffect(requestedSourceId) {
-            requestedSourceId?.let {
-                navController.navigate(Routes.Viewer(it.toString()))
-                openSourceRequests.value = null
+        LaunchedEffect(acknowledged, initialSourceId) {
+            if (acknowledged) {
+                initialSourceId?.let { navController.navigate(Routes.Viewer(it.toString())) }
             }
         }
-        LaunchedEffect(epoch) {
-            if (epoch > 0L) {
+        LaunchedEffect(acknowledged, requestedSourceId) {
+            if (acknowledged) {
+                requestedSourceId?.let {
+                    navController.navigate(Routes.Viewer(it.toString()))
+                    openSourceRequests.value = null
+                }
+            }
+        }
+        LaunchedEffect(acknowledged, epoch) {
+            if (acknowledged && epoch > 0L) {
                 navController.navigate(Routes.List) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = false }
                     launchSingleTop = true

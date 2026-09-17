@@ -58,10 +58,11 @@ thumbnail cache uses a generation barrier so an in-flight decode cannot be
 retained after a background transition. Protected recents remain an effect of
 `FLAG_SECURE` (`applySecureWindow()`), confirmed via `dumpsys window` showing
 no recents-thumbnail bitmap for the task. Every icon-only control carries a
-`contentDescription` and large-text rendering (1.3x/2.0x scale) was checked for clipping across every screen
-(`docs/verification/C0.md` C0-16); P0-07 adds deterministic Compose contracts
-for 2x font scale and forced RTL, while its final-tree connected run remains a
-documented device gap (`docs/verification/P0-07-ui-foundation.md`). An actual TalkBack accessibility-service
+`contentDescription`; the pre-P0-07 large-text baseline (1.3x/2.0x scale) was
+checked for clipping across every screen (`docs/verification/C0.md` C0-16).
+P0-07 adds deterministic Compose contracts for 1.3x/2x font scale, forced RTL,
+and inset bounds, while its final-tree connected run remains a documented
+device gap (`docs/verification/P0-07-ui-foundation.md`). An actual TalkBack accessibility-service
 run has not been performed in this environment and remains an open item
 (`docs/reviews/C0-security-self-review.md`), not a passed check.
 

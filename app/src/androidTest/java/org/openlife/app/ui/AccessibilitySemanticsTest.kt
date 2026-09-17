@@ -125,7 +125,78 @@ class AccessibilitySemanticsTest {
         }
 
         val bounds = composeRule.onNodeWithTag("primary_action").getUnclippedBoundsInRoot()
-        assertTrue("primary action overlaps the 48dp bottom inset: $bounds", bounds.bottom <= 652.dp)
+        assertTrue("primary action is above the 48dp bottom inset: $bounds", bounds.bottom <= 652.dp)
+        assertTrue("primary action is above the window: $bounds", bounds.top >= 0.dp)
+        assertTrue("primary action is left of the window: $bounds", bounds.left >= 0.dp)
+        assertTrue("primary action is right of the window: $bounds", bounds.right <= 400.dp)
+    }
+
+    @Test
+    fun firstRunExplanationKeepsContinueActionReachableAt13FontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides androidx.compose.ui.unit.Density(
+                    density = baseDensity.density,
+                    fontScale = 1.3f,
+                ),
+            ) {
+                FirstRunExplanationScreen(onContinue = {})
+            }
+        }
+
+        composeRule.onNodeWithText("I understand")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertHasClickAction()
+    }
+
+    @Test
+    fun listActionStaysReachableAt2xFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides androidx.compose.ui.unit.Density(
+                    density = baseDensity.density,
+                    fontScale = 2f,
+                ),
+            ) {
+                SourceListScreen(
+                    state = SourceListUiState.Loaded(emptyList()),
+                    loadThumbnail = { null },
+                    onOpen = {},
+                    onDelete = {},
+                    onImportFromPhotoPicker = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Import from photos")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+    }
+
+    @Test
+    fun viewerActionsStayReachableAt2xFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides androidx.compose.ui.unit.Density(
+                    density = baseDensity.density,
+                    fontScale = 2f,
+                ),
+            ) {
+                ViewerScreen(
+                    source = readySource(),
+                    loadBytes = { tinyJpeg() },
+                    onBack = {},
+                    onDeleteRequested = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Back").assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithContentDescription("Delete").assertIsDisplayed().assertHasClickAction()
     }
 
     @Test
@@ -179,10 +250,11 @@ class AccessibilitySemanticsTest {
 
     @Test
     fun screensMirrorCorrectlyUnderForcedRtl() {
+        val source = readySource()
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 SourceListScreen(
-                    state = SourceListUiState.Loaded(emptyList()),
+                    state = SourceListUiState.Loaded(listOf(source)),
                     loadThumbnail = { null },
                     onOpen = {},
                     onDelete = {},
@@ -194,6 +266,9 @@ class AccessibilitySemanticsTest {
         composeRule.onNodeWithContentDescription("Import from photos")
             .assertIsDisplayed()
             .assertHasClickAction()
+        val deleteBounds = composeRule.onNodeWithContentDescription("Delete").getUnclippedBoundsInRoot()
+        val labelBounds = composeRule.onNodeWithText("Imported", substring = true).getUnclippedBoundsInRoot()
+        assertTrue("RTL should place the delete action before the source label", deleteBounds.right < labelBounds.left)
     }
 
     private fun tinyJpeg(): ByteArray {
