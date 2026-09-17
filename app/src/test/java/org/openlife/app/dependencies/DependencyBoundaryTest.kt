@@ -2,6 +2,7 @@ package org.openlife.app.dependencies
 
 import java.nio.file.Files
 import java.nio.file.Path
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,6 +30,36 @@ class DependencyBoundaryTest {
                 documentedMlKitExceptionPrefixes.none(coordinate::startsWith)
         }
         assertTrue("denylisted release coordinates: $violations", violations.isEmpty())
+    }
+
+    @Test
+    fun documentedMlKitExceptionHasAReleaseGraphProvenancePath() {
+        assertTrue("release classpath report is missing: $classpathFile", Files.isRegularFile(classpathFile))
+
+        val policy = policyDocument()
+        val exceptionIds = policy.filter { it.startsWith("id:") }.map { it.substringAfter(':').trim() }
+        assertEquals(listOf("mlkit-transitive-transport"), exceptionIds)
+        val exceptionCoordinates = policy
+            .first { it.startsWith("coordinates:") }
+            .substringAfter(':')
+            .split(',')
+            .map(String::trim)
+        val origin = policy.first { it.startsWith("origin:") }.substringAfter(':').trim()
+        val lines = Files.readAllLines(classpathFile)
+        assertTrue("ML Kit exception origin is no longer present: $origin", lines.any { it == origin })
+
+        val denylisted = lines.filter { line -> exceptionCoordinates.any(line::startsWith) }
+        assertTrue("the documented exception has no resolved coordinates", denylisted.isNotEmpty())
+        denylisted.forEach { coordinate ->
+            assertTrue(
+                "exception coordinate has no ML Kit provenance: $coordinate",
+                lines.any { line ->
+                    line.startsWith("denylist-path:") &&
+                        line.contains(origin) &&
+                        line.contains(coordinate)
+                },
+            )
+        }
     }
 
     @Test

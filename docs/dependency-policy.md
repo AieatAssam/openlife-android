@@ -34,6 +34,8 @@ id: mlkit-transitive-transport
 coordinates: com.google.android.datatransport, com.google.firebase
 expires: P2-05
 reason: ML Kit's current bundled recognizer transitively resolves these support classes.
+origin: com.google.mlkit:text-recognition
+path: transitive-only
 ```
 
 ## Allowlisted licences
