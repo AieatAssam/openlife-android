@@ -280,6 +280,95 @@ public final class PlanCheck {
     requireType(step, "docs_to_update", List.class, file, path + ".docs_to_update");
     requireType(step, "risks", List.class, file, path + ".risks");
     requireType(step, "rollback", String.class, file, path + ".rollback");
+    validateNestedStepSchema(file, path, step);
+  }
+
+  private void validateNestedStepSchema(Path file, String path, Map<?, ?> step) {
+    Object requirementsValue = step.get("requirements");
+    if (requirementsValue instanceof List<?> requirements) {
+      for (int index = 0; index < requirements.size(); index++) {
+        Object requirementValue = requirements.get(index);
+        String requirementPath = path + ".requirements[" + index + "]";
+        if (!(requirementValue instanceof Map<?, ?> requirement)) {
+          error(file, requirementPath, "must be a map");
+          continue;
+        }
+        requireNestedKey(requirement, "id", file, requirementPath);
+        requireNestedKey(requirement, "text", file, requirementPath);
+        requireType(requirement, "id", String.class, file, requirementPath + ".id");
+        requireType(requirement, "text", String.class, file, requirementPath + ".text");
+        String requirementId = string(requirement.get("id"));
+        if (requirementId != null && !requirementId.matches("[A-Z][0-9]+-[0-9]{2}-R[0-9]+")) {
+          error(file, requirementPath + ".id", "must match <step>-R<n>");
+        }
+      }
+    }
+
+    Object tddValue = step.get("tdd");
+    if (tddValue instanceof Map<?, ?> tdd) {
+      String tddPath = path + ".tdd";
+      requireNestedKey(tdd, "red", file, tddPath);
+      requireNestedKey(tdd, "green", file, tddPath);
+      requireNestedKey(tdd, "refactor", file, tddPath);
+      requireType(tdd, "red", List.class, file, tddPath + ".red");
+      requireType(tdd, "green", List.class, file, tddPath + ".green");
+      requireType(tdd, "refactor", List.class, file, tddPath + ".refactor");
+      validateRedTests(file, tddPath, tdd.get("red"));
+      validateStringListItems(file, tddPath + ".green", tdd.get("green"));
+      validateStringListItems(file, tddPath + ".refactor", tdd.get("refactor"));
+    }
+
+    Object verificationValue = step.get("verification");
+    if (verificationValue instanceof Map<?, ?> verification) {
+      String verificationPath = path + ".verification";
+      requireNestedKey(verification, "commands", file, verificationPath);
+      requireNestedKey(verification, "evidence_required", file, verificationPath);
+      requireType(verification, "commands", List.class, file, verificationPath + ".commands");
+      requireType(verification, "evidence_required", List.class, file, verificationPath + ".evidence_required");
+      validateStringListItems(file, verificationPath + ".commands", verification.get("commands"));
+      validateStringListItems(file, verificationPath + ".evidence_required", verification.get("evidence_required"));
+    }
+  }
+
+  private void validateRedTests(Path file, String path, Object value) {
+    if (!(value instanceof List<?> tests)) {
+      return;
+    }
+    for (int index = 0; index < tests.size(); index++) {
+      Object testValue = tests.get(index);
+      String testPath = path + ".red[" + index + "]";
+      if (testValue instanceof String) {
+        continue;
+      }
+      if (!(testValue instanceof Map<?, ?> test)) {
+        error(file, testPath, "must be a map");
+        continue;
+      }
+      requireNestedKey(test, "name", file, testPath);
+      requireType(test, "name", String.class, file, testPath + ".name");
+      if (test.containsKey("asserts")
+          && !(test.get("asserts") instanceof String)
+          && !(test.get("asserts") instanceof List<?>)) {
+        error(file, testPath + ".asserts", "must be a string or list");
+      }
+    }
+  }
+
+  private void validateStringListItems(Path file, String path, Object value) {
+    if (!(value instanceof List<?> items)) {
+      return;
+    }
+    for (int index = 0; index < items.size(); index++) {
+      if (!(items.get(index) instanceof String)) {
+        error(file, path + "[" + index + "]", "must be a string");
+      }
+    }
+  }
+
+  private void requireNestedKey(Map<?, ?> map, String key, Path file, String path) {
+    if (!map.containsKey(key)) {
+      error(file, path + "." + key, "missing key");
+    }
   }
 
   private void validateDependencies() {
