@@ -1,4 +1,5 @@
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.LoaderOptions;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,6 +11,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -32,12 +34,12 @@ public final class PlanCheck {
       "id", "title", "phase", "status", "depends_on", "estimate", "owner",
       "summary", "requirements", "tdd", "verification", "acceptance_criteria",
       "docs_to_update", "risks", "rollback");
-  private static final Set<String> STATUSES = Set.of(
+  private static final List<String> STATUSES = List.of(
       "todo", "in_progress", "blocked", "review", "done", "waived");
 
   private final Path root;
   private final boolean json;
-  private final Yaml yaml = new Yaml();
+  private final Yaml yaml;
   private final List<String> errors = new ArrayList<>();
   private final List<String> warnings = new ArrayList<>();
   private final LinkedHashMap<String, StepRef> steps = new LinkedHashMap<>();
@@ -46,6 +48,10 @@ public final class PlanCheck {
   private PlanCheck(Path root, boolean json) {
     this.root = root.toAbsolutePath().normalize();
     this.json = json;
+    LoaderOptions loaderOptions = new LoaderOptions();
+    loaderOptions.setAllowDuplicateKeys(false);
+    loaderOptions.setWarnOnDuplicateKeys(false);
+    this.yaml = new Yaml(loaderOptions);
   }
 
   public static void main(String[] args) {
@@ -84,11 +90,29 @@ public final class PlanCheck {
       }
     }
     copyStringKeyedMap(document, plan);
+    validatePlanTypes(planFile);
     collectPlanSteps(planFile);
     validateReferencedFiles();
     validateAllStepFiles();
     validateDependencies();
     validateFindings();
+  }
+
+  private void validatePlanTypes(Path planFile) {
+    requireType(plan, "schema_version", Number.class, planFile, "schema_version");
+    requireType(plan, "plan_version", String.class, planFile, "plan_version");
+    Object planDate = plan.get("plan_date");
+    if (plan.containsKey("plan_date") && !(planDate instanceof Date) && !(planDate instanceof String)) {
+      error(planFile, "plan_date", "must be a date or string");
+    }
+    requireType(plan, "governing_documents", List.class, planFile, "governing_documents");
+    requireType(plan, "ethos", Map.class, planFile, "ethos");
+    requireType(plan, "conventions", Map.class, planFile, "conventions");
+    requireType(plan, "release_train", List.class, planFile, "release_train");
+    requireType(plan, "decisions_made_by_this_plan", List.class, planFile, "decisions_made_by_this_plan");
+    requireType(plan, "phases", List.class, planFile, "phases");
+    requireType(plan, "owner_actions_required", List.class, planFile, "owner_actions_required");
+    requireType(plan, "review_findings_index", List.class, planFile, "review_findings_index");
   }
 
   private void collectPlanSteps(Path planFile) {
@@ -110,6 +134,11 @@ public final class PlanCheck {
           error(planFile, phasePath + "." + key, "missing key");
         }
       }
+      requireType(phase, "id", String.class, planFile, phasePath + ".id");
+      requireType(phase, "title", String.class, planFile, phasePath + ".title");
+      requireType(phase, "goal", String.class, planFile, phasePath + ".goal");
+      requireType(phase, "exit_gate", String.class, planFile, phasePath + ".exit_gate");
+      requireType(phase, "steps", List.class, planFile, phasePath + ".steps");
       if (phaseId == null) {
         error(planFile, "phases[].id", "missing or not a string");
         continue;
@@ -134,6 +163,13 @@ public final class PlanCheck {
             error(planFile, stepPath + "." + key, "missing key");
           }
         }
+        requireType(step, "id", String.class, planFile, stepPath + ".id");
+        requireType(step, "title", String.class, planFile, stepPath + ".title");
+        requireType(step, "file", String.class, planFile, stepPath + ".file");
+        requireType(step, "status", String.class, planFile, stepPath + ".status");
+        requireType(step, "depends_on", List.class, planFile, stepPath + ".depends_on");
+        requireType(step, "estimate", String.class, planFile, stepPath + ".estimate");
+        requireType(step, "owner", String.class, planFile, stepPath + ".owner");
         if (id == null) {
           error(planFile, "phases[" + phaseId + "].steps[].id", "missing or not a string");
           continue;
@@ -198,6 +234,7 @@ public final class PlanCheck {
             error(file, key, "missing key");
           }
         }
+        validateStepTypes(file, step);
         String filenameId = file.getFileName().toString().replaceFirst("\\.yaml$", "");
         String id = string(step.get("id"));
         if (id == null) {
@@ -223,6 +260,26 @@ public final class PlanCheck {
     } catch (IOException ex) {
       error(stepsDir, "directory", "cannot enumerate step files: " + ex.getMessage());
     }
+  }
+
+  private void validateStepTypes(Path file, Map<?, ?> step) {
+    String id = string(step.get("id"));
+    String path = id == null ? "step" : "step " + id;
+    requireType(step, "id", String.class, file, path + ".id");
+    requireType(step, "title", String.class, file, path + ".title");
+    requireType(step, "phase", String.class, file, path + ".phase");
+    requireType(step, "status", String.class, file, path + ".status");
+    requireType(step, "depends_on", List.class, file, path + ".depends_on");
+    requireType(step, "estimate", String.class, file, path + ".estimate");
+    requireType(step, "owner", String.class, file, path + ".owner");
+    requireType(step, "summary", String.class, file, path + ".summary");
+    requireType(step, "requirements", List.class, file, path + ".requirements");
+    requireType(step, "tdd", Map.class, file, path + ".tdd");
+    requireType(step, "verification", Map.class, file, path + ".verification");
+    requireType(step, "acceptance_criteria", List.class, file, path + ".acceptance_criteria");
+    requireType(step, "docs_to_update", List.class, file, path + ".docs_to_update");
+    requireType(step, "risks", List.class, file, path + ".risks");
+    requireType(step, "rollback", String.class, file, path + ".rollback");
   }
 
   private void validateDependencies() {
@@ -340,6 +397,12 @@ public final class PlanCheck {
     return value instanceof String ? (String) value : null;
   }
 
+  private void requireType(Map<?, ?> map, String key, Class<?> expected, Path file, String path) {
+    if (map.containsKey(key) && !expected.isInstance(map.get(key))) {
+      error(file, path, "must be " + expected.getSimpleName());
+    }
+  }
+
   private void error(Path file, String key, String message) {
     errors.add(file + ": " + key + ": " + message);
   }
@@ -379,10 +442,27 @@ public final class PlanCheck {
   }
 
   private static String jsonEscape(String value) {
-    return value.replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r");
+    StringBuilder escaped = new StringBuilder();
+    for (int i = 0; i < value.length(); i++) {
+      char character = value.charAt(i);
+      switch (character) {
+        case '\\' -> escaped.append("\\\\");
+        case '"' -> escaped.append("\\\"");
+        case '\b' -> escaped.append("\\b");
+        case '\f' -> escaped.append("\\f");
+        case '\n' -> escaped.append("\\n");
+        case '\r' -> escaped.append("\\r");
+        case '\t' -> escaped.append("\\t");
+        default -> {
+          if (character < 0x20) {
+            escaped.append(String.format("\\u%04x", (int) character));
+          } else {
+            escaped.append(character);
+          }
+        }
+      }
+    }
+    return escaped.toString();
   }
 
   private static String firstLine(String value) {

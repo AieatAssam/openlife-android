@@ -20,7 +20,7 @@ if [ -z "$JAR" ]; then
   echo "snakeyaml jar not found under $GRADLE_CACHE; install the Gradle wrapper distribution first" >&2
   exit 2
 fi
-if [ -z "$(plan_step_lines "$PLAN_ROOT/plan.yaml")" ]; then
+if [ -z "$JSON" ] && [ -z "$(plan_step_lines "$PLAN_ROOT/plan.yaml")" ]; then
   echo "$PLAN_ROOT/plan.yaml: phases: no one-line step entries found" >&2
   exit 1
 fi

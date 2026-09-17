@@ -38,6 +38,10 @@ Optional keys: `closes_findings`, `owner_action`, `rationale`, `ethos_check`,
 - `verification`: `commands` (exact commands to run) and `evidence_required`
   (what to paste into plan.yaml `evidence`).
 - `depends_on` must equal the list in plan.yaml for the same id.
+- The lifecycle `status` in `plan/plan.yaml` is authoritative. The companion
+  step-file `status` is a required, schema-checked field retained in the brief
+  as its initial/default value; it is intentionally not compared with the
+  tracker so agents only mutate the approved tracking fields in `plan.yaml`.
 
 ## Status lifecycle
 

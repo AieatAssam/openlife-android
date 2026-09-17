@@ -16,6 +16,7 @@ for arg in "$@"; do
   esac
 done
 PLAN="$PLAN_ROOT/plan.yaml"
+[ -f "$PLAN" ] || { echo "$PLAN: missing plan file" >&2; exit 1; }
 
 declare -a ids statuses dependencies
 declare -A status_by_id deps_by_id
@@ -27,6 +28,11 @@ while IFS='|' read -r id status dep; do
   status_by_id["$id"]="$status"
   deps_by_id["$id"]="$dep"
 done < <(plan_step_lines "$PLAN")
+
+if [ "${#ids[@]}" -eq 0 ]; then
+  echo "$PLAN: no one-line step entries found" >&2
+  exit 1
+fi
 
 is_runnable() {
   local id="$1" dep
@@ -71,6 +77,7 @@ for i in "${!ids[@]}"; do
 done
 echo "--- runnable (todo, all deps done) ---"
 for id in "${ids[@]}"; do
-  is_runnable "$id" && echo "$id"
+  if is_runnable "$id"; then
+    echo "$id"
+  fi
 done
-true

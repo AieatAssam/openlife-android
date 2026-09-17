@@ -8,7 +8,9 @@ plan_step_lines() {
   sed -nE '/^[[:space:]]+-[[:space:]]+\{id:[[:space:]]*P[0-9]+-[0-9]+,/p' "$plan" \
     | while IFS= read -r line; do
         id=$(sed -nE 's/.*\{id:[[:space:]]*([A-Z0-9]+-[0-9]+),.*/\1/p' <<<"$line")
-        status=$(sed -nE 's/.*status:[[:space:]]*([a-z_]+)(,|\}).*/\1/p' <<<"$line")
+        status=$(grep -oE 'file:[[:space:]]*steps/P[0-9]+-[0-9]+\.yaml,[[:space:]]*status:[[:space:]]*[a-z_]+(,|\})' <<<"$line" \
+          | head -n 1 \
+          | sed -nE 's/.*status:[[:space:]]*([a-z_]+).*/\1/p' || true)
         dep=$(sed -nE 's/.*depends_on:[[:space:]]*\[([^]]*)\].*/\1/p' <<<"$line" | tr -d '[:space:]')
         printf '%s|%s|%s\n' "$id" "$status" "$dep"
       done
