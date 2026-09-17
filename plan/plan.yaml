@@ -274,7 +274,7 @@ phases:
       R8, and a production UI foundation (theme, navigation, strings, icon).
     exit_gate: "All P0 steps done; CI green on API 29 and API 36; release APK builds minified and signed from CI secrets."
     steps:
-      - {id: P0-01, title: Plan conventions and status tooling, file: steps/P0-01.yaml, status: in_progress, started: 2026-09-16, depends_on: [], estimate: S, owner: agent}
+      - {id: P0-01, title: Plan conventions and status tooling, file: steps/P0-01.yaml, status: review, started: 2026-09-16, evidence: "commits fd07520 (RED), 82bafcf (GREEN), 59348ae (REFACTOR); bash scripts/tests/run.sh => 8 passed, 0 failed; bash scripts/plan-check.sh => steps=77 errors=0; bash scripts/plan-status.sh => 77 step lines, --- runnable (todo, all deps done) ---; shell/JDK verification, no device required", notes: "Acceptance criteria met; awaiting review by an agent other than the implementer.", depends_on: [], estimate: S, owner: agent}
       - {id: P0-02, title: Dependency verification, SBOM, licence report, file: steps/P0-02.yaml, status: todo, depends_on: [P0-01], estimate: M, owner: agent}
       - {id: P0-03, title: Static analysis and lint policy, file: steps/P0-03.yaml, status: todo, depends_on: [P0-01], estimate: M, owner: agent}
       - {id: P0-04, title: CI matrix with API 29 and API 36 legs, file: steps/P0-04.yaml, status: todo, depends_on: [P0-02, P0-03], estimate: M, owner: agent}
