@@ -19,6 +19,17 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local label="$1" unexpected="$2" actual="$3"
+  if [[ "$actual" != *"$unexpected"* ]]; then
+    printf 'ok - %s\n' "$label"
+    pass=$((pass + 1))
+  else
+    printf 'not ok - %s\nunexpected to find: %s\nactual:\n%s\n' "$label" "$unexpected" "$actual" >&2
+    fail=$((fail + 1))
+  fi
+}
+
 assert_nonzero() {
   local label="$1" output_file="$2" status="$3"
   if [[ "$status" -ne 0 ]]; then
@@ -66,6 +77,11 @@ sed -i -E 's/status: (in_progress|review),/status: todo,/' "$TMP/plan-status/pla
 status_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status")"
 assert_contains "plan-status lists P0-01 as runnable" $'--- runnable (todo, all deps done) ---\nP0-01' "$status_output"
 
+cp -R "$ROOT/plan" "$TMP/plan-status-collision"
+sed -i 's/notes: "Acceptance criteria met; awaiting review by an agent other than the implementer\."/notes: "quoted status: todo, is not a field"/' "$TMP/plan-status-collision/plan.yaml"
+collision_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-collision")"
+assert_not_contains "plan-status ignores status text inside notes" $'--- runnable (todo, all deps done) ---\nP0-01' "$collision_output"
+
 cp -R "$ROOT/plan" "$TMP/plan-missing-phase-key"
 sed -i '/^    title: Engineering foundation$/d' "$TMP/plan-missing-phase-key/plan.yaml"
 set +e
@@ -83,6 +99,32 @@ missing_master_key_status=$?
 set -e
 assert_nonzero "plan-check rejects a missing master-step key" "$TMP/missing-master-key.out" "$missing_master_key_status"
 assert_contains "missing-master-key diagnostic names key" "step P0-01.owner: missing key" "$(<"$TMP/missing-master-key.out")"
+
+cp -R "$ROOT/plan" "$TMP/plan-duplicate-key"
+sed -i '1a schema_version: 1' "$TMP/plan-duplicate-key/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-duplicate-key" >"$TMP/duplicate-key.out" 2>&1
+duplicate_key_status=$?
+set -e
+assert_nonzero "plan-check rejects duplicate YAML keys" "$TMP/duplicate-key.out" "$duplicate_key_status"
+assert_contains "duplicate-key diagnostic is present" "duplicate" "$(<"$TMP/duplicate-key.out")"
+
+mkdir -p "$TMP/plan-no-file/steps"
+cp "$ROOT/plan/steps/P0-01.yaml" "$TMP/plan-no-file/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-no-file" >"$TMP/no-plan-file.out" 2>&1
+no_plan_file_status=$?
+set -e
+assert_nonzero "plan-status rejects a missing plan file" "$TMP/no-plan-file.out" "$no_plan_file_status"
+
+cp -R "$ROOT/plan" "$TMP/plan-empty"
+: > "$TMP/plan-empty/plan.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" --json "$TMP/plan-empty" >"$TMP/empty-json.out" 2>&1
+empty_json_status=$?
+set -e
+assert_nonzero "plan-check JSON rejects an empty plan" "$TMP/empty-json.out" "$empty_json_status"
+assert_contains "empty JSON failure remains machine-readable" '"valid":false' "$(<"$TMP/empty-json.out")"
 
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
