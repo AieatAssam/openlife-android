@@ -73,7 +73,7 @@ plan_step_lines() {
         fields=$(plan_flow_fields <<<"$line")
         id=$(plan_field id <<<"$fields")
         status=$(plan_field status <<<"$fields")
-        dep=$(plan_field depends_on <<<"$fields" | tr -d '[][:space:]')
+        dep=$(plan_field depends_on <<<"$fields" | tr -d '[][:space:]' | tr -d "\"'")
         printf '%s|%s|%s\n' "$id" "$status" "$dep"
       done
 }
