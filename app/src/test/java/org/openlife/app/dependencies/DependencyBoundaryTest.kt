@@ -2,7 +2,6 @@ package org.openlife.app.dependencies
 
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.text.Regex
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,23 +17,13 @@ class DependencyBoundaryTest {
         val coordinates = Files.readAllLines(classpathFile)
             .map(String::trim)
             .filter { it.isNotEmpty() && !it.startsWith("#") }
-        val denylistedPrefixes = listOf(
-            "com.google.firebase",
-            "com.google.android.datatransport",
-            "com.google.android.gms:play-services-measurement",
-            "io.sentry",
-            "com.bugsnag",
-            "com.squareup.okhttp3",
-            "io.ktor",
-            "com.android.volley",
-            "com.google.android.gms:play-services-ads",
-            "org.apache.httpcomponents",
-            "retrofit2",
-        )
-        val documentedMlKitExceptionPrefixes = setOf(
-            "com.google.android.datatransport",
-            "com.google.firebase",
-        )
+        val policy = policyDocument()
+        val denylistedPrefixes = fencedSection(policy, "Denylist")
+        val documentedMlKitExceptionPrefixes = policy
+            .first { it.startsWith("coordinates:") }
+            .substringAfter(':')
+            .split(',')
+            .map(String::trim)
         val violations = coordinates.filter { coordinate ->
             denylistedPrefixes.any(coordinate::startsWith) &&
                 documentedMlKitExceptionPrefixes.none(coordinate::startsWith)
@@ -46,21 +35,7 @@ class DependencyBoundaryTest {
     fun everyRuntimeDependencyHasAnAllowlistedLicence() {
         assertTrue("licence report is missing: $licenseReport", Files.isRegularFile(licenseReport))
 
-        val allowedLicences = setOf(
-            "Apache-2.0",
-            "Apache License, Version 2.0",
-            "Android Software Development Kit License",
-            "ML Kit Terms of Service",
-            "MIT",
-            "BSD-2-Clause",
-            "BSD-3-Clause",
-            "EPL-1.0",
-            "EPL-2.0",
-            "MPL-2.0",
-            "ISC",
-            "Unicode-DFS-2016",
-            "CC0-1.0",
-        )
+        val allowedLicences = fencedSection(policyDocument(), "Allowlisted licences")
         val dependencyPattern = Regex("\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`")
         val licensePattern = Regex("\\*\\*(?:(?:POM|Manifest) License|License URL)\\*\\*: ?([^\\n]+)")
         val dependencies = linkedMapOf<String, MutableSet<String>>()
@@ -84,5 +59,32 @@ class DependencyBoundaryTest {
             licences.isEmpty() || licences.any { it !in allowedLicences }
         }
         assertTrue("dependencies without an allowlisted licence: $unknown", unknown.isEmpty())
+    }
+
+    private fun policyDocument(): List<String> {
+        val resource = checkNotNull(javaClass.getResourceAsStream("/dependency-policy.md")) {
+            "dependency policy test resource is missing"
+        }.bufferedReader().use { it.readLines() }
+        assertTrue(
+            "test policy resource diverges from docs/dependency-policy.md",
+            resource == Files.readAllLines(projectDir.resolve("docs/dependency-policy.md")),
+        )
+        return resource
+    }
+
+    private fun fencedSection(lines: List<String>, heading: String): Set<String> {
+        val start = lines.indexOf("## $heading")
+        assertTrue("policy section is missing: $heading", start >= 0)
+        val firstFence = (start until lines.size).firstOrNull { lines[it] == "```text" } ?: -1
+        val closingFence = if (firstFence >= 0) {
+            (firstFence + 1 until lines.size).firstOrNull { lines[it] == "```" } ?: -1
+        } else {
+            -1
+        }
+        assertTrue("policy block is missing: $heading", firstFence >= 0 && closingFence > firstFence)
+        return lines.subList(firstFence + 1, closingFence)
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toSet()
     }
 }
