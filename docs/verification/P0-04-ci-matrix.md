@@ -57,3 +57,6 @@ The branch is not pushed and no authenticated GitHub run URL is available in
 this workspace, so API-29/API-36 hosted-runner counts and artefact URLs are not
 claimed. The workflow is configured for push, pull request, and manual runs;
 the owner/CI environment must provide the hosted-run evidence.
+
+Independent final review: James and Mill approved the implementation. The step
+remains in `review` solely for the hosted-run evidence gap.
