@@ -78,6 +78,15 @@ set -e
 assert_nonzero "plan-check rejects a missing requirement id" "$TMP/missing-requirement-id.out" "$missing_requirement_id_status"
 assert_contains "missing-requirement-id diagnostic names key" "requirements[0].id: missing key" "$(<"$TMP/missing-requirement-id.out")"
 
+cp -R "$ROOT/plan" "$TMP/plan-wrong-requirement-prefix"
+sed -i '0,/id: P0-01-R1/s//id: P0-02-R1/' "$TMP/plan-wrong-requirement-prefix/steps/P0-01.yaml"
+set +e
+bash "$ROOT/scripts/plan-check.sh" "$TMP/plan-wrong-requirement-prefix" >"$TMP/wrong-requirement-prefix.out" 2>&1
+wrong_requirement_prefix_status=$?
+set -e
+assert_nonzero "plan-check rejects a wrong requirement step prefix" "$TMP/wrong-requirement-prefix.out" "$wrong_requirement_prefix_status"
+assert_contains "wrong-requirement-prefix diagnostic names expected step" "must start with P0-01-R" "$(<"$TMP/wrong-requirement-prefix.out")"
+
 cp -R "$ROOT/plan" "$TMP/plan-missing-verification-command"
 sed -i '0,/^  commands:$/s//  wrong_commands:/' "$TMP/plan-missing-verification-command/steps/P0-01.yaml"
 set +e
