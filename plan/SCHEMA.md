@@ -32,11 +32,15 @@ Required keys: `id`, `title`, `phase`, `status`, `depends_on`, `estimate`,
 Optional keys: `closes_findings`, `owner_action`, `rationale`, `ethos_check`,
 `constraints`, `design_decisions`, `files_touched`, `evidence`, `notes`.
 
-- `requirements[]`: `{id: <step>-R<n>, text}` using MUST / MUST NOT / SHOULD.
-- `tdd`: `red` (tests to write first, each `{name, asserts?}`), `green`
-  (minimal implementation notes), `refactor`.
+- `requirements[]`: `{id: <step>-R<n>, text}`. Both keys are required;
+  requirement wording is interpreted by the owner and is not rewritten by the
+  checker.
+- `tdd`: `red` (tests to write first, each `{name, asserts?}` or a string
+  shorthand for a prose/manual check), `green` (minimal implementation
+  notes), and `refactor`; all three keys are required.
 - `verification`: `commands` (exact commands to run) and `evidence_required`
-  (what to paste into plan.yaml `evidence`).
+  (what to paste into plan.yaml `evidence`); both keys are required lists of
+  strings.
 - `depends_on` must equal the list in plan.yaml for the same id.
 - The lifecycle `status` in `plan/plan.yaml` is authoritative. The companion
   step-file `status` is a required, schema-checked field retained in the brief
