@@ -94,7 +94,22 @@ class IntakeViewModel(
     }
 
     fun startImport(stream: InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
-        startImport({ stream }, declaredMimeType, intakeKind)
+        // Compatibility for callers that already opened a stream. The
+        // production intake boundary uses the opener overload below, so it
+        // owns open/read/close on PROVIDER_READ_DISPATCHER. If cancellation
+        // wins before this pre-opened stream can be claimed, close it from
+        // the completion callback rather than leaking it.
+        val claimed = AtomicBoolean(false)
+        startImportInternal(
+            openStream = {
+                if (!claimed.compareAndSet(false, true)) throw CancellationException()
+                stream
+            },
+            declaredMimeType = declaredMimeType,
+            intakeKind = intakeKind,
+            preOpenedStream = stream,
+            preOpenedClaim = claimed,
+        )
     }
 
     /**
@@ -103,8 +118,18 @@ class IntakeViewModel(
      * coroutine that opens the provider descriptor also owns normal closure.
      */
     fun startImport(openStream: () -> InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
+        startImportInternal(openStream, declaredMimeType, intakeKind)
+    }
+
+    private fun startImportInternal(
+        openStream: () -> InputStream,
+        declaredMimeType: String,
+        intakeKind: IntakeKind,
+        preOpenedStream: InputStream? = null,
+        preOpenedClaim: AtomicBoolean? = null,
+    ) {
         activeImportJob?.cancel()
-        activeImportJob = viewModelScope.launch {
+        val importJob = viewModelScope.launch {
             try {
                 withContext(providerDispatcher) {
                     when (val access = application.vault()) {
@@ -122,6 +147,12 @@ class IntakeViewModel(
                 throw cancelled
             } catch (_: ProviderOpenException) {
                 _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
+            }
+        }
+        activeImportJob = importJob
+        if (preOpenedStream != null && preOpenedClaim != null) {
+            importJob.invokeOnCompletion {
+                if (preOpenedClaim.compareAndSet(false, true)) closeQuietly(preOpenedStream)
             }
         }
     }
