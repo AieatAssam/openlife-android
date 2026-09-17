@@ -110,6 +110,12 @@ sed -i "s/depends_on: \[P0-01\]/depends_on: ['P0-01']/g" "$TMP/plan-status-quote
 quoted_dependency_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-quoted-dependency")"
 assert_contains "plan-status recognizes quoted dependency items" $'--- runnable (todo, all deps done) ---\nP0-02' "$quoted_dependency_output"
 
+cp -R "$ROOT/plan" "$TMP/plan-status-double-quoted-dependency"
+sed -i 's/status: review,/status: done,/' "$TMP/plan-status-double-quoted-dependency/plan.yaml"
+sed -i 's/depends_on: \[P0-01\]/depends_on: ["P0-01"]/g' "$TMP/plan-status-double-quoted-dependency/plan.yaml"
+double_quoted_dependency_output="$(bash "$ROOT/scripts/plan-status.sh" "$TMP/plan-status-double-quoted-dependency")"
+assert_contains "plan-status recognizes double-quoted dependency items" $'--- runnable (todo, all deps done) ---\nP0-02' "$double_quoted_dependency_output"
+
 real_status_output="$(bash "$ROOT/scripts/plan-status.sh" "$ROOT/plan")"
 assert_not_contains "plan-status excludes review-finding entries" "F-47" "$real_status_output"
 
