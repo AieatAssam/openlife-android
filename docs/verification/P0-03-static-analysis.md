@@ -17,18 +17,16 @@ Branch: `plan/P0-03-static-analysis`
   `ManifestBoundaryTest.releaseManifestDeclaresNoNetworkOrBroadAccessPermission`.
   The mutation was reverted before handoff.
 
-## Instrumented-test environment gap
+## Instrumented verification
 
-The required command was attempted:
+The required command was rerun after the `dev36` AVD came online:
 
 ```text
 ./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest
 ```
 
-It reached packaging but failed at `:app:connectedDebugAndroidTest` with
-`DeviceException: No connected devices!`; `adb devices` was empty. The local
-`dev36` AVD was then started twice. The first launch exited 139 after QEMU
-thread hangs; the software-rendered retry remained `emulator-5554 offline`
-through the boot timeout and was stopped. No instrumented test result is
-claimed. CI API 29/API 36 runs remain required.
-
+`BUILD SUCCESSFUL` in 5m 56s on `dev36` (API 36); the app connected suite
+passed 28/28 and the vault connected suite passed 71/71, with zero failures,
+errors, or skips. Earlier no-device and offline-emulator attempts are retained
+in the prior handoff history, but are superseded by this successful run. CI
+API 29/API 36 runs remain part of P0-04's matrix.
