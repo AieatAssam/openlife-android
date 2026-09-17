@@ -9,9 +9,9 @@ summary: "C8, C9, C10 verification matrices, security reviews (PDF parsing surfa
 requirements:
   - id: P7-06-R0
     text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
-  - id: P7-04-R1
+  - id: P7-06-R1
     text: "MUST produce per-capability docs and update THREAT_MODEL, PRIVACY_POLICY (PDF and communication content), PERMISSIONS (none new)."
-  - id: P7-04-R2
+  - id: P7-06-R2
     text: "MUST run the reproducible-build and release checklists; tag v2.0.0."
 tdd: {red: [], green: [], refactor: []}
 verification: {commands: ["Full suites; CI; checklists"], evidence_required: ["Docs; tag"]}

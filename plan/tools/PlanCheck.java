@@ -298,8 +298,9 @@ public final class PlanCheck {
         requireType(requirement, "id", String.class, file, requirementPath + ".id");
         requireType(requirement, "text", String.class, file, requirementPath + ".text");
         String requirementId = string(requirement.get("id"));
-        if (requirementId != null && !requirementId.matches("[A-Z][0-9]+-[0-9]{2}-R[0-9]+")) {
-          error(file, requirementPath + ".id", "must match <step>-R<n>");
+        String stepId = string(step.get("id"));
+        if (requirementId != null && stepId != null && !requirementId.matches(stepId + "-R[0-9]+")) {
+          error(file, requirementPath + ".id", "must start with " + stepId + "-R");
         }
       }
     }
