@@ -2,7 +2,7 @@
 
 Date: 2026-09-17  
 Branch: `plan/P0-07-ui-foundation`  
-Status: implementation complete; handoff pending owner review
+Status: implementation complete; ready for owner review
 
 ## TDD record
 
@@ -14,6 +14,11 @@ Status: implementation complete; handoff pending owner review
 - REFACTOR `899ec4e`: corrected Detekt/Kotlin formatting and split the viewer
   into focused top bar, content, and correction-dialog composables without
   changing the UI contract.
+- Review closure `468dae4`: added committed instrumented back-navigation and
+  secure-window tests, guarded cold-start deep links, and completed the
+  large-font, RTL, inset, typography, contrast, and scoped-lint review fixes.
+- Icon geometry follow-up `d04ac8c`: applied the required 3dp rounded paper
+  corners to the adaptive foreground and monochrome vectors.
 
 ## Local verification
 
@@ -21,7 +26,7 @@ Status: implementation complete; handoff pending owner review
 | --- | --- |
 | `./gradlew :app:detekt` | pass; `BUILD SUCCESSFUL`, 0 findings |
 | `./gradlew :app:testDebugUnitTest --rerun-tasks` | pass; `BUILD SUCCESSFUL`; 32 tests, 0 failures, 0 errors |
-| `./gradlew :app:compileDebugAndroidTestKotlin` | pass; `BUILD SUCCESSFUL`; the added 400x700dp/48dp inset assertion compiles |
+| `./gradlew :app:compileDebugAndroidTestKotlin` | pass; `BUILD SUCCESSFUL`; the 400x700dp/48dp inset assertion and committed `NavigationBackTest`/`SecureWindowTest` compile |
 | `./gradlew detekt lint :app:test :vault:test assembleDebug` | pass after REFACTOR/final lint fixes; `BUILD SUCCESSFUL`, 114 actionable tasks; app/vault JVM tasks, Detekt, lint, and debug assembly passed |
 | `git diff --check` | pass after generated-report cleanup |
 
