@@ -66,6 +66,10 @@ plan_field() {
   awk -F'|' -v wanted="$key" 'BEGIN { single = sprintf("%c", 39) } $1 == wanted { value = $0; sub(/^[^|]*\|/, "", value); if (substr(value, 1, 1) == "\"") { sub(/^"/, "", value); sub(/"$/, "", value) } else if (substr(value, 1, 1) == single) { sub("^" single, "", value); sub(single "$", "", value) } print value; exit }'
 }
 
+plan_dependency_values() {
+  plan_field depends_on | tr -d '[][:space:]' | tr -d "\"'"
+}
+
 plan_step_lines() {
   local plan="$1" line id status dep
   sed -nE "/^[[:space:]]+-[[:space:]]+\\{id:[[:space:]]*(P[0-9]+-[0-9][0-9]|\"P[0-9]+-[0-9][0-9]\"|'P[0-9]+-[0-9][0-9]'),/p" "$plan" \
@@ -73,7 +77,7 @@ plan_step_lines() {
         fields=$(plan_flow_fields <<<"$line")
         id=$(plan_field id <<<"$fields")
         status=$(plan_field status <<<"$fields")
-        dep=$(plan_field depends_on <<<"$fields" | tr -d '[][:space:]' | tr -d "\"'")
+        dep=$(plan_dependency_values <<<"$fields")
         printf '%s|%s|%s\n' "$id" "$status" "$dep"
       done
 }
