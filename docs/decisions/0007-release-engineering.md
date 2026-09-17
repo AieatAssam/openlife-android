@@ -77,3 +77,6 @@ manifest processing and rejects broad permissions or exported components
 outside the two intentional activities. The source boundary test rejects
 logging, clipboard/WebView channels, and outbound intent actions outside the
 named intake/same-app paths.
+The app module's `lint` task also depends on its JVM boundary suite, ensuring
+the standard `lint` command exercises the same manifest and source-egress
+assertions as `:app:test`.

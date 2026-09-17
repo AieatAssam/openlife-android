@@ -226,6 +226,12 @@ tasks.withType<Test>().configureEach {
     systemProperty("openlife.projectDir", rootProject.projectDir.absolutePath)
 }
 
+// Keep the repository boundary tests on the standard lint path so a manifest
+// or source-egress regression cannot pass a lint-only pre-commit invocation.
+tasks.named("lint") {
+    dependsOn("test")
+}
+
 detekt {
     toolVersion = libs.versions.detekt.get()
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
