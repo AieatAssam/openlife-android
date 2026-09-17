@@ -7,13 +7,22 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
 import org.openlife.vault.model.IntakeKind
@@ -22,8 +31,12 @@ import org.openlife.vault.repository.ImageRejectionReason
 import org.openlife.vault.repository.ImportLimits
 import org.openlife.vault.repository.PrepareResult
 import org.openlife.vault.repository.SaveResult
+import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 private fun describeImageRejection(reason: ImageRejectionReason): IntakeRejectionMessage = when (reason) {
     ImageRejectionReason.EXCEEDS_BYTE_LIMIT -> IntakeRejectionMessage.FILE_TOO_LARGE
@@ -36,6 +49,18 @@ private fun describeImageRejection(reason: ImageRejectionReason): IntakeRejectio
 
 private const val KEY_SOURCE_ID = "org.openlife.app.ui.IntakeViewModel.sourceId"
 
+private const val PROVIDER_READ_GRACE_MILLIS = 5_000L
+private const val PROVIDER_READ_DEADLINE_MILLIS = ImportLimits.PROVIDER_READ_DEADLINE_SECONDS * 1_000L
+private const val PROVIDER_READ_DEADLINE_NANOS = ImportLimits.PROVIDER_READ_DEADLINE_SECONDS * 1_000_000_000L
+
+/** One daemon thread preserves provider descriptor open/read/close affinity. */
+private val PROVIDER_READ_DISPATCHER: CoroutineDispatcher = Executors.newSingleThreadExecutor { runnable ->
+    Thread(runnable, "OpenLife-provider-read").apply { isDaemon = true }
+}.asCoroutineDispatcher()
+
+/** Provider open failures are mapped to the same retryable intake outcome. */
+private class ProviderOpenException(cause: Throwable? = null) : IOException(cause)
+
 /**
  * Backs the intake preview screen hosted by `IntakeActivity`. Design §8:
  * rotation may retain the active preview only through a ViewModel and
@@ -44,15 +69,18 @@ private const val KEY_SOURCE_ID = "org.openlife.app.ui.IntakeViewModel.sourceId"
  * re-authenticates the stage from disk rather than trusting anything held
  * in memory across the recreation.
  */
-class IntakeViewModel(private val application: OpenLifeApp, private val savedStateHandle: SavedStateHandle) :
-    ViewModel() {
+@Suppress("TooManyFunctions")
+class IntakeViewModel(
+    private val application: OpenLifeApp,
+    private val savedStateHandle: SavedStateHandle,
+    private val providerDispatcher: CoroutineDispatcher = PROVIDER_READ_DISPATCHER,
+) : ViewModel() {
 
     private val _state = MutableStateFlow<IntakeUiState>(IntakeUiState.Preparing)
     val state: StateFlow<IntakeUiState> = _state
 
-    /** The active provider read, so cancelling while still preparing closes it immediately. */
+    /** The active provider read. Its owner coroutine performs normal closure. */
     private var activeImportJob: Job? = null
-    private var activeInputStream: InputStream? = null
     private var backgrounded = false
 
     private var sourceId: UUID?
@@ -66,50 +94,100 @@ class IntakeViewModel(private val application: OpenLifeApp, private val savedSta
     }
 
     fun startImport(stream: InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
+        startImport({ stream }, declaredMimeType, intakeKind)
+    }
+
+    /**
+     * Starts an import with an opener retained at the app intake boundary.
+     * Opening and reading happen on the same single-permit dispatcher, so the
+     * coroutine that opens the provider descriptor also owns normal closure.
+     */
+    fun startImport(openStream: () -> InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
         activeImportJob?.cancel()
-        activeInputStream?.let { closeQuietly(it) }
-        activeInputStream = stream
         activeImportJob = viewModelScope.launch {
             try {
-                // The intake boundary owns the provider descriptor after opening
-                // it. Closing through `use` covers normal completion, a failed
-                // read, vault/bootstrap failure, and coroutine cancellation.
-                stream.use { input ->
+                withContext(providerDispatcher) {
                     when (val access = application.vault()) {
-                        is VaultAccess.Unavailable -> {
-                            closeQuietly(input)
-                            _state.value = IntakeUiState.VaultUnavailable(access.reason)
-                        }
+                        is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
 
-                        is VaultAccess.Ready -> {
-                            val result = withContext(Dispatchers.IO) {
-                                // Cooperative cancellation: closing the descriptor is
-                                // what unblocks a stuck provider read, which then
-                                // fails closed through prepareImport's own I/O
-                                // handling (design §12).
-                                val deadline = launch {
-                                    delay(ImportLimits.PROVIDER_READ_DEADLINE_SECONDS * 1000)
-                                    input.close()
-                                }
-                                try {
-                                    access.importRepository.prepareImport(input, declaredMimeType, intakeKind)
-                                } finally {
-                                    deadline.cancel()
-                                }
-                            }
-                            // Publish no terminal state while the provider
-                            // descriptor is still open; this makes cancellation
-                            // and failure observable as fully released at the
-                            // state boundary.
-                            closeQuietly(input)
-                            applyPrepareResult(result, access)
-                        }
+                        is VaultAccess.Ready -> importFromProvider(
+                            openStream,
+                            declaredMimeType,
+                            intakeKind,
+                            access,
+                        )
                     }
                 }
-            } finally {
-                if (activeInputStream === stream) activeInputStream = null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: ProviderOpenException) {
+                _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
             }
         }
+    }
+
+    private suspend fun importFromProvider(
+        openStream: () -> InputStream,
+        declaredMimeType: String,
+        intakeKind: IntakeKind,
+        access: VaultAccess.Ready,
+    ) {
+        val input = try {
+            openStream()
+        } catch (error: SecurityException) {
+            throw ProviderOpenException(error)
+        } catch (error: IOException) {
+            throw ProviderOpenException(error)
+        }
+
+        val streamReference = AtomicReference(input)
+        val ownerClosed = AtomicBoolean(false)
+        val watchdog = CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            delay(
+                PROVIDER_READ_DEADLINE_MILLIS + PROVIDER_READ_GRACE_MILLIS,
+            )
+            val stuckStream = streamReference.get()
+            // This is deliberately the last resort. Normal closure is done by
+            // the owner coroutine after the bounded reader returns. A provider
+            // that ignores the cooperative deadline may require close() from
+            // this watchdog thread; see docs/THREAT_MODEL.md.
+            if (stuckStream != null && ownerClosed.compareAndSet(false, true)) {
+                closeQuietly(stuckStream)
+            }
+        }
+
+        val deadlineNanos = System.nanoTime() + PROVIDER_READ_DEADLINE_NANOS
+        var result: PrepareResult? = null
+        try {
+            result = try {
+                withTimeout(PROVIDER_READ_DEADLINE_MILLIS) {
+                    access.importRepository.prepareImport(
+                        input,
+                        declaredMimeType,
+                        intakeKind,
+                        deadline = { System.nanoTime() >= deadlineNanos },
+                    )
+                }
+            } catch (_: TimeoutCancellationException) {
+                PrepareResult.Failed
+            }
+        } finally {
+            withContext(NonCancellable) {
+                // The normal owner-thread close is in this finally block.
+                // The watchdog can only win after the deadline plus grace
+                // if the provider keeps the owner blocked in read().
+                closeOwnedStream(input, ownerClosed)
+                streamReference.set(null)
+                watchdog.cancelAndJoin()
+            }
+        }
+        // The terminal state is published only after the descriptor is
+        // closed by the same coroutine that opened it.
+        applyPrepareResult(result, access)
+    }
+
+    private fun closeOwnedStream(stream: InputStream, ownerClosed: AtomicBoolean) {
+        if (ownerClosed.compareAndSet(false, true)) closeQuietly(stream)
     }
 
     private suspend fun applyPrepareResult(result: PrepareResult, access: VaultAccess.Ready) {
@@ -198,12 +276,16 @@ class IntakeViewModel(private val application: OpenLifeApp, private val savedSta
     fun cancel() {
         val id = sourceId
         if (id == null) {
-            activeInputStream?.let { closeQuietly(it) }
-            activeImportJob?.cancel()
-            _state.value = IntakeUiState.Cancelled
+            val importJob = activeImportJob
+            importJob?.cancel()
+            viewModelScope.launch {
+                importJob?.join()
+                _state.value = IntakeUiState.Cancelled
+            }
             return
         }
         viewModelScope.launch {
+            activeImportJob?.cancelAndJoin()
             (application.vault() as? VaultAccess.Ready)?.importRepository?.cancelStagedImport(id)
             _state.value = IntakeUiState.Cancelled
         }
@@ -235,10 +317,10 @@ class IntakeViewModel(private val application: OpenLifeApp, private val savedSta
     }
 
     override fun onCleared() {
-        // If the coroutine was cancelled before it entered `use`, its
-        // finally block cannot release the descriptor. Close the boundary
-        // stream explicitly before allowing the ViewModel scope to finish.
-        activeInputStream?.let { closeQuietly(it) }
+        // The owner coroutine closes normally. If a provider ignores both
+        // cancellation and the cooperative deadline, the independent
+        // deadline+grace watchdog performs the documented cross-thread
+        // last-resort close; do not close an unknown descriptor here.
         activeImportJob?.cancel()
     }
 

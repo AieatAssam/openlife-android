@@ -32,13 +32,14 @@ import org.openlife.app.ui.IntakeViewModel
 import org.openlife.app.ui.applySecureWindow
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.IntakeKind
+import java.io.FileNotFoundException
 
 /**
  * The single exported intake activity (design §8/§11). Every incoming
  * intent is validated here regardless of the declared `<intent-filter>`,
  * because an exported activity can be started directly with an arbitrary
  * intent (design §8: "Validate every incoming intent regardless of the
- * filter"). Hands a validated, already-opened, bounded stream to
+ * filter"). Hands a validated stream opener to
  * [IntakeViewModel] without ever letting a `Uri`, filename, or claimed
  * sender identity reach the vault layer (design §7 repository layout).
  *
@@ -128,75 +129,40 @@ class IntakeActivity : ComponentActivity() {
     }
 
     private fun startImportFromUri(uri: Uri) {
-        // contentResolver.getType/openInputStream are ordinary blocking JVM
-        // calls into another (possibly slow or hostile) content provider,
-        // with no timeout of their own - calling them directly from this
-        // LaunchedEffect (the main/Compose thread) blocks the entire UI for
-        // as long as the provider takes to answer. A ~6s test provider
-        // delay reproduced a real Android ANR ("Input dispatching timed
-        // out... Waited 5000ms") during the performance investigation; the 15s
-        // cooperative-cancellation deadline in IntakeViewModel.startImport
-        // only covers reading an *already-opened* stream, not this open
-        // call itself. Dispatching to Dispatchers.IO keeps the open call
-        // off the main thread so a slow provider degrades to a stuck
-        // "Preparing…" spinner (recoverable by leaving the screen) instead
-        // of freezing the app.
+        // contentResolver.getType is a blocking call into another (possibly
+        // slow or hostile) provider. Keep metadata lookup off the main thread;
+        // the ViewModel later opens and reads the stream on its provider-owned
+        // dispatcher.
         lifecycleScope.launch(Dispatchers.IO) {
-            var openedStream: java.io.InputStream? = null
-            try {
-                val providerType = try {
-                    contentResolver.getType(uri)
-                } catch (_: SecurityException) {
-                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                    return@launch
-                } catch (_: java.io.FileNotFoundException) {
-                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                    return@launch
-                } ?: run {
-                    viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
-                    return@launch
-                }
-                val normalizedProviderType = providerType.lowercase()
-                if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
-                    viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
-                    return@launch
-                }
-                openedStream = try {
-                    contentResolver.openInputStream(uri)
-                } catch (_: SecurityException) {
-                    // Missing or expired URI grant (design §11 step 1: "If a
-                    // share grant expires or a provider disappears, ask the
-                    // user to select the item again").
-                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                    return@launch
-                } catch (_: java.io.FileNotFoundException) {
-                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                    return@launch
-                }
-                val stream = openedStream ?: run {
-                    viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                    return@launch
-                }
-                val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
-                    IntakeKind.PHOTO_PICKER
-                } else {
-                    IntakeKind.SHARE
-                }
-                viewModel.startImport(stream, normalizedProviderType, intakeKind)
-                // Ownership transfers to IntakeViewModel, which closes it on
-                // completion, cancellation, failure, or teardown.
-                openedStream = null
-            } finally {
-                // If lifecycle cancellation or a rejected validation happens
-                // after open but before handoff, do not leak the descriptor.
-                openedStream?.let { stream ->
-                    try {
-                        stream.close()
-                    } catch (_: Exception) {
-                        // Best-effort release on a hostile provider.
-                    }
-                }
+            val providerType = try {
+                contentResolver.getType(uri)
+            } catch (_: SecurityException) {
+                viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
+                return@launch
+            } catch (_: FileNotFoundException) {
+                viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
+                return@launch
+            } ?: run {
+                viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
+                return@launch
             }
+            val normalizedProviderType = providerType.lowercase()
+            if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
+                viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
+                return@launch
+            }
+            val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+                IntakeKind.PHOTO_PICKER
+            } else {
+                IntakeKind.SHARE
+            }
+            viewModel.startImport(
+                openStream = {
+                    contentResolver.openInputStream(uri) ?: throw FileNotFoundException()
+                },
+                declaredMimeType = normalizedProviderType,
+                intakeKind = intakeKind,
+            )
         }
     }
 

@@ -1,10 +1,10 @@
 package org.openlife.vault.storage
 
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeFormat
+import java.io.File
 
 class VaultKeyFileTest {
 
@@ -16,9 +16,7 @@ class VaultKeyFileTest {
                 EnvelopeFormat.HEADER_LENGTH_BYTES +
                 EnvelopeFormat.NONCE_LENGTH_BYTES +
                 EnvelopeFormat.CIPHERTEXT_LENGTH_FIELD_BYTES
-        file.outputStream().use { output ->
-            output.channel.truncate(maximumEncodedLength + 1)
-        }
+        java.io.RandomAccessFile(file, "rw").use { it.setLength(maximumEncodedLength + 1) }
 
         var reads = 0
         val reader = BoundedFileReader(

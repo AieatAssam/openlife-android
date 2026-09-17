@@ -52,4 +52,9 @@ object EnvelopeFormat {
     // Magic, version, and nonce-length fields precede the nonce bytes.
     const val HEADER_LENGTH_BYTES = 4 + 1 + 1
     const val CIPHERTEXT_LENGTH_FIELD_BYTES = 4
+
+    /** Maximum physical envelope size including framing and nonce bytes. */
+    val MAX_ENCODED_LENGTH_BYTES: Long =
+        MAX_CIPHERTEXT_LENGTH.toLong() + HEADER_LENGTH_BYTES + NONCE_LENGTH_BYTES +
+            CIPHERTEXT_LENGTH_FIELD_BYTES
 }

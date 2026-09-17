@@ -22,7 +22,7 @@ class SourceViewRepository(
     private val paths: VaultPaths,
     private val database: OpenLifeDatabase,
     keystoreWrapper: KeystoreWrapper,
-    private val mutationQueue: MutationQueue = MutationQueue(),
+    private val mutationQueue: MutationQueue,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 

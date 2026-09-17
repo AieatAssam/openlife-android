@@ -2,6 +2,7 @@ package org.openlife.vault.storage
 
 import org.openlife.vault.crypto.Envelope
 import org.openlife.vault.crypto.EnvelopeCodec
+import org.openlife.vault.crypto.EnvelopeFormat
 import java.io.File
 
 /**
@@ -12,9 +13,13 @@ import java.io.File
 object VaultKeyFile {
 
     /** Returns null if no key file exists yet (first run). */
-    fun read(file: File): Envelope? {
+    fun read(file: File, reader: BoundedFileReader = BoundedFileReader.Default): Envelope? {
         if (!file.exists()) return null
-        return EnvelopeCodec.decode(file.readBytes())
+        return try {
+            EnvelopeCodec.decode(reader.readAtMost(file, EnvelopeFormat.MAX_ENCODED_LENGTH_BYTES))
+        } catch (_: FileTooLargeException) {
+            throw EnvelopeCodec.MalformedEnvelopeException("envelope file exceeds the maximum length")
+        }
     }
 
     /**
