@@ -40,3 +40,19 @@ Verification run on 2026-09-17 UTC from commit `5649969` on
 - Repository construction requires the composition-root `MutationQueue`.
 - Intake stream ownership is exercised by the deadline androidTest; its
   descriptor-close assertion passed on the API-36 emulator.
+
+## CI evidence (2026-09-18)
+
+Run 35394382065 on the step branch failed in both JVM jobs before any test
+ran: Gradle dependency verification rejected 17 parent POM/BOM artefacts
+that a warm local cache had never recorded into
+`gradle/verification-metadata.xml`. Lint also failed on
+`AndroidGradlePluginVersion` after AGP 9.4.1 was published upstream.
+Commit 139f0d5 regenerated the metadata with `--refresh-dependencies`
+across the full CI task set and added the network-driven plugin-version
+check to both modules' ignored issues with a stated reason.
+
+Run 35395910369 (same branch, push): `Build, lint, unit tests` success;
+`Release APK boundary inspection` success; instrumented API 29/36 legs
+skipped by design on a non-main branch push. Device legs run when the
+pull request is opened.
