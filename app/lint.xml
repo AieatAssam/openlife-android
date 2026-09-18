@@ -3,7 +3,8 @@
   The profileinstaller receiver below is a tools:node="remove" merge marker.
   The class is intentionally absent from this app's source; lint cannot resolve
   a class that is removed before the packaged manifest is produced.
-  GradleDependency and NewerVersionAvailable stay ignored because dependency
+  GradleDependency, NewerVersionAvailable and AndroidGradlePluginVersion stay
+  ignored because dependency
   versions are pinned by the release policy; upgrades require a reviewed
   dependency decision and verification refresh. ObsoleteSdkInt is ignored only
   for the adaptive launcher resource directory: adaptive-icon XML is an API 26
@@ -12,6 +13,7 @@
 <lint>
     <issue id="GradleDependency" severity="ignore" />
     <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
     <issue id="MissingClass" severity="ignore" />
     <issue id="ObsoleteSdkInt" severity="error">
         <ignore path="src/main/res/mipmap-anydpi-v26" />

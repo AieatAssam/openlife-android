@@ -1,3 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No lint suppressions. Every future suppression needs an issue id and a reason. -->
-<lint />
+<!--
+  Every suppression needs an issue id and a reason.
+  AndroidGradlePluginVersion is ignored because it queries a remote version
+  index and fails the build whenever Google publishes a newer AGP; plugin
+  upgrades follow the reviewed dependency decision and verification refresh,
+  not a lint nag.
+-->
+<lint>
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+</lint>
