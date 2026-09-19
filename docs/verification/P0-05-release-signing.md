@@ -41,13 +41,17 @@ Status: review (2026-09-19)
 - `scripts/plan-check.sh` — `steps=77 errors=0`; runnable steps are
   `[P0-09, P1-03, P1-04, P1-05, P1-06, P1-13, P1-15, P2-02]`.
 - `git diff --check` — clean after generated licence artefacts were removed.
+- Hosted run [35477169375](https://github.com/AieatAssam/openlife-android/actions/runs/35477169375)
+  on commit `97a0bf1` — workflow-lint passed; the release build completed
+  successfully in 4m21s, then correctly took the `unsigned (no secrets)` path.
+  No release evidence artifact or GitHub Release was created.
 
 ## Review gaps and owner action
 
-The authenticated `gh workflow run release.yml --ref <test-tag-branch>` was
-not run from this sandbox because it requires an owner-pushed ref and would
-trigger external CI. The owner must run the workflow with the real four
-secrets, verify the signed APK/AAB and attached SBOM/licence/checksum assets,
+The workflow was dispatched from the pushed plan branch, but GitHub resolved
+the signing inputs as absent and selected its unsigned safety path. The owner
+must configure the four repository or environment secrets for this workflow,
+rerun it, verify the signed APK/AAB and attached SBOM/licence/checksum assets,
 and complete OA-1 by publishing that certificate fingerprint in `README.md`.
 Until then the signed-CI acceptance criterion remains unverified; the step is
 handed off as `review`, not claimed `done`.
