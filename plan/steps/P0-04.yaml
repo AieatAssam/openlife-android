@@ -79,3 +79,14 @@ docs_to_update:
 risks:
   - "API 29 image availability on runners; fall back to API 30 with an ADR note if 29 is removed from the SDK repository."
 rollback: "Revert workflow."
+
+notes: >
+  2026-09-19: Hosted run 35439433360 failed both instrumented legs in ~20s
+  before tests: unexpected input enable-kvm on pin
+  31f424d05a8bea0229d0feab746260472ef8e34d, then sudo mkdir cmdline-tools
+  (File exists) and spawn adb ENOENT. Workflow now keeps the udev KVM step,
+  omits enable-kvm, prepares cmdline-tools/latest + platform-tools PATH, and
+  pins emulator-runner v2.38.0 a421e43855164a8197daf9d8d40fe71c6996bb0d.
+  Re-run with `gh workflow run ci.yml --ref <branch>` (workflow_dispatch) or
+  by opening a PR against plan/P1-09-repository-crypto-hardening. Status
+  stays review until a hosted run gets past emulator boot.

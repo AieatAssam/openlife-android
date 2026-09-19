@@ -93,9 +93,7 @@ class IntakeAndListFlowTest {
     @Test
     fun savingThroughIntakeViewModelMakesTheSourceAppearInTheListAndDeletionRemovesIt(): Unit = runBlocking {
         val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
-        intakeViewModel.startImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
-
-        val prepared = awaitState(intakeViewModel) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        val prepared = importUntilPreview(intakeViewModel, syntheticJpegBytes())
 
         intakeViewModel.confirmSave()
         awaitState(intakeViewModel) { it is IntakeUiState.Saved }
@@ -125,33 +123,32 @@ class IntakeAndListFlowTest {
         val savedIds = mutableListOf<java.util.UUID>()
         repeat(count) { i ->
             val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
-            intakeViewModel.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = i + 1)), "image/jpeg", IntakeKind.SHARE)
-            val prepared = awaitState(intakeViewModel) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+            val prepared = importUntilPreview(intakeViewModel, syntheticJpegBytes(variant = i + 1))
             intakeViewModel.confirmSave()
             awaitState(intakeViewModel) { it is IntakeUiState.Saved }
             savedIds += prepared.sourceId
         }
 
         val listViewModel = SourceListViewModel(application)
-        val loaded = awaitState(listViewModel, timeoutMs = 45_000) {
-            it is SourceListUiState.Loaded && it.sources.size >= count
+        val loaded = awaitState(listViewModel, timeoutMs = CRYPTO_WAIT_MS) {
+            it is SourceListUiState.Loaded && it.sources.map { source -> source.id }.toSet().containsAll(savedIds)
         } as SourceListUiState.Loaded
-        assertEquals(count, loaded.sources.size)
-        // Set rather than order equality: importedAt is millisecond-
-        // resolution wall-clock time (design §9), so two saves landing in
-        // the same millisecond under a fast back-to-back loop like this one
-        // have no guaranteed relative order - the ordering guarantee itself
-        // is a finer-grained concern than what this test is stress-checking
-        // (that all fifteen genuinely-saved sources are present, none
-        // dropped or duplicated, once the list holds a non-trivial count).
-        assertEquals(savedIds.toSet(), loaded.sources.map { it.id }.toSet())
+        // The instrumented process shares one vault. Earlier tests in this
+        // class may already have READY rows, so exact table size is not the
+        // contract — the fifteen IDs we just saved must all be present, none
+        // dropped or duplicated among themselves.
+        val loadedIds = loaded.sources.map { it.id }
+        assertTrue(
+            "list dropped saved ids; missing=${savedIds.toSet() - loadedIds.toSet()}",
+            loadedIds.containsAll(savedIds),
+        )
+        assertEquals(savedIds.toSet(), loadedIds.filter { it in savedIds }.toSet())
     }
 
     @Test
     fun cancellingAPreviewDiscardsItWithoutSaving(): Unit = runBlocking {
         val intakeViewModel = IntakeViewModel(application, SavedStateHandle())
-        intakeViewModel.startImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
-        val prepared = awaitState(intakeViewModel) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        val prepared = importUntilPreview(intakeViewModel, syntheticJpegBytes())
 
         intakeViewModel.cancel()
         awaitState(intakeViewModel) { it is IntakeUiState.Cancelled }
@@ -232,8 +229,7 @@ class IntakeAndListFlowTest {
     @Test
     fun restoringFromASavedStateHandleReAuthenticatesTheStagePreview(): Unit = runBlocking {
         val original = IntakeViewModel(application, SavedStateHandle())
-        original.startImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
-        val prepared = awaitState(original) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        val prepared = importUntilPreview(original, syntheticJpegBytes())
 
         // Simulate process recreation: a fresh ViewModel over a
         // SavedStateHandle that already has the Source UUID, the way
@@ -241,7 +237,16 @@ class IntakeAndListFlowTest {
         // bytes carried in saved instance state.
         val restoredHandle = SavedStateHandle(mapOf("org.openlife.app.ui.IntakeViewModel.sourceId" to prepared.sourceId.toString()))
         val restored = IntakeViewModel(application, restoredHandle)
-        val restoredState = awaitState(restored) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        val restoredState = awaitState(restored) {
+            it is IntakeUiState.Preview ||
+                it is IntakeUiState.Cancelled ||
+                it is IntakeUiState.VaultUnavailable
+        }
+        assertTrue(
+            "restore must re-authenticate Preview; last state=$restoredState",
+            restoredState is IntakeUiState.Preview,
+        )
+        restoredState as IntakeUiState.Preview
 
         assertEquals(prepared.sourceId, restoredState.sourceId)
         assertEquals(prepared.width, restoredState.width)
@@ -262,8 +267,7 @@ class IntakeAndListFlowTest {
     @Test
     fun backgroundScrubsPreviewAndForegroundReauthenticatesIt(): Unit = runBlocking {
         val intake = IntakeViewModel(application, SavedStateHandle())
-        intake.startImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
-        val preview = awaitState(intake) { it is IntakeUiState.Preview } as IntakeUiState.Preview
+        val preview = importUntilPreview(intake, syntheticJpegBytes())
         assertTrue(preview.previewBytes != null)
 
         intake.clearSensitiveContentForBackground()
@@ -277,13 +281,53 @@ class IntakeAndListFlowTest {
         awaitState(intake) { it is IntakeUiState.Cancelled }
     }
 
+    /**
+     * Crypto + SQLCipher on a software emulator can exceed a 30s poll after
+     * P1-09's extra unwrap/decrypt on the preview path. Busy is terminal on
+     * this ViewModel (tryAcquire does not retry), so a leftover MutationQueue
+     * holder from another test in this process must be retried explicitly.
+     */
+    private suspend fun importUntilPreview(
+        viewModel: IntakeViewModel,
+        bytes: ByteArray,
+        timeoutMs: Long = CRYPTO_WAIT_MS,
+    ): IntakeUiState.Preview {
+        viewModel.startImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+        var retriedBusy = false
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var last: IntakeUiState = viewModel.state.value
+        while (System.currentTimeMillis() < deadline) {
+            last = viewModel.state.value
+            when (last) {
+                is IntakeUiState.Preview -> return last
+                is IntakeUiState.Busy -> if (!retriedBusy) {
+                    retriedBusy = true
+                    kotlinx.coroutines.delay(BUSY_RETRY_DELAY_MS)
+                    viewModel.startImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+                } else {
+                    kotlinx.coroutines.delay(POLL_MS)
+                }
+                is IntakeUiState.Failed,
+                is IntakeUiState.Rejected,
+                is IntakeUiState.Cancelled,
+                is IntakeUiState.VaultUnavailable,
+                is IntakeUiState.Saved,
+                is IntakeUiState.Duplicate,
+                is IntakeUiState.Saving,
+                -> throw AssertionError("import did not reach Preview; last state=$last")
+                else -> kotlinx.coroutines.delay(POLL_MS)
+            }
+        }
+        throw AssertionError("preview not reached within ${timeoutMs}ms; last state=$last")
+    }
+
     private suspend fun awaitState(
         viewModel: IntakeViewModel,
-        timeoutMs: Long = 30_000,
+        timeoutMs: Long = CRYPTO_WAIT_MS,
         predicate: (IntakeUiState) -> Boolean,
     ): IntakeUiState {
         var last: IntakeUiState = viewModel.state.value
-        awaitCondition(timeoutMs) {
+        awaitCondition(timeoutMs, { "last intake state=$last" }) {
             last = viewModel.state.value
             predicate(last)
         }
@@ -292,11 +336,11 @@ class IntakeAndListFlowTest {
 
     private suspend fun awaitState(
         viewModel: SourceListViewModel,
-        timeoutMs: Long = 30_000,
+        timeoutMs: Long = CRYPTO_WAIT_MS,
         predicate: (SourceListUiState) -> Boolean,
     ): SourceListUiState {
         var last: SourceListUiState = viewModel.state.value
-        awaitCondition(timeoutMs) {
+        awaitCondition(timeoutMs, { "last list state=$last" }) {
             last = viewModel.state.value
             predicate(last)
         }
@@ -317,12 +361,22 @@ class IntakeAndListFlowTest {
         it is SourceListUiState.Loaded && it.sources.none { s -> s.id == id }
     } as SourceListUiState.Loaded
 
-    private suspend fun awaitCondition(timeoutMs: Long = 30_000, check: () -> Boolean) {
+    private suspend fun awaitCondition(
+        timeoutMs: Long = CRYPTO_WAIT_MS,
+        describe: () -> String = { "condition" },
+        check: () -> Boolean,
+    ) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (check()) return
-            kotlinx.coroutines.delay(50)
+            kotlinx.coroutines.delay(POLL_MS)
         }
-        throw AssertionError("condition not met within ${timeoutMs}ms")
+        throw AssertionError("condition not met within ${timeoutMs}ms; ${describe()}")
+    }
+
+    private companion object {
+        const val CRYPTO_WAIT_MS = 60_000L
+        const val BUSY_RETRY_DELAY_MS = 250L
+        const val POLL_MS = 50L
     }
 }

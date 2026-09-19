@@ -60,3 +60,45 @@ the owner/CI environment must provide the hosted-run evidence.
 
 Independent final review: James and Mill approved the implementation. The step
 remains in `review` solely for the hosted-run evidence gap.
+
+## Hosted instrumented setup failure (2026-09-19)
+
+Run https://github.com/AieatAssam/openlife-android/actions/runs/35439433360
+failed **both** API 29 and API 36 instrumented jobs in ~20s, before any
+connected test started:
+
+1. `reactivecircus/android-emulator-runner@31f424d05a8bea0229d0feab746260472ef8e34d`
+   warned `Unexpected input 'enable-kvm'` (that pin's schema has no such
+   input). KVM was already enabled by the separate udev-rules step.
+2. The same action then ran `sudo mkdir /usr/local/lib/android/sdk/cmdline-tools`,
+   which failed with `File exists` on the preinstalled GHA SDK, and cleanup
+   reported `spawn adb ENOENT`.
+
+The workflow now:
+
+- keeps the Enable KVM udev step and **does not** pass `enable-kvm:`
+- prepares `cmdline-tools/latest` (symlink to a versioned dir when needed)
+  and puts `platform-tools` / `cmdline-tools/latest/bin` on `PATH`
+- pins `reactivecircus/android-emulator-runner` at v2.38.0
+  `a421e43855164a8197daf9d8d40fe71c6996bb0d` (full SHA)
+
+`scripts/tests/p0-04-ci-workflow.sh` — `21 passed, 0 failed` after the
+contract update.
+
+To re-run device legs from this branch (or a PR targeting
+`plan/P1-09-repository-crypto-hardening`):
+
+```text
+gh workflow run ci.yml --ref <branch> && gh run watch
+```
+
+`workflow_dispatch` and pull_request both start the instrumented matrix.
+A hosted run that gets past emulator boot is still required before P0-04
+can move to done; this change only removes the fail-in-20s setup bug.
+
+PR run https://github.com/AieatAssam/openlife-android/actions/runs/35441212385
+(from `cursor/p1-09-ci-intake-timeouts-f349`): both instrumented jobs
+completed Enable KVM and **Prepare Android SDK cmdline-tools and adb**
+successfully, then stayed in the emulator-runner step well past the
+previous ~20s mkdir/`adb ENOENT` death. Full API 29/36 connected counts
+are not claimed from this workspace.

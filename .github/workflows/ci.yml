@@ -65,14 +65,45 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # GHA ubuntu images already ship ANDROID_HOME/cmdline-tools. The older
+      # emulator-runner pin used `sudo mkdir` and died with "File exists"
+      # plus spawn adb ENOENT (run 35439433360). Keep KVM on the udev step
+      # above — do not pass enable-kvm; that input is not in every pin.
+      - name: Prepare Android SDK cmdline-tools and adb
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          {
+            echo "ANDROID_HOME=${sdk_root}"
+            echo "ANDROID_SDK_ROOT=${sdk_root}"
+            echo "ANDROID_USER_HOME=${HOME}/.android"
+            echo "ANDROID_EMULATOR_HOME=${HOME}/.android"
+            echo "ANDROID_AVD_HOME=${HOME}/.android/avd"
+          } >> "${GITHUB_ENV}"
+          mkdir -p "${HOME}/.android/avd"
+
+          cmdline_latest="${sdk_root}/cmdline-tools/latest"
+          if [ -d "${sdk_root}/cmdline-tools" ] && [ ! -e "${cmdline_latest}" ]; then
+            newest="$(find "${sdk_root}/cmdline-tools" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1 || true)"
+            if [ -n "${newest}" ]; then
+              ln -sfn "$(basename "${newest}")" "${cmdline_latest}"
+            fi
+          fi
+
+          if [ -d "${sdk_root}/platform-tools" ]; then
+            echo "${sdk_root}/platform-tools" >> "${GITHUB_PATH}"
+          fi
+          if [ -d "${cmdline_latest}/bin" ]; then
+            echo "${cmdline_latest}/bin" >> "${GITHUB_PATH}"
+          fi
+
       - name: Run connected tests with one retry for infrastructure flakes
-        uses: reactivecircus/android-emulator-runner@31f424d05a8bea0229d0feab746260472ef8e34d
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
           profile: pixel_7
-          enable-kvm: true
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
