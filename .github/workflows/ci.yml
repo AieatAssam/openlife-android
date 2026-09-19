@@ -106,32 +106,12 @@ jobs:
           profile: pixel_7
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: |
-            set -o pipefail
-            trap 'adb logcat -d 2>/dev/null | grep -E "org\\.openlife|OpenLifeRecovery" > "logcat-openlife-${{ matrix.api-level }}.txt" || true' EXIT
-            for attempt in 1 2; do
-              output="connected-attempt-${{ matrix.api-level }}-${attempt}.log"
-              set +e
-              ./gradlew :app:connectedDebugAndroidTest :vault:connectedDebugAndroidTest 2>&1 | tee "$output"
-              status=${PIPESTATUS[0]}
-              set -e
-              if [[ "$status" -eq 0 ]]; then
-                exit 0
-              fi
-              if scripts/ci/connected-test-failure-is-assertion.sh "$output"; then
-                echo "connected test assertion failure; not retrying" >&2
-                exit "$status"
-              fi
-              if [[ "$attempt" -eq 2 ]]; then
-                exit "$status"
-              fi
-              timeout 60s adb wait-for-device || true
-            done
+          script: exec bash -euo pipefail scripts/ci/run-connected-tests.sh ${{ matrix.api-level }}
 
       - name: Capture filtered OpenLife logcat
         if: always()
         run: |
-          adb logcat -d 2>/dev/null | grep -E 'org\.openlife|OpenLifeRecovery' > "logcat-openlife-${{ matrix.api-level }}.txt" || true
+          timeout 20s adb logcat -d 2>/dev/null | grep -E 'org\.openlife|OpenLifeRecovery' > "logcat-openlife-${{ matrix.api-level }}.txt" || true
 
       - name: Upload instrumented results and logcat
         if: always()

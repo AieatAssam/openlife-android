@@ -6,7 +6,8 @@ WORKFLOW="$ROOT/.github/workflows/ci.yml"
 GRADLE_SETUP="$ROOT/.github/actions/gradle-setup/action.yml"
 RELEASE_WORKFLOW="$ROOT/.github/workflows/release.yml"
 RETRY_CLASSIFIER="$ROOT/scripts/ci/connected-test-failure-is-assertion.sh"
-CI_FILES=("$WORKFLOW" "$GRADLE_SETUP" "$RELEASE_WORKFLOW" "$RETRY_CLASSIFIER")
+CONNECTED_SCRIPT="$ROOT/scripts/ci/run-connected-tests.sh"
+CI_FILES=("$WORKFLOW" "$GRADLE_SETUP" "$RELEASE_WORKFLOW" "$RETRY_CLASSIFIER" "$CONNECTED_SCRIPT")
 pass=0
 fail=0
 
@@ -31,6 +32,7 @@ require "CI invokes the standard verification command" './gradlew detekt lint :a
 require "connected tests have a retry wrapper" 'attempt|retry'
 require "connected script runs under bash" 'exec bash'
 require "logcat capture is time-bounded" 'timeout .*adb logcat'
+require "connected wrapper is a committed bash script" 'scripts/ci/run-connected-tests\.sh'
 require "connected runner uses swiftshader without snapshots" 'no-snapshot.*no-window.*swiftshader_indirect'
 require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
 if [[ -x "$RETRY_CLASSIFIER" ]]; then

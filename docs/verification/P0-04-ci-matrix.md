@@ -102,3 +102,15 @@ completed Enable KVM and **Prepare Android SDK cmdline-tools and adb**
 successfully, then stayed in the emulator-runner step well past the
 previous ~20s mkdir/`adb ENOENT` death. Full API 29/36 connected counts
 are not claimed from this workspace.
+
+Follow-up PR run https://github.com/AieatAssam/openlife-android/actions/runs/35441296491
+got further: API 29 **booted** (`sys.boot_completed=1`, 23411 ms) with
+`disable-linux-hw-accel: false` (KVM). The connected `script` then failed
+immediately: v2.38.0 invokes it with `/usr/bin/sh` (dash), which rejects
+`set -o pipefail`. The post-step `adb logcat -d` then hung ~38 minutes
+against the killed emulator (exit 143). The connected retry loop now lives
+in `scripts/ci/run-connected-tests.sh` and is launched with `exec bash`;
+logcat capture is `timeout 20s`. Push run 35441293935 on `b4f2a2f` was
+green for JVM + release inspection; instrumented jobs are skipped on
+non-main pushes by design. The GitHub "all checks success" notification
+for that commit is **not** connected-test evidence.
