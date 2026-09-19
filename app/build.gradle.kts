@@ -17,6 +17,7 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.tasks.testing.Test
 import java.util.ArrayDeque
+import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
@@ -42,12 +43,57 @@ android {
     namespace = "org.openlife.app"
     compileSdk = 37
 
+    val signingEnvironment = listOf(
+        "OPENLIFE_KEYSTORE_B64",
+        "OPENLIFE_KEYSTORE_PASSWORD",
+        "OPENLIFE_KEY_ALIAS",
+        "OPENLIFE_KEY_PASSWORD",
+    ).associateWith { name ->
+        providers.environmentVariable(name).orNull.orEmpty()
+    }
+    val signingValuesPresent = signingEnvironment.values.count(String::isNotEmpty)
+    require(signingValuesPresent == 0 || signingValuesPresent == signingEnvironment.size) {
+        "Release signing requires all four OPENLIFE_* signing variables"
+    }
+    val releaseKeystore = if (signingValuesPresent == signingEnvironment.size) {
+        layout.buildDirectory.file("secure/release-upload.jks").get().asFile.apply {
+            parentFile.mkdirs()
+            try {
+                writeBytes(Base64.getDecoder().decode(signingEnvironment.getValue("OPENLIFE_KEYSTORE_B64")))
+            } catch (exception: IllegalArgumentException) {
+                throw GradleException("OPENLIFE_KEYSTORE_B64 is not valid base64", exception)
+            }
+        }
+    } else {
+        null
+    }
+    if (releaseKeystore != null) {
+        gradle.buildFinished {
+            releaseKeystore.delete()
+        }
+    }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("releaseUpload") {
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+                storeFile = releaseKeystore
+                storePassword = signingEnvironment.getValue("OPENLIFE_KEYSTORE_PASSWORD")
+                keyAlias = signingEnvironment.getValue("OPENLIFE_KEY_ALIAS")
+                keyPassword = signingEnvironment.getValue("OPENLIFE_KEY_PASSWORD")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "org.openlife"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.0.1-c0"
+        versionCode = rootProject.extensions.extraProperties["openLifeVersionCode"] as Int
+        versionName = rootProject.extensions.extraProperties["openLifeVersionName"] as String
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["profileInstallerReceiverClass"] =
@@ -61,13 +107,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Debug-key signing so CI can produce an installable release
-            // APK/AAB for internal testing without a real keystore secret.
-            // This is not store-distribution signing - replace with a real
-            // signing config (from a secret keystore) before any real
-            // release, per docs/decisions/0001-c0-defaults.md's pending
-            // pre-distribution decisions.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("releaseUpload")
         }
     }
     // Debug-only hostile/adversarial content provider lives in src/debug and

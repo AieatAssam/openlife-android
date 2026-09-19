@@ -69,6 +69,23 @@ The build enforces `gradle/verification-metadata.xml`, writes the release SBOM
 to `app/build/reports/bom/bom.json`, and refreshes the committed runtime
 licence inventory at `docs/generated/THIRD_PARTY_LICENSES.md`.
 
+## Releases and verification
+
+Tagged releases use the owner-controlled upload key documented in
+[`docs/runbooks/signing.md`](docs/runbooks/signing.md). Without all four CI
+signing secrets, the release variant is intentionally unsigned and no release
+asset is published; it is never debug-signed. The workflow attaches the APK,
+AAB, SBOM, licence report, `SHA-256SUMS`, and the signing-certificate
+fingerprint to a signed GitHub Release.
+
+Certificate SHA-256 fingerprint: **to be published after owner action OA-1**.
+After that action, verify a downloaded APK with:
+
+```bash
+apksigner verify --verbose --print-certs app-release.apk
+sha256sum --check SHA-256SUMS
+```
+
 ## Licence
 
 Apache License 2.0 — see `LICENSE`. That covers the source code here; it

@@ -1,0 +1,9 @@
+OpenLife helps you keep a private record of the files you choose to save.
+
+Your originals stay on your device. OpenLife does not use cloud processing,
+accounts, sync, telemetry, or automatic sharing. It does not back up your
+OpenLife data: if the app data or device storage is cleared, the data is gone.
+
+The project is being built capability by capability. The available workflow
+and supported file types are intentionally limited while the app is under
+development.

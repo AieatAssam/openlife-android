@@ -1,5 +1,7 @@
 // Root build file. Plugins are declared here with apply false and applied per
 // module, per the standard AGP/Kotlin DSL convention.
+apply(from = "gradle/version.gradle.kts")
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -18,4 +20,14 @@ tasks.register("detekt") {
 
 tasks.register("generateLicenseReport") {
     dependsOn(":app:generateLicenseReport")
+}
+
+val openLifeVersionCode = rootProject.extensions.extraProperties["openLifeVersionCode"] as Int
+tasks.register("printVersionCode") {
+    group = "versioning"
+    description = "Print the versionCode derived from VERSION."
+    notCompatibleWithConfigurationCache("prints a value captured from the version convention")
+    doLast {
+        println(openLifeVersionCode)
+    }
 }

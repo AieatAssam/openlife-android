@@ -1,0 +1,1 @@
+Private, on-device memory for the files you choose to keep.

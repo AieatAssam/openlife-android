@@ -94,3 +94,19 @@ are retained as 30-day artefacts. The connected runner retries once only for
 infrastructure-shaped failures; assertion-shaped failures stop immediately.
 An authenticated workflow URL is not recorded until the owner runs the
 workflow from a pushed ref.
+
+## Release signing and provenance (P0-05)
+
+Release signing is an explicit CI boundary. `app/build.gradle.kts` reads the
+four `OPENLIFE_*` signing variables only from the environment, decodes the
+owner-generated keystore into a temporary build-directory file, and removes
+it when Gradle finishes. With no signing variables, `assembleRelease` still
+works but produces an unsigned release APK/AAB; it never falls back to the
+debug key. Partial secret sets fail closed.
+
+The release workflow validates a tag against `VERSION` and `CHANGELOG.md`,
+builds the APK and AAB, verifies the APK with `apksigner`, and attaches the
+SBOM, runtime licence report, `SHA-256SUMS`, and certificate fingerprint only
+for a signed release. Version codes use
+`major * 10000 + minor * 100 + patch`. v1 through v4 APK signing are enabled;
+R8 full mode and Play App Signing remain P0-06/owner decisions.
