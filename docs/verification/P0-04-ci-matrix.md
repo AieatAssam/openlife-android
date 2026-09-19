@@ -167,5 +167,14 @@ P0-04 stays `review`. Those app failures were product/test issues, not a
 reason to revert the runner/image change. Follow-up PR #4
 (`cursor/instrumented-test-failures-61ce`) cleared them on hosted run
 35451868283: API 29/36 vault **72/72**, app **38/38**. Plan steps are still
-not marked done. The debug-APK artifact upload from PR #2 is not on this
-plan branch and is not part of this change.
+not marked done. This consolidated branch also includes the debug-APK artifact upload
+(from PR #2) described below.
+
+## Debug APK artifact for physical-device testing
+
+The `build-lint-unit-test` job uploads `app/build/outputs/apk/debug/app-debug.apk`
+as the `app-debug-apk` artefact (`retention-days: 30`) after `assembleDebug`
+succeeds (`if: success()`). That upload is independent of the instrumented
+API-29/API-36 legs, so a sideloadable debug APK is retained whenever the JVM
+build path succeeds even if emulator jobs fail. The release-inspection job
+still uploads the release APK inside `release-apk-inspection`.
