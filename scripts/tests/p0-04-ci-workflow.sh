@@ -24,7 +24,8 @@ require() {
 require "JDK 21 is configured" 'java-version: *"?21"?'
 require "all jobs use the reusable Gradle setup action" '\./\.github/actions/gradle-setup'
 require "API 29 and API 36 matrix is declared" 'api-level: *\[29, *36\]'
-require "KVM is enabled" 'enable-kvm: *true'
+require "KVM is enabled via udev rules" 'KERNEL=="kvm".*MODE="0666"'
+require "cmdline-tools setup is resilient" 'cmdline-tools/latest'
 require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
 require "connected tests have a retry wrapper" 'attempt|retry'
@@ -61,6 +62,15 @@ require "filtered OpenLife logcat is uploaded" 'OpenLifeRecovery|org\.openlife'
 require "release APK inspection is wired" 'scripts/inspect-release-apk\.sh'
 require "push trigger is present" '^  push:'
 require "pull request trigger is present" '^  pull_request:'
+require "emulator-runner pin is the ubuntu-24-safe v2.38.0 SHA" 'android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d'
+
+if grep -Eq '^[[:space:]]*enable-kvm:' "$WORKFLOW"; then
+  printf 'not ok - workflow does not pass enable-kvm to the pinned emulator-runner\n' >&2
+  fail=$((fail + 1))
+else
+  printf 'ok - workflow does not pass enable-kvm to the pinned emulator-runner\n'
+  pass=$((pass + 1))
+fi
 
 generic_short_msg="$(grep -F "INSTRUMENTATION_RESULT: shortMsg='" "$WORKFLOW" || true)"
 if [[ -z "$generic_short_msg" ]]; then
