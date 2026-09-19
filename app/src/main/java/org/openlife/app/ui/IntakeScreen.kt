@@ -56,7 +56,7 @@ fun IntakeScreen(
 
             is IntakeUiState.Rejected -> {
                 TerminalMessage(
-                    stringResource(R.string.intake_not_imported, stringResource(state.message.resourceId)),
+                    stringResource(R.string.intake_not_imported, stringResource(state.message.stringRes)),
                     onDone,
                 )
             }
@@ -202,22 +202,3 @@ private fun formatBytes(bytes: Long): String = when {
 
     else -> stringResource(R.string.intake_size_bytes, bytes)
 }
-
-private val IntakeRejectionMessage.resourceId: Int
-    get() = when (this) {
-        IntakeRejectionMessage.FILE_TOO_LARGE -> R.string.rejection_file_too_large
-        IntakeRejectionMessage.UNSUPPORTED_FORMAT -> R.string.rejection_unsupported_format
-        IntakeRejectionMessage.DECLARED_FORMAT_MISMATCH -> R.string.rejection_declared_format_mismatch
-        IntakeRejectionMessage.CORRUPT_CONTENT -> R.string.rejection_corrupt_content
-        IntakeRejectionMessage.ANIMATED_NOT_SUPPORTED -> R.string.rejection_animated_not_supported
-        IntakeRejectionMessage.IMAGE_TOO_LARGE -> R.string.rejection_image_too_large
-        IntakeRejectionMessage.UNSUPPORTED_ACTION -> R.string.rejection_unsupported_action
-        IntakeRejectionMessage.NO_IMAGE -> R.string.rejection_no_image
-        IntakeRejectionMessage.MULTIPLE_ITEMS -> R.string.rejection_multiple_items
-        IntakeRejectionMessage.UNSUPPORTED_SOURCE -> R.string.rejection_unsupported_source
-        IntakeRejectionMessage.INVALID_SOURCE -> R.string.rejection_invalid_source
-        IntakeRejectionMessage.MISSING_READ_ACCESS -> R.string.rejection_missing_read_access
-        IntakeRejectionMessage.UNSUPPORTED_OR_MISSING_TYPE -> R.string.rejection_unsupported_or_missing_type
-        IntakeRejectionMessage.ACCESS_RETRY -> R.string.rejection_access_retry
-        IntakeRejectionMessage.TYPE_MISMATCH -> R.string.rejection_type_mismatch
-    }
