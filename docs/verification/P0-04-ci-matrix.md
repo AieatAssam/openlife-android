@@ -163,9 +163,9 @@ App failures (assertions, not infrastructure):
 - both: `NavigationBackTest#backFromListFinishesActivity`
 - API 29 only: `ViewerScreenC1Test#extractedTextIsInertAndCorrectionIsAttributable`
 
-P0-04 stays `review`. These app failures are product/test issues, not a
-reason to revert the runner/image change. A follow-up on
-`cursor/instrumented-test-failures-61ce` fixes the four assertions against
-existing C0/C1/P0-07 contracts without marking those plan steps done. The
-debug-APK artifact upload from PR #2 is not on this plan branch and is not
-part of this change.
+P0-04 stays `review`. Those app failures were product/test issues, not a
+reason to revert the runner/image change. Follow-up PR #4
+(`cursor/instrumented-test-failures-61ce`) cleared them on hosted run
+35451868283: API 29/36 vault **72/72**, app **38/38**. Plan steps are still
+not marked done. The debug-APK artifact upload from PR #2 is not on this
+plan branch and is not part of this change.

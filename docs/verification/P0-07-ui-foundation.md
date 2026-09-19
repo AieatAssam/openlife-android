@@ -98,10 +98,12 @@ Local static/JVM verification on this follow-up (2026-09-19), no emulator:
   0 failures
 - `:app:compileDebugAndroidTestKotlin` — `BUILD SUCCESSFUL`
 
-Hosted run 35450834208 on this follow-up: API 29 app **36/38**, API 36 app
-**37/38**. Cleared: `unavailableProviderIsRejectedGracefully` and
-`backFromListFinishesActivity` on both APIs. Remaining:
-`screensMirrorCorrectlyUnderForcedRtl` (both; merged-row bounds) and
-`extractedTextIsInertAndCorrectionIsAttributable` (API 29; dialog label
-`assertIsDisplayed`). Those two are addressed in the next commits; connected
-counts are not claimed until a later hosted run.
+Hosted run 35451868283 on commit `92d18b3` (PR #4): **all jobs green**.
+
+- API 29: vault **72/72**, app **38/38**, including the four originally failing
+  classes
+- API 36: vault **72/72**, app **38/38**, same four classes
+- JVM/lint and release APK inspection: pass
+
+P0-07 stays `todo`; this is connected evidence for the back/RTL contracts, not
+step completion.
