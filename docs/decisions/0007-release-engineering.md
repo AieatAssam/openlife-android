@@ -85,8 +85,10 @@ assertions as `:app:test`.
 
 The CI workflow uses Temurin JDK 21 in every job, runs the plan/static-analysis
 and dependency-verification build command, and executes connected tests on
-API 29 and API 36 `google_apis` x86_64 Pixel 7 emulators with KVM enabled.
-Third-party actions are pinned to full commit SHAs. Instrumented reports,
+API 29 (`google_apis` x86_64) and API 36 (`aosp_atd` x86_64) emulators with
+KVM enabled on `ubuntu-22.04`. CI does not use a `pixel_7` hardware profile;
+see `docs/decisions/0016-ci-emulator-images.md`. Third-party actions are
+pinned to full commit SHAs. Instrumented reports,
 filtered OpenLife logcat, lint/Detekt reports, and release-inspection output
 are retained as 30-day artefacts. The connected runner retries once only for
 infrastructure-shaped failures; assertion-shaped failures stop immediately.

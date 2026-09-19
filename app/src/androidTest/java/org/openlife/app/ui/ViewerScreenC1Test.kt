@@ -1,11 +1,13 @@
 package org.openlife.app.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
 import org.junit.Assert.assertEquals
@@ -54,10 +56,19 @@ class ViewerScreenC1Test {
         }
 
         composeRule.onNodeWithText(span.text).assertIsDisplayed()
-        composeRule.onNodeWithText("Show region").performClick()
-        composeRule.onNodeWithText("Correct").performClick()
-        composeRule.onNodeWithText("Your correction").performTextClearance()
-        composeRule.onNodeWithText("Your correction").performTextInput("hullo")
+        composeRule.onNodeWithText("Show region").performScrollTo().performClick()
+        composeRule.onNodeWithText("Correct").performScrollTo().performClick()
+        // API 29's OutlinedTextField label is not a standalone unmerged Text
+        // node. Wait for the editable field, then assert the attributable
+        // content description (C1-R5) and type through SetText (C1-R8).
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(hasSetTextAction(), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("Your correction").assertExists()
+        composeRule.onNode(hasSetTextAction(), useUnmergedTree = true)
+            .performTextReplacement("hullo")
         composeRule.onNodeWithText("Save correction").performClick()
 
         assertEquals("hullo", corrected)
