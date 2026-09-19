@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.pressBackUnconditionally
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -81,7 +82,17 @@ class NavigationBackTest {
     @Test
     fun backFromListFinishesActivity() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            pressBack()
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            // pressBack() throws NoActivityResumedException when the activity
+            // finishes, which is the P0-07-R3 list-root behaviour. Use the
+            // unconditional variant and then assert DESTROYED.
+            pressBackUnconditionally()
+            val deadline = System.currentTimeMillis() + 5_000
+            while (scenario.state != Lifecycle.State.DESTROYED &&
+                System.currentTimeMillis() < deadline
+            ) {
+                Thread.sleep(50)
+            }
             assertEquals(Lifecycle.State.DESTROYED, scenario.state)
         }
     }

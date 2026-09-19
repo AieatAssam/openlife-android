@@ -3,6 +3,7 @@ package org.openlife.app.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -128,11 +129,14 @@ private fun SourceRow(
     onDeleteRequested: () -> Unit,
 ) {
     val deletionPending = source.state == SourceState.DELETING
+    // spacedBy, not padding(start): under RTL a wrapping label's unclipped
+    // bounds would otherwise sit flush against the delete control.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (deletionPending) Modifier else Modifier.clickable(onClick = onOpen))
             .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -160,7 +164,7 @@ private fun SourceRow(
                 }
             }
         }
-        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(sourceLabel(source))
             if (source.state == SourceState.CORRUPT) {
                 Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
