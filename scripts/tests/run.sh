@@ -263,5 +263,17 @@ else
   fail=$((fail + 1))
 fi
 
+set +e
+bash "$ROOT/scripts/tests/p0-05-release-workflow.sh" >"$TMP/p0-05-release-workflow.out" 2>&1
+release_workflow_status=$?
+set -e
+if [[ "$release_workflow_status" -eq 0 ]]; then
+  printf 'ok - P0-05 release workflow lint passes\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - P0-05 release workflow lint passes\n%s\n' "$(<"$TMP/p0-05-release-workflow.out")" >&2
+  fail=$((fail + 1))
+fi
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
