@@ -56,3 +56,38 @@ Run 35395910369 (same branch, push): `Build, lint, unit tests` success;
 `Release APK boundary inspection` success; instrumented API 29/36 legs
 skipped by design on a non-main branch push. Device legs run when the
 pull request is opened.
+
+## IntakeAndListFlowTest HOLD (2026-09-19)
+
+Independent review at commit `3540eff` held the step because
+`:app:connectedDebugAndroidTest` for `IntakeAndListFlowTest` was **7/10**
+on a local API-33 software emulator (`-accel off`). The P1-09 deadline
+case `readDeadlineProducesFailedStateAndReleasesTheDescriptorOnTheOwningThread`
+**passed** (17.2s). These three timed out on a generic 30s `awaitCondition`:
+
+- `cancellingAPreviewDiscardsItWithoutSaving`
+- `listHoldsManySourcesWithoutLosingOrMisorderingAny`
+- `restoringFromASavedStateHandleReAuthenticatesTheStagePreview`
+
+This is not a length-bound / deadline-typing / zeroisation regression.
+The same class already documents the process-wide `MutationQueue` isolation
+rule (C0-17): `PrepareResult.Busy` is a **terminal** `IntakeUiState` when
+`tryAcquire` loses, so polling for `Preview` for 30s cannot recover. Soft
+emulators also make Keystore unwrap + SQLCipher path verification on
+`loadStagePreviewBytes` slow enough that a 30s poll with no last-state
+message is a poor signal.
+
+Mitigation in `IntakeAndListFlowTest` (P1-09 hardening behaviour unchanged):
+
+- `importUntilPreview` retries **once** after `Busy`, then fails with the
+  last state
+- unexpected terminal states fail immediately instead of waiting out the
+  poll
+- crypto/list waits are bounded at 60s and include `last state=...`
+- the many-sources assertion requires the fifteen saved IDs to be present
+  and unique among themselves; it no longer requires the shared vault to
+  contain *only* those rows
+
+Connected re-run of this class is still required before moving P1-09 to
+done. FLAG_SECURE / UI timing is not involved: these cases drive
+ViewModels directly.
