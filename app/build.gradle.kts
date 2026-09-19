@@ -29,6 +29,15 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
+val releaseSigningEnvironmentNames = listOf(
+    "OPENLIFE_KEYSTORE_B64",
+    "OPENLIFE_KEYSTORE_PASSWORD",
+    "OPENLIFE_KEY_ALIAS",
+    "OPENLIFE_KEY_PASSWORD",
+)
+val openLifeVersionName = rootProject.extensions.extraProperties["openLifeVersionName"] as String
+val openLifeVersionCode = rootProject.extensions.extraProperties["openLifeVersionCode"] as Int
+
 tasks.withType<CyclonedxAggregateTask>().configureEach {
     jsonOutput.set(layout.buildDirectory.file("reports/bom/bom.json"))
     xmlOutput.unsetConvention()
@@ -43,12 +52,7 @@ android {
     namespace = "org.openlife.app"
     compileSdk = 37
 
-    val signingEnvironment = listOf(
-        "OPENLIFE_KEYSTORE_B64",
-        "OPENLIFE_KEYSTORE_PASSWORD",
-        "OPENLIFE_KEY_ALIAS",
-        "OPENLIFE_KEY_PASSWORD",
-    ).associateWith { name ->
+    val signingEnvironment = releaseSigningEnvironmentNames.associateWith { name ->
         providers.environmentVariable(name).orNull.orEmpty()
     }
     val signingValuesPresent = signingEnvironment.values.count(String::isNotEmpty)
@@ -56,7 +60,7 @@ android {
         "Release signing requires all four OPENLIFE_* signing variables"
     }
     val releaseKeystore = if (signingValuesPresent == signingEnvironment.size) {
-        layout.buildDirectory.file("secure/release-upload.jks").get().asFile.apply {
+        rootProject.layout.buildDirectory.file("secure/release-upload.jks").get().asFile.apply {
             parentFile.mkdirs()
             try {
                 writeBytes(Base64.getDecoder().decode(signingEnvironment.getValue("OPENLIFE_KEYSTORE_B64")))
@@ -92,8 +96,8 @@ android {
         applicationId = "org.openlife"
         minSdk = 29
         targetSdk = 37
-        versionCode = rootProject.extensions.extraProperties["openLifeVersionCode"] as Int
-        versionName = rootProject.extensions.extraProperties["openLifeVersionName"] as String
+        versionCode = openLifeVersionCode
+        versionName = openLifeVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["profileInstallerReceiverClass"] =
