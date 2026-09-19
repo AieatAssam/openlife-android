@@ -90,5 +90,6 @@ notes: >
   regression: Busy is a terminal tryAcquire outcome on the shared
   MutationQueue, and 30s polls omitted the last UI state. Tests now retry
   one Busy, fail fast with last state, use a 60s crypto-bound wait, and
-  tolerate leftover READY rows in the shared process. Do not flip to done
-  until a connected IntakeAndListFlowTest rerun is recorded.
+  tolerate leftover READY rows in the shared process. Hosted run 35451868283
+  subsequently passed the full API-29/API-36 connected suites (vault 72/72,
+  app 38/38), so the connected rerun gate is closed.

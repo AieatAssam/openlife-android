@@ -98,4 +98,6 @@ notes: >
   docs/decisions/0016-ci-emulator-images.md.
   Hosted PR run 35447168861 finished both legs in ~7m (not 35m timeout):
   vault 72/72 on API 29 and 36; app 34/38 (API 29) and 35/38 (API 36)
-  assertion failures. Do not mark this step done.
+  assertion failures. Follow-up run 35451868283 completed both legs with
+  vault 72/72 and app 38/38 on API 29 and API 36, including uploaded test
+  results and logcat artefacts; this closes the hosted evidence gate.

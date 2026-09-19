@@ -2,7 +2,7 @@
 
 Date: 2026-09-17  
 Branch: `plan/P0-07-ui-foundation`  
-Status: implementation complete; ready for owner review
+Status: done; hosted and owner device evidence recorded
 
 ## TDD record
 
@@ -69,6 +69,15 @@ outbound action was added. Navigation arguments carry UUID strings only. The
 generated dependency licence report and SHA-256 verification metadata include
 the new AndroidX/navigation/serialization graph; no untracked disposable
 licence-report JSON is retained.
+
+## Hosted closure and owner device report
+
+Hosted run `35451868283` completed the final API-29 and API-36 legs with
+vault `72/72` and app `38/38`; JVM/lint and release APK inspection also
+passed, and the connected results/logcat artefacts were uploaded. The owner
+also tested the merged APK on a physical Android device. The reported missing
+share target is tracked separately as an intake diagnostic; it does not
+invalidate the P0-07 UI-foundation acceptance evidence.
 
 ## Hosted CI assertion follow-up (2026-09-19)
 

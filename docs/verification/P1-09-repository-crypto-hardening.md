@@ -1,6 +1,7 @@
 # P1-09 repository and crypto hardening
 
-Verification run on 2026-09-17 UTC from commit `5649969` on
+Verification record updated on 2026-09-19 UTC at consolidated commit `00d93d2`
+on
 `plan/P1-09-repository-crypto-hardening`.
 
 ## Automated results
@@ -40,6 +41,20 @@ Verification run on 2026-09-17 UTC from commit `5649969` on
 - Repository construction requires the composition-root `MutationQueue`.
 - Intake stream ownership is exercised by the deadline androidTest; its
   descriptor-close assertion passed on the API-36 emulator.
+
+## Hosted closure
+
+Hosted run `35451868283` completed both connected legs after the intake wait
+hardening and follow-up UI fixes:
+
+- API 29: vault `72/72`, app `38/38`.
+- API 36: vault `72/72`, app `38/38`.
+
+The run uploaded the connected test results and filtered logcat artefacts.
+This closes the previous local-emulator gap for the step's required connected
+verification. The owner also reports a physical-device test; the separate
+missing share-target observation remains an intake diagnostic outside the
+repository/crypto acceptance criteria.
 
 ## CI evidence (2026-09-18)
 
