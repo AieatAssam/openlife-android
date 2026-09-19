@@ -3,8 +3,10 @@ package org.openlife.app.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
@@ -54,12 +56,17 @@ class ViewerScreenC1Test {
         }
 
         composeRule.onNodeWithText(span.text).assertIsDisplayed()
-        composeRule.onNodeWithText("Show region").performClick()
-        composeRule.onNodeWithText("Correct").performClick()
-        // API 29 AlertDialog can expose the merged TextField as existing but
-        // not displayed on a 320dp window. The unmerged label still names the
-        // field (C1-R5); typing uses the editable action (C1-R8 stays inert).
-        composeRule.onNodeWithText("Your correction", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Show region").performScrollTo().performClick()
+        composeRule.onNodeWithText("Correct").performScrollTo().performClick()
+        // API 29's OutlinedTextField label is not a standalone unmerged Text
+        // node. Wait for the editable field, then assert the attributable
+        // content description (C1-R5) and type through SetText (C1-R8).
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(hasSetTextAction(), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("Your correction").assertExists()
         composeRule.onNode(hasSetTextAction(), useUnmergedTree = true)
             .performTextReplacement("hullo")
         composeRule.onNodeWithText("Save correction").performClick()
