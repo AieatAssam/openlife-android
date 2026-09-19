@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -165,7 +166,10 @@ private fun SourceRow(
             }
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(sourceLabel(source))
+            Text(
+                sourceLabel(source),
+                modifier = Modifier.testTag("source_row_label"),
+            )
             if (source.state == SourceState.CORRUPT) {
                 Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
             } else if (deletionPending) {

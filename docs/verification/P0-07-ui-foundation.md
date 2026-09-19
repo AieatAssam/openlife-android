@@ -80,11 +80,12 @@ they are not a step completion.
   finish `MainActivity` (P0-07-R3). Espresso `pressBack()` throws
   `NoActivityResumedException` when that happens, so the test now uses
   `pressBackUnconditionally()` and asserts `DESTROYED`.
-- `AccessibilitySemanticsTest.screensMirrorCorrectlyUnderForcedRtl` — the list
-  row used `padding(start)` only, so on a 320dp RTL layout the wrapped source
-  label's unclipped bounds sat flush against the delete control. The row now
-  uses `Arrangement.spacedBy(12.dp)` on both sides so delete stays to the left
-  of the label under forced RTL.
+- `AccessibilitySemanticsTest.screensMirrorCorrectlyUnderForcedRtl` — clickable
+  list rows merge the source label into the row node, so measuring
+  `onNodeWithText("Imported")` compared delete against the **full row** and
+  could never pass. The test now measures the unmerged `source_row_label` and
+  Delete icon. The row still uses `Arrangement.spacedBy(12.dp)` so those
+  unclipped bounds stay separated under RTL.
 
 Connected re-run of those two classes is required on the hosted API 29/36 legs;
 this environment does not claim those counts here.
@@ -97,5 +98,10 @@ Local static/JVM verification on this follow-up (2026-09-19), no emulator:
   0 failures
 - `:app:compileDebugAndroidTestKotlin` — `BUILD SUCCESSFUL`
 
-No AVD is available in this cloud-agent image, so the four instrumented classes
-were not re-run on a device here.
+Hosted run 35450834208 on this follow-up: API 29 app **36/38**, API 36 app
+**37/38**. Cleared: `unavailableProviderIsRejectedGracefully` and
+`backFromListFinishesActivity` on both APIs. Remaining:
+`screensMirrorCorrectlyUnderForcedRtl` (both; merged-row bounds) and
+`extractedTextIsInertAndCorrectionIsAttributable` (API 29; dialog label
+`assertIsDisplayed`). Those two are addressed in the next commits; connected
+counts are not claimed until a later hosted run.

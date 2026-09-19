@@ -266,9 +266,18 @@ class AccessibilitySemanticsTest {
         composeRule.onNodeWithContentDescription("Import from photos")
             .assertIsDisplayed()
             .assertHasClickAction()
-        val deleteBounds = composeRule.onNodeWithContentDescription("Delete").getUnclippedBoundsInRoot()
-        val labelBounds = composeRule.onNodeWithText("Imported", substring = true).getUnclippedBoundsInRoot()
-        assertTrue("RTL should place the delete action before the source label", deleteBounds.right < labelBounds.left)
+        // Clickable rows merge label text into the row node, so measure the
+        // unmerged Text and Delete icon. "Before" is visual left in RTL.
+        val deleteBounds = composeRule
+            .onNodeWithContentDescription("Delete", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val labelBounds = composeRule
+            .onNodeWithTag("source_row_label", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "RTL should place the delete action before the source label: delete=$deleteBounds label=$labelBounds",
+            deleteBounds.right < labelBounds.left,
+        )
     }
 
     private fun tinyJpeg(): ByteArray {

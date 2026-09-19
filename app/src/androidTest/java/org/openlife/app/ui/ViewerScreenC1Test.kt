@@ -56,10 +56,10 @@ class ViewerScreenC1Test {
         composeRule.onNodeWithText(span.text).assertIsDisplayed()
         composeRule.onNodeWithText("Show region").performClick()
         composeRule.onNodeWithText("Correct").performClick()
-        composeRule.onNodeWithText("Your correction").assertIsDisplayed()
-        // API 29 does not merge the label into the editable semantics node the
-        // way API 36 does, so drive the field by its input action rather than
-        // by label text (C1-R5: the correction is still typed).
+        // API 29 AlertDialog can expose the merged TextField as existing but
+        // not displayed on a 320dp window. The unmerged label still names the
+        // field (C1-R5); typing uses the editable action (C1-R8 stays inert).
+        composeRule.onNodeWithText("Your correction", useUnmergedTree = true).assertExists()
         composeRule.onNode(hasSetTextAction(), useUnmergedTree = true)
             .performTextReplacement("hullo")
         composeRule.onNodeWithText("Save correction").performClick()

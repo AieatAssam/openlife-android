@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -195,16 +194,18 @@ private fun ViewerCorrectionDialog(
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.viewer_correct_title)) },
             text = {
-                OutlinedTextField(
-                    value = correctionText,
-                    onValueChange = onCorrectionTextChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 64.dp, max = 160.dp)
-                        .testTag("viewer_correction_input"),
-                    label = { Text(stringResource(R.string.viewer_correction_label)) },
-                    singleLine = false,
-                )
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    OutlinedTextField(
+                        value = correctionText,
+                        onValueChange = onCorrectionTextChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("viewer_correction_input"),
+                        label = { Text(stringResource(R.string.viewer_correction_label)) },
+                        minLines = 1,
+                        maxLines = 4,
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
