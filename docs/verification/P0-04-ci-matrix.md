@@ -95,3 +95,10 @@ gh workflow run ci.yml --ref <branch> && gh run watch
 `workflow_dispatch` and pull_request both start the instrumented matrix.
 A hosted run that gets past emulator boot is still required before P0-04
 can move to done; this change only removes the fail-in-20s setup bug.
+
+PR run https://github.com/AieatAssam/openlife-android/actions/runs/35441212385
+(from `cursor/p1-09-ci-intake-timeouts-f349`): both instrumented jobs
+completed Enable KVM and **Prepare Android SDK cmdline-tools and adb**
+successfully, then stayed in the emulator-runner step well past the
+previous ~20s mkdir/`adb ENOENT` death. Full API 29/36 connected counts
+are not claimed from this workspace.
