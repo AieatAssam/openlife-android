@@ -48,8 +48,14 @@ issues; Linux + KVM is still preferred over macOS.
 
 This is a documented drift from the original P0-04-R3 image/profile
 wording. The API pair, KVM, SHA-pinned emulator-runner, assertion-aware
-retry, and 30-day artefacts are unchanged. P0-04 stays `review` until a
-hosted run reaches Gradle connected tests.
+retry, and 30-day artefacts are unchanged. P0-04 stays `review` until
+app connected failures owned by P1 steps are closed.
+
+Hosted confirmation: PR run
+https://github.com/AieatAssam/openlife-android/actions/runs/35447168861
+finished both legs in about seven minutes. Vault connected tests were
+72/72 on API 29 and API 36. App connected tests failed on assertions
+(34/38 on API 29, 35/38 on API 36), not on emulator boot or logcat hang.
 
 ## Consequences
 

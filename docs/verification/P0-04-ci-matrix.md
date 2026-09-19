@@ -130,9 +130,40 @@ The workflow now:
 - caches AVD snapshots and launches tests with `-no-snapshot-save`
 
 `scripts/tests/p0-04-ci-workflow.sh` — `37 passed, 0 failed` after this
-contract update. A hosted run that reaches Gradle
-`:app:connectedDebugAndroidTest` is still required before P0-04 can
-move to done; this change is not claimed as device evidence.
+contract update.
 
-The debug-APK artifact upload from PR #2 is not on this plan branch and
-is not part of this change.
+## Hosted run past Gradle connected tests (2026-09-19, run 35447168861)
+
+PR run https://github.com/AieatAssam/openlife-android/actions/runs/35447168861
+(`cursor/ci-instrumented-emulator-eef4` against
+`plan/P1-09-repository-crypto-hardening`):
+
+| Job | Result | Wall time |
+| --- | --- | --- |
+| Build, lint, unit tests | success | ~3m 40s |
+| Release APK boundary inspection | success | ~2m |
+| Instrumented API 29 (`google_apis` x86_64) | failed (app assertions) | ~7m 41s |
+| Instrumented API 36 (`aosp_atd` x86_64) | failed (app assertions) | ~6m 38s |
+
+Both instrumented jobs created an AVD snapshot, booted, ran
+`:vault:connectedDebugAndroidTest` and `:app:connectedDebugAndroidTest`,
+captured logcat in 20s, and uploaded artefacts. The dash/`adb logcat`
+hang from run 35444099558 did not recur. Assertion-shaped failures
+were not retried (`connected test assertion failure; not retrying`).
+
+Counts from the uploaded XML:
+
+- API 29 vault: **72/72** pass. App: **34/38** pass.
+- API 36 vault: **72/72** pass. App: **35/38** pass.
+
+App failures (assertions, not infrastructure):
+
+- both: `IntakeActivityTest#unavailableProviderIsRejectedGracefully`
+- both: `AccessibilitySemanticsTest#screensMirrorCorrectlyUnderForcedRtl`
+- both: `NavigationBackTest#backFromListFinishesActivity`
+- API 29 only: `ViewerScreenC1Test#extractedTextIsInertAndCorrectionIsAttributable`
+
+P0-04 stays `review`. These app failures are product/test issues for P1
+steps, not a reason to revert the runner/image change. The debug-APK
+artifact upload from PR #2 is not on this plan branch and is not part
+of this change.

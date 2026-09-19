@@ -95,4 +95,7 @@ notes: >
   CI now uses ubuntu-22.04, KVM fail-fast, a bash connected-test wrapper,
   bounded logcat, AVD snapshot cache, API 29 google_apis (no ATD) and API 36
   aosp_atd, no pixel_7 profile. Documented in
-  docs/decisions/0016-ci-emulator-images.md. Do not mark this step done.
+  docs/decisions/0016-ci-emulator-images.md.
+  Hosted PR run 35447168861 finished both legs in ~7m (not 35m timeout):
+  vault 72/72 on API 29 and 36; app 34/38 (API 29) and 35/38 (API 36)
+  assertion failures. Do not mark this step done.
