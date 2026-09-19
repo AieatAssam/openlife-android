@@ -69,3 +69,41 @@ outbound action was added. Navigation arguments carry UUID strings only. The
 generated dependency licence report and SHA-256 verification metadata include
 the new AndroidX/navigation/serialization graph; no untracked disposable
 licence-report JSON is retained.
+
+## Hosted CI assertion follow-up (2026-09-19)
+
+Run 35447641798 (API 29 `google_apis` 320x640 and API 36 `aosp_atd`) failed three
+P0-07 instrumented contracts. The product/test fixes below keep P0-07 `todo`;
+they are not a step completion.
+
+- `NavigationBackTest.backFromListFinishesActivity` — back from the list **does**
+  finish `MainActivity` (P0-07-R3). Espresso `pressBack()` throws
+  `NoActivityResumedException` when that happens, so the test now uses
+  `pressBackUnconditionally()` and asserts `DESTROYED`.
+- `AccessibilitySemanticsTest.screensMirrorCorrectlyUnderForcedRtl` — clickable
+  list rows merge the source label into the row node, so measuring
+  `onNodeWithText("Imported")` compared delete against the **full row** and
+  could never pass. The test now measures the unmerged `source_row_label` and
+  Delete icon. The row still uses `Arrangement.spacedBy(12.dp)` so those
+  unclipped bounds stay separated under RTL.
+
+Connected re-run of those two classes is required on the hosted API 29/36 legs;
+this environment does not claim those counts here.
+
+Local static/JVM verification on this follow-up (2026-09-19), no emulator:
+
+- `scripts/plan-check.sh` — `steps=77 errors=0`
+- `./gradlew detekt lint :app:test :vault:test assembleDebug` — `BUILD SUCCESSFUL`
+- `:app:testDebugUnitTest` 33 passed, 0 failures; `:vault:testDebugUnitTest` 68 passed,
+  0 failures
+- `:app:compileDebugAndroidTestKotlin` — `BUILD SUCCESSFUL`
+
+Hosted run 35451868283 on commit `92d18b3` (PR #4): **all jobs green**.
+
+- API 29: vault **72/72**, app **38/38**, including the four originally failing
+  classes
+- API 36: vault **72/72**, app **38/38**, same four classes
+- JVM/lint and release APK inspection: pass
+
+P0-07 stays `todo`; this is connected evidence for the back/RTL contracts, not
+step completion.

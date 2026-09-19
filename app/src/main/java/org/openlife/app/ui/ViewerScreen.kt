@@ -42,8 +42,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -193,12 +195,20 @@ private fun ViewerCorrectionDialog(
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.viewer_correct_title)) },
             text = {
-                OutlinedTextField(
-                    value = correctionText,
-                    onValueChange = onCorrectionTextChange,
-                    label = { Text(stringResource(R.string.viewer_correction_label)) },
-                    singleLine = false,
-                )
+                val correctionLabel = stringResource(R.string.viewer_correction_label)
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    OutlinedTextField(
+                        value = correctionText,
+                        onValueChange = onCorrectionTextChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("viewer_correction_input")
+                            .semantics { contentDescription = correctionLabel },
+                        label = { Text(correctionLabel) },
+                        minLines = 1,
+                        maxLines = 4,
+                    )
+                }
             },
             confirmButton = {
                 TextButton(

@@ -23,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
+import org.openlife.app.R
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.IntakeRejectionMessage
@@ -55,7 +56,7 @@ class IntakeActivity : ComponentActivity() {
     }
 
     /** Test-only observation seam for the C0-05/C0-02/C0-03 instrumented tests. */
-    fun currentStatusForTest(): String = describeForTest(viewModel.state.value)
+    fun currentStatusForTest(): String = describeForTest(this, viewModel.state.value)
 
     override fun onStart() {
         super.onStart()
@@ -217,15 +218,29 @@ private fun describeIntentRejection(reason: IntakeRejectionReason): IntakeReject
     IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> IntakeRejectionMessage.UNSUPPORTED_OR_MISSING_TYPE
 }
 
-private fun describeForTest(state: IntakeUiState): String = when (state) {
+private fun describeForTest(activity: IntakeActivity, state: IntakeUiState): String = when (state) {
     IntakeUiState.Preparing -> "Preparing"
+
     is IntakeUiState.Preview -> "Prepared ${state.format} ${state.width}x${state.height}"
+
     is IntakeUiState.Saving -> "Saving"
+
     is IntakeUiState.Saved -> "Saved on this device"
+
     is IntakeUiState.Duplicate -> "Not imported again"
-    is IntakeUiState.Rejected -> "Not imported: ${state.message.name}"
+
+    // C0-R12: a vanished provider must prompt reselection. Report the same
+    // user-visible copy the screen shows, not the enum name.
+    is IntakeUiState.Rejected -> activity.getString(
+        R.string.intake_not_imported,
+        activity.getString(state.message.stringRes),
+    )
+
     IntakeUiState.Busy -> "Another import is already in progress."
+
     IntakeUiState.Failed -> "Import failed"
+
     is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.reason}"
+
     IntakeUiState.Cancelled -> "Cancelled"
 }

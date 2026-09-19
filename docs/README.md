@@ -15,6 +15,7 @@ One line is provided for every tracked documentation file under `docs/`.
 - [`decisions/0006-ui-foundation.md`](decisions/0006-ui-foundation.md) — fixed UI foundation, navigation, inset, and secure-window decisions.
 - [`decisions/0007-release-engineering.md`](decisions/0007-release-engineering.md) — dependency, release, and static-analysis decisions.
 - [`decisions/0015-local-vision-model-ocr-tier.md`](decisions/0015-local-vision-model-ocr-tier.md) — local vision-model OCR tier decision.
+- [`decisions/0016-ci-emulator-images.md`](decisions/0016-ci-emulator-images.md) — CI emulator image, runner, and snapshot decisions.
 - [`design/VISUAL_IDENTITY.md`](design/VISUAL_IDENTITY.md) — fixed visual identity and UI constraints.
 - [`generated/THIRD_PARTY_LICENSES.md`](generated/THIRD_PARTY_LICENSES.md) — generated runtime dependency licence inventory.
 - [`generated/annotation-jvm-1.9.1.jar/META-INF/androidx/annotation/annotation/LICENSE.txt`](generated/annotation-jvm-1.9.1.jar/META-INF/androidx/annotation/annotation/LICENSE.txt) — bundled annotation licence text.

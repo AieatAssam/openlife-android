@@ -6,7 +6,11 @@ WORKFLOW="$ROOT/.github/workflows/ci.yml"
 GRADLE_SETUP="$ROOT/.github/actions/gradle-setup/action.yml"
 RELEASE_WORKFLOW="$ROOT/.github/workflows/release.yml"
 RETRY_CLASSIFIER="$ROOT/scripts/ci/connected-test-failure-is-assertion.sh"
+CONNECTED_WRAPPER="$ROOT/scripts/ci/run-connected-android-tests.sh"
 CI_FILES=("$WORKFLOW" "$GRADLE_SETUP" "$RELEASE_WORKFLOW" "$RETRY_CLASSIFIER")
+if [[ -f "$CONNECTED_WRAPPER" ]]; then
+  CI_FILES+=("$CONNECTED_WRAPPER")
+fi
 pass=0
 fail=0
 
@@ -21,16 +25,48 @@ require() {
   fi
 }
 
+forbid_in_workflow() {
+  local label="$1" pattern="$2"
+  if grep -Eq "$pattern" "$WORKFLOW"; then
+    printf 'not ok - %s\nforbidden pattern: %s\n' "$label" "$pattern" >&2
+    fail=$((fail + 1))
+  else
+    printf 'ok - %s\n' "$label"
+    pass=$((pass + 1))
+  fi
+}
+
 require "JDK 21 is configured" 'java-version: *"?21"?'
 require "all jobs use the reusable Gradle setup action" '\./\.github/actions/gradle-setup'
-require "API 29 and API 36 matrix is declared" 'api-level: *\[29, *36\]'
+require "API 29 matrix entry is declared" 'api-level: *(29|\[29)'
+require "API 36 matrix entry is declared" 'api-level: *(36|\[29, *36\])'
 require "KVM is enabled via udev rules" 'KERNEL=="kvm".*MODE="0666"'
+require "KVM device is asserted after udev" 'test -e /dev/kvm'
+if grep -A20 '^  instrumented-tests:' "$WORKFLOW" | grep -Eq 'runs-on: ubuntu-22.04'; then
+  printf 'ok - instrumented job pins ubuntu-22.04 rather than ubuntu-latest\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - instrumented job pins ubuntu-22.04 rather than ubuntu-latest\n' >&2
+  fail=$((fail + 1))
+fi
 require "cmdline-tools setup is resilient" 'cmdline-tools/latest'
 require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
 require "connected tests have a retry wrapper" 'attempt|retry'
-require "connected runner uses swiftshader without snapshots" 'no-snapshot.*no-window.*swiftshader_indirect'
+require "connected runner uses swiftshader" 'gpu swiftshader_indirect'
+require "test run reuses a snapshot without saving" 'no-snapshot-save'
+require "AVD snapshot cache is configured" 'id: avd-cache'
+require "AVD cache includes ~/.android/avd" '~/\.android/avd'
 require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
+require "connected tests run under bash not dash" 'bash scripts/ci/run-connected-android-tests\.sh'
+require "API 36 uses aosp_atd" 'target: aosp_atd'
+require "API 29 keeps google_apis" 'target: google_apis'
+require "emulator cores are capped" 'cores: *"?2"?'
+require "emulator ram-size is modest" 'ram-size: *2048M'
+require "force-avd-creation is false for snapshot reuse" 'force-avd-creation: *false'
+require "logcat capture is time-bounded" 'timeout 20s adb logcat'
+forbid_in_workflow "pixel_7 profile is not used on CI emulators" 'profile:[[:space:]]*pixel_7'
+forbid_in_workflow "workflow does not pass bash-only pipefail to emulator-runner sh" 'set -o pipefail'
 if [[ -x "$RETRY_CLASSIFIER" ]]; then
   classifier_tmp="$(mktemp -d)"
   trap 'rm -rf "$classifier_tmp"' EXIT
@@ -55,6 +91,13 @@ if grep -Fq 'INSTRUMENTATION_RESULT: shortMsg=[(]?' "$RETRY_CLASSIFIER"; then
   pass=$((pass + 1))
 else
   printf 'not ok - retry classifier names assertion-shaped instrumentation failures\n' >&2
+  fail=$((fail + 1))
+fi
+if [[ -x "$CONNECTED_WRAPPER" ]] && grep -Eq 'PIPESTATUS|attempt' "$CONNECTED_WRAPPER"; then
+  printf 'ok - bash connected-test wrapper exists and retries under bash\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - bash connected-test wrapper exists and retries under bash\nmissing: %s\n' "$CONNECTED_WRAPPER" >&2
   fail=$((fail + 1))
 fi
 require "instrumented results retain artifacts for 30 days" 'retention-days: *30'
