@@ -90,3 +90,9 @@ notes: >
   Re-run with `gh workflow run ci.yml --ref <branch>` (workflow_dispatch) or
   by opening a PR against plan/P1-09-repository-crypto-hardening. Status
   stays review until a hosted run gets past emulator boot.
+  2026-09-19 (run 35444099558): both legs booted google_apis+pixel_7, then
+  dash rejected set -o pipefail and adb logcat hung until the 35m timeout.
+  CI now uses ubuntu-22.04, KVM fail-fast, a bash connected-test wrapper,
+  bounded logcat, AVD snapshot cache, API 29 google_apis (no ATD) and API 36
+  aosp_atd, no pixel_7 profile. Documented in
+  docs/decisions/0016-ci-emulator-images.md. Do not mark this step done.
