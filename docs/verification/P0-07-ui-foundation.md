@@ -69,3 +69,33 @@ outbound action was added. Navigation arguments carry UUID strings only. The
 generated dependency licence report and SHA-256 verification metadata include
 the new AndroidX/navigation/serialization graph; no untracked disposable
 licence-report JSON is retained.
+
+## Hosted CI assertion follow-up (2026-09-19)
+
+Run 35447641798 (API 29 `google_apis` 320x640 and API 36 `aosp_atd`) failed three
+P0-07 instrumented contracts. The product/test fixes below keep P0-07 `todo`;
+they are not a step completion.
+
+- `NavigationBackTest.backFromListFinishesActivity` — back from the list **does**
+  finish `MainActivity` (P0-07-R3). Espresso `pressBack()` throws
+  `NoActivityResumedException` when that happens, so the test now uses
+  `pressBackUnconditionally()` and asserts `DESTROYED`.
+- `AccessibilitySemanticsTest.screensMirrorCorrectlyUnderForcedRtl` — the list
+  row used `padding(start)` only, so on a 320dp RTL layout the wrapped source
+  label's unclipped bounds sat flush against the delete control. The row now
+  uses `Arrangement.spacedBy(12.dp)` on both sides so delete stays to the left
+  of the label under forced RTL.
+
+Connected re-run of those two classes is required on the hosted API 29/36 legs;
+this environment does not claim those counts here.
+
+Local static/JVM verification on this follow-up (2026-09-19), no emulator:
+
+- `scripts/plan-check.sh` — `steps=77 errors=0`
+- `./gradlew detekt lint :app:test :vault:test assembleDebug` — `BUILD SUCCESSFUL`
+- `:app:testDebugUnitTest` 33 passed, 0 failures; `:vault:testDebugUnitTest` 68 passed,
+  0 failures
+- `:app:compileDebugAndroidTestKotlin` — `BUILD SUCCESSFUL`
+
+No AVD is available in this cloud-agent image, so the four instrumented classes
+were not re-run on a device here.
