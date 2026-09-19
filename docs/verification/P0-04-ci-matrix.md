@@ -102,3 +102,68 @@ completed Enable KVM and **Prepare Android SDK cmdline-tools and adb**
 successfully, then stayed in the emulator-runner step well past the
 previous ~20s mkdir/`adb ENOENT` death. Full API 29/36 connected counts
 are not claimed from this workspace.
+
+## Hosted instrumented timeout (2026-09-19, run 35444099558)
+
+PR run https://github.com/AieatAssam/openlife-android/actions/runs/35444099558
+(`cursor/upload-debug-apk-artifact-c11f` against
+`plan/P1-09-repository-crypto-hardening`): JVM and release jobs succeeded
+in ~4 minutes. Both instrumented jobs reached `Starting emulator` and
+`Emulator booted` (API 29 ~16s, API 36 ~54s), then failed immediately
+with `/usr/bin/sh: 1: set: Illegal option -o pipefail`. The
+`always()` `adb logcat -d` step then hung until job timeout (exit 143,
+~35–40 minutes). This was not an app assertion failure and not a boot
+hang.
+
+The workflow now:
+
+- pins instrumented jobs to `ubuntu-22.04` (Linux + KVM; not macOS, not
+  floating `ubuntu-latest`)
+- asserts `/dev/kvm` after the udev step
+- runs connected tests via `bash scripts/ci/run-connected-android-tests.sh`
+  because emulator-runner's `script` input is `/usr/bin/sh` (dash)
+- bounds leftover `adb logcat -d` with `timeout 20s` and a 1-minute step
+  timeout
+- uses API 29 `google_apis` x86_64 (ATD does not exist for 29) and API 36
+  `aosp_atd` x86_64; no `pixel_7` profile. See
+  `docs/decisions/0016-ci-emulator-images.md`
+- caches AVD snapshots and launches tests with `-no-snapshot-save`
+
+`scripts/tests/p0-04-ci-workflow.sh` — `37 passed, 0 failed` after this
+contract update.
+
+## Hosted run past Gradle connected tests (2026-09-19, run 35447168861)
+
+PR run https://github.com/AieatAssam/openlife-android/actions/runs/35447168861
+(`cursor/ci-instrumented-emulator-eef4` against
+`plan/P1-09-repository-crypto-hardening`):
+
+| Job | Result | Wall time |
+| --- | --- | --- |
+| Build, lint, unit tests | success | ~3m 40s |
+| Release APK boundary inspection | success | ~2m |
+| Instrumented API 29 (`google_apis` x86_64) | failed (app assertions) | ~7m 41s |
+| Instrumented API 36 (`aosp_atd` x86_64) | failed (app assertions) | ~6m 38s |
+
+Both instrumented jobs created an AVD snapshot, booted, ran
+`:vault:connectedDebugAndroidTest` and `:app:connectedDebugAndroidTest`,
+captured logcat in 20s, and uploaded artefacts. The dash/`adb logcat`
+hang from run 35444099558 did not recur. Assertion-shaped failures
+were not retried (`connected test assertion failure; not retrying`).
+
+Counts from the uploaded XML:
+
+- API 29 vault: **72/72** pass. App: **34/38** pass.
+- API 36 vault: **72/72** pass. App: **35/38** pass.
+
+App failures (assertions, not infrastructure):
+
+- both: `IntakeActivityTest#unavailableProviderIsRejectedGracefully`
+- both: `AccessibilitySemanticsTest#screensMirrorCorrectlyUnderForcedRtl`
+- both: `NavigationBackTest#backFromListFinishesActivity`
+- API 29 only: `ViewerScreenC1Test#extractedTextIsInertAndCorrectionIsAttributable`
+
+P0-04 stays `review`. These app failures are product/test issues for P1
+steps, not a reason to revert the runner/image change. The debug-APK
+artifact upload from PR #2 is not on this plan branch and is not part
+of this change.
