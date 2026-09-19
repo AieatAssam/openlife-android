@@ -1,11 +1,11 @@
 package org.openlife.app.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
 import org.junit.Assert.assertEquals
@@ -56,8 +56,12 @@ class ViewerScreenC1Test {
         composeRule.onNodeWithText(span.text).assertIsDisplayed()
         composeRule.onNodeWithText("Show region").performClick()
         composeRule.onNodeWithText("Correct").performClick()
-        composeRule.onNodeWithText("Your correction").performTextClearance()
-        composeRule.onNodeWithText("Your correction").performTextInput("hullo")
+        composeRule.onNodeWithText("Your correction").assertIsDisplayed()
+        // API 29 does not merge the label into the editable semantics node the
+        // way API 36 does, so drive the field by its input action rather than
+        // by label text (C1-R5: the correction is still typed).
+        composeRule.onNode(hasSetTextAction(), useUnmergedTree = true)
+            .performTextReplacement("hullo")
         composeRule.onNodeWithText("Save correction").performClick()
 
         assertEquals("hullo", corrected)
