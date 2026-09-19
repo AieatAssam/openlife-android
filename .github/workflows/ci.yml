@@ -28,6 +28,19 @@ jobs:
       - name: Static analysis, lint, JVM tests, and debug build
         run: ./gradlew detekt lint :app:test :vault:test assembleDebug
 
+      # Sideloadable debug APK for physical-device testing when emulator
+      # legs fail. Uploaded only after assembleDebug succeeds so a missing
+      # APK is not published; this job's success is independent of later
+      # instrumented jobs.
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: app-debug-apk
+          retention-days: 30
+          if-no-files-found: error
+          path: app/build/outputs/apk/debug/app-debug.apk
+
       - name: Upload static-analysis, lint, and JVM reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -102,3 +102,12 @@ completed Enable KVM and **Prepare Android SDK cmdline-tools and adb**
 successfully, then stayed in the emulator-runner step well past the
 previous ~20s mkdir/`adb ENOENT` death. Full API 29/36 connected counts
 are not claimed from this workspace.
+
+## Debug APK artifact for physical-device testing
+
+The `build-lint-unit-test` job uploads `app/build/outputs/apk/debug/app-debug.apk`
+as the `app-debug-apk` artefact (`retention-days: 30`) after `assembleDebug`
+succeeds (`if: success()`). That upload is independent of the instrumented
+API-29/API-36 legs, so a sideloadable debug APK is retained whenever the JVM
+build path succeeds even if emulator jobs fail. The release-inspection job
+still uploads the release APK inside `release-apk-inspection`.

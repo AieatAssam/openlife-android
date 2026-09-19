@@ -28,6 +28,15 @@ require "KVM is enabled via udev rules" 'KERNEL=="kvm".*MODE="0666"'
 require "cmdline-tools setup is resilient" 'cmdline-tools/latest'
 require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
+if grep -Eq 'name: *app-debug-apk' "$WORKFLOW" &&
+    grep -Fq 'app/build/outputs/apk/debug/app-debug.apk' "$WORKFLOW" &&
+    grep -Eq 'if: *success\(\)' "$WORKFLOW"; then
+  printf 'ok - CI build job uploads debug APK artifact on assemble success\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - CI build job uploads debug APK artifact on assemble success\n' >&2
+  fail=$((fail + 1))
+fi
 require "connected tests have a retry wrapper" 'attempt|retry'
 require "connected runner uses swiftshader without snapshots" 'no-snapshot.*no-window.*swiftshader_indirect'
 require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
