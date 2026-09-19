@@ -29,6 +29,8 @@ require "cmdline-tools setup is resilient" 'cmdline-tools/latest'
 require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
 require "connected tests have a retry wrapper" 'attempt|retry'
+require "connected script runs under bash" 'exec bash'
+require "logcat capture is time-bounded" 'timeout .*adb logcat'
 require "connected runner uses swiftshader without snapshots" 'no-snapshot.*no-window.*swiftshader_indirect'
 require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
 if [[ -x "$RETRY_CLASSIFIER" ]]; then
