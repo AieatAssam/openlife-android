@@ -1,5 +1,7 @@
 package org.openlife.vault.repository
 
+import android.database.sqlite.SQLiteFullException
+import android.system.ErrnoException
 import org.openlife.vault.crypto.AesGcmCodec
 import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeCodec
@@ -26,6 +28,8 @@ private const val SCHEMA_ARTEFACT_VERSION = 1
 private const val RESERVED_STORAGE_BYTES = 8L * 1024 * 1024
 private const val MINIMUM_AVAILABLE_STORAGE_BYTES =
     2L * ImportLimits.MAX_ORIGINAL_BYTES + RESERVED_STORAGE_BYTES
+
+private data class StageWriteRequest(val sourceId: UUID, val plaintext: ByteArray, val dek: ByteArray)
 
 fun interface PlaintextBufferObserver {
     fun onReleased(bytes: ByteArray)
@@ -100,7 +104,10 @@ class ImportRepository(
             // The STAGED row, with its wrapped key, is committed before any
             // file is written - this is what lets recovery find interrupted
             // work (design §11 step 2).
-            sourceDao.insert(stagedSource.toEntity())
+            val insertFailure = insertStagedSource(stagedSource)
+            if (insertFailure != null) {
+                return insertFailure
+            }
 
             val read = try {
                 BoundedStreamReader.read(inputStream, deadline)
@@ -122,20 +129,9 @@ class ImportRepository(
                     return PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
                 }
 
-                try {
-                    val artefactEnvelope = AesGcmCodec.encrypt(
-                        read.bytes,
-                        SecretKeySpec(dek, "AES"),
-                        EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId),
-                    )
-                    fileOps.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
-                } catch (error: Exception) {
-                    cancelStage(sourceId)
-                    return if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-                        PrepareResult.StorageUnavailable
-                    } else {
-                        PrepareResult.Failed
-                    }
+                val stageFailure = writeEncryptedStage(StageWriteRequest(sourceId, read.bytes, dek))
+                if (stageFailure != null) {
+                    return stageFailure
                 }
 
                 val updated = stagedSource.copy(
@@ -151,7 +147,10 @@ class ImportRepository(
                     },
                     artefactVersion = SCHEMA_ARTEFACT_VERSION,
                 )
-                sourceDao.update(updated.toEntity())
+                val updateFailure = updatePreparedSource(updated)
+                if (updateFailure != null) {
+                    return updateFailure
+                }
 
                 return PrepareResult.Prepared(
                     sourceId,
@@ -174,6 +173,55 @@ class ImportRepository(
         storageSpace.availableBytes(paths.artefactsDir) >= MINIMUM_AVAILABLE_STORAGE_BYTES
     } catch (_: Exception) {
         false
+    }
+
+    private suspend fun writeEncryptedStage(request: StageWriteRequest): PrepareResult? = try {
+        val artefactEnvelope = AesGcmCodec.encrypt(
+            request.plaintext,
+            SecretKeySpec(request.dek, "AES"),
+            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, request.sourceId),
+        )
+        fileOps.writeAndSync(paths.stageFile(request.sourceId), EnvelopeCodec.encode(artefactEnvelope))
+        null
+    } catch (error: IOException) {
+        cancelStage(request.sourceId)
+        prepareFailureFor(error)
+    } catch (error: ErrnoException) {
+        cancelStage(request.sourceId)
+        prepareFailureFor(error)
+    }
+
+    private fun prepareFailureFor(error: Throwable): PrepareResult =
+        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+            PrepareResult.StorageUnavailable
+        } else {
+            PrepareResult.Failed
+        }
+
+    private suspend fun insertStagedSource(source: Source): PrepareResult? = try {
+        sourceDao.insert(source.toEntity())
+        null
+    } catch (error: IOException) {
+        prepareFailureFor(error)
+    } catch (error: ErrnoException) {
+        prepareFailureFor(error)
+    } catch (error: SQLiteFullException) {
+        prepareFailureFor(error)
+    } catch (_: Exception) {
+        PrepareResult.Failed
+    }
+
+    private suspend fun updatePreparedSource(source: Source): PrepareResult? = try {
+        sourceDao.update(source.toEntity())
+        null
+    } catch (error: IOException) {
+        prepareFailureFor(error)
+    } catch (error: ErrnoException) {
+        prepareFailureFor(error)
+    } catch (error: SQLiteFullException) {
+        prepareFailureFor(error)
+    } catch (_: Exception) {
+        PrepareResult.Failed
     }
 
     /**
@@ -232,27 +280,36 @@ class ImportRepository(
             val blobFile = paths.blobFile(sourceId)
             if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
             fileOps.syncDirectory(paths.artefactsDir)
-        } catch (error: Exception) {
-            return@acquire if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-                SaveResult.StorageUnavailable
-            } else {
-                SaveResult.Failed
-            }
+        } catch (error: IOException) {
+            return@acquire saveFailureFor(error)
+        } catch (error: ErrnoException) {
+            return@acquire saveFailureFor(error)
         }
 
         try {
             sourceDao.update(source.copy(state = SourceState.READY).toEntity())
-        } catch (error: Exception) {
+        } catch (error: IOException) {
+            return@acquire saveFailureFor(error)
+        } catch (error: ErrnoException) {
+            return@acquire saveFailureFor(error)
+        } catch (_: SQLiteFullException) {
+            // The rename already happened, but the row remains STAGED when
+            // the final commit is rejected; recovery owns both paths.
+            return@acquire SaveResult.StorageUnavailable
+        } catch (_: Exception) {
             // The rename already happened, but the row remains STAGED when
             // the final commit is rejected (for example by the READY
             // invariant trigger). Recovery owns both possible artefact paths
             // and will remove them on the next pass; never surface success.
-            return@acquire if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-                SaveResult.StorageUnavailable
-            } else {
-                SaveResult.Failed
-            }
+            return@acquire SaveResult.Failed
         }
         SaveResult.Saved(sourceId)
     }
+
+    private fun saveFailureFor(error: Throwable): SaveResult =
+        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+            SaveResult.StorageUnavailable
+        } else {
+            SaveResult.Failed
+        }
 }

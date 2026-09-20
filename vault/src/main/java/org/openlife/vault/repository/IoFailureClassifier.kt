@@ -17,7 +17,7 @@ object IoFailureClassifier {
         var current: Throwable? = error
         while (current != null && seen.add(current)) {
             if (current is SQLiteFullException ||
-                current is ErrnoException && current.errno == OsConstants.ENOSPC
+                (current is ErrnoException && current.errno == OsConstants.ENOSPC)
             ) {
                 return Kind.STORAGE_UNAVAILABLE
             }

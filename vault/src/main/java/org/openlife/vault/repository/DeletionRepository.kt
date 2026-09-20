@@ -1,5 +1,7 @@
 package org.openlife.vault.repository
 
+import android.database.sqlite.SQLiteFullException
+import android.system.ErrnoException
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
@@ -61,12 +63,21 @@ class DeletionRepository(
             database.ocrDao().deleteForSource(sourceId.toString())
             database.sourceDao().deleteById(sourceId.toString())
             DeleteResult.Deleted
-        } catch (error: Exception) {
-            if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-                DeleteResult.StorageUnavailable
-            } else {
-                DeleteResult.Failed
-            }
+        } catch (error: java.io.IOException) {
+            deleteFailureFor(error)
+        } catch (error: ErrnoException) {
+            deleteFailureFor(error)
+        } catch (error: SQLiteFullException) {
+            deleteFailureFor(error)
+        } catch (_: Exception) {
+            DeleteResult.Failed
         }
     }
+
+    private fun deleteFailureFor(error: Throwable): DeleteResult =
+        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+            DeleteResult.StorageUnavailable
+        } else {
+            DeleteResult.Failed
+        }
 }
