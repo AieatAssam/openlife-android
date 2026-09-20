@@ -67,6 +67,7 @@ require "smoke records media scan broadcast status" "$ROOT/scripts/release-smoke
 require "smoke matches MediaStore paths by basename" "$ROOT/scripts/release-smoke.sh" 'media_name=.*basename'
 require "smoke grants the MediaStore URI through intent data" "$ROOT/scripts/release-smoke.sh" '.*-d "\$media_uri"'
 require "smoke matches the prefixed verification row" "$ROOT/scripts/release-smoke.sh" 'text="\[\^"\]\*Verified against the saved copy'
+require "smoke matches the deletion warning within its full sentence" "$ROOT/scripts/release-smoke.sh" 'text="\[\^"\]\*There is no undo'
 require "release evidence retains mapping" "$RELEASE_WORKFLOW" 'app/build/outputs/mapping/release/mapping\.txt'
 require_file "release smoke script exists" "$ROOT/scripts/release-smoke.sh"
 require_executable "release smoke script is executable" "$ROOT/scripts/release-smoke.sh"
