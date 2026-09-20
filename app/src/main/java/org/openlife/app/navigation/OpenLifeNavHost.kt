@@ -15,10 +15,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import org.openlife.app.ui.AboutScreen
 import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
-import org.openlife.app.ui.AboutScreen
 import java.util.UUID
 
 @Composable

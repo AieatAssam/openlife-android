@@ -1,11 +1,11 @@
 package org.openlife.app.ui.brand
 
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.math.max
 import kotlin.math.min
-import org.junit.Assert.assertTrue
-import org.junit.Test
 
 class PaletteContrastTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))

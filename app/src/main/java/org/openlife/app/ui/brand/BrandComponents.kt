@@ -2,8 +2,8 @@ package org.openlife.app.ui.brand
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +16,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -38,20 +35,9 @@ import org.openlife.app.R
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.app.ui.theme.OpenLifeTheme
 
-enum class StampState {
-    Confirmed,
-    Verified,
-    Stale,
-    Saved,
-}
-
 /** A labeled state stamp; there is deliberately no unreviewed variant. */
 @Composable
-fun StampBadge(
-    state: StampState,
-    modifier: Modifier = Modifier,
-    motionScale: Float? = null,
-) {
+fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Float? = null) {
     val brand = LocalOpenLifeBrandColors.current
     val label = stringResource(
         when (state) {
@@ -64,14 +50,18 @@ fun StampBadge(
     val scale = remember { Animatable(1f) }
     // Compose carries MotionDurationScale through the animation coroutine;
     // Android's system scaleFactor == 0f makes this hero moment snap.
-    val duration = if ((motionScale ?: 1f) == 0f) 0 else 160
+    val duration = if ((motionScale ?: DEFAULT_MOTION_SCALE) == ZERO_MOTION_SCALE) {
+        0
+    } else {
+        HERO_MOTION_DURATION_MILLIS
+    }
     LaunchedEffect(state, duration) {
         if (duration == 0) {
             scale.snapTo(1f)
         } else {
             scale.snapTo(1f)
-            scale.animateTo(0.96f, tween(durationMillis = duration / 2))
-            scale.animateTo(1f, tween(durationMillis = duration / 2))
+            scale.animateTo(STAMP_PRESS_SCALE, tween(durationMillis = duration / 2))
+            scale.animateTo(STAMP_REST_SCALE, tween(durationMillis = duration / 2))
         }
     }
     val stampColor = when (state) {
@@ -81,8 +71,11 @@ fun StampBadge(
     }
     Box(
         modifier = modifier
-            .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
-            .rotate(-3f)
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            }
+            .rotate(STAMP_ROTATION_DEGREES)
             .border(BorderStroke(1.5.dp, stampColor), MaterialTheme.shapes.small)
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .semantics { contentDescription = label },
@@ -98,10 +91,7 @@ fun StampBadge(
 }
 
 @Composable
-fun FoldedCornerCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
+fun FoldedCornerCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val brand = LocalOpenLifeBrandColors.current
     Surface(
         modifier = modifier,
@@ -138,6 +128,13 @@ private fun Modifier.drawFold(foldColor: Color, ruleColor: Color): Modifier = dr
         )
     }
 }
+
+private const val DEFAULT_MOTION_SCALE = 1f
+private const val ZERO_MOTION_SCALE = 0f
+private const val HERO_MOTION_DURATION_MILLIS = 160
+private const val STAMP_PRESS_SCALE = 0.96f
+private const val STAMP_REST_SCALE = 1f
+private const val STAMP_ROTATION_DEGREES = -3f
 
 @Composable
 fun PerforationDivider(

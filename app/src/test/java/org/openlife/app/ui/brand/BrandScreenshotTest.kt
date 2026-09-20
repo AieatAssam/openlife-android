@@ -1,9 +1,9 @@
 package org.openlife.app.ui.brand
 
-import java.nio.file.Files
-import java.nio.file.Path
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Path
 
 class BrandScreenshotTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
@@ -28,6 +28,9 @@ class BrandScreenshotTest {
             "app/src/androidTest/java/org/openlife/app/ui/brand/BrandScreenshotInstrumentedTest.kt",
         )
         assertTrue("screenshot test is missing", Files.isRegularFile(screenshotTest))
-        assertTrue("screenshot test must capture Compose pixels", Files.readString(screenshotTest).contains("captureToImage"))
+        assertTrue(
+            "screenshot test must capture Compose pixels",
+            Files.readString(screenshotTest).contains("captureToImage"),
+        )
     }
 }

@@ -180,7 +180,10 @@ private fun SourceRow(
                     } else if (source.state == SourceState.CORRUPT) {
                         Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
                     } else if (deletionPending) {
-                        Text(stringResource(R.string.deletion_pending_retry), style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(R.string.deletion_pending_retry),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                         Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
                     }
                 }
