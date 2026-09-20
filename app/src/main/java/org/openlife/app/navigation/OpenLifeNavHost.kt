@@ -18,6 +18,7 @@ import androidx.navigation.toRoute
 import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
+import org.openlife.app.ui.AboutScreen
 import java.util.UUID
 
 @Composable
@@ -86,7 +87,7 @@ fun OpenLifeNavHost(
             }
         }
         composable<Routes.Settings> { PlaceholderScreen(org.openlife.app.R.string.settings_title) }
-        composable<Routes.About> { PlaceholderScreen(org.openlife.app.R.string.about_title) }
+        composable<Routes.About> { AboutScreen() }
     }
 }
 

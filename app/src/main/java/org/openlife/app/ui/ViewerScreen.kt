@@ -50,6 +50,11 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.PerforationDivider
+import org.openlife.app.ui.brand.StampBadge
+import org.openlife.app.ui.brand.StampState
+import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrFailureReason
@@ -227,6 +232,7 @@ private fun ViewerCorrectionDialog(
 
 @Composable
 private fun ViewerImage(source: Source, bytes: ByteArray?, selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?) {
+    val brand = LocalOpenLifeBrandColors.current
     Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
         val decoded = remember(bytes) { bytes?.let(SampledBitmapDecoder::decode) }
         DisposableEffect(decoded) {
@@ -259,10 +265,15 @@ private fun ViewerImage(source: Source, bytes: ByteArray?, selectedRegion: org.o
                 val right = region.right.toFloat() / sourceWidth * size.width
                 val bottom = region.bottom.toFloat() / sourceHeight * size.height
                 drawRect(
-                    color = Color.Yellow,
+                    color = brand.highlighter.copy(alpha = 0.30f),
                     topLeft = Offset(left, top),
                     size = Size(right - left, bottom - top),
-                    style = Stroke(width = 4f),
+                )
+                drawRect(
+                    color = brand.highlighter,
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, bottom - top),
+                    style = Stroke(width = 3.dp.toPx()),
                 )
             }
         }
@@ -296,7 +307,7 @@ private fun OcrSection(
                 if (state.spans.isEmpty()) Text(stringResource(R.string.viewer_no_latin_text))
                 state.spans.forEach { span ->
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(span.text, modifier = Modifier.weight(1f))
+                        Text(span.text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
                         span.evidenceRegion?.let { region ->
                             TextButton(onClick = { onSelectRegion(region) }) {
                                 Text(stringResource(R.string.viewer_show_region))
@@ -345,29 +356,33 @@ private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) 
 
 @Composable
 private fun DetailsSection(source: Source, verified: Boolean) {
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
-        DetailRow(stringResource(R.string.viewer_imported_label), sourceLabel(source))
-        DetailRow(
-            stringResource(R.string.viewer_route_label),
-            stringResource(
-                if (source.intakeKind.name == "SHARE") R.string.viewer_route_share else R.string.viewer_route_photos,
-            ),
-        )
-        DetailRow(
-            stringResource(R.string.viewer_integrity_label),
-            when {
-                source.state == SourceState.CORRUPT -> stringResource(R.string.viewer_integrity_unreadable)
-                verified -> stringResource(R.string.viewer_integrity_verified)
-                else -> stringResource(R.string.viewer_integrity_unverified)
-            },
-        )
-        Text(
-            stringResource(R.string.viewer_integrity_notice),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+    FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
+            DetailRow(stringResource(R.string.viewer_imported_label), sourceLabel(source))
+            DetailRow(
+                stringResource(R.string.viewer_route_label),
+                stringResource(
+                    if (source.intakeKind.name == "SHARE") R.string.viewer_route_share else R.string.viewer_route_photos,
+                ),
+            )
+            DetailRow(
+                stringResource(R.string.viewer_integrity_label),
+                when {
+                    source.state == SourceState.CORRUPT -> stringResource(R.string.viewer_integrity_unreadable)
+                    verified -> stringResource(R.string.viewer_integrity_verified)
+                    else -> stringResource(R.string.viewer_integrity_unverified)
+                },
+            )
+            if (verified) StampBadge(StampState.Verified, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                stringResource(R.string.viewer_integrity_notice),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
     }
+    PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
 }
 
 @Composable

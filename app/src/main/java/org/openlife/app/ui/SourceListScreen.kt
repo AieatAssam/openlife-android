@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -41,6 +40,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.PerforationDivider
+import org.openlife.app.ui.brand.StampBadge
+import org.openlife.app.ui.brand.StampState
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import java.util.UUID
@@ -89,7 +92,7 @@ fun SourceListScreen(
                 is SourceListUiState.Loaded -> {
                     if (state.sources.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(stringResource(R.string.list_empty))
+                            Text(stringResource(R.string.list_empty), style = MaterialTheme.typography.headlineSmall)
                         }
                     } else {
                         LazyColumn {
@@ -132,62 +135,69 @@ private fun SourceRow(
     val deletionPending = source.state == SourceState.DELETING
     // spacedBy, not padding(start): under RTL a wrapping label's unclipped
     // bounds would otherwise sit flush against the delete control.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (deletionPending) Modifier else Modifier.clickable(onClick = onOpen))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (source.state == SourceState.CORRUPT || deletionPending) {
-                Icon(Icons.Filled.Warning, contentDescription = stringResource(R.string.content_unavailable))
-            } else {
-                val bitmap by produceState<android.graphics.Bitmap?>(
-                    initialValue = null,
-                    source.id,
-                    thumbnailGeneration,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (deletionPending) Modifier else Modifier.clickable(onClick = onOpen))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    value = loadThumbnail(source.id)
+                    if (source.state == SourceState.CORRUPT || deletionPending) {
+                        Icon(Icons.Filled.Warning, contentDescription = stringResource(R.string.content_unavailable))
+                    } else {
+                        val bitmap by produceState<android.graphics.Bitmap?>(
+                            initialValue = null,
+                            source.id,
+                            thumbnailGeneration,
+                        ) {
+                            value = loadThumbnail(source.id)
+                        }
+                        bitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = stringResource(R.string.saved_image_thumbnail_content_description),
+                            )
+                        }
+                    }
                 }
-                bitmap?.let {
-                    Image(
-                        bitmap = it.asImageBitmap(),
-                        contentDescription = stringResource(R.string.saved_image_thumbnail_content_description),
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        sourceLabel(source),
+                        modifier = Modifier.testTag("source_row_label"),
+                    )
+                    if (source.state == SourceState.READY) {
+                        StampBadge(StampState.Saved, modifier = Modifier.padding(top = 4.dp))
+                    } else if (source.state == SourceState.CORRUPT) {
+                        Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
+                    } else if (deletionPending) {
+                        Text(stringResource(R.string.deletion_pending_retry), style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                IconButton(onClick = onDeleteRequested) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = stringResource(
+                            if (deletionPending) {
+                                R.string.retry_deletion_content_description
+                            } else {
+                                R.string.delete_content_description
+                            },
+                        ),
                     )
                 }
             }
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                sourceLabel(source),
-                modifier = Modifier.testTag("source_row_label"),
-            )
-            if (source.state == SourceState.CORRUPT) {
-                Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
-            } else if (deletionPending) {
-                Text(stringResource(R.string.deletion_pending_retry), style = MaterialTheme.typography.bodySmall)
-                Text(stringResource(R.string.content_unavailable), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        IconButton(onClick = onDeleteRequested) {
-            Icon(
-                Icons.Filled.Delete,
-                contentDescription = stringResource(
-                    if (deletionPending) {
-                        R.string.retry_deletion_content_description
-                    } else {
-                        R.string.delete_content_description
-                    },
-                ),
-            )
-        }
+        PerforationDivider(modifier = Modifier.padding(horizontal = 12.dp))
     }
 }

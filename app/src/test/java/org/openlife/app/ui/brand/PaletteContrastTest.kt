@@ -24,7 +24,7 @@ class PaletteContrastTest {
             "Paper" to "StampGreen",
             "Ink" to "AttentionContainer",
             "ErrorInk" to "Paper",
-            "DarkInk" to "DarkVermilion",
+            "DarkSurface" to "DarkVermilion",
             "DarkInk" to "DarkAttentionContainer",
         )
 

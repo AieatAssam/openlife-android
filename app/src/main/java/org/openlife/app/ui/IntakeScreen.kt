@@ -27,6 +27,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.StampBadge
+import org.openlife.app.ui.brand.StampState
 import java.util.UUID
 
 @Composable
@@ -46,7 +49,7 @@ fun IntakeScreen(
             is IntakeUiState.Saving -> CenteredMessage(stringResource(R.string.intake_saving))
 
             is IntakeUiState.Saved -> {
-                CenteredMessage(stringResource(R.string.intake_saved))
+                CenteredMessage(stringResource(R.string.intake_saved), stampState = StampState.Saved)
                 DoneAfterAcknowledging(onDone)
             }
 
@@ -111,30 +114,34 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
                 if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = stringResource(R.string.intake_selected_image_content_description),
-                )
-            } else {
-                Text(stringResource(R.string.intake_preview_unavailable))
+        FoldedCornerCard {
+            Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = stringResource(R.string.intake_selected_image_content_description),
+                    )
+                } else {
+                    Text(stringResource(R.string.intake_preview_unavailable))
+                }
             }
+            Text(
+                stringResource(
+                    R.string.intake_preview_details,
+                    state.format,
+                    state.width,
+                    state.height,
+                    formatBytes(state.byteCount),
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(16.dp),
+            )
+            Text(
+                stringResource(R.string.intake_copy_notice),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
         }
-        Text(
-            stringResource(
-                R.string.intake_preview_details,
-                state.format,
-                state.width,
-                state.height,
-                formatBytes(state.byteCount),
-            ),
-        )
-        Text(
-            stringResource(R.string.intake_copy_notice),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 8.dp),
-        )
         Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
             OutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) {
                 Text(stringResource(R.string.cancel_action))
@@ -147,12 +154,13 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
 }
 
 @Composable
-private fun CenteredMessage(text: String) {
+private fun CenteredMessage(text: String, stampState: StampState? = null) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            stampState?.let { StampBadge(it, modifier = Modifier.padding(bottom = 16.dp)) }
             Text(text)
         }
     }

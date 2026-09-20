@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import org.openlife.app.R
+import org.openlife.app.ui.brand.FoldedCornerCard
 
 /**
  * Design §8: "First-run explanation must state that the vault has no sync
@@ -55,10 +56,13 @@ fun FirstRunExplanationScreen(onContinue: () -> Unit) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(stringResource(R.string.first_run_title), style = MaterialTheme.typography.headlineSmall)
-            Column(modifier = Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.first_run_body))
-                Text(stringResource(R.string.first_run_device_lock))
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
+            FoldedCornerCard(modifier = Modifier.padding(top = 16.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.first_run_title), style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.first_run_body))
+                    Text(stringResource(R.string.first_run_device_lock))
+                }
             }
             Button(
                 modifier = Modifier.padding(top = 24.dp),

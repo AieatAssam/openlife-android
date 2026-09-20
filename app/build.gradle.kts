@@ -279,6 +279,21 @@ licenseReport {
     allowedLicensesFile = rootProject.layout.projectDirectory.file("config/allowed-licenses.json").asFile
 }
 
+// Font binaries are repository assets rather than Gradle dependencies, so the
+// dependency-license plugin cannot discover their OFL text. Keep the checked-
+// in report complete whenever the report is regenerated.
+tasks.named("generateLicenseReport") {
+    outputs.upToDateWhen { false }
+    doLast {
+        val report = rootProject.file("docs/generated/THIRD_PARTY_LICENSES.md")
+        val marker = "## Bundled font licences"
+        if (!report.readText().contains(marker)) {
+            val licenseText = rootProject.file("app/src/main/res/raw/ofl_1_1.txt").readText().trim()
+            report.appendText("\n\n$marker\n\n$licenseText\n")
+        }
+    }
+}
+
 tasks.withType<Test>().configureEach {
     dependsOn(writeReleaseRuntimeClasspath)
     dependsOn("checkLicense")

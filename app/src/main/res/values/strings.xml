@@ -103,4 +103,11 @@
 
     <string name="settings_title">Settings</string>
     <string name="about_title">About OpenLife</string>
+    <string name="stamp_confirmed">Confirmed</string>
+    <string name="stamp_verified">Verified</string>
+    <string name="stamp_stale">Stale</string>
+    <string name="stamp_saved">Saved</string>
+    <string name="perforation_content_description">Section divider</string>
+    <string name="about_subtitle">A private ledger for the files you choose to keep.</string>
+    <string name="about_font_credits">Typeface credits: IBM Plex Sans, IBM Plex Mono, and Fraunces. These fonts are distributed under the SIL Open Font License 1.1. The complete license text is included below.</string>
 </resources>
