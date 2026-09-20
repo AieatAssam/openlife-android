@@ -7,6 +7,7 @@ PROGUARD="$ROOT/app/proguard-rules.pro"
 PROPERTIES="$ROOT/gradle.properties"
 CI_WORKFLOW="$ROOT/.github/workflows/ci.yml"
 RELEASE_WORKFLOW="$ROOT/.github/workflows/release.yml"
+RELEASE_VALIDATION="$ROOT/scripts/ci/run-release-validation.sh"
 pass=0
 fail=0
 
@@ -57,6 +58,9 @@ require "source and line attributes are retained" "$PROGUARD" '^-keepattributes 
 require "source names remain mappable" "$PROGUARD" '^-renamesourcefileattribute SourceFile$'
 require "CI runs the release smoke" "$CI_WORKFLOW" 'scripts/release-smoke\.sh'
 require "CI checks native alignment" "$CI_WORKFLOW" 'scripts/check-16kb-alignment\.sh'
+require_file "release validation script exists" "$RELEASE_VALIDATION"
+require_executable "release validation script is executable" "$RELEASE_VALIDATION"
+require "CI invokes release validation as one script" "$CI_WORKFLOW" 'scripts/ci/run-release-validation\.sh'
 require "release evidence retains mapping" "$RELEASE_WORKFLOW" 'app/build/outputs/mapping/release/mapping\.txt'
 require_file "release smoke script exists" "$ROOT/scripts/release-smoke.sh"
 require_executable "release smoke script is executable" "$ROOT/scripts/release-smoke.sh"
