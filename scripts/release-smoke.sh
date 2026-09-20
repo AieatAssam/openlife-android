@@ -226,7 +226,7 @@ dump_ui
 after_save_thumbnail_count="$(count_descriptions)"
 (( after_save_thumbnail_count > baseline_thumbnail_count ))
 tap_description 'Saved image thumbnail'
-wait_for_ui_pattern 'text="Verified against the saved copy"' 45
+wait_for_ui_pattern 'text="[^"]*Verified against the saved copy"' 45
 tap_description 'Delete'
 wait_for_ui_pattern 'text="There is no undo"' 15
 tap_text 'Delete'
