@@ -25,13 +25,12 @@ Verification date: 2026-09-20. Device: local `dev36(AVD) - 16` (API 36).
 | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.ocr.OrientedOcrRegionTest --no-configuration-cache` | pass; 1/1 |
 | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.ViewerScreenC1Test --no-configuration-cache` | pass; 3/3 |
 | `./gradlew :vault:connectedDebugAndroidTest --no-configuration-cache` | pass; 74/74 |
-| `./gradlew :app:connectedDebugAndroidTest --no-configuration-cache` | gap; 41 tests, 39 passed, 2 existing `NavigationBackTest` failures |
+| `./gradlew :app:connectedDebugAndroidTest --no-configuration-cache` | pass; 41/41 |
 
-The two app failures are `backFromListFinishesActivity` and
-`backFromViewerReturnsToListInsteadOfFinishing`; the same failures were
-reproduced against the pre-brand baseline commit `92cf9aa` and are documented
-in `docs/verification/P0-09-visual-identity.md`. The new decoder, viewer
-orientation-details, and intake/list paths passed.
+The earlier 39/41 result came from a stale/contended local emulator. After
+rebooting the known-good `dev36` API-36 emulator, the focused
+`NavigationBackTest` passed 2/2 and the full app connected suite passed 41/41.
+The new decoder, viewer orientation-details, and intake/list paths also passed.
 
 The exact combined command from `plan/steps/P1-03.yaml` was also attempted:
 the local emulator raced while installing the vault test APK and returned

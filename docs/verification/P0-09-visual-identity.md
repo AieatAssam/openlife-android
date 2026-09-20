@@ -33,6 +33,11 @@ reproduced both failures: the viewer test timed out waiting for the saved-image
 node, and the list-back test raised `RootViewWithoutFocusException`. No device
 data was reset or deleted during this comparison.
 
+Follow-up on 2026-09-20: after rebooting the known-good `dev36` API-36
+emulator, the focused `NavigationBackTest` passed 2/2 and the full app
+connected suite passed 41/41. The earlier failures were local emulator state
+and are not reproducible on the clean boot.
+
 ## Design review
 
 The installed Material 3 Expressive, mobile Android design, and colour-system
