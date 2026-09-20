@@ -22,6 +22,7 @@ import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.Orientation
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapper
@@ -147,6 +148,23 @@ class ImportRepositoryTest {
         assertEquals(SourceState.STAGED, row.state) // not READY until an explicit Save
         assertEquals(expectedDigest.toList(), row.sha256!!.toList())
         assertTrue(paths.stageFile(prepared.sourceId).exists())
+    }
+
+    @Test
+    fun exifOrientationIsPersistedWithoutChangingBytesOrDigest(): Unit = runBlocking {
+        val original = ExifFixtures.injectOrientation(syntheticJpegBytes(80, 40), 6)
+        val expectedDigest = MessageDigest.getInstance("SHA-256").digest(original)
+
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(original),
+            "image/jpeg",
+            IntakeKind.SHARE,
+        ) as PrepareResult.Prepared
+
+        val row = db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain()
+        assertEquals(Orientation.ROTATE_90, row.orientation)
+        assertEquals(expectedDigest.toList(), row.sha256!!.toList())
+        assertEquals(original.size.toLong(), row.byteCount)
     }
 
     @Test

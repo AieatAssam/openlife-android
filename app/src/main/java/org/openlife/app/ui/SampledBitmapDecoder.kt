@@ -2,6 +2,7 @@ package org.openlife.app.ui
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import org.openlife.vault.model.Orientation
 import org.openlife.vault.repository.ImportLimits
 
 /**
@@ -11,6 +12,8 @@ import org.openlife.vault.repository.ImportLimits
  * dimensions differently from the requested [BitmapFactory.Options.inSampleSize].
  */
 object SampledBitmapDecoder {
+
+    fun decode(bytes: ByteArray, orientation: Orientation): Bitmap? = TODO("RED stub")
 
     fun decode(bytes: ByteArray): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
