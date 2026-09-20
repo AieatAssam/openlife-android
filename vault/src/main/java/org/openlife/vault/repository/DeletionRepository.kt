@@ -62,7 +62,7 @@ class DeletionRepository(
             database.sourceDao().deleteById(sourceId.toString())
             DeleteResult.Deleted
         } catch (error: Exception) {
-            if (IoFailureClassifier.isStorageUnavailable(error)) {
+            if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
                 DeleteResult.StorageUnavailable
             } else {
                 DeleteResult.Failed

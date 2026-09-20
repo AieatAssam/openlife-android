@@ -131,7 +131,7 @@ class ImportRepository(
                     fileOps.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
                 } catch (error: Exception) {
                     cancelStage(sourceId)
-                    return if (IoFailureClassifier.isStorageUnavailable(error)) {
+                    return if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
                         PrepareResult.StorageUnavailable
                     } else {
                         PrepareResult.Failed
@@ -233,7 +233,7 @@ class ImportRepository(
             if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
             fileOps.syncDirectory(paths.artefactsDir)
         } catch (error: Exception) {
-            return@acquire if (IoFailureClassifier.isStorageUnavailable(error)) {
+            return@acquire if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
                 SaveResult.StorageUnavailable
             } else {
                 SaveResult.Failed
@@ -247,7 +247,7 @@ class ImportRepository(
             // the final commit is rejected (for example by the READY
             // invariant trigger). Recovery owns both possible artefact paths
             // and will remove them on the next pass; never surface success.
-            return@acquire if (IoFailureClassifier.isStorageUnavailable(error)) {
+            return@acquire if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
                 SaveResult.StorageUnavailable
             } else {
                 SaveResult.Failed
