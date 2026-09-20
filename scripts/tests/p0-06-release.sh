@@ -24,6 +24,19 @@ require() {
     fi
 }
 
+reject() {
+    local label="$1"
+    local file="$2"
+    local pattern="$3"
+    if grep -Eq "$pattern" "$file"; then
+        printf 'not ok - %s\nforbidden pattern: %s\nfile: %s\n' "$label" "$pattern" "$file" >&2
+        fail=$((fail + 1))
+    else
+        printf 'ok - %s\n' "$label"
+        pass=$((pass + 1))
+    fi
+}
+
 require_file() {
     local label="$1"
     local file="$2"
@@ -67,7 +80,7 @@ require "smoke records media scan broadcast status" "$ROOT/scripts/release-smoke
 require "smoke matches MediaStore paths by basename" "$ROOT/scripts/release-smoke.sh" 'media_name=.*basename'
 require "smoke grants the MediaStore URI through intent data" "$ROOT/scripts/release-smoke.sh" '.*-d "\$media_uri"'
 require "smoke matches the prefixed verification row" "$ROOT/scripts/release-smoke.sh" 'text="\[\^"\]\*Verified against the saved copy'
-require "smoke matches the deletion warning within its full sentence" "$ROOT/scripts/release-smoke.sh" 'text="\[\^"\]\*There is no undo'
+reject "smoke does not assume a confirmation dialog in the viewer flow" "$ROOT/scripts/release-smoke.sh" 'There is no undo'
 require "release evidence retains mapping" "$RELEASE_WORKFLOW" 'app/build/outputs/mapping/release/mapping\.txt'
 require_file "release smoke script exists" "$ROOT/scripts/release-smoke.sh"
 require_executable "release smoke script is executable" "$ROOT/scripts/release-smoke.sh"
