@@ -240,6 +240,8 @@ private fun describeForTest(activity: IntakeActivity, state: IntakeUiState): Str
 
     IntakeUiState.Failed -> "Import failed"
 
+    IntakeUiState.StorageUnavailable -> "Storage unavailable"
+
     is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.reason}"
 
     IntakeUiState.Cancelled -> "Cancelled"

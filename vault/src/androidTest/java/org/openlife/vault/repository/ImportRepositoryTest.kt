@@ -1,7 +1,10 @@
 package org.openlife.vault.repository
 
+import android.database.sqlite.SQLiteFullException
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.system.ErrnoException
+import android.system.OsConstants
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
@@ -10,6 +13,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,6 +29,8 @@ import org.openlife.vault.model.SourceState
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
+import org.openlife.vault.storage.SourceDao
+import org.openlife.vault.storage.SourceEntity
 import org.openlife.vault.storage.VaultBootstrapper
 import org.openlife.vault.storage.VaultBootstrapResult
 import org.openlife.vault.storage.VaultPaths
@@ -113,14 +119,47 @@ class ImportRepositoryTest {
         )
     }
 
-    private fun repositoryWithFileOps(fileOps: ArtefactFileOps): ImportRepository = ImportRepository(
+    private fun repositoryWithFileOps(
+        fileOps: ArtefactFileOps,
+        storageSpace: StorageSpace = StorageSpace.Default,
+        sourceDao: SourceDao = db.sourceDao(),
+    ): ImportRepository = ImportRepository(
         paths = paths,
         database = db,
         keystoreWrapper = wrapper,
         bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
         mutationQueue = MutationQueue(),
         fileOps = fileOps,
+        storageSpace = storageSpace,
+        sourceDao = sourceDao,
     )
+
+    private fun sourceDaoFailingReadyUpdate(): SourceDao {
+        val delegate = db.sourceDao()
+        return object : SourceDao {
+            override suspend fun insert(source: SourceEntity) = delegate.insert(source)
+
+            override suspend fun update(source: SourceEntity) {
+                if (source.state == SourceState.READY.name) {
+                    throw SQLiteFullException("synthetic database full")
+                }
+                delegate.update(source)
+            }
+
+            override suspend fun findById(id: String): SourceEntity? = delegate.findById(id)
+
+            override suspend fun count(): Int = delegate.count()
+
+            override suspend fun deleteById(id: String) = delegate.deleteById(id)
+
+            override suspend fun findAll(): List<SourceEntity> = delegate.findAll()
+
+            override suspend fun findReadyDuplicate(byteCount: Long, sha256: ByteArray): SourceEntity? =
+                delegate.findReadyDuplicate(byteCount, sha256)
+
+            override fun observeVisibleSources(): Flow<List<SourceEntity>> = delegate.observeVisibleSources()
+        }
+    }
 
     @After
     fun tearDown() {
@@ -294,6 +333,46 @@ class ImportRepositoryTest {
         )
 
         assertEquals(PrepareResult.Failed, result)
+        assertEquals(0, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
+    fun insufficientFreeSpaceIsRejectedBeforeAnyRowOrFileIsCreated(): Unit = runBlocking {
+        val before = db.sourceDao().count()
+        val noSpaceRepository = repositoryWithFileOps(
+            ArtefactFileOps.Default,
+            storageSpace = StorageSpace { 2L * ImportLimits.MAX_ORIGINAL_BYTES + 8L * 1024 * 1024 - 1L },
+        )
+
+        val result = noSpaceRepository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        )
+
+        assertEquals(PrepareResult.Rejected(ImageRejectionReason.STORAGE_UNAVAILABLE), result)
+        assertEquals(before, db.sourceDao().count())
+        assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
+    }
+
+    @Test
+    fun enospcDuringStageWriteReportsStorageUnavailableAndCleansTheRow(): Unit = runBlocking {
+        val noSpaceRepository = repositoryWithFileOps(object : ArtefactFileOps {
+            override fun writeAndSync(file: java.io.File, bytes: ByteArray) {
+                throw ErrnoException("write", OsConstants.ENOSPC)
+            }
+
+            override fun rename(stage: java.io.File, blob: java.io.File): Boolean = stage.renameTo(blob)
+
+            override fun syncDirectory(directory: java.io.File) = Unit
+
+            override fun deleteIfExists(file: java.io.File): Boolean = ArtefactFileOps.Default.deleteIfExists(file)
+        })
+
+        val result = noSpaceRepository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        )
+
+        assertEquals(PrepareResult.StorageUnavailable, result)
         assertEquals(0, db.sourceDao().count())
         assertTrue(paths.artefactsDir.listFiles()?.isEmpty() ?: true)
     }
@@ -593,6 +672,34 @@ class ImportRepositoryTest {
     }
 
     @Test
+    fun enospcDuringDirectorySyncLeavesRecoverableStateAndReportsStorageUnavailable(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+        val noSpaceRepository = repositoryWithFileOps(object : ArtefactFileOps {
+            override fun writeAndSync(file: java.io.File, bytes: ByteArray) =
+                ArtefactFileOps.Default.writeAndSync(file, bytes)
+
+            override fun rename(stage: java.io.File, blob: java.io.File): Boolean =
+                ArtefactFileOps.Default.rename(stage, blob)
+
+            override fun syncDirectory(directory: java.io.File) {
+                throw ErrnoException("fsync", OsConstants.ENOSPC)
+            }
+
+            override fun deleteIfExists(file: java.io.File): Boolean = ArtefactFileOps.Default.deleteIfExists(file)
+        })
+
+        assertEquals(SaveResult.StorageUnavailable, noSpaceRepository.saveImport(prepared.sourceId))
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,
+        )
+        assertTrue(!paths.stageFile(prepared.sourceId).exists())
+        assertTrue(paths.blobFile(prepared.sourceId).exists())
+    }
+
+    @Test
     fun saveCommitFailureReturnsFailedAndLeavesRenamedArtefactRecoverable(): Unit = runBlocking {
         val prepared = repository.prepareImport(
             ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
@@ -605,6 +712,25 @@ class ImportRepositoryTest {
         db.sourceDao().update(staged.copy(mimeType = null))
 
         assertEquals(SaveResult.Failed, repository.saveImport(prepared.sourceId))
+        assertEquals(
+            SourceState.STAGED,
+            db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,
+        )
+        assertTrue(!paths.stageFile(prepared.sourceId).exists())
+        assertTrue(paths.blobFile(prepared.sourceId).exists())
+    }
+
+    @Test
+    fun sqliteFullOnReadyCommitLeavesStagedAndReportsStorageUnavailable(): Unit = runBlocking {
+        val prepared = repository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
+        ) as PrepareResult.Prepared
+        val noSpaceRepository = repositoryWithFileOps(
+            ArtefactFileOps.Default,
+            sourceDao = sourceDaoFailingReadyUpdate(),
+        )
+
+        assertEquals(SaveResult.StorageUnavailable, noSpaceRepository.saveImport(prepared.sourceId))
         assertEquals(
             SourceState.STAGED,
             db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state,

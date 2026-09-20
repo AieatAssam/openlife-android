@@ -24,6 +24,7 @@ enum class IntakeRejectionMessage(
     UNSUPPORTED_OR_MISSING_TYPE(R.string.rejection_unsupported_or_missing_type),
     ACCESS_RETRY(R.string.rejection_access_retry),
     TYPE_MISMATCH(R.string.rejection_type_mismatch),
+    STORAGE_UNAVAILABLE(R.string.intake_storage_unavailable),
 }
 
 sealed interface IntakeUiState {
@@ -55,6 +56,7 @@ sealed interface IntakeUiState {
 
     data object Busy : IntakeUiState
     data object Failed : IntakeUiState
+    data object StorageUnavailable : IntakeUiState
     data class VaultUnavailable(val reason: String) : IntakeUiState
     data object Cancelled : IntakeUiState
 }

@@ -45,6 +45,7 @@ private fun describeImageRejection(reason: ImageRejectionReason): IntakeRejectio
     ImageRejectionReason.CORRUPT_CONTENT -> IntakeRejectionMessage.CORRUPT_CONTENT
     ImageRejectionReason.ANIMATED_NOT_SUPPORTED -> IntakeRejectionMessage.ANIMATED_NOT_SUPPORTED
     ImageRejectionReason.EXCEEDS_DIMENSION_LIMIT -> IntakeRejectionMessage.IMAGE_TOO_LARGE
+    ImageRejectionReason.STORAGE_UNAVAILABLE -> IntakeRejectionMessage.STORAGE_UNAVAILABLE
 }
 
 private const val KEY_SOURCE_ID = "org.openlife.app.ui.IntakeViewModel.sourceId"
@@ -247,6 +248,8 @@ class IntakeViewModel(
 
             PrepareResult.Busy -> IntakeUiState.Busy
 
+            PrepareResult.StorageUnavailable -> IntakeUiState.StorageUnavailable
+
             PrepareResult.Failed -> IntakeUiState.Failed
         }
     }
@@ -294,6 +297,7 @@ class IntakeViewModel(
                         is SaveResult.Saved -> IntakeUiState.Saved(id)
                         is SaveResult.DuplicateFound -> IntakeUiState.Duplicate(result.existingSourceId)
                         SaveResult.StageNotFound -> IntakeUiState.Cancelled
+                        SaveResult.StorageUnavailable -> IntakeUiState.StorageUnavailable
                         SaveResult.Failed -> IntakeUiState.Failed
                     }
                 }

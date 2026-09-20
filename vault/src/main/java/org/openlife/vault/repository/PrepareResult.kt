@@ -19,6 +19,9 @@ sealed interface PrepareResult {
 
     data class Rejected(val reason: ImageRejectionReason) : PrepareResult
 
+    /** The device could not reserve enough durable space for this import. */
+    data object StorageUnavailable : PrepareResult
+
     /** A provider read, encryption, or file-write failure unrelated to the content itself. */
     data object Failed : PrepareResult
 }

@@ -72,6 +72,10 @@ fun IntakeScreen(
                 TerminalMessage(stringResource(R.string.intake_failed), onDone)
             }
 
+            IntakeUiState.StorageUnavailable -> {
+                TerminalMessage(stringResource(R.string.intake_storage_unavailable), onDone)
+            }
+
             is IntakeUiState.VaultUnavailable -> {
                 TerminalMessage(stringResource(R.string.intake_vault_unavailable), onDone)
             }

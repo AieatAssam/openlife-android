@@ -62,4 +62,22 @@ class IntakeScreenTest {
         composeRule.onNodeWithText("Cancel").performClick()
         assertTrue(cancelled)
     }
+
+    @Test
+    fun storageUnavailableStateExplainsAndOffersDone() {
+        var done = false
+        composeRule.setContent {
+            IntakeScreen(
+                state = IntakeUiState.StorageUnavailable,
+                onSave = {},
+                onCancel = {},
+                onDone = { done = true },
+            )
+        }
+
+        composeRule.onNodeWithText("Storage is unavailable. Nothing was saved because there may not be enough free space.")
+            .assertExists()
+        composeRule.onNodeWithText("Done").performClick()
+        assertTrue(done)
+    }
 }

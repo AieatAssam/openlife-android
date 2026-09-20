@@ -11,6 +11,7 @@ import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
@@ -49,6 +50,8 @@ class ImportRepository(
     private val clock: () -> Long = System::currentTimeMillis,
     private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
     private val plaintextBufferObserver: PlaintextBufferObserver = PlaintextBufferObserver { },
+    private val storageSpace: StorageSpace = StorageSpace.Default,
+    private val sourceDao: SourceDao = database.sourceDao(),
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 

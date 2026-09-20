@@ -29,6 +29,7 @@
     <string name="intake_not_imported">Not imported: %1$s</string>
     <string name="intake_busy">Another import is already in progress. Finish or cancel it first.</string>
     <string name="intake_failed">Import failed. Please try again.</string>
+    <string name="intake_storage_unavailable">Storage is unavailable. Nothing was saved because there may not be enough free space.</string>
     <string name="intake_vault_unavailable">The vault is unavailable right now.</string>
     <string name="intake_done">Done</string>
     <string name="save_action">Save</string>

@@ -10,6 +10,7 @@ enum class ImageRejectionReason {
     CORRUPT_CONTENT,
     ANIMATED_NOT_SUPPORTED,
     EXCEEDS_DIMENSION_LIMIT,
+    STORAGE_UNAVAILABLE,
 }
 
 sealed interface ImageValidationResult {
