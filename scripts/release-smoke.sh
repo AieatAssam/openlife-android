@@ -20,6 +20,7 @@ intake_activity="$package/org.openlife.app.intake.IntakeActivity"
 tmp="$(mktemp -d)"
 ui_dump="$tmp/window.xml"
 remote_file="/sdcard/Pictures/openlife-release-smoke-$BASHPID.png"
+media_name="$(basename "$remote_file")"
 trap 'rm -rf "$tmp"' EXIT
 
 "$adb_bin" wait-for-device
@@ -195,7 +196,9 @@ for _ in $(seq 1 30); do
     query="$("$adb_bin" shell content query \
         --uri content://media/external/images/media \
         --projection _id:_data 2>/dev/null | tr -d '\r')"
-    media_id="$(printf '%s\n' "$query" | grep -F "$remote_file" | sed -n 's/.*_id=\([^,]*\).*/\1/p' | head -n 1)"
+    # MediaStore normalizes /sdcard to /storage/emulated/0 in _data, so match
+    # the unique synthetic basename rather than the shell-facing path prefix.
+    media_id="$(printf '%s\n' "$query" | grep -F "/$media_name" | sed -n 's/.*_id=\([^,]*\).*/\1/p' | head -n 1)"
     [[ -n "$media_id" ]] && break
     sleep 1
 done
