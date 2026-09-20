@@ -29,35 +29,44 @@ class DeletionRepository(
 ) {
 
     suspend fun deleteSource(sourceId: UUID): DeleteResult = mutationQueue.acquire {
-        val entity = database.sourceDao().findById(sourceId.toString()) ?: return@acquire DeleteResult.NotFound
-        val source = entity.toDomain()
+        try {
+            val entity = database.sourceDao().findById(sourceId.toString())
+                ?: return@acquire DeleteResult.NotFound
+            val source = entity.toDomain()
 
-        if (source.state != SourceState.READY &&
-            source.state != SourceState.CORRUPT &&
-            source.state != SourceState.DELETING
-        ) {
-            return@acquire DeleteResult.NotFound
+            if (source.state != SourceState.READY &&
+                source.state != SourceState.CORRUPT &&
+                source.state != SourceState.DELETING
+            ) {
+                return@acquire DeleteResult.NotFound
+            }
+
+            // Committed before any file is touched, so a kill partway through
+            // leaves an unambiguous, resumable state (design §12; also handled
+            // by RecoveryRepository's DELETING branch on next startup).
+            if (source.state != SourceState.DELETING) {
+                database.sourceDao().update(source.copy(state = SourceState.DELETING).toEntity())
+            }
+
+            val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
+            val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
+            if (!stageRemoved || !blobRemoved) {
+                return@acquire DeleteResult.Failed
+            }
+
+            // Delete derived OCR rows on the same serialized mutation path as the
+            // Source. The foreign keys also cascade in SQLite, but keeping this
+            // explicit makes the C1 deletion contract independent of connection
+            // pragma defaults and leaves no dependent provenance row behind.
+            database.ocrDao().deleteForSource(sourceId.toString())
+            database.sourceDao().deleteById(sourceId.toString())
+            DeleteResult.Deleted
+        } catch (error: Exception) {
+            if (IoFailureClassifier.isStorageUnavailable(error)) {
+                DeleteResult.StorageUnavailable
+            } else {
+                DeleteResult.Failed
+            }
         }
-
-        // Committed before any file is touched, so a kill partway through
-        // leaves an unambiguous, resumable state (design §12; also handled
-        // by RecoveryRepository's DELETING branch on next startup).
-        if (source.state != SourceState.DELETING) {
-            database.sourceDao().update(source.copy(state = SourceState.DELETING).toEntity())
-        }
-
-        val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
-        val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
-        if (!stageRemoved || !blobRemoved) {
-            return@acquire DeleteResult.Failed
-        }
-
-        // Delete derived OCR rows on the same serialized mutation path as the
-        // Source. The foreign keys also cascade in SQLite, but keeping this
-        // explicit makes the C1 deletion contract independent of connection
-        // pragma defaults and leaves no dependent provenance row behind.
-        database.ocrDao().deleteForSource(sourceId.toString())
-        database.sourceDao().deleteById(sourceId.toString())
-        DeleteResult.Deleted
     }
 }

@@ -244,7 +244,11 @@ class IntakeViewModel(
                 }
             }
 
-            is PrepareResult.Rejected -> IntakeUiState.Rejected(describeImageRejection(result.reason))
+            is PrepareResult.Rejected -> if (result.reason == ImageRejectionReason.STORAGE_UNAVAILABLE) {
+                IntakeUiState.StorageUnavailable
+            } else {
+                IntakeUiState.Rejected(describeImageRejection(result.reason))
+            }
 
             PrepareResult.Busy -> IntakeUiState.Busy
 

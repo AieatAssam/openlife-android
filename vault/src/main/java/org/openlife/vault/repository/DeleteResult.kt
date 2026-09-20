@@ -8,4 +8,7 @@ sealed interface DeleteResult {
 
     /** File cleanup failed; the row is left DELETING, durable for retry (design §12). */
     data object Failed : DeleteResult
+
+    /** A database or artefact operation reported that storage is unavailable. */
+    data object StorageUnavailable : DeleteResult
 }

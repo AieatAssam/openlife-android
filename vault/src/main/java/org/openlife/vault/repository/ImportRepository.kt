@@ -23,6 +23,9 @@ import javax.crypto.spec.SecretKeySpec
 
 private const val DEK_LENGTH_BYTES = 32
 private const val SCHEMA_ARTEFACT_VERSION = 1
+private const val RESERVED_STORAGE_BYTES = 8L * 1024 * 1024
+private const val MINIMUM_AVAILABLE_STORAGE_BYTES =
+    2L * ImportLimits.MAX_ORIGINAL_BYTES + RESERVED_STORAGE_BYTES
 
 fun interface PlaintextBufferObserver {
     fun onReleased(bytes: ByteArray)
@@ -71,6 +74,10 @@ class ImportRepository(
         intakeKind: IntakeKind,
         deadline: () -> Boolean,
     ): PrepareResult {
+        if (!hasEnoughStorage()) {
+            return PrepareResult.Rejected(ImageRejectionReason.STORAGE_UNAVAILABLE)
+        }
+
         val sourceId = UUID.randomUUID()
         val dek = ByteArray(DEK_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
 
@@ -93,7 +100,7 @@ class ImportRepository(
             // The STAGED row, with its wrapped key, is committed before any
             // file is written - this is what lets recovery find interrupted
             // work (design §11 step 2).
-            database.sourceDao().insert(stagedSource.toEntity())
+            sourceDao.insert(stagedSource.toEntity())
 
             val read = try {
                 BoundedStreamReader.read(inputStream, deadline)
@@ -122,9 +129,13 @@ class ImportRepository(
                         EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId),
                     )
                     fileOps.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
-                } catch (_: IOException) {
+                } catch (error: Exception) {
                     cancelStage(sourceId)
-                    return PrepareResult.Failed
+                    return if (IoFailureClassifier.isStorageUnavailable(error)) {
+                        PrepareResult.StorageUnavailable
+                    } else {
+                        PrepareResult.Failed
+                    }
                 }
 
                 val updated = stagedSource.copy(
@@ -140,7 +151,7 @@ class ImportRepository(
                     },
                     artefactVersion = SCHEMA_ARTEFACT_VERSION,
                 )
-                database.sourceDao().update(updated.toEntity())
+                sourceDao.update(updated.toEntity())
 
                 return PrepareResult.Prepared(
                     sourceId,
@@ -159,6 +170,12 @@ class ImportRepository(
         }
     }
 
+    private fun hasEnoughStorage(): Boolean = try {
+        storageSpace.availableBytes(paths.artefactsDir) >= MINIMUM_AVAILABLE_STORAGE_BYTES
+    } catch (_: Exception) {
+        false
+    }
+
     /**
      * Removes a STAGED row and both possible artefact files. Never touches a
      * READY row. If either file cannot be removed, retain the row so startup
@@ -169,7 +186,7 @@ class ImportRepository(
         val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
         val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
         if (!stageRemoved || !blobRemoved) return false
-        database.sourceDao().deleteById(sourceId.toString())
+        sourceDao.deleteById(sourceId.toString())
         return true
     }
 
@@ -181,7 +198,7 @@ class ImportRepository(
      * touch.
      */
     suspend fun cancelStagedImport(sourceId: UUID): Boolean = mutationQueue.acquire {
-        val entity = database.sourceDao().findById(sourceId.toString())
+        val entity = sourceDao.findById(sourceId.toString())
         if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
         cancelStage(sourceId)
     }
@@ -194,7 +211,7 @@ class ImportRepository(
      * resolve; it is never reported as saved.
      */
     suspend fun saveImport(sourceId: UUID): SaveResult = mutationQueue.acquire {
-        val entity = database.sourceDao().findById(sourceId.toString())
+        val entity = sourceDao.findById(sourceId.toString())
         if (entity == null || entity.state != SourceState.STAGED.name) {
             return@acquire SaveResult.StageNotFound
         }
@@ -205,7 +222,7 @@ class ImportRepository(
 
         if (!authenticator.authenticates(source, stageFile)) return@acquire SaveResult.Failed
 
-        val duplicate = database.sourceDao().findReadyDuplicate(source.byteCount!!, source.sha256!!)
+        val duplicate = sourceDao.findReadyDuplicate(source.byteCount!!, source.sha256!!)
         if (duplicate != null) {
             cancelStage(sourceId)
             return@acquire SaveResult.DuplicateFound(UUID.fromString(duplicate.id))
@@ -215,18 +232,26 @@ class ImportRepository(
             val blobFile = paths.blobFile(sourceId)
             if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
             fileOps.syncDirectory(paths.artefactsDir)
-        } catch (_: IOException) {
-            return@acquire SaveResult.Failed
+        } catch (error: Exception) {
+            return@acquire if (IoFailureClassifier.isStorageUnavailable(error)) {
+                SaveResult.StorageUnavailable
+            } else {
+                SaveResult.Failed
+            }
         }
 
         try {
-            database.sourceDao().update(source.copy(state = SourceState.READY).toEntity())
-        } catch (_: Exception) {
+            sourceDao.update(source.copy(state = SourceState.READY).toEntity())
+        } catch (error: Exception) {
             // The rename already happened, but the row remains STAGED when
             // the final commit is rejected (for example by the READY
             // invariant trigger). Recovery owns both possible artefact paths
             // and will remove them on the next pass; never surface success.
-            return@acquire SaveResult.Failed
+            return@acquire if (IoFailureClassifier.isStorageUnavailable(error)) {
+                SaveResult.StorageUnavailable
+            } else {
+                SaveResult.Failed
+            }
         }
         SaveResult.Saved(sourceId)
     }
