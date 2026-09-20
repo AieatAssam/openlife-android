@@ -275,5 +275,17 @@ else
   fail=$((fail + 1))
 fi
 
+set +e
+bash "$ROOT/scripts/tests/p0-06-release.sh" >"$TMP/p0-06-release.out" 2>&1
+release_smoke_contract_status=$?
+set -e
+if [[ "$release_smoke_contract_status" -eq 0 ]]; then
+  printf 'ok - P0-06 release smoke contract passes\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - P0-06 release smoke contract passes\n%s\n' "$(<"$TMP/p0-06-release.out")" >&2
+  fail=$((fail + 1))
+fi
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
