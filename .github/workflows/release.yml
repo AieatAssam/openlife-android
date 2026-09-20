@@ -117,11 +117,13 @@ jobs:
           mkdir -p release-artifacts
           cp app/build/reports/bom/bom.json release-artifacts/SBOM.json
           cp docs/generated/THIRD_PARTY_LICENSES.md release-artifacts/THIRD_PARTY_LICENSES.md
+          cp app/build/outputs/mapping/release/mapping.txt release-artifacts/mapping.txt
           sha256sum \
             app/build/outputs/apk/release/app-release.apk \
             app/build/outputs/bundle/release/app-release.aab \
             release-artifacts/SBOM.json \
             release-artifacts/THIRD_PARTY_LICENSES.md \
+            release-artifacts/mapping.txt \
             release-artifacts/CERTIFICATE-FINGERPRINT-SHA256.txt \
             > release-artifacts/SHA-256SUMS
 

@@ -98,6 +98,14 @@ android {
         targetSdk = 37
         versionCode = openLifeVersionCode
         versionName = openLifeVersionName
+        ndk {
+            // The pinned ML Kit native artifact has 4 KB LOAD alignment in
+            // its 32-bit armeabi-v7a/x86 binaries. Keep only architectures
+            // whose packaged native libraries pass the Android 15 16 KB
+            // alignment gate; P2-03 revisits 32-bit support with the OCR
+            // engine replacement.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["profileInstallerReceiverClass"] =
@@ -106,7 +114,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -137,6 +146,9 @@ android {
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }

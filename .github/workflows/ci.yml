@@ -62,7 +62,7 @@ jobs:
     name: Instrumented tests (API ${{ matrix.api-level }})
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
@@ -161,7 +161,15 @@ jobs:
           emulator-boot-timeout: 300
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash scripts/ci/run-connected-android-tests.sh
+          script: |
+            bash scripts/ci/run-connected-android-tests.sh
+            ./gradlew assembleRelease
+            release_apk=app/build/outputs/apk/release/app-release.apk
+            if [[ ! -f "$release_apk" ]]; then
+              release_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+            fi
+            bash scripts/check-16kb-alignment.sh "$release_apk"
+            bash scripts/release-smoke.sh "$release_apk"
 
       - name: Capture filtered OpenLife logcat
         if: always()
@@ -198,7 +206,11 @@ jobs:
 
       - name: Inspect release APK boundary and size
         run: |
-          scripts/inspect-release-apk.sh app/build/outputs/apk/release/app-release.apk | tee release-inspection.txt
+          release_apk=app/build/outputs/apk/release/app-release.apk
+          if [[ ! -f "$release_apk" ]]; then
+            release_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
+          scripts/inspect-release-apk.sh "$release_apk" | tee release-inspection.txt
           apk_size_bytes="$(awk -F= '$1 == "APK_SIZE_BYTES" { print $2; exit }' release-inspection.txt)"
           {
             echo "## Release APK"
@@ -206,6 +218,14 @@ jobs:
             echo "- Boundary inspection: pass"
             echo "- APK size: ${apk_size_bytes} bytes"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check release native alignment
+        run: |
+          release_apk=app/build/outputs/apk/release/app-release.apk
+          if [[ ! -f "$release_apk" ]]; then
+            release_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
+          bash scripts/check-16kb-alignment.sh "$release_apk"
 
       - name: Upload release inspection report
         if: always()

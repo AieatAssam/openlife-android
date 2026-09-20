@@ -110,3 +110,10 @@ SBOM, runtime licence report, `SHA-256SUMS`, and certificate fingerprint only
 for a signed release. Version codes use
 `major * 10000 + minor * 100 + patch`. v1 through v4 APK signing are enabled;
 R8 full mode and Play App Signing remain P0-06/owner decisions.
+
+P0-06 release APKs package only arm64-v8a and x86_64. The pinned ML Kit
+native artifact has 4 KB LOAD alignment in its 32-bit armeabi-v7a and x86
+libraries, so including those binaries would fail the Android 15 16 KB
+alignment gate. The 64-bit ML Kit and SQLCipher libraries pass. 32-bit
+support is deferred to P2-03, when the OCR engine is replaced and its native
+artifacts can be checked before being reintroduced.
