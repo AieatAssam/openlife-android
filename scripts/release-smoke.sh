@@ -15,8 +15,8 @@ if [[ -z "$adb_bin" ]]; then
     adb_bin="adb"
 fi
 package="org.openlife"
-main_activity="$package/.MainActivity"
-intake_activity="$package/.intake.IntakeActivity"
+main_activity="$package/org.openlife.app.MainActivity"
+intake_activity="$package/org.openlife.app.intake.IntakeActivity"
 tmp="$(mktemp -d)"
 ui_dump="$tmp/window.xml"
 remote_file="/sdcard/Pictures/openlife-release-smoke-$BASHPID.png"
