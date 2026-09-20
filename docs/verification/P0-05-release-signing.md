@@ -1,6 +1,6 @@
 # P0-05 — Release signing, versioning, and store metadata
 
-Status: review (2026-09-19)
+Status: review (2026-09-20)
 
 ## TDD evidence
 
@@ -45,13 +45,19 @@ Status: review (2026-09-19)
   on commit `97a0bf1` — workflow-lint passed; the release build completed
   successfully in 4m21s, then correctly took the `unsigned (no secrets)` path.
   No release evidence artifact or GitHub Release was created.
+- Hosted signed dry run [35478365545](https://github.com/AieatAssam/openlife-android/actions/runs/35478365545)
+  on commit `9ea5e6b` — workflow lint and the keystore-backed release build
+  passed. The signing verification, signed-evidence packaging, and upload
+  steps passed; the unsigned path and GitHub Release were skipped because
+  `dry_run=true`. The downloaded `openlife-release-evidence` artifact contained
+  the signed APK/AAB, SBOM, licence report, checksum manifest, and certificate
+  fingerprint file. Local checks passed for APK signature verification,
+  fingerprint-file presence, and every recorded checksum.
 
 ## Review gaps and owner action
 
-The workflow was dispatched from the pushed plan branch, but GitHub resolved
-the signing inputs as absent and selected its unsigned safety path. The owner
-must configure the four repository or environment secrets for this workflow,
-rerun it, verify the signed APK/AAB and attached SBOM/licence/checksum assets,
-and complete OA-1 by publishing that certificate fingerprint in `README.md`.
-Until then the signed-CI acceptance criterion remains unverified; the step is
-handed off as `review`, not claimed `done`.
+The four repository secrets are configured and the signed-CI acceptance
+criterion is verified by hosted run `35478365545`. Before the first public tag,
+the owner must complete OA-1 by publishing the production certificate
+fingerprint in `README.md` and comparing it with the workflow evidence. The
+step remains handed off as `review`, not claimed `done`.
