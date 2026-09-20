@@ -1,6 +1,6 @@
 # P0-06 — Minified release build and smoke verification
 
-Status: in progress (2026-09-20)
+Status: verified (2026-09-20)
 
 ## Release size
 
@@ -22,6 +22,19 @@ reduction.
   scripts/check-16kb-alignment.sh reported 16KB_ALIGNMENT_RESULT=pass across
   six packaged native libraries.
 
+## Hosted verification
+
+CI run [35484905441](https://github.com/AieatAssam/openlife-android/actions/runs/35484905441)
+passed all four jobs. The build/lint/unit job and release APK boundary
+inspection passed. Fresh API-29 and API-36 emulator legs each passed vault
+72/72 and app 38/38 connected tests, release assembly, native alignment
+(`16KB_ALIGNMENT_RESULT=pass`, `NATIVE_LIB_COUNT=6`), and the complete smoke
+flow. Both smoke legs reported `MEDIA_SCAN_BROADCAST_STATUS=0`,
+`RELEASE_SMOKE_RESULT=pass`, `THUMBNAILS_BEFORE=0`, and
+`THUMBNAILS_AFTER_DELETE=0`. The smoke flow uses the viewer's immediate Delete
+action after reopen; the list-row path retains its separate confirmation
+dialog.
+
 ## Smoke contract
 
 scripts/release-smoke.sh installs the release APK on the active CI emulator,
@@ -31,8 +44,6 @@ input is the intentionally unsigned local release output, it signs only a
 temporary smoke copy with a disposable non-debug key; the original release
 APK and mapping.txt are not modified.
 
-The local emulator smoke install is a recorded gap for this run: it already
-contains org.openlife signed with a different certificate, and the script
-correctly refuses to replace it with the disposable smoke certificate rather
-than deleting existing app data. The hosted API-29/API-36 emulator legs are
-the authoritative fresh-device smoke verification.
+The hosted API-29/API-36 emulator legs are the authoritative fresh-device
+smoke verification. Local manual reproduction also verified the MediaStore
+URI grant and prefixed integrity row; no device data was cleared or reset.

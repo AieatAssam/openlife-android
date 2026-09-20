@@ -95,6 +95,16 @@ infrastructure-shaped failures; assertion-shaped failures stop immediately.
 An authenticated workflow URL is not recorded until the owner runs the
 workflow from a pushed ref.
 
+## Minified release smoke (P0-06)
+
+The minified release APK is validated with R8/resource shrinking, a retained
+mapping file, and the 16 KB native alignment gate. Hosted run
+[35484905441](https://github.com/AieatAssam/openlife-android/actions/runs/35484905441)
+passed build/lint/unit, release boundary inspection, and fresh API-29/API-36
+release smoke legs. The smoke legs passed the MediaStore share boundary,
+preview, save, reopen, verified viewer, and immediate viewer deletion flow;
+the synthetic test PNG was deleted from the device after each run.
+
 ## Release signing and provenance (P0-05)
 
 Release signing is an explicit CI boundary. `app/build.gradle.kts` reads the
