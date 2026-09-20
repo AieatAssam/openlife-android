@@ -163,13 +163,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             bash scripts/ci/run-connected-android-tests.sh
-            ./gradlew assembleRelease
-            release_apk=app/build/outputs/apk/release/app-release.apk
-            if [[ ! -f "$release_apk" ]]; then
-              release_apk=app/build/outputs/apk/release/app-release-unsigned.apk
-            fi
-            bash scripts/check-16kb-alignment.sh "$release_apk"
-            bash scripts/release-smoke.sh "$release_apk"
+            bash scripts/ci/run-release-validation.sh
 
       - name: Capture filtered OpenLife logcat
         if: always()

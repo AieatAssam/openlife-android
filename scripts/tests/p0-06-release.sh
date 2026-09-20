@@ -56,8 +56,8 @@ require "Room generated implementations are retained" "$PROGUARD" '^-keep class 
 require "coroutines debug-agent warnings are excluded" "$PROGUARD" 'kotlinx\.coroutines\.debug'
 require "source and line attributes are retained" "$PROGUARD" '^-keepattributes SourceFile,LineNumberTable$'
 require "source names remain mappable" "$PROGUARD" '^-renamesourcefileattribute SourceFile$'
-require "CI runs the release smoke" "$CI_WORKFLOW" 'scripts/release-smoke\.sh'
-require "CI checks native alignment" "$CI_WORKFLOW" 'scripts/check-16kb-alignment\.sh'
+require "release validation runs the release smoke" "$RELEASE_VALIDATION" 'scripts/release-smoke\.sh'
+require "release validation checks native alignment" "$RELEASE_VALIDATION" 'scripts/check-16kb-alignment\.sh'
 require_file "release validation script exists" "$RELEASE_VALIDATION"
 require_executable "release validation script is executable" "$RELEASE_VALIDATION"
 require "CI invokes release validation as one script" "$CI_WORKFLOW" 'scripts/ci/run-release-validation\.sh'
