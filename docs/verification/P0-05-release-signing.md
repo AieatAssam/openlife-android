@@ -1,6 +1,6 @@
 # P0-05 — Release signing, versioning, and store metadata
 
-Status: review (2026-09-20)
+Status: done (2026-09-20)
 
 ## TDD evidence
 
@@ -53,11 +53,12 @@ Status: review (2026-09-20)
   the signed APK/AAB, SBOM, licence report, checksum manifest, and certificate
   fingerprint file. Local checks passed for APK signature verification,
   fingerprint-file presence, and every recorded checksum.
+- The owner-published fingerprint in `README.md` matches both the local upload
+  keystore and the fingerprint recorded by the signed CI artifact.
 
 ## Review gaps and owner action
 
 The four repository secrets are configured and the signed-CI acceptance
-criterion is verified by hosted run `35478365545`. Before the first public tag,
-the owner must complete OA-1 by publishing the production certificate
-fingerprint in `README.md` and comparing it with the workflow evidence. The
-step remains handed off as `review`, not claimed `done`.
+criterion is verified by hosted run `35478365545`. OA-1 is complete: the
+production certificate fingerprint is published in `README.md` and matches the
+keystore and workflow evidence. P0-05 is handed off as `done`.

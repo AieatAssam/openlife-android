@@ -78,8 +78,8 @@ asset is published; it is never debug-signed. The workflow attaches the APK,
 AAB, SBOM, licence report, `SHA-256SUMS`, and the signing-certificate
 fingerprint to a signed GitHub Release.
 
-Certificate SHA-256 fingerprint: **to be published after owner action OA-1**.
-After that action, verify a downloaded APK with:
+Certificate SHA-256 fingerprint: **F9:B0:E9:81:6D:AD:78:35:7B:94:D6:DD:BA:3E:AB:C7:44:E2:39:03:FB:78:AD:D8:AF:09:40:EB:92:47:DF:5A**.
+Verify a downloaded APK with:
 
 ```bash
 apksigner verify --verbose --print-certs app-release.apk
