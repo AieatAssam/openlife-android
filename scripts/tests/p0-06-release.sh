@@ -64,6 +64,7 @@ require "CI invokes release validation as one script" "$CI_WORKFLOW" 'scripts/ci
 require "smoke launches the namespaced main activity" "$ROOT/scripts/release-smoke.sh" 'org\.openlife\.app\.MainActivity'
 require "smoke launches the namespaced intake activity" "$ROOT/scripts/release-smoke.sh" 'org\.openlife\.app\.intake\.IntakeActivity'
 require "smoke records media scan broadcast status" "$ROOT/scripts/release-smoke.sh" 'MEDIA_SCAN_BROADCAST_STATUS'
+require "smoke matches MediaStore paths by basename" "$ROOT/scripts/release-smoke.sh" 'media_name=.*basename'
 require "release evidence retains mapping" "$RELEASE_WORKFLOW" 'app/build/outputs/mapping/release/mapping\.txt'
 require_file "release smoke script exists" "$ROOT/scripts/release-smoke.sh"
 require_executable "release smoke script is executable" "$ROOT/scripts/release-smoke.sh"
