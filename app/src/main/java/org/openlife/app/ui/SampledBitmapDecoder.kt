@@ -19,9 +19,14 @@ object SampledBitmapDecoder {
     fun decode(bytes: ByteArray, orientation: Orientation): Bitmap? =
         decode(bytes, orientation, ImportLimits.MAX_PREVIEW_PIXELS)
 
-    fun decode(bytes: ByteArray, orientation: Orientation, maxPixels: Long): Bitmap? {
+    fun decode(
+        bytes: ByteArray,
+        orientation: Orientation,
+        maxPixels: Long,
+        preferredConfig: Bitmap.Config = Bitmap.Config.ARGB_8888,
+    ): Bitmap? {
         require(maxPixels > 0) { "Maximum decode pixels must be positive" }
-        val sampled = decodeSampled(bytes, maxPixels) ?: return null
+        val sampled = decodeSampled(bytes, maxPixels, preferredConfig) ?: return null
         val matrix = OrientationTransform.matrixFor(orientation) ?: return sampled
         val transformed = Bitmap.createBitmap(
             sampled,
@@ -36,7 +41,7 @@ object SampledBitmapDecoder {
         return transformed
     }
 
-    private fun decodeSampled(bytes: ByteArray, maxPixels: Long): Bitmap? {
+    private fun decodeSampled(bytes: ByteArray, maxPixels: Long, preferredConfig: Bitmap.Config): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
@@ -49,7 +54,10 @@ object SampledBitmapDecoder {
                 bytes,
                 0,
                 bytes.size,
-                BitmapFactory.Options().apply { inSampleSize = sampleSize },
+                BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inPreferredConfig = preferredConfig
+                },
             )
             if (bitmap == null) {
                 exhausted = true

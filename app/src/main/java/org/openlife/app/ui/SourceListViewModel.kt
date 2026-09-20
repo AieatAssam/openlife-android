@@ -37,9 +37,13 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     private val _state = MutableStateFlow<SourceListUiState>(SourceListUiState.Loading)
     val state: StateFlow<SourceListUiState> = _state
 
-    private val thumbnailCache = SensitiveContentCache<UUID, android.graphics.Bitmap?> { bitmap ->
-        if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
-    }
+    private val thumbnailCache = SensitiveContentCache<UUID, android.graphics.Bitmap?>(
+        onEvict = { bitmap ->
+            if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+        },
+        sizeOf = { bitmap -> bitmap?.allocationByteCount?.toLong() ?: 0L },
+    )
+    private val unregisterTrimCallback = application.registerSensitiveContentClearer(::clearSensitiveContent)
     private val _sensitiveContentGeneration = MutableStateFlow(thumbnailCache.generation())
     val sensitiveContentGeneration: StateFlow<Long> = _sensitiveContentGeneration.asStateFlow()
 
@@ -78,6 +82,7 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
                                 bytes,
                                 source.orientation ?: Orientation.NORMAL,
                                 THUMBNAIL_TARGET_PIXELS,
+                                android.graphics.Bitmap.Config.RGB_565,
                             )
                         }
                     }
@@ -103,6 +108,7 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     }
 
     override fun onCleared() {
+        unregisterTrimCallback()
         clearSensitiveContent()
     }
 

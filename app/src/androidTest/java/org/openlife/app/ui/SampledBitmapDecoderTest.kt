@@ -27,4 +27,24 @@ class SampledBitmapDecoderTest {
             decoded.recycle()
         }
     }
+
+    @Test
+    fun thumbnailDecodeUsesRgb565WhenRequested() {
+        val bitmap = Bitmap.createBitmap(80, 40, Bitmap.Config.ARGB_8888)
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, output)
+        bitmap.recycle()
+
+        val decoded = SampledBitmapDecoder.decode(
+            output.toByteArray(),
+            Orientation.NORMAL,
+            maxPixels = 80L * 40L,
+            preferredConfig = Bitmap.Config.RGB_565,
+        ) ?: error("synthetic bitmap did not decode")
+        try {
+            assertEquals(Bitmap.Config.RGB_565, decoded.config)
+        } finally {
+            decoded.recycle()
+        }
+    }
 }

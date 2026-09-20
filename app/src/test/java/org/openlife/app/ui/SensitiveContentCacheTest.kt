@@ -1,10 +1,12 @@
 package org.openlife.app.ui
 
+import android.content.ComponentCallbacks2
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.openlife.app.SensitiveContentTrimPolicy
 
 class SensitiveContentCacheTest {
 
@@ -102,5 +104,12 @@ class SensitiveContentCacheTest {
 
         assertTrue(cache.contains("missing"))
         assertTrue(cache.contains("present"))
+    }
+
+    @Test
+    fun trimPolicyClearsAtRunningLowAndUiHidden() {
+        assertTrue(SensitiveContentTrimPolicy.shouldClear(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW))
+        assertTrue(SensitiveContentTrimPolicy.shouldClear(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN))
+        assertFalse(SensitiveContentTrimPolicy.shouldClear(ComponentCallbacks2.TRIM_MEMORY_MODERATE))
     }
 }

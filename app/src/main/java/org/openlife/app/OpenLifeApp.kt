@@ -1,6 +1,7 @@
 package org.openlife.app
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -39,6 +40,25 @@ class OpenLifeApp : Application() {
     private val vaultInitLock = Mutex()
     private var cachedAccess: VaultAccess? = null
     private var cachedDatabase: OpenLifeDatabase? = null
+    private val sensitiveContentClearers = mutableSetOf<() -> Unit>()
+
+    @Synchronized
+    fun registerSensitiveContentClearer(clearer: () -> Unit): () -> Unit {
+        sensitiveContentClearers += clearer
+        return { unregisterSensitiveContentClearer(clearer) }
+    }
+
+    @Synchronized
+    private fun unregisterSensitiveContentClearer(clearer: () -> Unit) {
+        sensitiveContentClearers -= clearer
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (!SensitiveContentTrimPolicy.shouldClear(level)) return
+        val clearers = synchronized(this) { sensitiveContentClearers.toList() }
+        clearers.forEach { it() }
+    }
 
     suspend fun vault(): VaultAccess = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {
@@ -81,5 +101,13 @@ class OpenLifeApp : Application() {
             cachedAccess = access
             access
         }
+    }
+}
+
+internal object SensitiveContentTrimPolicy {
+    @Suppress("FunctionExpressionBody")
+    fun shouldClear(level: Int): Boolean {
+        return level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
     }
 }

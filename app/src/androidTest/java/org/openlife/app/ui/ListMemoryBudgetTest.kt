@@ -1,11 +1,14 @@
 package org.openlife.app.ui
 
+import android.content.ComponentCallbacks2
 import android.graphics.Bitmap
 import android.os.Debug
+import android.util.Log
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
 import org.junit.Assert.assertFalse
@@ -13,6 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.OpenLifeApp
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.Source
@@ -23,6 +27,26 @@ class ListMemoryBudgetTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val application = ApplicationProvider.getApplicationContext<OpenLifeApp>()
+
+    @Test
+    fun runningLowTrimClearsRegisteredSensitiveContent() {
+        var clearCount = 0
+        val unregister = application.registerSensitiveContentClearer { clearCount++ }
+        try {
+            application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_MODERATE)
+            assertTrue(clearCount == 0)
+
+            application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+            assertTrue(clearCount == 1)
+
+            application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
+            assertTrue(clearCount == 2)
+        } finally {
+            unregister()
+        }
+    }
 
     @Test
     fun twoHundredSourcesScrollWithinBudget() {
@@ -42,9 +66,12 @@ class ListMemoryBudgetTest {
                 artefactVersion = null,
             )
         }
-        val cache = SensitiveContentCache<UUID, Bitmap?> { bitmap ->
-            if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
-        }
+        val cache = SensitiveContentCache<UUID, Bitmap?>(
+            onEvict = { bitmap ->
+                if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+            },
+            sizeOf = { bitmap -> bitmap?.allocationByteCount?.toLong() ?: 0L },
+        )
         val generation = cache.generation()
         val pssBefore = Debug.getPss()
 
@@ -73,6 +100,10 @@ class ListMemoryBudgetTest {
                 composeRule.waitForIdle()
             }
             val pssAfter = Debug.getPss()
+            Log.i(
+                "OpenLifeMemoryTest",
+                "PSS_KiB before=$pssBefore after=$pssAfter delta=${pssAfter - pssBefore}",
+            )
 
             assertTrue(
                 "PSS delta exceeded 60 MiB: before=$pssBefore KiB after=$pssAfter KiB",
