@@ -1,6 +1,7 @@
 package org.openlife.vault.repository
 
 import org.openlife.vault.model.ImageFormat
+import org.openlife.vault.model.Orientation
 import java.util.UUID
 
 sealed interface PrepareResult {
@@ -10,6 +11,7 @@ sealed interface PrepareResult {
         val width: Int,
         val height: Int,
         val byteCount: Long,
+        val orientation: Orientation = Orientation.NORMAL,
     ) : PrepareResult
 
     /** Another import is already in progress; the user must finish or cancel it first. */

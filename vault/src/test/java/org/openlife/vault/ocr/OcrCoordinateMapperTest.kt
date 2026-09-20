@@ -25,7 +25,7 @@ class OcrCoordinateMapperTest {
     @Test
     fun `quarter turn maps display rectangle back to source pixels`() {
         assertEquals(
-            OcrEvidenceRegion(left = 20, top = 70, right = 40, bottom = 90),
+            OcrEvidenceRegion(left = 20, top = 30, right = 40, bottom = 50),
             OcrCoordinateMapper.toSourcePixels(
                 displayRegion,
                 sourceWidth,

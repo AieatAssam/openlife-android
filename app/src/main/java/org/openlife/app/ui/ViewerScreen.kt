@@ -54,6 +54,7 @@ import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
+import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrFailureReason
@@ -233,7 +234,9 @@ private fun ViewerCorrectionDialog(
 private fun ViewerImage(source: Source, bytes: ByteArray?, selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?) {
     val brand = LocalOpenLifeBrandColors.current
     Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-        val decoded = remember(bytes) { bytes?.let(SampledBitmapDecoder::decode) }
+        val decoded = remember(bytes, source.orientation) {
+            bytes?.let { SampledBitmapDecoder.decode(it, source.orientation ?: Orientation.NORMAL) }
+        }
         DisposableEffect(decoded) {
             onDispose {
                 if (decoded != null && !decoded.isRecycled) decoded.recycle()
@@ -378,6 +381,7 @@ private fun DetailsSection(source: Source, verified: Boolean) {
                 },
             )
             if (verified) StampBadge(StampState.Verified, modifier = Modifier.padding(top = 8.dp))
+            DisplayOrientationNotice(source.orientation)
             Text(
                 stringResource(R.string.viewer_integrity_notice),
                 style = MaterialTheme.typography.bodySmall,
@@ -389,6 +393,29 @@ private fun DetailsSection(source: Source, verified: Boolean) {
 }
 
 @Composable
+private fun DisplayOrientationNotice(orientation: Orientation?) {
+    when (orientation) {
+        Orientation.ROTATE_90 -> Text(stringResource(R.string.viewer_display_rotation, DISPLAY_ROTATION_90))
+        Orientation.ROTATE_180 -> Text(stringResource(R.string.viewer_display_rotation, DISPLAY_ROTATION_180))
+        Orientation.ROTATE_270 -> Text(stringResource(R.string.viewer_display_rotation, DISPLAY_ROTATION_270))
+        Orientation.FLIP_HORIZONTAL -> Text(stringResource(R.string.viewer_display_flip_horizontal))
+        Orientation.FLIP_VERTICAL -> Text(stringResource(R.string.viewer_display_flip_vertical))
+        Orientation.TRANSPOSE -> Text(stringResource(R.string.viewer_display_transpose))
+        Orientation.TRANSVERSE -> Text(stringResource(R.string.viewer_display_transverse))
+        null, Orientation.NORMAL -> return
+    }
+    Text(
+        stringResource(R.string.viewer_saved_bytes_unchanged),
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+@Composable
 private fun DetailRow(label: String, value: String) {
     Text(stringResource(R.string.viewer_detail_row, label, value), modifier = Modifier.padding(top = 4.dp))
 }
+
+private const val DISPLAY_ROTATION_90 = 90
+private const val DISPLAY_ROTATION_180 = 180
+private const val DISPLAY_ROTATION_270 = 270

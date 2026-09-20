@@ -2,7 +2,6 @@ package org.openlife.vault.ocr
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.graphics.Rect
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
@@ -11,6 +10,7 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import org.openlife.vault.model.Orientation
+import org.openlife.vault.model.OrientationTransform
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -21,14 +21,6 @@ import kotlin.coroutines.resumeWithException
  * cancelled task cannot retain a decoded bitmap.
  */
 class MlKitOcrEngine : OcrEngine {
-    private companion object {
-        const val ROTATE_90_DEGREES = 90f
-        const val ROTATE_180_DEGREES = 180f
-        const val ROTATE_270_DEGREES = 270f
-        const val UNIT_SCALE = 1f
-        const val FLIPPED_SCALE = -1f
-    }
-
     override val id: String = "mlkit-latin"
     override val modelVersion: String = "16.0.1"
 
@@ -40,8 +32,8 @@ class MlKitOcrEngine : OcrEngine {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
             val text = awaitTask(recognizer.process(InputImage.fromBitmap(display, 0)))
-            val displaySourceWidth = if (swapsAxes(input.orientation)) input.height else input.width
-            val displaySourceHeight = if (swapsAxes(input.orientation)) input.width else input.height
+            val displaySourceWidth = OrientationTransform.displayWidth(input.width, input.height, input.orientation)
+            val displaySourceHeight = OrientationTransform.displayHeight(input.width, input.height, input.orientation)
             val scaleX = displaySourceWidth.toDouble() / display.width.toDouble()
             val scaleY = displaySourceHeight.toDouble() / display.height.toDouble()
             val spans = text.textBlocks.flatMap { block ->
@@ -103,31 +95,7 @@ class MlKitOcrEngine : OcrEngine {
     }
 
     private fun orient(bitmap: Bitmap, orientation: Orientation): Bitmap {
-        if (orientation == Orientation.NORMAL) return bitmap
-        val matrix = Matrix()
-        when (orientation) {
-            Orientation.ROTATE_90 -> matrix.setRotate(ROTATE_90_DEGREES)
-
-            Orientation.ROTATE_180 -> matrix.setRotate(ROTATE_180_DEGREES)
-
-            Orientation.ROTATE_270 -> matrix.setRotate(ROTATE_270_DEGREES)
-
-            Orientation.FLIP_HORIZONTAL -> matrix.setScale(FLIPPED_SCALE, UNIT_SCALE)
-
-            Orientation.FLIP_VERTICAL -> matrix.setScale(UNIT_SCALE, FLIPPED_SCALE)
-
-            Orientation.TRANSPOSE -> {
-                matrix.setRotate(ROTATE_90_DEGREES)
-                matrix.postScale(FLIPPED_SCALE, UNIT_SCALE)
-            }
-
-            Orientation.TRANSVERSE -> {
-                matrix.setRotate(ROTATE_270_DEGREES)
-                matrix.postScale(FLIPPED_SCALE, UNIT_SCALE)
-            }
-
-            Orientation.NORMAL -> Unit
-        }
+        val matrix = OrientationTransform.matrixFor(orientation) ?: return bitmap
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
@@ -143,16 +111,6 @@ class MlKitOcrEngine : OcrEngine {
         val right = kotlin.math.ceil(rect.right * scaleX).toInt().coerceIn(left, displayWidth)
         val bottom = kotlin.math.ceil(rect.bottom * scaleY).toInt().coerceIn(top, displayHeight)
         return OcrEvidenceRegion(left, top, right, bottom)
-    }
-
-    private fun swapsAxes(orientation: Orientation): Boolean = when (orientation) {
-        Orientation.ROTATE_90,
-        Orientation.ROTATE_270,
-        Orientation.TRANSPOSE,
-        Orientation.TRANSVERSE,
-        -> true
-
-        else -> false
     }
 
     private suspend fun <T> awaitTask(task: Task<T>): T = suspendCancellableCoroutine { continuation ->

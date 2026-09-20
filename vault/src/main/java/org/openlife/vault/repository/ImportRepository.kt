@@ -5,6 +5,7 @@ import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
@@ -129,10 +130,11 @@ class ImportRepository(
                     sha256 = read.sha256,
                     width = valid.width,
                     height = valid.height,
-                    // EXIF-derived orientation is out of scope for C0's header
-                    // validator; every accepted Source is recorded as already
-                    // display-correct until a later capability reads EXIF.
-                    orientation = Orientation.NORMAL,
+                    orientation = if (valid.format == ImageFormat.JPEG) {
+                        ExifOrientationParser.parse(read.bytes)
+                    } else {
+                        Orientation.NORMAL
+                    },
                     artefactVersion = SCHEMA_ARTEFACT_VERSION,
                 )
                 database.sourceDao().update(updated.toEntity())
@@ -143,6 +145,7 @@ class ImportRepository(
                     valid.width,
                     valid.height,
                     read.bytes.size.toLong(),
+                    updated.orientation ?: Orientation.NORMAL,
                 )
             } finally {
                 read.bytes.fill(0)

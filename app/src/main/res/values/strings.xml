@@ -89,6 +89,12 @@
     <string name="viewer_integrity_verified">Verified against the saved copy</string>
     <string name="viewer_integrity_unverified">Not yet verified</string>
     <string name="viewer_integrity_notice">Verification confirms this is the exact copy OpenLife saved. It does not confirm who sent it or that its contents are true.</string>
+    <string name="viewer_display_rotation">Display rotation: %1$d degrees</string>
+    <string name="viewer_display_flip_horizontal">Display transform: horizontal flip</string>
+    <string name="viewer_display_flip_vertical">Display transform: vertical flip</string>
+    <string name="viewer_display_transpose">Display transform: transpose</string>
+    <string name="viewer_display_transverse">Display transform: transverse</string>
+    <string name="viewer_saved_bytes_unchanged">Saved bytes are unchanged.</string>
     <string name="viewer_detail_row">%1$s: %2$s</string>
     <string name="source_imported">Imported %1$s</string>
 

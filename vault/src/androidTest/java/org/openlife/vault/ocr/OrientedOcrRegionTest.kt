@@ -11,7 +11,7 @@ class OrientedOcrRegionTest {
     @Test
     fun regionsMapBackToSourcePixelsForRotatedInput() {
         val sourceRegion = OcrEvidenceRegion(10, 20, 30, 40)
-        val displayedRegion = OcrEvidenceRegion(20, 70, 40, 90)
+        val displayedRegion = OcrEvidenceRegion(20, 10, 40, 30)
 
         assertEquals(
             sourceRegion,

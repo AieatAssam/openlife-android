@@ -9,7 +9,13 @@ import java.io.ByteArrayOutputStream
 object ExifFixtures {
     fun jpegWithOrientation(value: Int, littleEndian: Boolean = true): ByteArray {
         require(value in 1..8)
-        return injectOrientation(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte()), value, littleEndian)
+        val minimalJpeg = byteArrayOf(
+            0xFF.toByte(),
+            0xD8.toByte(),
+            0xFF.toByte(),
+            0xD9.toByte(),
+        )
+        return injectOrientation(minimalJpeg, value, littleEndian)
     }
 
     fun injectOrientation(jpeg: ByteArray, value: Int, littleEndian: Boolean = true): ByteArray {
@@ -30,12 +36,23 @@ object ExifFixtures {
                 write(byteArrayOf(0x00, 0x00, 0x00, 0x00))
             }
         }.toByteArray()
-        val payload = byteArrayOf('E'.code.toByte(), 'x'.code.toByte(), 'i'.code.toByte(), 'f'.code.toByte(), 0, 0) + tiff
+        val payload = byteArrayOf(
+            'E'.code.toByte(),
+            'x'.code.toByte(),
+            'i'.code.toByte(),
+            'f'.code.toByte(),
+            0,
+            0,
+        ) + tiff
         val segmentLength = payload.size + 2
         val app1 = byteArrayOf(
-            0xFF.toByte(), 0xE1.toByte(),
-            (segmentLength shr 8).toByte(), segmentLength.toByte(),
+            0xFF.toByte(),
+            0xE1.toByte(),
+            (segmentLength shr 8).toByte(),
+            segmentLength.toByte(),
         ) + payload
-        return jpeg.copyOfRange(0, 2) + app1 + jpeg.copyOfRange(2, jpeg.size)
+        return jpeg.copyOfRange(0, 2) +
+            app1 +
+            jpeg.copyOfRange(2, jpeg.size)
     }
 }

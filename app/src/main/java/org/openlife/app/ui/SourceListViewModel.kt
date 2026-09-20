@@ -1,6 +1,5 @@
 package org.openlife.app.ui
 
-import android.graphics.BitmapFactory
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -14,7 +13,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
+import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
+import org.openlife.vault.model.SourceState
 import org.openlife.vault.repository.DeleteResult
 import java.util.UUID
 
@@ -68,24 +69,15 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
                     null
                 } else {
                     val bitmap = withContext(Dispatchers.Default) {
-                        val bytes = access.viewRepository.loadReadyBytes(sourceId)
-                        if (bytes == null) {
+                        val source = access.viewRepository.findSource(sourceId)
+                        val bytes = source?.let { access.viewRepository.loadReadyBytes(sourceId) }
+                        if (source == null || source.state != SourceState.READY || bytes == null) {
                             null
                         } else {
-                            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                            var sampleSize = 1
-                            val targetPixels = THUMBNAIL_TARGET_PIXELS
-                            while ((bounds.outWidth / sampleSize).toLong() *
-                                (bounds.outHeight / sampleSize) > targetPixels
-                            ) {
-                                sampleSize *= 2
-                            }
-                            BitmapFactory.decodeByteArray(
+                            SampledBitmapDecoder.decode(
                                 bytes,
-                                0,
-                                bytes.size,
-                                BitmapFactory.Options().apply { inSampleSize = sampleSize },
+                                source.orientation ?: Orientation.NORMAL,
+                                THUMBNAIL_TARGET_PIXELS,
                             )
                         }
                     }

@@ -3,6 +3,7 @@ package org.openlife.app.ui
 import androidx.annotation.StringRes
 import org.openlife.app.R
 import org.openlife.vault.model.ImageFormat
+import org.openlife.vault.model.Orientation
 import java.util.UUID
 
 enum class IntakeRejectionMessage(
@@ -36,6 +37,7 @@ sealed interface IntakeUiState {
         val byteCount: Long,
         /** Authenticated stage bytes for the preview image; null if sampling isn't available. */
         val previewBytes: ByteArray?,
+        val orientation: Orientation = Orientation.NORMAL,
     ) : IntakeUiState
 
     data class Saving(val sourceId: UUID) : IntakeUiState

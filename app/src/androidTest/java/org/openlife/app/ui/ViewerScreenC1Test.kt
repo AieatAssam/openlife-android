@@ -92,7 +92,27 @@ class ViewerScreenC1Test {
         ).assertIsDisplayed()
     }
 
-    private fun readySource(id: UUID) = Source(
+    @Test
+    fun rotatedSourceDetailsExplainDisplayAndBytePreservation() {
+        val sourceId = UUID.randomUUID()
+        composeRule.setContent {
+            ViewerScreen(
+                source = readySource(sourceId, Orientation.ROTATE_90),
+                loadBytes = { null },
+                onBack = {},
+                onDeleteRequested = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Display rotation: 90 degrees")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Saved bytes are unchanged.")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    private fun readySource(id: UUID, orientation: Orientation = Orientation.NORMAL) = Source(
         id = id,
         state = SourceState.READY,
         importedAt = 1,
@@ -102,7 +122,7 @@ class ViewerScreenC1Test {
         sha256 = ByteArray(32),
         width = 100,
         height = 100,
-        orientation = Orientation.NORMAL,
+        orientation = orientation,
         wrappedDek = ByteArray(16),
         artefactVersion = 1,
     )

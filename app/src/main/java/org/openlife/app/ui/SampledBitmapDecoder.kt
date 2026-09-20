@@ -3,6 +3,7 @@ package org.openlife.app.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import org.openlife.vault.model.Orientation
+import org.openlife.vault.model.OrientationTransform
 import org.openlife.vault.repository.ImportLimits
 
 /**
@@ -13,14 +14,34 @@ import org.openlife.vault.repository.ImportLimits
  */
 object SampledBitmapDecoder {
 
-    fun decode(bytes: ByteArray, orientation: Orientation): Bitmap? = TODO("RED stub")
+    fun decode(bytes: ByteArray): Bitmap? = decode(bytes, Orientation.NORMAL)
 
-    fun decode(bytes: ByteArray): Bitmap? {
+    fun decode(bytes: ByteArray, orientation: Orientation): Bitmap? =
+        decode(bytes, orientation, ImportLimits.MAX_PREVIEW_PIXELS)
+
+    fun decode(bytes: ByteArray, orientation: Orientation, maxPixels: Long): Bitmap? {
+        require(maxPixels > 0) { "Maximum decode pixels must be positive" }
+        val sampled = decodeSampled(bytes, maxPixels) ?: return null
+        val matrix = OrientationTransform.matrixFor(orientation) ?: return sampled
+        val transformed = Bitmap.createBitmap(
+            sampled,
+            0,
+            0,
+            sampled.width,
+            sampled.height,
+            matrix,
+            true,
+        )
+        if (transformed !== sampled) sampled.recycle()
+        return transformed
+    }
+
+    private fun decodeSampled(bytes: ByteArray, maxPixels: Long): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-        var sampleSize = initialSampleSize(bounds.outWidth, bounds.outHeight)
+        var sampleSize = initialSampleSize(bounds.outWidth, bounds.outHeight, maxPixels)
         var decoded: Bitmap? = null
         var exhausted = false
         while (decoded == null && !exhausted) {
@@ -34,7 +55,7 @@ object SampledBitmapDecoder {
                 exhausted = true
             } else {
                 val pixelCount = bitmap.width.toLong() * bitmap.height.toLong()
-                if (pixelCount <= ImportLimits.MAX_PREVIEW_PIXELS) {
+                if (pixelCount <= maxPixels) {
                     decoded = bitmap
                 } else {
                     // A codec may round up despite inSampleSize. Recycle that
@@ -52,10 +73,10 @@ object SampledBitmapDecoder {
         return decoded
     }
 
-    private fun initialSampleSize(width: Int, height: Int): Int {
+    private fun initialSampleSize(width: Int, height: Int, maxPixels: Long): Int {
         var sampleSize = 1
         while ((width / sampleSize).toLong() * (height / sampleSize).toLong() >
-            ImportLimits.MAX_PREVIEW_PIXELS
+            maxPixels
         ) {
             if (sampleSize > Int.MAX_VALUE / 2) return sampleSize
             sampleSize *= 2

@@ -108,7 +108,9 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
         // scales; scrolling is preferable to clipping the confirmation row.
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
     ) {
-        val bitmap = remember(state.previewBytes) { state.previewBytes?.let(SampledBitmapDecoder::decode) }
+        val bitmap = remember(state.previewBytes, state.orientation) {
+            state.previewBytes?.let { SampledBitmapDecoder.decode(it, state.orientation) }
+        }
         DisposableEffect(bitmap) {
             onDispose {
                 if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()

@@ -238,6 +238,7 @@ class IntakeViewModel(
                         result.height,
                         result.byteCount,
                         previewBytes,
+                        result.orientation,
                     )
                 }
             }
@@ -269,6 +270,7 @@ class IntakeViewModel(
                         source.height!!,
                         source.byteCount!!,
                         previewBytes,
+                        source.orientation ?: org.openlife.vault.model.Orientation.NORMAL,
                     )
                 }
             }
