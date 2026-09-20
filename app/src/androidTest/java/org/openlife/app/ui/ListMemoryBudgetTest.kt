@@ -11,6 +11,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -36,13 +37,13 @@ class ListMemoryBudgetTest {
         val unregister = application.registerSensitiveContentClearer { clearCount++ }
         try {
             application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_MODERATE)
-            assertTrue(clearCount == 0)
+            assertEquals(0, clearCount)
 
             application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
-            assertTrue(clearCount == 1)
+            assertEquals(1, clearCount)
 
             application.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
-            assertTrue(clearCount == 2)
+            assertEquals(2, clearCount)
         } finally {
             unregister()
         }
