@@ -207,6 +207,7 @@ media_uri="content://media/external/images/media/$media_id"
 
 "$adb_bin" shell am start -W \
     -a android.intent.action.SEND \
+    -d "$media_uri" \
     -t image/png \
     --eu android.intent.extra.STREAM "$media_uri" \
     --grant-read-uri-permission \
