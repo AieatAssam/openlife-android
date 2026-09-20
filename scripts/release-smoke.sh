@@ -184,9 +184,11 @@ base64 --decode > "$tmp/smoke.png" <<'PNG'
 iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=
 PNG
 "$adb_bin" push "$tmp/smoke.png" "$remote_file" >/dev/null
+media_scan_broadcast_status=0
 "$adb_bin" shell am broadcast \
     -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
-    -d "file://$remote_file" >/dev/null
+    -d "file://$remote_file" >/dev/null 2>&1 || media_scan_broadcast_status=$?
+printf 'MEDIA_SCAN_BROADCAST_STATUS=%s\n' "$media_scan_broadcast_status"
 
 media_id=""
 for _ in $(seq 1 30); do
