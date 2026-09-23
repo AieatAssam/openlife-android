@@ -16,7 +16,13 @@ intended reasons:
 - the Saved screen had no Done
 
 `loadingListHasNoImportAction` passed from the start as a guard. The old
-top-bar "+" exposed only a content description, never a text label.
+top-bar "+" exposed only a content description, never a text label. Its RED
+is proven by a recorded mutation:
+- Mutation: `hasItems = (Loaded && nonEmpty) || state is Loading`, which shows
+  the FAB while loading.
+- Result: the test failed with "Did not expect any node but found '1' node
+  ... 'Import from photos'".
+- The mutation was then reverted.
 
 ## GREEN (cc1cd09) and REFACTOR
 
@@ -32,6 +38,24 @@ Before the goldens were regenerated, the app suite ran 57/58. The one failure
 was the intended change to `list-light.png` for the local render profile
 (26,592 px). Only the `list-*` goldens changed. At 420 dpi the 360x640 px
 viewer capture shows only the top bar, so it is pixel-identical.
+
+## Release smoke (import -> viewer -> confirmed delete)
+
+`scripts/release-smoke.sh` now does three things:
+- It waits for the authenticated `Saved image` node instead of the Details
+  text, which can sit below the fold on small screens.
+- It confirms the delete dialog, as C0-R37 requires.
+- It matches the new empty-state heading.
+
+The validation ran as separate steps, because the host's memory pressure
+killed the chained `run-release-validation.sh` daemon twice:
+- `./gradlew assembleRelease` passed. Locally the APK is unsigned, since the
+  signing secrets exist only on CI.
+- `scripts/check-16kb-alignment.sh` passed: `16KB_ALIGNMENT_RESULT=pass`,
+  6 native libraries.
+- `scripts/release-smoke.sh` passed at 1080x2400/420 dpi and at 320x640/160
+  dpi, reporting `RELEASE_SMOKE_RESULT=pass` with thumbnails 0 before and 0
+  after the delete.
 
 ## On-device walk-through (uiautomator, fresh install)
 
