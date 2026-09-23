@@ -20,13 +20,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.StampBadge
@@ -135,23 +138,33 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
         // scales; scrolling is preferable to clipping the confirmation row.
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
     ) {
-        val bitmap = remember(state.previewBytes, state.orientation) {
-            state.previewBytes?.let { SampledBitmapDecoder.decode(it, state.orientation) }
-        }
-        DisposableEffect(bitmap) {
-            onDispose {
-                if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+        // P1-13-R2: decode off the main thread. The preview owns this bitmap,
+        // so it is recycled when replaced or when the preview leaves.
+        val preview by produceState<PreviewImage>(PreviewImage.Loading, state.previewBytes, state.orientation) {
+            val bytes = state.previewBytes
+            value = if (bytes == null) {
+                PreviewImage.Unavailable
+            } else {
+                withContext(Dispatchers.Default) { SampledBitmapDecoder.decode(bytes, state.orientation) }
+                    ?.let(PreviewImage::Shown) ?: PreviewImage.Unavailable
             }
         }
+        val current = preview
+        DisposableEffect(current) {
+            onDispose { (current as? PreviewImage.Shown)?.bitmap?.let { if (!it.isRecycled) it.recycle() } }
+        }
+        val bitmap = (current as? PreviewImage.Shown)?.bitmap
         FoldedCornerCard {
             Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-                if (bitmap != null) {
-                    Image(
+                when {
+                    bitmap != null -> Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = stringResource(R.string.intake_selected_image_content_description),
                     )
-                } else {
-                    Text(stringResource(R.string.intake_preview_unavailable))
+
+                    current == PreviewImage.Loading -> Text(stringResource(R.string.intake_preparing))
+
+                    else -> Text(stringResource(R.string.intake_preview_unavailable))
                 }
             }
             Text(
@@ -243,4 +256,10 @@ private fun formatBytes(bytes: Long): String = when {
     )
 
     else -> stringResource(R.string.intake_size_bytes, bytes)
+}
+
+private sealed interface PreviewImage {
+    data object Loading : PreviewImage
+    class Shown(val bitmap: android.graphics.Bitmap) : PreviewImage
+    data object Unavailable : PreviewImage
 }
