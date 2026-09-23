@@ -134,7 +134,7 @@ class IntakeViewModel(
             try {
                 withContext(providerDispatcher) {
                     when (val access = application.vault()) {
-                        is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
+                        is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
 
                         is VaultAccess.Ready -> importFromProvider(
                             openStream,
@@ -261,7 +261,7 @@ class IntakeViewModel(
     private fun restorePreviewIfNeeded(id: UUID) {
         viewModelScope.launch {
             when (val access = application.vault()) {
-                is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
+                is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
 
                 is VaultAccess.Ready -> {
                     val source = access.viewRepository.findSource(id)
@@ -294,7 +294,7 @@ class IntakeViewModel(
         viewModelScope.launch {
             _state.value = IntakeUiState.Saving(id)
             when (val access = application.vault()) {
-                is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.reason)
+                is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
 
                 is VaultAccess.Ready -> {
                     _state.value = when (val result = access.importRepository.saveImport(id)) {

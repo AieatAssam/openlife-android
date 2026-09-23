@@ -1,24 +1,22 @@
 package org.openlife.app.navigation
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import org.openlife.app.settings.SettingsScreen
 import org.openlife.app.ui.AboutScreen
 import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
+import org.openlife.vault.repository.VaultResetResult
 import java.util.UUID
 
 @Composable
@@ -34,6 +32,10 @@ fun OpenLifeNavHost(
     correct: (UUID, org.openlife.vault.ocr.OcrSpan, String) -> Unit,
     review: (UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     onImportFromPhotoPicker: () -> Unit,
+    onRetryVault: () -> Unit,
+    onFinishReset: () -> Unit,
+    onResetVault: suspend () -> VaultResetResult,
+    onResetComplete: () -> Unit,
     navController: NavHostController = rememberNavController(),
 ) {
     val currentEntry by navController.currentBackStackEntryAsStateCompat()
@@ -53,6 +55,9 @@ fun OpenLifeNavHost(
                 onOpen = { id -> navController.navigate(Routes.Viewer(id.toString())) },
                 onDelete = { id -> delete(id) {} },
                 onImportFromPhotoPicker = onImportFromPhotoPicker,
+                onRetryVault = onRetryVault,
+                onFinishReset = onFinishReset,
+                onOpenSettings = { navController.navigate(Routes.Settings) },
             )
         }
         composable<Routes.Viewer> { entry ->
@@ -67,6 +72,9 @@ fun OpenLifeNavHost(
                     onOpen = { id -> navController.navigate(Routes.Viewer(id.toString())) },
                     onDelete = { id -> delete(id) {} },
                     onImportFromPhotoPicker = onImportFromPhotoPicker,
+                    onRetryVault = onRetryVault,
+                    onFinishReset = onFinishReset,
+                    onOpenSettings = { navController.navigate(Routes.Settings) },
                 )
             } else if (source == null) {
                 LaunchedEffect(route.sourceId) { navController.popBackStack() }
@@ -86,18 +94,8 @@ fun OpenLifeNavHost(
                 )
             }
         }
-        composable<Routes.Settings> { PlaceholderScreen(org.openlife.app.R.string.settings_title) }
+        composable<Routes.Settings> { SettingsScreen(onResetVault, onResetComplete) }
         composable<Routes.About> { AboutScreen() }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(titleResId: Int) {
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-        contentAlignment = Alignment.Center,
-    ) {
-        androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(titleResId))
     }
 }
 

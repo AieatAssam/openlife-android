@@ -20,6 +20,7 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
     private val _states = MutableStateFlow<Map<UUID, OcrUiState>>(emptyMap())
     val states: StateFlow<Map<UUID, OcrUiState>> = _states.asStateFlow()
     private val jobs = mutableMapOf<UUID, Job>()
+    private val unregisterResetCallback = application.registerPreResetCallback(::clearSensitiveContent)
 
     fun stateFor(sourceId: UUID): OcrUiState = _states.value[sourceId] ?: OcrUiState.Idle
 
@@ -48,6 +49,12 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
         setState(sourceId, OcrUiState.Cancelled(sourceId))
     }
 
+    private fun clearSensitiveContent() {
+        jobs.values.forEach(Job::cancel)
+        jobs.clear()
+        _states.value = emptyMap()
+    }
+
     fun correct(revisionId: UUID, spanId: UUID, correctedText: String) {
         viewModelScope.launch {
             val access = application.vault() as? VaultAccess.Ready ?: return@launch
@@ -67,8 +74,8 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
     }
 
     override fun onCleared() {
-        jobs.values.forEach(Job::cancel)
-        jobs.clear()
+        unregisterResetCallback()
+        clearSensitiveContent()
     }
 
     companion object {

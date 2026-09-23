@@ -57,6 +57,9 @@ fun SourceListScreen(
     onOpen: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     onImportFromPhotoPicker: () -> Unit,
+    onRetryVault: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onFinishReset: () -> Unit = {},
 ) {
     var pendingDelete by remember { mutableStateOf<Source?>(null) }
 
@@ -82,12 +85,12 @@ fun SourceListScreen(
                     Text(stringResource(R.string.list_loading))
                 }
 
-                is SourceListUiState.VaultUnavailable -> Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(stringResource(R.string.list_vault_unavailable, state.reason))
-                }
+                is SourceListUiState.VaultUnavailable -> VaultUnavailableScreen(
+                    cause = state.cause,
+                    onRetry = onRetryVault,
+                    onOpenResetSettings = onOpenSettings,
+                    onFinishReset = onFinishReset,
+                )
 
                 is SourceListUiState.Loaded -> {
                     if (state.sources.isEmpty()) {

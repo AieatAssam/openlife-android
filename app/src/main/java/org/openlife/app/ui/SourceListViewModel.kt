@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,12 +18,14 @@ import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.repository.DeleteResult
+import org.openlife.vault.repository.VaultResetResult
+import org.openlife.vault.storage.VaultUnavailableCause
 import java.util.UUID
 
 sealed interface SourceListUiState {
     data object Loading : SourceListUiState
     data class Loaded(val sources: List<Source>) : SourceListUiState
-    data class VaultUnavailable(val reason: String) : SourceListUiState
+    data class VaultUnavailable(val cause: VaultUnavailableCause) : SourceListUiState
 }
 
 /**
@@ -46,11 +49,30 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     private val unregisterTrimCallback = application.registerSensitiveContentClearer(::clearSensitiveContent)
     private val _sensitiveContentGeneration = MutableStateFlow(thumbnailCache.generation())
     val sensitiveContentGeneration: StateFlow<Long> = _sensitiveContentGeneration.asStateFlow()
+    private var vaultObservation: Job? = null
 
     init {
+        observeVault()
+    }
+
+    fun retryVault() {
         viewModelScope.launch {
+            application.retryVault()
+            observeVault()
+        }
+    }
+
+    fun finishVaultReset() {
+        viewModelScope.launch {
+            if (application.resetVault() == VaultResetResult.COMPLETED) observeVault()
+        }
+    }
+
+    private fun observeVault() {
+        vaultObservation?.cancel()
+        vaultObservation = viewModelScope.launch {
             when (val access = application.vault()) {
-                is VaultAccess.Unavailable -> _state.value = SourceListUiState.VaultUnavailable(access.reason)
+                is VaultAccess.Unavailable -> _state.value = SourceListUiState.VaultUnavailable(access.cause)
 
                 is VaultAccess.Ready -> access.viewRepository.observeVisibleSources().collect { sources ->
                     _state.value = SourceListUiState.Loaded(sources)

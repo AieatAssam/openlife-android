@@ -5,6 +5,7 @@ import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryReport
 import org.openlife.vault.repository.SourceViewRepository
+import org.openlife.vault.storage.VaultUnavailableCause
 
 sealed interface VaultAccess {
     data class Ready(
@@ -15,6 +16,5 @@ sealed interface VaultAccess {
         val lastRecovery: RecoveryReport,
     ) : VaultAccess
 
-    /** [reason] is the non-sensitive category from VaultBootstrapResult.Unavailable. */
-    data class Unavailable(val reason: String) : VaultAccess
+    data class Unavailable(val cause: VaultUnavailableCause) : VaultAccess
 }

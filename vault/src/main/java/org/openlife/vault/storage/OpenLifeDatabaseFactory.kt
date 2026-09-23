@@ -38,4 +38,9 @@ object OpenLifeDatabaseFactory {
             .addCallback(OpenLifeDatabase.readyInvariantCallback)
             .build()
     }
+
+    /** Closes Room without exposing the RoomDatabase dependency to the app module. */
+    fun close(database: OpenLifeDatabase) {
+        database.close()
+    }
 }

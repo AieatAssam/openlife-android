@@ -242,7 +242,7 @@ private fun describeForTest(activity: IntakeActivity, state: IntakeUiState): Str
 
     IntakeUiState.StorageUnavailable -> "Storage unavailable"
 
-    is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.reason}"
+    is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.cause.name}"
 
     IntakeUiState.Cancelled -> "Cancelled"
 }

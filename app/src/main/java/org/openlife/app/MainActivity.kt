@@ -137,6 +137,13 @@ class MainActivity : ComponentActivity() {
                     },
                     onImportFromPhotoPicker = launchPhotoPicker,
                     navController = navController,
+                    onRetryVault = viewModel::retryVault,
+                    onFinishReset = viewModel::finishVaultReset,
+                    onResetVault = { (application as OpenLifeApp).resetVault() },
+                    onResetComplete = {
+                        viewModel.retryVault()
+                        navController.navigate(Routes.List) { launchSingleTop = true }
+                    },
                 )
             }
         }

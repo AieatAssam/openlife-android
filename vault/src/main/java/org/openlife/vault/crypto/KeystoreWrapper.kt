@@ -23,7 +23,7 @@ import javax.crypto.spec.GCMParameterSpec
  * IV to a Keystore key, or disabling randomized-encryption requirements, is
  * not done anywhere in this class.
  */
-class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
+open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
 
     companion object {
         const val DEFAULT_ALIAS = "openlife.vault.wrap.v1"
@@ -62,7 +62,12 @@ class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
     /** True if a wrapping key already exists for this alias, without creating one. */
     fun hasWrappingKey(): Boolean = keyStore.containsAlias(alias)
 
-    fun wrap(plaintext: ByteArray, domain: EnvelopeDomain, sourceId: UUID? = null): Envelope {
+    /** Removes this installation's wrapping key as part of an explicit vault reset. */
+    fun deleteWrappingKey() {
+        if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
+    }
+
+    open fun wrap(plaintext: ByteArray, domain: EnvelopeDomain, sourceId: UUID? = null): Envelope {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, wrappingKey())
         val iv = cipher.iv
@@ -73,7 +78,7 @@ class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
     }
 
     /** @throws EnvelopeAuthenticationException on any failure; see [AesGcmCodec.decrypt]. */
-    fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID? = null): ByteArray {
+    open fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID? = null): ByteArray {
         try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
