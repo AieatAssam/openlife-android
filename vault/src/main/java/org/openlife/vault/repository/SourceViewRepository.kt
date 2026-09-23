@@ -40,6 +40,10 @@ class SourceViewRepository(
         }
     }
 
+    /** P1-13-R5 stub: typed read of a READY source. */
+    suspend fun readReadyBytes(sourceId: UUID): ReadyReadResult =
+        loadReadyBytes(sourceId)?.let { ReadyReadResult.Loaded(it) } ?: ReadyReadResult.Unavailable
+
     /** A saved (READY) source's original bytes, authenticated before use (design §8). */
     suspend fun loadReadyBytes(sourceId: UUID): ByteArray? {
         return mutationQueue.acquire {

@@ -40,7 +40,7 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
      * bootstrap rule that an existing wrapper is never silently replaced
      * (design §10, C0-R18).
      */
-    fun wrappingKey(): SecretKey {
+    open fun wrappingKey(): SecretKey {
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
