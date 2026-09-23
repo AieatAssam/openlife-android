@@ -80,16 +80,17 @@ class IntakeActivity : ComponentActivity() {
         enableEdgeToEdge()
         applySecureWindow()
 
-        // Validate only on a fresh launch. On a configuration-change
-        // recreation the ViewModel already holds (or is restoring) the
-        // Source UUID via SavedStateHandle - re-validating an already
-        // consumed Intent would be meaningless (design §8: rotation
-        // survives through the ViewModel and UUID, never by re-deriving
-        // from the original Intent/Uri).
-        val validation = if (savedInstanceState == null) {
+        // A fresh launch validates the intent. So does a configuration
+        // change: the retained ViewModel ignores a repeat start and the
+        // intent and its grant are still attached, so a share that had not
+        // started yet (first run, splash) still starts. Only a new process
+        // restored from saved state refuses to reopen a URI (design §8);
+        // the ViewModel restores a saved stage by UUID or asks to reselect.
+        val retainedViewModel = viewModel.attach()
+        val validation = if (savedInstanceState == null || retainedViewModel) {
             IntakeIntentValidator.validate(extractShape(intent), packageName)
         } else {
-            viewModel.onActivityRecreated()
+            viewModel.onRestoredAfterProcessDeath()
             null
         }
 

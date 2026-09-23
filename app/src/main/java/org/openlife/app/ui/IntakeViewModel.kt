@@ -17,6 +17,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +88,8 @@ class IntakeViewModel(
     /** The active provider read. Its owner coroutine performs normal closure. */
     private var activeImportJob: Job? = null
     private var uriImportRequested = false
+    private var attached = false
+    private val lookupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var backgrounded = false
 
     private var sourceId: UUID?
@@ -175,7 +179,12 @@ class IntakeViewModel(
         val uri = uriString.toUri()
         activeImportJob?.cancel()
         activeImportJob = viewModelScope.launch {
-            val lookup = withContext(providerDispatcher) { providerTypeOf(resolver, uri) }
+            // getType is not part of the descriptor open/read/close sequence
+            // that must stay on the provider thread (P1-09). It runs in its own
+            // IO scope and is awaited cancellably: a provider stalling here
+            // blocks neither other imports nor Cancel, and an abandoned lookup
+            // finishes on its own and is discarded.
+            val lookup = lookupScope.async { providerTypeOf(resolver, uri) }.await()
             val providerType = (lookup as? ProviderTypeLookup.Known)?.mimeType
             when {
                 lookup == ProviderTypeLookup.Refused ->
@@ -194,13 +203,23 @@ class IntakeViewModel(
     }
 
     /**
-     * Called when the intake activity was recreated from saved state. After
-     * a configuration change this ViewModel still owns its import and nothing
-     * happens. After process death there is neither an import nor a stage:
-     * ask the user to select the item again instead of leaving Preparing up
-     * forever (design §8: a new process must not restore from a URI).
+     * Records that an activity is using this instance. Returns true when one
+     * already was: the activity is being recreated for a configuration
+     * change and this ViewModel, with its import, survived.
      */
-    fun onActivityRecreated() {
+    fun attach(): Boolean {
+        val wasAttached = attached
+        attached = true
+        return wasAttached
+    }
+
+    /**
+     * The activity was restored from saved state into a new process. With
+     * neither an import nor a stage there is nothing to continue: ask the
+     * user to select the item again rather than leaving Preparing up forever
+     * (design §8: a new process must not restore from a URI).
+     */
+    fun onRestoredAfterProcessDeath() {
         val ownsWork = activeImportJob?.isActive == true || uriImportRequested || sourceId != null
         if (!ownsWork && _state.value == IntakeUiState.Preparing) {
             _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
@@ -427,6 +446,7 @@ class IntakeViewModel(
         // deadline+grace watchdog performs the documented cross-thread
         // last-resort close; do not close an unknown descriptor here.
         activeImportJob?.cancel()
+        lookupScope.cancel()
     }
 
     companion object {
