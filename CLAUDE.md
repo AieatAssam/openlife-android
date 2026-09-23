@@ -69,13 +69,18 @@ bash scripts/release-smoke.sh app/build/outputs/apk/release/*.apk   # from P0-06
 ## Emulator: known-good launch command
 
 ```bash
-./gradlew --stop; pkill -f KotlinCompileDaemon || true
+./gradlew --stop; pkill -f '[K]otlinCompileDaemon' || true
 emulator -avd dev36 -no-window -no-audio -no-boot-anim \
   -gpu host -feature -Vulkan \
   -no-snapshot -no-metrics -crash-report-mode disabled
 ```
 
 Boots in ~30-40s with real hardware GLES acceleration.
+
+Keep the brackets in the `pkill` pattern. A plain
+`pkill -f KotlinCompileDaemon` matches the calling shell's own command line
+and kills it (exit 144), so the emulator never starts (observed 2026-09-23).
+Run the emulator as a tracked background task so its exit code is recorded.
 
 **Do not drop `-feature -Vulkan`.** `-gpu host` alone segfaults the emulator
 process outright (confirmed via exit code 139, i.e. SIGSEGV — not an OOM
