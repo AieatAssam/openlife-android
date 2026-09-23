@@ -22,7 +22,7 @@ ethos_check:
 
 requirements:
   - id: P1-08-R1
-    text: "MUST add routes Settings and About in the nav host with entries from the list screen overflow menu."
+    text: "MUST add routes Settings and About in the nav host with entries from the list screen overflow menu. (Plan 1.2.0: delivered early by P1-17-R3; this step verifies it and adds the screen content.)"
   - id: P1-08-R2
     text: "MUST show in About: versionName, versionCode, git identity (BuildConfig field injected at build from `git describe --tags --always --dirty`, 'unknown' when unavailable; P5-03 pins it to the tag for reproducible builds), signing certificate SHA-256 read at runtime from PackageManager (so users can compare with README), open-source licences (rendered from docs/generated/THIRD_PARTY_LICENSES.md packaged as a raw resource by the licence-report task), link to the privacy policy text bundled offline (no browser launch; text shown in-app)."
   - id: P1-08-R3
