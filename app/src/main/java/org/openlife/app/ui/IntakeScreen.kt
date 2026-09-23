@@ -49,7 +49,11 @@ fun IntakeScreen(
             is IntakeUiState.Saving -> CenteredMessage(stringResource(R.string.intake_saving))
 
             is IntakeUiState.Saved -> {
-                CenteredMessage(stringResource(R.string.intake_saved), stampState = StampState.Saved)
+                CenteredMessage(
+                    stringResource(R.string.intake_saved),
+                    stampState = StampState.Saved,
+                    onDone = onDone,
+                )
                 DoneAfterAcknowledging(onDone)
             }
 
@@ -160,7 +164,7 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
 }
 
 @Composable
-private fun CenteredMessage(text: String, stampState: StampState? = null) {
+private fun CenteredMessage(text: String, stampState: StampState? = null, onDone: (() -> Unit)? = null) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -168,6 +172,11 @@ private fun CenteredMessage(text: String, stampState: StampState? = null) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             stampState?.let { StampBadge(it, modifier = Modifier.padding(bottom = 16.dp)) }
             Text(text)
+            onDone?.let {
+                Button(onClick = it, modifier = Modifier.padding(top = 16.dp)) {
+                    Text(stringResource(R.string.intake_done))
+                }
+            }
         }
     }
 }

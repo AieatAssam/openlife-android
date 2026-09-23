@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      generate-goldens:
+        description: "Generate brand screenshot goldens on each emulator leg instead of running connected tests"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -161,9 +166,10 @@ jobs:
           emulator-boot-timeout: 300
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # android-emulator-runner executes each line separately; keep the
+          # golden/test switch on one line.
           script: |
-            bash scripts/ci/run-connected-android-tests.sh
-            bash scripts/ci/run-release-validation.sh
+            if [ "${{ inputs.generate-goldens }}" = "true" ]; then bash scripts/ci/generate-goldens.sh; else bash scripts/ci/run-connected-android-tests.sh && bash scripts/ci/run-release-validation.sh; fi
 
       - name: Capture filtered OpenLife logcat
         if: always()
@@ -185,6 +191,7 @@ jobs:
             vault/build/reports/androidTests/**
             connected-attempt-${{ matrix.api-level }}-*.log
             logcat-openlife-${{ matrix.api-level }}.txt
+            app/src/androidTest/assets/golden/**
 
   release-inspection:
     name: Release APK boundary inspection

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,7 +24,7 @@ import org.openlife.app.VaultFailureDiagnostics
 import org.openlife.app.ui.brand.FoldedCornerCard
 
 @Composable
-fun AboutScreen() {
+fun AboutScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val licenseText = produceState(initialValue = "", resources) {
@@ -30,7 +32,17 @@ fun AboutScreen() {
             resources.openRawResource(R.raw.ofl_1_1).bufferedReader().use { it.readText() }
         }
     }.value
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+        topBar = { BackTopAppBar(title = stringResource(R.string.about_title), onBack = onBack) },
+    ) { padding ->
+        AboutContent(modifier = Modifier.padding(padding), licenseText = licenseText, context = context)
+    }
+}
+
+@Composable
+private fun AboutContent(modifier: Modifier, licenseText: String, context: android.content.Context) {
+    Surface(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()

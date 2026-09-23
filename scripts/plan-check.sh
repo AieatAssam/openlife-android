@@ -20,7 +20,16 @@ for arg in "$@"; do
   esac
 done
 GRADLE_CACHE="${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper/dists"
-JAR="$(find "$GRADLE_CACHE" -type f -name 'snakeyaml-*.jar' -print -quit 2>/dev/null || true)"
+find_snakeyaml() {
+  find "$GRADLE_CACHE" -type f -name 'snakeyaml-*.jar' -print -quit 2>/dev/null || true
+}
+JAR="$(find_snakeyaml)"
+if [ -z "$JAR" ]; then
+  # A fresh CI runner has not unpacked the wrapper distribution yet; the
+  # wrapper fetches the same distribution every Gradle task would use.
+  "$ROOT/gradlew" --version >/dev/null 2>&1 || true
+  JAR="$(find_snakeyaml)"
+fi
 if [ -z "$JAR" ]; then
   echo "snakeyaml jar not found under $GRADLE_CACHE; install the Gradle wrapper distribution first" >&2
   exit 2

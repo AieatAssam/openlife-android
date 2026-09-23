@@ -71,7 +71,7 @@ class NavigationBackTest {
 
             assertTrue(
                 "list was not restored after viewer back",
-                device.wait(Until.hasObject(By.desc("Import from photos")), 5_000),
+                device.wait(Until.hasObject(By.text("Import from photos")), 5_000),
             )
             var finishing = true
             scenario.onActivity { finishing = it.isFinishing }

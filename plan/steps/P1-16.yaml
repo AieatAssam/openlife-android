@@ -8,7 +8,7 @@ owner: agent
 summary: "Make the app correct on large screens, split-screen, and foldables (Android 16 ignores orientation and resizability restrictions for targetSdk 36+), and release sensitive memory on system trim signals."
 requirements:
   - id: P1-16-R1
-    text: "MUST use window size classes (androidx.compose.material3.adaptive or WindowSizeClass from material3-window-size-class) so list/viewer become a two-pane layout at expanded width; no fixed 320dp image box: the viewer image area sizes from the window."
+    text: "MUST use window size classes (androidx.compose.material3.adaptive or WindowSizeClass from material3-window-size-class) so list/viewer become a two-pane layout at expanded width; no fixed 320dp image box: the viewer image area sizes from the window. (Plan 1.2.0: P1-17-R4 removes the fixed box on single-pane layouts; this step adds the two-pane layout.)"
   - id: P1-16-R2
     text: "MUST keep FLAG_SECURE and the onStop scrub correct in multi-window: in split-screen the activity may be STARTED but not RESUMED; content stays visible while STARTED (design intent: scrub on hidden, not on focus loss) — an instrumented test uses ActivityScenario.moveToState(STARTED) and asserts the viewer still shows content and that moving to CREATED scrubs it."
   - id: P1-16-R3

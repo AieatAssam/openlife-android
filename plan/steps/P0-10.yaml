@@ -1,0 +1,78 @@
+id: P0-10
+title: Restore a green CI gate
+phase: P0
+status: todo
+depends_on: [P0-04]
+estimate: S
+owner: agent
+closes_findings: []
+
+summary: >
+  Every CI run since P1-05 failed. The build job stopped at `Validate plan`
+  because SnakeYAML was not yet unpacked on the runner, so lint, JVM tests
+  and assembleDebug never ran (and lint had two errors waiting). Both
+  instrumented legs failed the same three tests: two ViewerScreenC1Test
+  assertions on text that CI's small AVD screen leaves off-screen, and the
+  brand golden comparison, whose goldens were produced on the local dev36
+  host-GPU emulator and differ by ~15% of pixels under CI's SwiftShader.
+
+rationale: >
+  Owner instruction (2026-09-23): CI must be green before UX work lands. A red
+  gate hides regressions; the P1-05 and P1-06 evidence already had to record
+  "pre-existing lint errors" instead of a passing gate.
+
+ethos_check:
+  - "Honesty: a golden that cannot be compared on a profile is reported as an assumption skip naming the profile, never as a pass."
+
+requirements:
+  - id: P0-10-R1
+    text: "MUST make scripts/plan-check.sh provision the Gradle wrapper distribution when SnakeYAML is missing, and pass from an empty GRADLE_USER_HOME."
+  - id: P0-10-R2
+    text: "MUST clear the lint errors that block `./gradlew detekt lint :app:test :vault:test assembleDebug`, without weakening lint configuration globally; any suppression is local and justified."
+  - id: P0-10-R3
+    text: "MUST make ViewerScreenC1Test independent of screen height by scrolling to the asserted node, and reproduce the CI failure locally at 320x640/160dpi before the fix."
+  - id: P0-10-R4
+    text: "MUST key screenshot goldens by render profile (API level, Build.PRODUCT, density); a profile without committed goldens yields an assumption skip naming the profile; scripts/ci/generate-goldens.sh and a `generate-goldens` workflow_dispatch input produce and upload goldens from the CI emulators."
+
+constraints:
+  - "No new dependency. No change to product behaviour."
+
+files_touched:
+  - scripts/plan-check.sh
+  - app/src/main/res/values/strings.xml
+  - app/src/androidTest/java/org/openlife/app/ui/ViewerScreenC1Test.kt
+  - app/src/androidTest/java/org/openlife/app/ui/brand/BrandScreenshotInstrumentedTest.kt
+  - app/src/androidTest/assets/golden/<profile>/
+  - scripts/ci/generate-goldens.sh
+  - .github/workflows/ci.yml
+
+tdd:
+  red:
+    - name: "CI run 35839602476 (recorded failures: plan-check exit 2; ViewerScreenC1Test x2; BrandScreenshotInstrumentedTest)"
+    - name: "Local repro: ViewerScreenC1Test at wm size 320x640 / density 160 => 2 of 3 fail"
+  green:
+    - "Provision wrapper; fix lint; scroll-to in viewer tests; profile-keyed goldens."
+  refactor: []
+
+verification:
+  commands:
+    - "GRADLE_USER_HOME=<empty dir> scripts/plan-check.sh"
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug"
+    - "./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.ViewerScreenC1Test (default and 320x640/160dpi)"
+    - "bash scripts/ci/generate-goldens.sh <scratch dir>"
+    - "Hosted CI run on the pushed branch; then dispatch with generate-goldens=true and commit the CI-profile goldens"
+  evidence_required:
+    - "Local command outputs; hosted run URL once the owner pushes."
+
+acceptance_criteria:
+  - "The CI build job reaches and passes lint, JVM tests and assembleDebug."
+  - "Instrumented legs have no assertion failures; the brand golden is either compared on the CI profile or visibly skipped until CI goldens are committed."
+
+docs_to_update:
+  - docs/design/screens.md
+  - docs/verification/P0-10-ci-green.md
+
+risks:
+  - "Until CI-profile goldens are committed, CI does not compare brand screenshots (visible skip)."
+
+rollback: "Revert the branch; CI returns to its previous red state."

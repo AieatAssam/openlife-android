@@ -19,6 +19,28 @@ unverified or corrupt content remains unstamped. Intake shows `SAVED` only in
 the successful terminal state. Delete confirmation uses an outlined error
 action and keeps the no-undo explanation inside a folded card.
 
+## Core flow (P1-17)
+
+- **List.** The top bar carries the title and a "More options" menu that
+  leads to Settings and About. The one primary action is a labelled extended
+  FAB, "Import from photos". Rows set the import timestamp in Plex Mono.
+- **Empty list.** The empty state is a Fraunces heading ("Nothing kept yet"),
+  one sentence and one filled "Import from photos" button, with no FAB.
+  While the list is loading or the vault is unavailable, no import action is
+  offered.
+- **Viewer.** Sections run in this order: the image, then extracted text,
+  then details.
+  - The image area takes the source's displayed aspect ratio and is capped at
+    60% of the window height. It replaces the fixed 320 dp box, so the image
+    fills its box and the evidence outline covers the drawn pixels.
+  - Delete opens the same named, no-undo confirmation as the list.
+  - Details show "Imported: <time>" once, with the time in Plex Mono.
+- **Settings and About** each have a top app bar with Back. Settings'
+  heading moved from Fraunces to the Sans top-bar title, because Fraunces is
+  reserved for display text.
+- **Intake Saved.** Shows the `SAVED` stamp and a Done button, and still
+  returns on its own after 5 s.
+
 ## Type and colour review
 
 IBM Plex Sans is the UI family, IBM Plex Mono is the data/stamp family, and
@@ -43,8 +65,22 @@ state when the scale is zero. No sound or haptics were added.
 The Compose test captures a fixed 360 × 640 pixel surface and compares the
 three components plus list, viewer, and first-run screens in light and dark
 themes to the committed PNGs under
-`app/src/androidTest/assets/golden/`. The comparator allows at most 0.5% of
-pixels to differ. Goldens contain only synthetic content.
+`app/src/androidTest/assets/golden/<render-profile>/`. The comparator allows
+at most 0.5% of pixels to differ. Goldens contain only synthetic content.
+
+A golden is valid only on the render profile that produced it:
+`api<SDK>-<Build.PRODUCT>-<density>dpi`. Text antialiasing and the GPU path
+(host GLES locally, SwiftShader on CI) differ enough that goldens made on the
+local `dev36` emulator failed on both CI legs by 15% of pixels (runs
+35800443855 and 35839602476). When no goldens exist for the running
+profile the test raises an assumption failure naming the profile; Gradle
+treats it as skipped, not passed, and it is recorded as a gap.
+
+Generate goldens on a device with `bash scripts/ci/generate-goldens.sh`, or on
+CI by dispatching the `CI` workflow with `generate-goldens: true`; the
+instrumented-results artefact then contains
+`app/src/androidTest/assets/golden/<profile>/`. Review the PNGs before
+committing them.
 
 Local evidence on the API 36 `dev36` emulator:
 

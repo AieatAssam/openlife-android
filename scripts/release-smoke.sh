@@ -174,7 +174,7 @@ fi
 if wait_for_ui_pattern 'text="I understand"' 8; then
     tap_text 'I understand'
 fi
-wait_for_ui_pattern 'text="OpenLife"|text="Nothing imported yet"|content-desc="Saved image thumbnail"' 45
+wait_for_ui_pattern 'text="OpenLife"|text="Nothing kept yet"|content-desc="Saved image thumbnail"' 45
 dump_ui
 baseline_thumbnail_count="$(count_descriptions)"
 
@@ -226,8 +226,14 @@ dump_ui
 after_save_thumbnail_count="$(count_descriptions)"
 (( after_save_thumbnail_count > baseline_thumbnail_count ))
 tap_description 'Saved image thumbnail'
-wait_for_ui_pattern 'text="[^"]*Verified against the saved copy"' 45
+# The viewer renders "Saved image" only after the blob authenticates and
+# decodes; the Details card (with the Verified text) can sit below the fold on
+# small screens since the extracted-text section comes first (P1-17).
+wait_for_ui_pattern 'content-desc="Saved image"|text="[^"]*Verified against the saved copy"' 45
 tap_description 'Delete'
+# Delete is confirmed from every entry point (C0-R37); tap the dialog action.
+wait_for_ui_pattern 'text="Delete"' 15
+tap_text 'Delete'
 wait_for_thumbnail_count "$baseline_thumbnail_count" 45
 after_delete_thumbnail_count="$(count_descriptions)"
 [[ "$after_delete_thumbnail_count" -eq "$baseline_thumbnail_count" ]]

@@ -22,6 +22,7 @@ import java.io.File
 import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,8 +45,25 @@ class BrandScreenshotInstrumentedTest {
         .getString("generateGoldens") == "true"
     private val activeSpec = mutableStateOf(ScreenSpec("brand-components", false) {})
 
+    /**
+     * Rendering differs between system images, GPU paths and densities, so a
+     * golden is only meaningful on the profile that produced it. CI legs are
+     * the reference; generate them there with scripts/ci/generate-goldens.sh.
+     */
+    private val renderProfile: String = run {
+        val densityDpi = InstrumentationRegistry.getInstrumentation().targetContext
+            .resources.displayMetrics.densityDpi
+        "api${android.os.Build.VERSION.SDK_INT}-${android.os.Build.PRODUCT}-${densityDpi}dpi"
+    }
+
     @Test
     fun listViewerFirstRunMatchGoldensLightAndDark() {
+        if (!generateGoldens) {
+            val committed = InstrumentationRegistry.getInstrumentation().context.assets
+                .list("golden/$renderProfile").orEmpty()
+            // Reported as skipped, never as passed: see docs/design/screens.md.
+            assumeTrue("no committed goldens for render profile $renderProfile", committed.isNotEmpty())
+        }
         composeRule.setContent {
             val spec = activeSpec.value
             OpenLifeTheme(darkTheme = spec.darkTheme) {
@@ -109,7 +127,7 @@ class BrandScreenshotInstrumentedTest {
 
     private fun writeGolden(filename: String, bitmap: Bitmap) {
         val directory = InstrumentationRegistry.getInstrumentation().targetContext
-            .getExternalFilesDir("goldens")!!
+            .getExternalFilesDir("goldens/$renderProfile")!!
         directory.mkdirs()
         File(directory, filename).outputStream().use { output ->
             assertTrue("could not write golden $filename", bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
@@ -118,7 +136,7 @@ class BrandScreenshotInstrumentedTest {
 
     private fun assertGolden(filename: String, actual: Bitmap) {
         val expected = InstrumentationRegistry.getInstrumentation().context.assets
-            .open("golden/$filename").use { BitmapFactory.decodeStream(it)!! }
+            .open("golden/$renderProfile/$filename").use { BitmapFactory.decodeStream(it)!! }
         assertEquals("golden width for $filename", expected.width, actual.width)
         assertEquals("golden height for $filename", expected.height, actual.height)
         var differentPixels = 0
@@ -131,7 +149,7 @@ class BrandScreenshotInstrumentedTest {
         }
         val tolerance = actual.width * actual.height * 0.005
         assertTrue(
-            "$filename differs in $differentPixels pixels; tolerance is $tolerance",
+            "$renderProfile/$filename differs in $differentPixels pixels; tolerance is $tolerance",
             differentPixels <= tolerance,
         )
     }

@@ -1,0 +1,108 @@
+id: P1-17
+title: Core UX and flow pass for the C0/C1 screens
+phase: P1
+status: todo
+depends_on: [P0-07, P0-10]
+estimate: M
+owner: agent
+closes_findings: []
+
+summary: >
+  The screens work but read as a skeleton. An owner-requested audit on
+  2026-09-23 found the following:
+  - The viewer's Delete deletes with no confirmation, which violates design
+    §8 step 5 (a MUST).
+  - About cannot be reached from anywhere. Settings can be reached only
+    from the vault-unavailable screen, and neither screen has a back
+    affordance.
+  - The empty list has no action and points at a bare "+" icon.
+  - The viewer places extracted text below a fixed 320 dp image box and
+    the details card.
+  - The details row reads "Imported: Imported <date>".
+  - The Saved confirmation only auto-dismisses after 5 s and offers no
+    control.
+  This step fixes those defects inside the existing visual identity.
+
+rationale: >
+  Owner instruction (2026-09-23): the app needs UX, flow and behaviour work.
+  Design §8 already specifies the flow (intake -> preview -> save -> list ->
+  viewer -> confirmed delete). VISUAL_IDENTITY.md §7 specifies one filled
+  primary action per screen, typographic empty states, outlined-error
+  destructive actions and Plex Mono for data. The code has not caught up
+  with either.
+
+ethos_check:
+  - "Delete stays confirmed and names the item (design §8.5); no undo is implied."
+  - "No new capability, permission, dependency or outbound path. Extracted text stays labelled untrusted."
+
+requirements:
+  - id: P1-17-R1
+    text: "MUST require confirmation for delete from the viewer using the same DeleteConfirmationDialog as the list; cancelling leaves the item untouched."
+  - id: P1-17-R2
+    text: "MUST give the list one primary action: a labelled extended FAB 'Import from photos' when items exist; an empty state with a Fraunces heading, one sentence and a filled button with the same label; no import action while loading or when the vault is unavailable."
+  - id: P1-17-R3
+    text: "MUST add a list overflow menu with Settings and About (this is P1-08-R1, pulled forward; P1-08 keeps screen content), and top app bars with Back on Settings and About."
+  - id: P1-17-R4
+    text: "MUST order the viewer as image, extracted text, then details. The image area MUST size from the source aspect ratio (display orientation applied) and be capped at a fraction of the window height. The fixed 320 dp box MUST be removed, and the image MUST fill the box so that the evidence overlay covers the drawn image."
+  - id: P1-17-R5
+    text: "MUST show import time and sizes in the data (Plex Mono) style and remove the duplicated 'Imported' wording in the viewer details."
+  - id: P1-17-R6
+    text: "MUST offer an explicit Done on the intake Saved state while keeping the existing auto-return."
+
+constraints:
+  - "No new dependency (material3-adaptive and window size classes remain P1-16)."
+  - "All text in string resources; lint and detekt clean after every commit."
+
+exclusions:
+  - "P1-08: About/Settings content (version, KeyInfo, licences, diagnostics layout)."
+  - "P1-13: moving viewer/preview decode off the main thread."
+  - "P1-16: two-pane layout, window size classes, multi-window and trim policy."
+  - "P2-06: zoom/pan and orientation-correct evidence geometry."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/ui/{SourceListScreen.kt,ViewerScreen.kt,IntakeScreen.kt,AboutScreen.kt,SourceLabel.kt}
+  - app/src/main/java/org/openlife/app/settings/ResetVaultFlow.kt
+  - app/src/main/java/org/openlife/app/navigation/OpenLifeNavHost.kt
+  - app/src/main/res/values/strings.xml
+  - app/src/androidTest/java/org/openlife/app/ui/{CoreFlowUxTest.kt,AccessibilitySemanticsTest.kt,NavigationBackTest.kt}
+  - app/src/androidTest/assets/golden/<profile>/
+
+tdd:
+  red:
+    - name: CoreFlowUxTest.viewerDeleteAsksForConfirmationBeforeDeleting
+    - name: CoreFlowUxTest.emptyListOffersOneImportAction
+    - name: CoreFlowUxTest.populatedListOffersImportAsPrimaryAction
+    - name: CoreFlowUxTest.loadingListHasNoImportAction
+    - name: CoreFlowUxTest.overflowMenuReachesSettingsAndAbout
+    - name: CoreFlowUxTest.settingsOffersBack
+    - name: CoreFlowUxTest.aboutOffersBack
+    - name: CoreFlowUxTest.viewerShowsExtractedTextBeforeDetails
+    - name: CoreFlowUxTest.viewerImageAreaFollowsSourceAspectRatio
+    - name: CoreFlowUxTest.viewerDetailsShowImportTimeOnce
+    - name: CoreFlowUxTest.savedStateOffersDone
+  green:
+    - "Implement R1-R6 with existing brand components."
+  refactor:
+    - "Move import-control lookups in existing tests from content description to text; regenerate goldens for the local profile."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug"
+    - "./gradlew :app:connectedDebugAndroidTest (dev36, plus CoreFlowUxTest at 320x640/160dpi)"
+    - "uiautomator dump of list (empty and populated), viewer, Settings, About"
+  evidence_required:
+    - "Test counts; uiautomator excerpts in docs/design/screens.md."
+
+acceptance_criteria:
+  - "Every red test passes; no existing instrumented test regresses."
+  - "From a fresh install a user can reach import, viewer, confirmed delete, Settings and About without system back or share intents."
+
+docs_to_update:
+  - docs/design/screens.md
+  - docs/capabilities/C0.md (flow notes)
+  - docs/verification/P1-17-core-ux.md
+
+risks:
+  - "Golden images change; CI-profile goldens must be regenerated after this step (P0-10 mechanism)."
+
+rollback: "Revert the branch; screens return to the previous layout."

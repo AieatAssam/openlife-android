@@ -58,6 +58,7 @@ fun OpenLifeNavHost(
                 onRetryVault = onRetryVault,
                 onFinishReset = onFinishReset,
                 onOpenSettings = { navController.navigate(Routes.Settings) },
+                onOpenAbout = { navController.navigate(Routes.About) },
             )
         }
         composable<Routes.Viewer> { entry ->
@@ -75,6 +76,7 @@ fun OpenLifeNavHost(
                     onRetryVault = onRetryVault,
                     onFinishReset = onFinishReset,
                     onOpenSettings = { navController.navigate(Routes.Settings) },
+                    onOpenAbout = { navController.navigate(Routes.About) },
                 )
             } else if (source == null) {
                 LaunchedEffect(route.sourceId) { navController.popBackStack() }
@@ -94,8 +96,10 @@ fun OpenLifeNavHost(
                 )
             }
         }
-        composable<Routes.Settings> { SettingsScreen(onResetVault, onResetComplete) }
-        composable<Routes.About> { AboutScreen() }
+        composable<Routes.Settings> {
+            SettingsScreen(onResetVault, onResetComplete, onBack = { navController.popBackStack() })
+        }
+        composable<Routes.About> { AboutScreen(onBack = { navController.popBackStack() }) }
     }
 }
 

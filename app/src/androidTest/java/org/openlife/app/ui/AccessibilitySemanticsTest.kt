@@ -171,7 +171,7 @@ class AccessibilitySemanticsTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Import from photos")
+        composeRule.onNodeWithText("Import from photos")
             .assertIsDisplayed()
             .assertHasClickAction()
     }
@@ -240,7 +240,7 @@ class AccessibilitySemanticsTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("Import from photos")
+        composeRule.onNodeWithText("Import from photos")
             .assertIsDisplayed()
             .assertHasClickAction()
         composeRule.onNodeWithContentDescription("Retry deletion")
@@ -263,7 +263,7 @@ class AccessibilitySemanticsTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Import from photos")
+        composeRule.onNodeWithText("Import from photos")
             .assertIsDisplayed()
             .assertHasClickAction()
         // Clickable rows merge label text into the row node, so measure the
