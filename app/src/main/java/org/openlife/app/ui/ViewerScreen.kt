@@ -28,8 +28,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,10 +57,9 @@ import org.openlife.vault.repository.ReadyReadResult
 /**
  * Design §8: "Opening an entry verifies and displays the saved artefact.
  * The details view can show import time, route and integrity status
- * without claiming authenticity." [loadBytes] only ever returns bytes that
- * have already authenticated (design §9); a null result here means
- * verification failed or the content is unreadable, never a shortcut past
- * authentication.
+ * without claiming authenticity." [loadContent] only ever yields bytes that
+ * have already authenticated (design §9); every other result is explained,
+ * never left on "Verifying…" (P1-13-R4).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,11 +74,8 @@ fun ViewerScreen(
     onCorrect: (OcrSpan, String) -> Unit = { _, _ -> },
     onReview: (OcrReviewState) -> Unit = {},
 ) {
-    // P1-13-R4 stub: preserves the old mapping (anything but Loaded stays "Verifying").
-    val bytes by produceState<ByteArray?>(initialValue = null, source.id) {
-        value = (loadContent() as? ReadyReadResult.Loaded)?.bytes
-    }
-    val verified = bytes != null
+    var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
+    val content = rememberViewerContent(source, loadContent, loadAttempt)
     var selectedRegion by remember(source.id) { mutableStateOf<org.openlife.vault.ocr.OcrEvidenceRegion?>(null) }
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }
     var correctionText by remember(source.id) { mutableStateOf("") }
@@ -92,9 +88,10 @@ fun ViewerScreen(
         ViewerContent(
             modifier = Modifier.fillMaxSize().padding(padding),
             source = source,
-            bytes = bytes,
+            content = content,
             selectedRegion = selectedRegion,
-            verified = verified,
+            onRetryLoad = { loadAttempt++ },
+            onDeleteRequested = { confirmingDelete = true },
             ocrState = ocrState,
             onExtractText = onExtractText,
             onCancelOcr = onCancelOcr,
@@ -157,9 +154,10 @@ private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Uni
 private fun ViewerContent(
     modifier: Modifier,
     source: Source,
-    bytes: ByteArray?,
+    content: ViewerContentState,
     selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?,
-    verified: Boolean,
+    onRetryLoad: () -> Unit,
+    onDeleteRequested: () -> Unit,
     ocrState: OcrUiState,
     onExtractText: () -> Unit,
     onCancelOcr: () -> Unit,
@@ -169,7 +167,7 @@ private fun ViewerContent(
 ) {
     Surface(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            ViewerImage(source, bytes, selectedRegion)
+            ViewerImage(source, content, selectedRegion, onRetry = onRetryLoad, onDelete = onDeleteRequested)
             if (selectedRegion != null) {
                 // TalkBack does not receive visual Canvas changes by itself.
                 // Announce the evidence action as a polite live region while
@@ -194,7 +192,7 @@ private fun ViewerContent(
                 onReview = onReview,
             )
             PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            DetailsSection(source = source, verified = verified)
+            DetailsSection(source = source, verified = content is ViewerContentState.Shown)
         }
     }
 }

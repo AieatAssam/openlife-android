@@ -7,6 +7,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -36,6 +37,7 @@ fun DeleteConfirmationDialog(itemLabel: String, onConfirm: () -> Unit, onDismiss
         confirmButton = {
             OutlinedButton(
                 onClick = onConfirm,
+                modifier = androidx.compose.ui.Modifier.testTag("delete_confirm"),
                 colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error,
                 ),

@@ -40,10 +40,11 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     private val _state = MutableStateFlow<SourceListUiState>(SourceListUiState.Loading)
     val state: StateFlow<SourceListUiState> = _state
 
+    // Evicted thumbnails are dropped, never recycled: a row that is still
+    // composed may draw the same instance again (F-28, P1-13-R6). From API 26
+    // on, bitmap pixel memory is released when the bitmap is collected.
     private val thumbnailCache = SensitiveContentCache<UUID, android.graphics.Bitmap?>(
-        onEvict = { bitmap ->
-            if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
-        },
+        onEvict = {},
         sizeOf = { bitmap -> bitmap?.allocationByteCount?.toLong() ?: 0L },
     )
     private val unregisterTrimCallback = application.registerSensitiveContentClearer(::clearSensitiveContent)

@@ -47,7 +47,7 @@ class ViewerScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("This item's saved content is unreadable", substring = true)
+        composeRule.onNodeWithText("This item’s saved content is unreadable", substring = true)
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Verifying…").fetchSemanticsNodes().let { nodes ->
             assertEquals("must not keep showing Verifying", 0, nodes.size)
