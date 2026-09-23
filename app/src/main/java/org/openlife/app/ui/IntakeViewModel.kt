@@ -447,6 +447,7 @@ class IntakeViewModel(
         // last-resort close; do not close an unknown descriptor here.
         activeImportJob?.cancel()
         lookupScope.cancel()
+        sourceId?.let(application::releaseImportSlot)
     }
 
     companion object {

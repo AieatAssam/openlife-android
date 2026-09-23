@@ -407,6 +407,31 @@ class IntakeAndListFlowTest {
         }
     }
 
+    /** P1-15: leaving a preview without Save or Cancel frees the one-import slot. */
+    @Test
+    fun leavingAPreviewWithoutDecidingDoesNotLockOutTheNextShare(): Unit = runBlocking {
+        val store = androidx.lifecycle.ViewModelStore()
+        val left = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                    IntakeViewModel(application, SavedStateHandle()) as T
+            }
+            androidx.lifecycle.ViewModelProvider(store, factory)[IntakeViewModel::class.java]
+        }
+        val abandoned = importUntilPreview(left, syntheticJpegBytes(variant = 15))
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { store.clear() }
+
+        val next = IntakeViewModel(application, SavedStateHandle())
+        next.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = 16)), "image/jpeg", IntakeKind.SHARE)
+        val settled = awaitState(next) { it is IntakeUiState.Preview || it is IntakeUiState.Busy }
+        assertTrue("an abandoned preview must not make the next share busy; was $settled", settled is IntakeUiState.Preview)
+
+        next.cancel()
+        awaitState(next) { it is IntakeUiState.Cancelled }
+        (application.vault() as VaultAccess.Ready).importRepository.cancelStagedImport(abandoned.sourceId)
+    }
+
     /** C0-14: deleting the item being viewed clears the viewer and returns to the list. */
     @Test
     fun deletingWhileViewingClearsViewerAndReturnsToList(): Unit = runBlocking {

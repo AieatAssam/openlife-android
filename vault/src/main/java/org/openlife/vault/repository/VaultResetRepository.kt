@@ -21,7 +21,7 @@ class VaultResetRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun resetVault(): VaultResetResult = withContext(ioDispatcher) {
-        mutationQueue.tryAcquire { resetWhileLocked() } ?: VaultResetResult.BUSY
+        mutationQueue.tryMutation { resetWhileLocked() } ?: VaultResetResult.BUSY
     }
 
     private fun resetWhileLocked(): VaultResetResult = try {

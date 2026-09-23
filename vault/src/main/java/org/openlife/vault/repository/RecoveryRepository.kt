@@ -33,7 +33,7 @@ class RecoveryRepository(
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
     suspend fun recover(): RecoveryReport = withContext(ioDispatcher) {
-        mutationQueue.acquire {
+        mutationQueue.withMutation {
             // A process death can leave an OCR operation marked RUNNING. Recovery
             // must make that state explicit before reconciling Sources; it can
             // never be treated as a confirmed result after restart.

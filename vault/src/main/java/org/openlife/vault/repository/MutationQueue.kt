@@ -1,30 +1,71 @@
 package org.openlife.vault.repository
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * The single repository-owned serial mutation queue covering imports,
- * deletion, and recovery (design §11). Import uses [tryAcquire], which
- * never blocks: if another mutation is already in progress, C0 asks the
- * user to finish or cancel it rather than queueing a second one
- * (ImportLimits.MAX_CONCURRENT_IMPORTS = 1). Deletion and recovery use
- * [acquire], which waits its turn — those are not subject to the
- * one-at-a-time *import* limit, but still must never run concurrently with
- * an import or with each other.
+ * The repository-owned serial mutation queue (design §11), with read leases.
+ *
+ * - [withReadLease]: many holders at once. Viewers use it, and so does
+ *   import preparation, which only creates rows and files for a fresh UUID.
+ *   A plaintext read therefore never makes an import "busy" (P1-15, F-29).
+ * - [withMutation] / [tryMutation]: exclusive. Save, cancel, deletion,
+ *   recovery, OCR bookkeeping and reset. A mutation waits for active read
+ *   leases to finish, so deletion can never race plaintext delivery.
+ *
+ * A mutation holds [gate] for its whole run; a reader only passes through
+ * [gate] to register. A waiting mutation therefore blocks new readers, and
+ * a steady stream of reads cannot starve deletion or reset. [gate] is fair
+ * (FIFO), so waiting mutations run in arrival order.
+ *
+ * The one-import-at-a-time rule is not this lock's job: see [ImportSlot].
+ *
+ * Never start a mutation while the same flow holds a read lease: the
+ * mutation waits for that lease and the flow never releases it. Work done
+ * under a read lease writes only through DAOs directly (for example the
+ * idempotent CORRUPT mark in SourceViewRepository), never through here.
  */
 class MutationQueue {
-    private val mutex = Mutex()
+    private val gate = Mutex()
+    private val readerLock = Any()
+    private var activeReaders = 0
+    private val readersIdle = MutableStateFlow(true)
 
-    suspend fun <T> acquire(block: suspend () -> T): T = mutex.withLock { block() }
+    suspend fun <T> withReadLease(block: suspend () -> T): T {
+        gate.withLock {
+            synchronized(readerLock) {
+                activeReaders++
+                readersIdle.value = false
+            }
+        }
+        try {
+            return block()
+        } finally {
+            synchronized(readerLock) {
+                activeReaders--
+                if (activeReaders == 0) readersIdle.value = true
+            }
+        }
+    }
 
-    /** Returns null immediately if a mutation is already in progress. */
-    suspend fun <T> tryAcquire(block: suspend () -> T): T? {
-        if (!mutex.tryLock()) return null
+    suspend fun <T> withMutation(block: suspend () -> T): T = gate.withLock {
+        readersIdle.first { it }
+        block()
+    }
+
+    /**
+     * Runs [block] exclusively, or returns null at once if another mutation
+     * holds the queue. Active read leases are waited for, not reported busy.
+     */
+    suspend fun <T> tryMutation(block: suspend () -> T): T? {
+        if (!gate.tryLock()) return null
         return try {
+            readersIdle.first { it }
             block()
         } finally {
-            mutex.unlock()
+            gate.unlock()
         }
     }
 }

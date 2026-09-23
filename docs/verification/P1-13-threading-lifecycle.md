@@ -101,4 +101,9 @@ recorded mutation, applied and then reverted:
 
 - No test asserts which thread performs the bitmap decode; StrictMode
   cannot observe CPU work.
-- API 29 results come from CI.
+- Hosted CI: PR #8 run 35898587922 ran app 70 and vault 85 connected tests
+  on both API 29 and API 36, and the release smoke passed on both. Earlier
+  runs on this PR hit a CI emulator problem: a cached quick-boot snapshot and
+  then stale userdata, which gave a false green with 0 app tests. That was
+  fixed in P0-10 follow-ups 229571f and 8accfee; see the ADR-0016
+  amendment.

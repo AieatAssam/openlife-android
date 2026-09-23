@@ -89,7 +89,7 @@ class VaultResetRepositoryTest {
     @Test
     fun resetIsRefusedWhileAnImportIsInProgress(): Unit = runBlocking {
         val queue = MutationQueue()
-        val result = queue.acquire {
+        val result = queue.withMutation {
             VaultResetRepository(paths, wrapper, queue).resetVault()
         }
         assertEquals(VaultResetResult.BUSY, result)

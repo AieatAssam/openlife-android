@@ -46,7 +46,11 @@ class OpenLifeApp : Application() {
     private val keystoreWrapper by lazy { KeystoreWrapper() }
     private val mutationQueue = MutationQueue()
     private val vaultInitLock = Mutex()
+
+    // Read outside vaultInitLock by releaseImportSlot, so publish it safely.
+    @Volatile
     private var cachedAccess: VaultAccess? = null
+
     private var cachedDatabase: OpenLifeDatabase? = null
     private val sensitiveContentClearers = mutableSetOf<() -> Unit>()
     private val preResetCallbacks = mutableSetOf<() -> Unit>()
@@ -162,6 +166,15 @@ class OpenLifeApp : Application() {
         }
     }
 
+    /**
+     * Frees the one-import slot when an intake screen goes away without Save
+     * or Cancel, so the next share is not refused as busy (P1-15). The stage
+     * itself is left for recovery; P1-01 removes it sooner.
+     */
+    fun releaseImportSlot(sourceId: java.util.UUID) {
+        (cachedAccess as? VaultAccess.Ready)?.importRepository?.importSlot?.release(sourceId)
+    }
+
     suspend fun retryVault() = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {
             if (cachedAccess is VaultAccess.Unavailable) cachedAccess = null
@@ -170,6 +183,11 @@ class OpenLifeApp : Application() {
 
     suspend fun resetVault(): VaultResetResult = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {
+            // Reset must not wait out an import and then silently wipe the
+            // user's preview: an import in progress makes reset busy.
+            if ((cachedAccess as? VaultAccess.Ready)?.importRepository?.importSlot?.isOccupied == true) {
+                return@withLock VaultResetResult.BUSY
+            }
             val clearers = synchronized(this@OpenLifeApp) { sensitiveContentClearers.toList() }
             val resetters = synchronized(this@OpenLifeApp) { preResetCallbacks.toList() }
             withContext(Dispatchers.Main.immediate) {
