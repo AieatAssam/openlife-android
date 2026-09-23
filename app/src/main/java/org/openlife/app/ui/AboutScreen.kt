@@ -22,7 +22,7 @@ import org.openlife.app.VaultFailureDiagnostics
 import org.openlife.app.ui.brand.FoldedCornerCard
 
 @Composable
-fun AboutScreen() {
+fun AboutScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val licenseText = produceState(initialValue = "", resources) {

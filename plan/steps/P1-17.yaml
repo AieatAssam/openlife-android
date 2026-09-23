@@ -72,8 +72,10 @@ tdd:
     - name: CoreFlowUxTest.viewerDeleteAsksForConfirmationBeforeDeleting
     - name: CoreFlowUxTest.emptyListOffersOneImportAction
     - name: CoreFlowUxTest.populatedListOffersImportAsPrimaryAction
+    - name: CoreFlowUxTest.loadingListHasNoImportAction
     - name: CoreFlowUxTest.overflowMenuReachesSettingsAndAbout
-    - name: CoreFlowUxTest.settingsAndAboutOfferBack
+    - name: CoreFlowUxTest.settingsOffersBack
+    - name: CoreFlowUxTest.aboutOffersBack
     - name: CoreFlowUxTest.viewerShowsExtractedTextBeforeDetails
     - name: CoreFlowUxTest.viewerImageAreaFollowsSourceAspectRatio
     - name: CoreFlowUxTest.viewerDetailsShowImportTimeOnce

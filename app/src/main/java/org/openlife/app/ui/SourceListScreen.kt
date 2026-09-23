@@ -60,6 +60,7 @@ fun SourceListScreen(
     onRetryVault: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onFinishReset: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
     var pendingDelete by remember { mutableStateOf<Source?>(null) }
 

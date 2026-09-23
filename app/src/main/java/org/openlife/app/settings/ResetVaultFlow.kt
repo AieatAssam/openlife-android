@@ -30,7 +30,11 @@ import org.openlife.app.R
 import org.openlife.vault.repository.VaultResetResult
 
 @Composable
-fun SettingsScreen(onResetVault: suspend () -> VaultResetResult, onResetComplete: () -> Unit) {
+fun SettingsScreen(
+    onResetVault: suspend () -> VaultResetResult,
+    onResetComplete: () -> Unit,
+    onBack: () -> Unit = {},
+) {
     Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
