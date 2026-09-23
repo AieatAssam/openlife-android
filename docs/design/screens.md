@@ -43,8 +43,22 @@ state when the scale is zero. No sound or haptics were added.
 The Compose test captures a fixed 360 × 640 pixel surface and compares the
 three components plus list, viewer, and first-run screens in light and dark
 themes to the committed PNGs under
-`app/src/androidTest/assets/golden/`. The comparator allows at most 0.5% of
-pixels to differ. Goldens contain only synthetic content.
+`app/src/androidTest/assets/golden/<render-profile>/`. The comparator allows
+at most 0.5% of pixels to differ. Goldens contain only synthetic content.
+
+A golden is valid only on the render profile that produced it:
+`api<SDK>-<Build.PRODUCT>-<density>dpi`. Text antialiasing and the GPU path
+(host GLES locally, SwiftShader on CI) differ enough that goldens made on the
+local `dev36` emulator failed on both CI legs by 15% of pixels (runs
+35800443855 and 35839602476). When no goldens exist for the running
+profile the test raises an assumption failure naming the profile; Gradle
+treats it as skipped, not passed, and it is recorded as a gap.
+
+Generate goldens on a device with `bash scripts/ci/generate-goldens.sh`, or on
+CI by dispatching the `CI` workflow with `generate-goldens: true`; the
+instrumented-results artefact then contains
+`app/src/androidTest/assets/golden/<profile>/`. Review the PNGs before
+committing them.
 
 Local evidence on the API 36 `dev36` emulator:
 

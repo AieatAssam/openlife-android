@@ -55,7 +55,7 @@ class ViewerScreenC1Test {
             )
         }
 
-        composeRule.onNodeWithText(span.text).assertIsDisplayed()
+        composeRule.onNodeWithText(span.text).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Show region").performScrollTo().performClick()
         composeRule.onNodeWithText("Correct").performScrollTo().performClick()
         // API 29's OutlinedTextField label is not a standalone unmerged Text
@@ -89,7 +89,7 @@ class ViewerScreenC1Test {
 
         composeRule.onNodeWithText(
             "Text extraction was not accepted: the image contains unsupported or mixed script text",
-        ).assertIsDisplayed()
+        ).performScrollTo().assertIsDisplayed()
     }
 
     @Test
