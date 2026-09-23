@@ -17,7 +17,21 @@ sealed interface VaultBootstrapResult {
      * was created. [reason] is a non-sensitive category, not raw exception
      * detail (design §9: error messages use non-sensitive categories).
      */
-    data class Unavailable(val reason: String) : VaultBootstrapResult
+    data class Unavailable(
+        val reason: String,
+        val cause: VaultUnavailableCause = VaultUnavailableCause.STORAGE_IO_ERROR,
+    ) : VaultBootstrapResult
+}
+
+/** Typed bootstrap failures; detailed platform exceptions are never exposed to callers. */
+enum class VaultUnavailableCause {
+    KEYSTORE_TEMPORARILY_UNAVAILABLE,
+    KEY_FILE_CORRUPT,
+    KEY_UNWRAP_FAILED,
+    DATABASE_WITHOUT_KEY,
+    DATABASE_OPEN_FAILED,
+    STORAGE_IO_ERROR,
+    RESET_INCOMPLETE,
 }
 
 private const val DATABASE_SECRET_LENGTH_BYTES = 32

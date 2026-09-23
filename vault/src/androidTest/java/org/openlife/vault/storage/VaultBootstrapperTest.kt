@@ -142,4 +142,17 @@ class VaultBootstrapperTest {
         // that an unreadable database is empty and delete its files").
         assertArrayEquals(byteArrayOf(1, 2, 3, 4), paths.databaseKeyFile.readBytes())
     }
+
+    @Test
+    fun eachFailureModeReportsItsTypedCause() {
+        paths.ensureDirectoriesExist()
+        paths.databaseKeyFile.writeBytes(byteArrayOf(1, 2, 3, 4))
+        val corrupt = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
+        assertEquals(VaultUnavailableCause.KEY_FILE_CORRUPT, corrupt.cause)
+
+        paths.databaseKeyFile.delete()
+        paths.databaseFile.writeBytes(byteArrayOf(7))
+        val missingKey = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
+        assertEquals(VaultUnavailableCause.DATABASE_WITHOUT_KEY, missingKey.cause)
+    }
 }
