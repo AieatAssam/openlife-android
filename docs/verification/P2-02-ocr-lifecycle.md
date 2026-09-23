@@ -54,6 +54,35 @@ Every test failed on the unchanged tree for the intended reason:
 | `./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest` | vault 99/99, app 72/72 |
 | `./gradlew detekt lint :app:test :vault:test assembleDebug` | BUILD SUCCESSFUL |
 
+## Hosted CI and a follow-up fix (227350b)
+
+- **First PR run (35920088708).** API 36 passed (app 72, vault 99). API 29
+  failed six app tests.
+  - The first failure was
+    `IntakeScreenFlowTest.secondShareDuringActiveImportShowsBusyCopy`. Both
+    imports queue on the single provider thread, so the second learned it
+    was Busy only after the first read ended.
+  - The test's slow stream (54 reads × 400 ms) outlasted the 15 s read
+    deadline. The first import therefore failed, freed the slot, and the
+    second reached Preview.
+  - The failing test did not clean up, so the process-wide slot stayed
+    taken, and five later imports reported Busy.
+- **Product fix.** `IntakeViewModel` checks the import slot before queueing
+  on the provider thread, so a second share is refused immediately.
+  `prepareImport` remains the authoritative check.
+- **Test fix.** The Busy test holds the first import on a latch instead of
+  sleeps. Both `IntakeScreenFlowTest` tests cancel in `finally`, so a
+  failure cannot cascade.
+- **Local rerun (dev36, freshly booted).** Both `IntakeScreenFlowTest` tests
+  passed. Six unrelated UI tests failed on window visibility or focus:
+  first run not shown, viewer image not shown,
+  `RootViewWithoutFocusException`. Those tests do not touch this change and
+  passed on the same code paths an hour earlier; recorded here as an
+  environment observation.
+- **Second PR run (35922895524).** `CONNECTED_TESTS_RAN` app=72 and vault=99
+  on both API 29 and API 36, and `RELEASE_SMOKE_RESULT=pass` on both.
+  Merged as ee104a5.
+
 ## Limits
 
 - **ML Kit cancellation is best effort.** Closing the recognizer abandons
