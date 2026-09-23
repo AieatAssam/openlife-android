@@ -10,19 +10,28 @@ class BrandScreenshotTest {
 
     @Test
     fun listViewerFirstRunMatchGoldensLightAndDark() {
-        val goldenDirectory = projectDir.resolve("app/src/androidTest/assets/golden")
-        assertTrue("golden directory is missing", Files.isDirectory(goldenDirectory))
-        listOf(
-            "brand-components-light.png",
-            "brand-components-dark.png",
-            "list-light.png",
-            "list-dark.png",
-            "viewer-light.png",
-            "viewer-dark.png",
-            "first-run-light.png",
-            "first-run-dark.png",
-        ).forEach { filename ->
-            assertTrue("missing golden $filename", Files.isRegularFile(goldenDirectory.resolve(filename)))
+        val goldenRoot = projectDir.resolve("app/src/androidTest/assets/golden")
+        assertTrue("golden directory is missing", Files.isDirectory(goldenRoot))
+        // Goldens are grouped by render profile (see docs/design/screens.md);
+        // every committed profile must carry the complete set.
+        val profiles = Files.list(goldenRoot).use { entries -> entries.filter(Files::isDirectory).toList() }
+        assertTrue("no render-profile golden directory", profiles.isNotEmpty())
+        profiles.forEach { profile ->
+            listOf(
+                "brand-components-light.png",
+                "brand-components-dark.png",
+                "list-light.png",
+                "list-dark.png",
+                "viewer-light.png",
+                "viewer-dark.png",
+                "first-run-light.png",
+                "first-run-dark.png",
+            ).forEach { filename ->
+                assertTrue(
+                    "missing golden ${profile.fileName}/$filename",
+                    Files.isRegularFile(profile.resolve(filename)),
+                )
+            }
         }
         val screenshotTest = projectDir.resolve(
             "app/src/androidTest/java/org/openlife/app/ui/brand/BrandScreenshotInstrumentedTest.kt",
