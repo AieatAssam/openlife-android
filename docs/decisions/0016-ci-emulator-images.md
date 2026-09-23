@@ -39,9 +39,10 @@ issues; Linux + KVM is still preferred over macOS.
   `system-images;android-36;aosp_atd;x86_64`. C0 connected tests do
   not require Play Store or a Pixel skin.
 - Do not pass `profile: pixel_7` in CI. Local `dev36` may keep Pixel 7.
-- Cache AVD snapshots (`~/.android/avd/*`, `~/.android/*.img`,
-  `~/.android/adb*`); generate a snapshot on cache miss, then run tests
-  with `-no-snapshot-save`.
+- Cache the AVD (`~/.android/avd/*`, `~/.android/*.img`,
+  `~/.android/adb*`), and run tests with `-no-snapshot`, so every run cold
+  boots. The earlier `-no-snapshot-save` choice was revised on 2026-09-23,
+  see Amendment below.
 - Run the connected Gradle command from
   `scripts/ci/run-connected-android-tests.sh` under bash. Bound leftover
   `adb logcat` to 20 seconds.
@@ -63,6 +64,23 @@ finished both legs in about seven minutes. Vault connected tests were
   needs Play services on the device (unbundled ML Kit, Play-dependent
   Photo Picker behaviour), switch that leg to `google_atd` or
   `google_apis` and record it here.
-- First instrumented run after a cache miss still cold-boots to write
-  the snapshot; later runs should restore it.
+- Every instrumented run cold-boots, which adds roughly half a minute per
+  leg. That is the price of not trusting a cached quick-boot snapshot.
 - `ubuntu-22.04` must be bumped deliberately when GitHub retires it.
+
+## Amendment 2026-09-23: cold boot instead of the cached snapshot
+
+- **What happened.** Run 35865849434 on `main` had a cache miss, generated
+  the AVD snapshot, cold-booted and passed, and saved the cache. Every later
+  API 29 run restored that snapshot: "Successfully loaded snapshot
+  'default_boot' using 1380 ms". The system then reported
+  `sys.boot_completed=1` with `settings` and `input` services missing ("No
+  service published for: input"). The runner's first `input keyevent`
+  failed, and the step then hung until the 55-minute job timeout (runs
+  35881181744 and 35888111697, including a rerun).
+- **What didn't cause it.** The emulator (37.1.11.0) and runner image
+  versions were identical between the good and bad runs. No app code ran
+  before the failure.
+- **Decision.** Test steps pass `-no-snapshot` (no load, no save). The
+  cached AVD still spares image and AVD creation.
+
