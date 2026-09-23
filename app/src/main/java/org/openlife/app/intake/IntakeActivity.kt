@@ -58,6 +58,9 @@ class IntakeActivity : ComponentActivity() {
     /** Test-only observation seam for the C0-05/C0-02/C0-03 instrumented tests. */
     fun currentStatusForTest(): String = describeForTest(this, viewModel.state.value)
 
+    /** Test-only: cancels the active import deterministically, as the Cancel button would. */
+    fun cancelForTest() = viewModel.cancel()
+
     override fun onStart() {
         super.onStart()
         viewModel.restoreSensitiveContentAfterForeground()
@@ -117,7 +120,7 @@ class IntakeActivity : ComponentActivity() {
                         onOpenExisting = { existingSourceId ->
                             startActivity(
                                 Intent(this, MainActivity::class.java).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    addFlags(openExistingIntentFlags())
                                     putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
                                 },
                             )

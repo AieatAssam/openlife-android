@@ -29,6 +29,7 @@ import org.openlife.app.ui.SourceListViewModel
 import org.openlife.app.ui.applySecureWindow
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.IntakeKind
+import org.openlife.vault.repository.ReadyReadResult
 import java.util.UUID
 
 /** Persistent source list and viewer host. Intake remains a separate activity. */
@@ -123,7 +124,7 @@ class MainActivity : ComponentActivity() {
                     thumbnailGeneration = thumbnailGeneration,
                     ocrStates = ocrStates,
                     loadThumbnail = viewModel::loadThumbnail,
-                    loadReadyBytes = { sourceId -> viewModelLoadReadyBytes(sourceId) },
+                    loadReadyContent = { sourceId -> loadReadyContent(sourceId) },
                     delete = { sourceId, onDone -> viewModel.delete(sourceId) { onDone() } },
                     extractText = ocrViewModel::run,
                     cancelOcr = ocrViewModel::cancel,
@@ -161,8 +162,9 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private suspend fun viewModelLoadReadyBytes(sourceId: UUID): ByteArray? =
-        ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.loadReadyBytes(sourceId)
+    private suspend fun loadReadyContent(sourceId: UUID): ReadyReadResult =
+        ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.readReadyBytes(sourceId)
+            ?: ReadyReadResult.Unavailable
 
     companion object {
         const val EXTRA_OPEN_SOURCE_ID = "org.openlife.app.MainActivity.openSourceId"

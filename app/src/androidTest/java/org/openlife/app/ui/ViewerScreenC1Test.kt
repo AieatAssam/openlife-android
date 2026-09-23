@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import kotlinx.coroutines.awaitCancellation
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -47,7 +48,7 @@ class ViewerScreenC1Test {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(sourceId),
-                loadBytes = { null },
+                loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
                 ocrState = OcrUiState.Ready(sourceId, revisionId, listOf(span)),
@@ -80,7 +81,7 @@ class ViewerScreenC1Test {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(sourceId),
-                loadBytes = { null },
+                loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
                 ocrState = OcrUiState.Failed(sourceId, OcrFailureReason.UNSUPPORTED_SCRIPT),
@@ -98,7 +99,7 @@ class ViewerScreenC1Test {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(sourceId, Orientation.ROTATE_90),
-                loadBytes = { null },
+                loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
             )

@@ -1,5 +1,6 @@
 package org.openlife.app.ui.brand
 
+import kotlinx.coroutines.awaitCancellation
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
@@ -101,7 +102,7 @@ class BrandScreenshotInstrumentedTest {
             capture("viewer", darkTheme) {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = {},
                 )

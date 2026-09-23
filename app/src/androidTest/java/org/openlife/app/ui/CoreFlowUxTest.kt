@@ -1,5 +1,7 @@
 package org.openlife.app.ui
 
+import org.openlife.vault.repository.ReadyReadResult
+import kotlinx.coroutines.awaitCancellation
 import android.graphics.Bitmap
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -42,7 +44,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = { deleteRequests++ },
                 )
@@ -177,7 +179,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = {},
                 )
@@ -197,7 +199,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(width = 200, height = 100),
-                    loadBytes = { jpeg(200, 100) },
+                    loadContent = { ReadyReadResult.Loaded(jpeg(200, 100)) },
                     onBack = {},
                     onDeleteRequested = {},
                 )
@@ -220,7 +222,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = {},
                 )

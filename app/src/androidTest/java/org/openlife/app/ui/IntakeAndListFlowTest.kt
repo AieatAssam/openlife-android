@@ -1,6 +1,13 @@
 package org.openlife.app.ui
 
+import android.content.ComponentName
+import android.content.Intent
 import android.graphics.Bitmap
+import androidx.test.core.app.ActivityScenario
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -12,10 +19,16 @@ import java.io.InputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
+import org.openlife.app.VaultAccess
+import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.intake.TestHostileContentProvider
+import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.repository.DeleteResult
 
@@ -280,6 +293,97 @@ class IntakeAndListFlowTest {
         intake.cancel()
         awaitState(intake) { it is IntakeUiState.Cancelled }
     }
+
+
+    /** F-37: rotation while the provider metadata lookup is in flight must not strand the user. */
+    @Test
+    fun rotatingDuringPreparingStillReachesPreviewOrCancelled() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        FirstRunPreferences.setAcknowledged(context)
+        TestHostileContentProvider.reset()
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes(variant = 7)
+        TestHostileContentProvider.getTypeDelayMillis = 3_000
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            component = ComponentName(context.packageName, IntakeActivity::class.java.name)
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("rotate.jpg"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
+                assertTrue(statusOf(scenario).startsWith("Preparing"))
+                scenario.recreate()
+                val deadline = System.currentTimeMillis() + CRYPTO_WAIT_MS
+                var status = statusOf(scenario)
+                while (System.currentTimeMillis() < deadline &&
+                    !status.startsWith("Prepared") && status != "Cancelled"
+                ) {
+                    Thread.sleep(POLL_MS)
+                    status = statusOf(scenario)
+                }
+                assertTrue("rotation during Preparing stranded the import; last=$status",
+                    status.startsWith("Prepared") || status == "Cancelled")
+                if (status.startsWith("Prepared")) {
+                    scenario.onActivity { it.cancelForTest() }
+                    awaitCancelledOrFinished(scenario)
+                }
+            }
+        } finally {
+            TestHostileContentProvider.reset()
+        }
+    }
+
+    /** C0-14: deleting the item being viewed clears the viewer and returns to the list. */
+    @Test
+    fun deletingWhileViewingClearsViewerAndReturnsToList(): Unit = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        FirstRunPreferences.setAcknowledged(context)
+        val intake = IntakeViewModel(application, SavedStateHandle())
+        val preview = importUntilPreview(intake, syntheticJpegBytes(variant = 11))
+        intake.confirmSave()
+        awaitState(intake) { it is IntakeUiState.Saved }
+
+        val open = Intent(context, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, preview.sourceId.toString())
+        }
+        ActivityScenario.launch<MainActivity>(open).use { scenario ->
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            assertTrue("viewer did not show the saved image",
+                device.wait(Until.hasObject(By.desc("Saved image")), CRYPTO_WAIT_MS))
+
+            val access = application.vault() as VaultAccess.Ready
+            assertTrue(access.deletionRepository.deleteSource(preview.sourceId) is DeleteResult.Deleted)
+
+            assertTrue("viewer image must be cleared",
+                device.wait(Until.gone(By.desc("Saved image")), CRYPTO_WAIT_MS))
+            assertTrue("list must be shown",
+                device.wait(Until.hasObject(By.desc("More options")), CRYPTO_WAIT_MS))
+            var finishing = true
+            scenario.onActivity { finishing = it.isFinishing }
+            assertFalse("MainActivity must stay open", finishing)
+        }
+    }
+
+    private fun statusOf(scenario: ActivityScenario<IntakeActivity>): String {
+        var status = ""
+        scenario.onActivity { status = it.currentStatusForTest() }
+        return status
+    }
+
+    /** Cancelled finishes IntakeActivity, so a destroyed scenario also counts. */
+    private fun awaitCancelledOrFinished(scenario: ActivityScenario<IntakeActivity>) {
+        val deadline = System.currentTimeMillis() + CRYPTO_WAIT_MS
+        while (System.currentTimeMillis() < deadline) {
+            if (scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED) return
+            if (statusOf(scenario) == "Cancelled") return
+            Thread.sleep(POLL_MS)
+        }
+        throw AssertionError("import was not cancelled; last=${statusOf(scenario)}")
+    }
+
+    private fun stageFiles(): List<String> =
+        VaultPaths(application).vaultDir.walkTopDown().filter { it.isFile && it.name.endsWith(".stage") }
+            .map { it.name }.toList()
 
     /**
      * Crypto + SQLCipher on a software emulator can exceed a 30s poll after

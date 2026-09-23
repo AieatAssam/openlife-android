@@ -55,6 +55,17 @@ class ManifestBoundaryTest {
     }
 
     @Test
+    fun mainActivityIsSingleTaskSoOpenExistingReusesIt() {
+        // P1-13-R9 / F-44: with FLAG_ACTIVITY_NEW_TASK from intake, singleTask
+        // routes "Open existing" to the one MainActivity instead of a copy.
+        val main = elements(readReleaseManifest()).single { element ->
+            element.localName == "activity" &&
+                element.getAttributeNS(androidNamespace, "name") == "org.openlife.app.MainActivity"
+        }
+        assertEquals("singleTask", main.getAttributeNS(androidNamespace, "launchMode"))
+    }
+
+    @Test
     fun backupIsDisabledInTheReleaseManifest() {
         val application = readReleaseManifest().documentElement.childElements("application").single()
         assertEquals("false", application.getAttributeNS(androidNamespace, "allowBackup"))

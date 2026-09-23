@@ -16,6 +16,7 @@ import org.openlife.app.ui.AboutScreen
 import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
+import org.openlife.vault.repository.ReadyReadResult
 import org.openlife.vault.repository.VaultResetResult
 import java.util.UUID
 
@@ -25,7 +26,7 @@ fun OpenLifeNavHost(
     thumbnailGeneration: Long,
     ocrStates: Map<UUID, org.openlife.app.ui.OcrUiState>,
     loadThumbnail: suspend (UUID) -> android.graphics.Bitmap?,
-    loadReadyBytes: suspend (UUID) -> ByteArray?,
+    loadReadyContent: suspend (UUID) -> ReadyReadResult,
     delete: (UUID, () -> Unit) -> Unit,
     extractText: (UUID) -> Unit,
     cancelOcr: (UUID) -> Unit,
@@ -83,7 +84,7 @@ fun OpenLifeNavHost(
             } else {
                 ViewerScreen(
                     source = source,
-                    loadBytes = { loadReadyBytes(source.id) },
+                    loadContent = { loadReadyContent(source.id) },
                     onBack = { navController.popBackStack() },
                     onDeleteRequested = {
                         delete(source.id) { navController.popBackStack() }

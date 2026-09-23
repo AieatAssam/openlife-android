@@ -52,6 +52,7 @@ import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.repository.ReadyReadResult
 
 /**
  * Design §8: "Opening an entry verifies and displays the saved artefact.
@@ -65,7 +66,7 @@ import org.openlife.vault.ocr.OcrSpan
 @Composable
 fun ViewerScreen(
     source: Source,
-    loadBytes: suspend () -> ByteArray?,
+    loadContent: suspend () -> ReadyReadResult,
     onBack: () -> Unit,
     onDeleteRequested: () -> Unit,
     ocrState: OcrUiState = OcrUiState.Idle,
@@ -74,7 +75,10 @@ fun ViewerScreen(
     onCorrect: (OcrSpan, String) -> Unit = { _, _ -> },
     onReview: (OcrReviewState) -> Unit = {},
 ) {
-    val bytes by produceState<ByteArray?>(initialValue = null, source.id) { value = loadBytes() }
+    // P1-13-R4 stub: preserves the old mapping (anything but Loaded stays "Verifying").
+    val bytes by produceState<ByteArray?>(initialValue = null, source.id) {
+        value = (loadContent() as? ReadyReadResult.Loaded)?.bytes
+    }
     val verified = bytes != null
     var selectedRegion by remember(source.id) { mutableStateOf<org.openlife.vault.ocr.OcrEvidenceRegion?>(null) }
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }

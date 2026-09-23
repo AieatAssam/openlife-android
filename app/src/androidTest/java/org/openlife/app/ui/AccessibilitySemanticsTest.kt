@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import org.openlife.vault.repository.ReadyReadResult
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -188,7 +189,7 @@ class AccessibilitySemanticsTest {
             ) {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { tinyJpeg() },
+                    loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
                     onBack = {},
                     onDeleteRequested = {},
                 )
@@ -204,7 +205,7 @@ class AccessibilitySemanticsTest {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(),
-                loadBytes = { tinyJpeg() },
+                loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
                 onBack = {},
                 onDeleteRequested = {},
             )

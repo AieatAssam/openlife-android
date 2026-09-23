@@ -71,6 +71,9 @@ class TestHostileContentProvider : ContentProvider() {
          */
         @Volatile var artificialDelayMillis: Long = 0
 
+        /** Bounded delay inside getType, the metadata lookup that precedes open (F-37). */
+        @Volatile var getTypeDelayMillis: Long = 0
+
         private var openCount = 0
 
         fun reset() {
@@ -79,6 +82,7 @@ class TestHostileContentProvider : ContentProvider() {
             failOpen = false
             mutateAfterFirstOpen = false
             artificialDelayMillis = 0
+            getTypeDelayMillis = 0
             openCount = 0
         }
 
@@ -158,7 +162,10 @@ class TestHostileContentProvider : ContentProvider() {
         return fd
     }
 
-    override fun getType(uri: Uri): String? = mimeTypeToReport
+    override fun getType(uri: Uri): String? {
+        if (getTypeDelayMillis > 0) Thread.sleep(getTypeDelayMillis)
+        return mimeTypeToReport
+    }
 
     override fun query(
         uri: Uri,
