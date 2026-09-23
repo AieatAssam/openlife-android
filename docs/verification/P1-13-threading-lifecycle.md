@@ -46,7 +46,7 @@ recorded mutation, applied and then reverted:
 | Command | Result |
 | --- | --- |
 | `./gradlew detekt lint :app:test :vault:test assembleDebug` | BUILD SUCCESSFUL |
-| `./gradlew :app:connectedDebugAndroidTest` | 68/68; every class under `StrictModeRule` |
+| `./gradlew :app:connectedDebugAndroidTest` | 70/70 after the review fixes; every class under `StrictModeRule` |
 | `./gradlew :vault:connectedDebugAndroidTest` | 85/85 |
 | `scripts/release-smoke.sh app-debug.apk` (share → preview → save → view → confirmed delete) | `RELEASE_SMOKE_RESULT=pass` |
 | `adb logcat -d \| grep -c 'StrictMode policy violation'` after that flow | 0 (0 with org.openlife frames) |
@@ -66,11 +66,29 @@ recorded mutation, applied and then reverted:
   idle preview needs P1-15's `importInProgress` flag. The deadline
   end-to-end case through `IntakeViewModel` is the existing P1-09 test
   `readDeadlineProducesFailedStateAndReleasesTheDescriptorOnTheOwningThread`.
-- **R9:** a runbook check with `dumpsys activity activities` is not run
-  here. The JVM flag test and the manifest boundary test cover the
+- **R9:** checked on dev36 with `dumpsys activity activities`. The steps
+  were: share a MediaStore image and save it; share it again; the duplicate
+  screen appears; tap "Open existing". There was exactly one
+  `org.openlife/.app.MainActivity` record (`Hist #0`, task 667), resumed,
+  showing the viewer. An `am start` from the shell always adds NEW_TASK,
+  so this cannot reproduce a share that lands inside another app's task;
+  the JVM flag test and the manifest boundary test cover that
   configuration.
 
 ## Observations
+
+- **Leaving a preview discards it.** Home alone finishes IntakeActivity,
+  because it is `noHistory`, and the stage is left for cleanup. This is the
+  existing F-01 behaviour owned by P1-01, not an effect of `singleTask`.
+  `singleTask` gives the same outcome when returning through the launcher.
+- **Found in review and fixed (62bbf44 RED, 5d6720d GREEN):**
+  - Moving `getType` into the ViewModel first put it on the process-wide
+    provider thread. A stalled provider then blocked other imports and
+    Cancel. The lookup now runs on IO, and its result is awaited in a way
+    that can be cancelled.
+  - Every recreation was first treated as process death, which rejected a
+    share still waiting on first run. A retained ViewModel now marks a
+    configuration change.
 
 - The Compose test rule and ActivityScenario/UiDevice checks do not mix in
   one class: MainActivity was RESUMED but never drawn. Compose-driven intake
