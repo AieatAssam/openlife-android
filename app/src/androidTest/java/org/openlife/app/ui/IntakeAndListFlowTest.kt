@@ -338,6 +338,75 @@ class IntakeAndListFlowTest {
         }
     }
 
+    /** P1-13-R8: a provider stalling in getType neither blocks Cancel nor other imports. */
+    @Test
+    fun cancelDuringASlowProviderTypeLookupIsPromptAndDoesNotBlockOtherImports(): Unit = runBlocking {
+        TestHostileContentProvider.reset()
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes(variant = 12)
+        TestHostileContentProvider.getTypeDelayMillis = 10_000
+        try {
+            val stalled = IntakeViewModel(application, SavedStateHandle())
+            stalled.startImportFromUri(
+                TestHostileContentProvider.uriFor("stall.jpg").toString(),
+                "image/jpeg",
+                IntakeKind.SHARE,
+            )
+            kotlinx.coroutines.delay(1_000)
+
+            val other = IntakeViewModel(application, SavedStateHandle())
+            val otherPreview = importUntilPreview(other, syntheticJpegBytes(variant = 13), timeoutMs = 8_000)
+            other.cancel()
+            awaitState(other) { it is IntakeUiState.Cancelled }
+
+            val cancelledAt = System.currentTimeMillis()
+            stalled.cancel()
+            awaitState(stalled, timeoutMs = 2_000) { it is IntakeUiState.Cancelled }
+            assertTrue("cancel took ${System.currentTimeMillis() - cancelledAt}ms",
+                System.currentTimeMillis() - cancelledAt < 2_000)
+            assertTrue(otherPreview.previewBytes != null)
+        } finally {
+            TestHostileContentProvider.reset()
+        }
+    }
+
+    /** P1-13-R8: rotating on the first-run screen of a first share must not reject that share. */
+    @Test
+    fun rotatingOnFirstRunStillImportsAfterAcknowledging() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.getSharedPreferences("first_run", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        TestHostileContentProvider.reset()
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes(variant = 14)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            component = ComponentName(context.packageName, IntakeActivity::class.java.name)
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("firstrun.jpg"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
+                val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                assertTrue(device.wait(Until.hasObject(By.text("I understand")), CRYPTO_WAIT_MS))
+                scenario.recreate()
+                device.wait(Until.findObject(By.text("I understand")), CRYPTO_WAIT_MS)!!.click()
+                val deadline = System.currentTimeMillis() + CRYPTO_WAIT_MS
+                var status = statusOf(scenario)
+                while (System.currentTimeMillis() < deadline && !status.startsWith("Prepared") &&
+                    !status.startsWith("Not imported")
+                ) {
+                    Thread.sleep(POLL_MS)
+                    status = statusOf(scenario)
+                }
+                assertTrue("a share that was never started must still import; last=$status",
+                    status.startsWith("Prepared"))
+                scenario.onActivity { it.cancelForTest() }
+                awaitCancelledOrFinished(scenario)
+            }
+        } finally {
+            FirstRunPreferences.setAcknowledged(context)
+            TestHostileContentProvider.reset()
+        }
+    }
+
     /** C0-14: deleting the item being viewed clears the viewer and returns to the list. */
     @Test
     fun deletingWhileViewingClearsViewerAndReturnsToList(): Unit = runBlocking {
