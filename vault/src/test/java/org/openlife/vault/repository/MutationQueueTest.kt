@@ -13,20 +13,20 @@ import org.junit.Test
 class MutationQueueTest {
 
     @Test
-    fun tryAcquireSucceedsWhenIdle() = runTest {
+    fun tryMutationSucceedsWhenIdle() = runTest {
         val queue = MutationQueue()
-        val result = queue.tryAcquire { "done" }
+        val result = queue.tryMutation { "done" }
         assertEquals("done", result)
     }
 
     @Test
-    fun tryAcquireFailsWhileAnotherMutationHoldsTheQueue() = runTest {
+    fun tryMutationFailsWhileAnotherMutationHoldsTheQueue() = runTest {
         val queue = MutationQueue()
         val holding = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
 
         val first = async {
-            queue.tryAcquire {
+            queue.tryMutation {
                 holding.complete(Unit)
                 release.await()
             }
@@ -36,7 +36,7 @@ class MutationQueueTest {
         // A second import attempt while the first is still in progress must
         // be told "busy" immediately, not queued (design §12: at most one
         // concurrent import; ask the user to finish or cancel the first).
-        val second = queue.tryAcquire { "should not run" }
+        val second = queue.tryMutation { "should not run" }
         assertNull(second)
 
         release.complete(Unit)
@@ -44,20 +44,20 @@ class MutationQueueTest {
     }
 
     @Test
-    fun acquireWaitsForAPriorMutationInsteadOfFailing() = runTest {
+    fun withMutationWaitsForAPriorMutationInsteadOfFailing() = runTest {
         val queue = MutationQueue()
         val holding = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
 
         val first = async {
-            queue.tryAcquire {
+            queue.tryMutation {
                 holding.complete(Unit)
                 release.await()
             }
         }
         holding.await()
 
-        val second = async { queue.acquire { "deletion ran" } }
+        val second = async { queue.withMutation { "deletion ran" } }
         release.complete(Unit)
         first.await()
 
@@ -65,10 +65,10 @@ class MutationQueueTest {
     }
 
     @Test
-    fun tryAcquireSucceedsAgainAfterThePriorMutationReleases() = runTest {
+    fun tryMutationSucceedsAgainAfterThePriorMutationReleases() = runTest {
         val queue = MutationQueue()
-        queue.tryAcquire { "first" }
-        val second = queue.tryAcquire { "second" }
+        queue.tryMutation { "first" }
+        val second = queue.tryMutation { "second" }
         assertEquals("second", second)
     }
 
@@ -79,7 +79,12 @@ class MutationQueueTest {
         val queue = MutationQueue()
         val firstIn = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        val first = async { queue.withReadLease { firstIn.complete(Unit); release.await() } }
+        val first = async {
+            queue.withReadLease {
+                firstIn.complete(Unit)
+                release.await()
+            }
+        }
         firstIn.await()
 
         val second = async { queue.withReadLease { "second read" } }
@@ -96,7 +101,12 @@ class MutationQueueTest {
         val readerIn = CompletableDeferred<Unit>()
         val releaseReader = CompletableDeferred<Unit>()
         val order = mutableListOf<String>()
-        val reader = async { queue.withReadLease { readerIn.complete(Unit); releaseReader.await() } }
+        val reader = async {
+            queue.withReadLease {
+                readerIn.complete(Unit)
+                releaseReader.await()
+            }
+        }
         readerIn.await()
 
         val mutation = async { queue.withMutation { order += "mutation" } }
@@ -121,7 +131,12 @@ class MutationQueueTest {
         val queue = MutationQueue()
         val readerIn = CompletableDeferred<Unit>()
         val releaseReader = CompletableDeferred<Unit>()
-        val reader = async { queue.withReadLease { readerIn.complete(Unit); releaseReader.await() } }
+        val reader = async {
+            queue.withReadLease {
+                readerIn.complete(Unit)
+                releaseReader.await()
+            }
+        }
         readerIn.await()
 
         val attempt = async { queue.tryMutation { "ran" } }
@@ -138,7 +153,12 @@ class MutationQueueTest {
         val queue = MutationQueue()
         val holding = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        val first = async { queue.withMutation { holding.complete(Unit); release.await() } }
+        val first = async {
+            queue.withMutation {
+                holding.complete(Unit)
+                release.await()
+            }
+        }
         holding.await()
 
         assertNull(queue.tryMutation { "should not run" })

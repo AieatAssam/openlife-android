@@ -84,10 +84,15 @@ class RecoveryRepositoryTest {
         }
     }
 
+    /**
+     * Leaves a STAGED import, as a process killed before Save would. A new
+     * process starts with a free import slot, so free it here too (P1-15).
+     */
     private suspend fun prepareOnly(): UUID {
         val prepared = importRepository.prepareImport(
             ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE
         ) as PrepareResult.Prepared
+        importRepository.importSlot.release(prepared.sourceId)
         return prepared.sourceId
     }
 

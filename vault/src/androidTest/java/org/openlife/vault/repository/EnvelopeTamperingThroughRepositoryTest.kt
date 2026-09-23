@@ -153,7 +153,7 @@ class EnvelopeTamperingThroughRepositoryTest {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val mutation = async {
-            mutationQueue.acquire {
+            mutationQueue.withMutation {
                 entered.complete(Unit)
                 release.await()
             }

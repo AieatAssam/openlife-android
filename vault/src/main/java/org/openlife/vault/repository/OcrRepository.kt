@@ -55,7 +55,7 @@ class OcrRepository(
         }
     }
 
-    private suspend fun capture(sourceId: UUID): Capture = mutationQueue.acquire {
+    private suspend fun capture(sourceId: UUID): Capture = mutationQueue.withMutation {
         val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
         if (source == null) {
             Capture.Failure(OcrFailureReason.SOURCE_NOT_READY)
@@ -149,7 +149,7 @@ class OcrRepository(
     }
 
     private suspend fun persist(sourceId: UUID, revision: OcrRevision, spans: List<OcrSpanDraft>): OcrRunResult =
-        mutationQueue.acquire {
+        mutationQueue.withMutation {
             val current = database.ocrDao().findRevision(revision.id.toString())?.toDomain()
             val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
             if (current == null || current.state != OcrRevisionState.RUNNING || source?.state != SourceState.READY) {
@@ -194,13 +194,13 @@ class OcrRepository(
 
     suspend fun addCorrection(revisionId: UUID, spanId: UUID?, correctedText: String): Boolean =
         withContext(ioDispatcher) {
-            mutationQueue.acquire {
+            mutationQueue.withMutation {
                 val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain()
-                    ?: return@acquire false
-                if (revision.state != OcrRevisionState.READY) return@acquire false
+                    ?: return@withMutation false
+                if (revision.state != OcrRevisionState.READY) return@withMutation false
                 if (spanId != null) {
-                    val span = database.ocrDao().findSpan(spanId.toString()) ?: return@acquire false
-                    if (span.revisionId != revisionId.toString()) return@acquire false
+                    val span = database.ocrDao().findSpan(spanId.toString()) ?: return@withMutation false
+                    if (span.revisionId != revisionId.toString()) return@withMutation false
                 }
                 database.ocrDao().insertUserRevision(
                     OcrUserRevision(
@@ -216,10 +216,10 @@ class OcrRepository(
         }
 
     suspend fun setReviewState(revisionId: UUID, reviewState: OcrReviewState): Boolean = withContext(ioDispatcher) {
-        mutationQueue.acquire {
+        mutationQueue.withMutation {
             val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain()
-                ?: return@acquire false
-            if (revision.state != OcrRevisionState.READY) return@acquire false
+                ?: return@withMutation false
+            if (revision.state != OcrRevisionState.READY) return@withMutation false
             database.ocrDao().updateRevision(revision.copy(reviewState = reviewState).toEntity())
             true
         }
@@ -227,8 +227,8 @@ class OcrRepository(
 
     private suspend fun markCancelled(revisionId: UUID) {
         withContext(NonCancellable) {
-            mutationQueue.acquire {
-                val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain() ?: return@acquire
+            mutationQueue.withMutation {
+                val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain() ?: return@withMutation
                 if (revision.state == OcrRevisionState.RUNNING) {
                     database.ocrDao().updateRevision(
                         revision.copy(
@@ -242,8 +242,8 @@ class OcrRepository(
     }
 
     private suspend fun markFailed(revisionId: UUID, reason: OcrFailureReason) {
-        mutationQueue.acquire {
-            val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain() ?: return@acquire
+        mutationQueue.withMutation {
+            val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain() ?: return@withMutation
             if (revision.state == OcrRevisionState.RUNNING) {
                 database.ocrDao().updateRevision(
                     revision.copy(state = OcrRevisionState.FAILED, failureReason = reason).toEntity(),

@@ -2,6 +2,7 @@ package org.openlife.vault.repository
 
 import android.database.sqlite.SQLiteFullException
 import android.system.ErrnoException
+import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,17 +38,17 @@ class DeletionRepository(
 ) {
 
     suspend fun deleteSource(sourceId: UUID): DeleteResult = withContext(ioDispatcher) {
-        mutationQueue.acquire {
+        mutationQueue.withMutation {
             try {
                 val entity = sourceDao.findById(sourceId.toString())
-                    ?: return@acquire DeleteResult.NotFound
+                    ?: return@withMutation DeleteResult.NotFound
                 val source = entity.toDomain()
 
                 if (source.state != SourceState.READY &&
                     source.state != SourceState.CORRUPT &&
                     source.state != SourceState.DELETING
                 ) {
-                    return@acquire DeleteResult.NotFound
+                    return@withMutation DeleteResult.NotFound
                 }
 
                 // Committed before any file is touched, so a kill partway through
@@ -60,15 +61,19 @@ class DeletionRepository(
                 val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
                 val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
                 if (!stageRemoved || !blobRemoved) {
-                    return@acquire DeleteResult.Failed
+                    return@withMutation DeleteResult.Failed
                 }
 
                 // Delete derived OCR rows on the same serialized mutation path as the
                 // Source. The foreign keys also cascade in SQLite, but keeping this
                 // explicit makes the C1 deletion contract independent of connection
                 // pragma defaults and leaves no dependent provenance row behind.
-                database.ocrDao().deleteForSource(sourceId.toString())
-                sourceDao.deleteById(sourceId.toString())
+                // One transaction: a failure leaves both tables as they were, with
+                // the Source still DELETING for retry (P1-15-R3).
+                database.withTransaction {
+                    database.ocrDao().deleteForSource(sourceId.toString())
+                    sourceDao.deleteById(sourceId.toString())
+                }
                 DeleteResult.Deleted
             } catch (error: java.io.IOException) {
                 deleteFailureFor(error)

@@ -760,14 +760,16 @@ class ImportRepositoryTest {
             queue.withReadLease { readerIn.complete(Unit); releaseReader.await() }
         }
         readerIn.await()
-        try {
-            val result = importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
-            assertTrue("a viewer read must not make an import busy: $result", result is PrepareResult.Prepared)
-            importer.cancelStagedImport((result as PrepareResult.Prepared).sourceId)
+        val result = try {
+            importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
         } finally {
+            // Release before cancelling: cancel is a mutation and correctly
+            // waits for this read lease (P1-15-R2).
             releaseReader.complete(Unit)
             reader.await()
         }
+        assertTrue("a viewer read must not make an import busy: $result", result is PrepareResult.Prepared)
+        importer.cancelStagedImport((result as PrepareResult.Prepared).sourceId)
     }
 
     @Test

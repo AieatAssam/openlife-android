@@ -39,8 +39,8 @@ class SourceViewRepository(
 
     /** The not-yet-saved stage, authenticated from the encrypted file on disk (design §11 step 4). */
     suspend fun loadStagePreviewBytes(sourceId: UUID): ByteArray? = withContext(ioDispatcher) {
-        mutationQueue.acquire {
-            val source = database.sourceDao().findById(sourceId.toString())?.toDomain() ?: return@acquire null
+        mutationQueue.withReadLease {
+            val source = database.sourceDao().findById(sourceId.toString())?.toDomain() ?: return@withReadLease null
             authenticator.decryptAndVerify(source, paths.stageFile(sourceId))
         }
     }
@@ -53,9 +53,9 @@ class SourceViewRepository(
      * (design §9). A Keystore or I/O failure marks nothing (P1-13-R5).
      */
     suspend fun readReadyBytes(sourceId: UUID): ReadyReadResult = withContext(ioDispatcher) {
-        mutationQueue.acquire {
+        mutationQueue.withReadLease {
             val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
-            if (source == null || source.state != SourceState.READY) return@acquire ReadyReadResult.Unavailable
+            if (source == null || source.state != SourceState.READY) return@withReadLease ReadyReadResult.Unavailable
             when (val check = authenticator.check(source, paths.blobFile(sourceId))) {
                 is ArtefactCheck.Verified -> ReadyReadResult.Loaded(check.plaintext)
 

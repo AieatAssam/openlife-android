@@ -68,16 +68,30 @@ class ImportRepository(
 
     /** The one-import-at-a-time rule (design §12); P1-15. */
     val importSlot = ImportSlot()
+    private val duplicateVerifier = DuplicateVerifier(paths, sourceDao, authenticator)
 
     suspend fun prepareImport(
         inputStream: InputStream,
         declaredMimeType: String,
         intakeKind: IntakeKind,
         deadline: () -> Boolean = { false },
-    ): PrepareResult = mutationQueue.tryAcquire {
-        prepareImportLocked(inputStream, declaredMimeType, intakeKind, deadline)
+    ): PrepareResult {
+        // Busy is decided by the import slot, not by lock state (P1-15-R1).
+        // Preparation only creates a row and a file for a fresh UUID, so it
+        // shares a read lease with viewers; deletion, recovery, save and
+        // reset stay excluded.
+        if (!importSlot.tryBeginPreparing()) return PrepareResult.Busy
+        var result: PrepareResult? = null
+        try {
+            result = mutationQueue.withReadLease {
+                prepareImportLocked(inputStream, declaredMimeType, intakeKind, deadline)
+            }
+            return result
+        } finally {
+            val prepared = result as? PrepareResult.Prepared
+            if (prepared != null) importSlot.preparedAs(prepared.sourceId) else importSlot.preparationEnded()
+        }
     }
-        ?: PrepareResult.Busy
 
     private suspend fun prepareImportLocked(
         inputStream: InputStream,
@@ -253,10 +267,14 @@ class ImportRepository(
      * touch.
      */
     suspend fun cancelStagedImport(sourceId: UUID): Boolean = withContext(ioDispatcher) {
-        mutationQueue.acquire {
-            val entity = sourceDao.findById(sourceId.toString())
-            if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
-            cancelStage(sourceId)
+        try {
+            mutationQueue.withMutation {
+                val entity = sourceDao.findById(sourceId.toString())
+                if (entity == null || entity.state != SourceState.STAGED.name) return@withMutation false
+                cancelStage(sourceId)
+            }
+        } finally {
+            importSlot.release(sourceId)
         }
     }
 
@@ -268,52 +286,63 @@ class ImportRepository(
      * resolve; it is never reported as saved.
      */
     suspend fun saveImport(sourceId: UUID): SaveResult = withContext(ioDispatcher) {
-        mutationQueue.acquire {
-            val entity = sourceDao.findById(sourceId.toString())
-            if (entity == null || entity.state != SourceState.STAGED.name) {
-                return@acquire SaveResult.StageNotFound
+        try {
+            mutationQueue.withMutation {
+                val entity = sourceDao.findById(sourceId.toString())
+                if (entity == null || entity.state != SourceState.STAGED.name) {
+                    return@withMutation SaveResult.StageNotFound
+                }
+                val source = entity.toDomain()
+
+                val stageFile = paths.stageFile(sourceId)
+                if (!stageFile.exists()) return@withMutation SaveResult.StageNotFound
+
+                if (!authenticator.authenticates(source, stageFile)) return@withMutation SaveResult.Failed
+
+                when (val duplicate = duplicateVerifier.check(source, stageFile)) {
+                    DuplicateCheck.None -> Unit
+
+                    is DuplicateCheck.Found -> {
+                        cancelStage(sourceId)
+                        return@withMutation SaveResult.DuplicateFound(duplicate.existingId)
+                    }
+
+                    DuplicateCheck.Unverifiable -> return@withMutation SaveResult.Failed
+                }
+
+                try {
+                    val blobFile = paths.blobFile(sourceId)
+                    if (!fileOps.rename(stageFile, blobFile)) return@withMutation SaveResult.Failed
+                    fileOps.syncDirectory(paths.artefactsDir)
+                } catch (error: IOException) {
+                    return@withMutation saveFailureFor(error)
+                } catch (error: ErrnoException) {
+                    return@withMutation saveFailureFor(error)
+                }
+
+                try {
+                    sourceDao.update(source.copy(state = SourceState.READY).toEntity())
+                } catch (error: IOException) {
+                    return@withMutation saveFailureFor(error)
+                } catch (error: ErrnoException) {
+                    return@withMutation saveFailureFor(error)
+                } catch (_: SQLiteFullException) {
+                    // The rename already happened, but the row remains STAGED when
+                    // the final commit is rejected; recovery owns both paths.
+                    return@withMutation SaveResult.StorageUnavailable
+                } catch (_: Exception) {
+                    // The rename already happened, but the row remains STAGED when
+                    // the final commit is rejected (for example by the READY
+                    // invariant trigger). Recovery owns both possible artefact paths
+                    // and will remove them on the next pass; never surface success.
+                    return@withMutation SaveResult.Failed
+                }
+                SaveResult.Saved(sourceId)
             }
-            val source = entity.toDomain()
-
-            val stageFile = paths.stageFile(sourceId)
-            if (!stageFile.exists()) return@acquire SaveResult.StageNotFound
-
-            if (!authenticator.authenticates(source, stageFile)) return@acquire SaveResult.Failed
-
-            val duplicate = sourceDao.findReadyDuplicate(source.byteCount!!, source.sha256!!)
-            if (duplicate != null) {
-                cancelStage(sourceId)
-                return@acquire SaveResult.DuplicateFound(UUID.fromString(duplicate.id))
-            }
-
-            try {
-                val blobFile = paths.blobFile(sourceId)
-                if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
-                fileOps.syncDirectory(paths.artefactsDir)
-            } catch (error: IOException) {
-                return@acquire saveFailureFor(error)
-            } catch (error: ErrnoException) {
-                return@acquire saveFailureFor(error)
-            }
-
-            try {
-                sourceDao.update(source.copy(state = SourceState.READY).toEntity())
-            } catch (error: IOException) {
-                return@acquire saveFailureFor(error)
-            } catch (error: ErrnoException) {
-                return@acquire saveFailureFor(error)
-            } catch (_: SQLiteFullException) {
-                // The rename already happened, but the row remains STAGED when
-                // the final commit is rejected; recovery owns both paths.
-                return@acquire SaveResult.StorageUnavailable
-            } catch (_: Exception) {
-                // The rename already happened, but the row remains STAGED when
-                // the final commit is rejected (for example by the READY
-                // invariant trigger). Recovery owns both possible artefact paths
-                // and will remove them on the next pass; never surface success.
-                return@acquire SaveResult.Failed
-            }
-            SaveResult.Saved(sourceId)
+        } finally {
+            // Whatever the outcome, this import has been decided; a stage left
+            // by a failure is recovery's to remove.
+            importSlot.release(sourceId)
         }
     }
 
