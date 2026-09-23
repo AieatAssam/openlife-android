@@ -22,6 +22,7 @@ import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
 import org.openlife.vault.ocr.OcrUnsupportedScriptException
 import org.openlife.vault.ocr.OcrUserRevision
+import org.openlife.vault.storage.OcrDao
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
@@ -41,6 +42,8 @@ class OcrRepository(
     private val mutationQueue: MutationQueue,
     private val clock: () -> Long = System::currentTimeMillis,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ocrDao: OcrDao = database.ocrDao(),
+    private val deadlineMillis: Long = org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -82,7 +85,7 @@ class OcrRepository(
                     charCount = 0,
                     spanCount = 0,
                 )
-                database.ocrDao().insertRevision(revision.toEntity())
+                ocrDao.insertRevision(revision.toEntity())
                 Capture.Ready(
                     revision = revision,
                     input = OcrEngineInput(
@@ -102,7 +105,7 @@ class OcrRepository(
 
     private suspend fun extract(prepared: Capture.Ready): Extraction {
         val output = try {
-            withTimeoutOrNull(org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS) {
+            withTimeoutOrNull(deadlineMillis) {
                 engineRegistry.selected().extract(prepared.input)
             }
         } catch (cancelled: CancellationException) {
@@ -181,7 +184,7 @@ class OcrRepository(
                         evidenceRegion = span.region,
                     )
                 }
-                database.ocrDao().insertSpans(persistedSpans.map { it.toEntity() })
+                ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
                 OcrRunResult.Completed(completed.id, persistedSpans)
             }
         }

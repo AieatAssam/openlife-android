@@ -1,5 +1,7 @@
 package org.openlife.app.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.awaitCancellation
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
@@ -117,6 +119,79 @@ class ViewerScreenC1Test {
             .assertIsDisplayed()
     }
 
+    /** P2-02-R6/R7, C1-R7: deleting the source clears its OCR panel and leaves no OCR rows. */
+    @Test
+    fun deletingTheSourceWhileOcrTextIsShownClearsItAndRemovesRows(): Unit = kotlinx.coroutines.runBlocking {
+        val application = androidx.test.core.app.ApplicationProvider
+            .getApplicationContext<org.openlife.app.OpenLifeApp>()
+        val (list, ocr) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            SourceListViewModel(application) to OcrViewModel(application)
+        }
+        val sourceId = saveSyntheticSource(application)
+
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { ocr.run(sourceId) }
+        val finished = awaitNonNull("OCR finished") {
+            ocr.states.value[sourceId]?.takeIf { it is OcrUiState.Ready || it is OcrUiState.Failed }
+        }
+        val revisionId = (finished as? OcrUiState.Ready)?.revisionId
+        composeRule.setContent {
+            val states by ocr.states.collectAsState()
+            ViewerScreen(
+                source = readySource(sourceId),
+                loadContent = { awaitCancellation() },
+                onBack = {},
+                onDeleteRequested = {},
+                ocrState = states[sourceId] ?: OcrUiState.Idle,
+            )
+        }
+        composeRule.onNodeWithText("Extract text on this device").assertDoesNotExist()
+
+        val deleted = java.util.concurrent.atomic.AtomicReference<org.openlife.vault.repository.DeleteResult?>(null)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { list.delete(sourceId) { deleted.set(it) } }
+        awaitNonNull("deletion finished") { deleted.get() }
+
+        awaitNonNull("OCR state forgotten after deletion") { Unit.takeIf { ocr.states.value[sourceId] == null } }
+        composeRule.onNodeWithText("Extract text on this device").performScrollTo().assertIsDisplayed()
+        val access = application.vault() as org.openlife.app.VaultAccess.Ready
+        if (revisionId != null) assertEquals(null, access.ocrRepository.findRevision(revisionId))
+    }
+
+    private suspend fun saveSyntheticSource(application: org.openlife.app.OpenLifeApp): UUID {
+        val intake = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            IntakeViewModel(application, androidx.lifecycle.SavedStateHandle())
+        }
+        val bitmap = android.graphics.Bitmap.createBitmap(48, 32, android.graphics.Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(UUID.randomUUID().hashCode() or 0xFF000000.toInt())
+        val bytes = java.io.ByteArrayOutputStream().also {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
+        }.toByteArray()
+        bitmap.recycle()
+        repeat(BUSY_RETRIES) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                intake.startImport(java.io.ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+            }
+            val settled = awaitNonNull {
+                intake.state.value.takeIf { it is IntakeUiState.Preview || it is IntakeUiState.Busy }
+            }
+            if (settled is IntakeUiState.Preview) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { intake.confirmSave() }
+                awaitNonNull { intake.state.value as? IntakeUiState.Saved }
+                return settled.sourceId
+            }
+            kotlinx.coroutines.delay(BUSY_RETRY_DELAY_MS)
+        }
+        throw AssertionError("import stayed Busy")
+    }
+
+    private suspend fun <T : Any> awaitNonNull(what: String = "condition", timeoutMs: Long = 60_000, read: () -> T?): T {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            read()?.let { return it }
+            kotlinx.coroutines.delay(50)
+        }
+        throw AssertionError("$what not met within ${timeoutMs}ms")
+    }
+
     private fun readySource(id: UUID, orientation: Orientation = Orientation.NORMAL) = Source(
         id = id,
         state = SourceState.READY,
@@ -131,4 +206,9 @@ class ViewerScreenC1Test {
         wrappedDek = ByteArray(16),
         artefactVersion = 1,
     )
+
+    private companion object {
+        const val BUSY_RETRIES = 5
+        const val BUSY_RETRY_DELAY_MS = 500L
+    }
 }

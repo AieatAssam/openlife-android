@@ -111,6 +111,7 @@
     <string name="ocr_failure_engine">the local engine failed</string>
     <string name="ocr_failure_cancelled">the operation was cancelled</string>
     <string name="ocr_failure_process_restart">the operation was interrupted by a process restart</string>
+    <string name="ocr_failure_timeout">it took too long, so OpenLife stopped it</string>
 
     <string name="settings_title">Settings</string>
     <string name="about_title">About</string>

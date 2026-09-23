@@ -29,6 +29,9 @@ data class OcrEngineInput(
     }
 }
 
+/** P2-02-R5 stub: will zero [OcrEngineInput.bytes]. */
+fun OcrEngineInput.close() = Unit
+
 data class OcrEngineOutput(val spans: List<OcrSpanDraft>)
 
 enum class OcrScriptStatus {
