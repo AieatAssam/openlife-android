@@ -84,3 +84,22 @@ finished both legs in about seven minutes. Vault connected tests were
 - **Decision.** Test steps pass `-no-snapshot` (no load, no save). The
   cached AVD still spares image and AVD creation.
 
+### Follow-up the same day: wipe data, uninstall, and count the tests
+
+The first cold-boot run (35897004928) passed on both legs, but the app leg
+had run 0 tests. Cold boot started from the cached AVD's userdata, which
+still held the release-signed OpenLife installed by the run that saved the
+cache. The debug install then failed with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`,
+and the Gradle connected task still reported BUILD SUCCESSFUL.
+
+Three changes:
+
+- Test steps add `-wipe-data`.
+- `scripts/ci/run-connected-android-tests.sh` uninstalls both OpenLife
+  packages before running tests.
+- A successful Gradle exit must also pass
+  `scripts/ci/assert-connected-tests-ran.sh`, which fails when a module ran
+  zero connected tests.
+
+A green Gradle exit alone is not evidence.
+

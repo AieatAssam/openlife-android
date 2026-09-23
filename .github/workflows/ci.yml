@@ -169,7 +169,10 @@ jobs:
           # cache left API 29 google_apis without system services ("No
           # service published for: input") and the runner then hung until the
           # job timeout (runs 35881181744, 35888111697). The AVD stays cached.
-          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # -wipe-data: the cached AVD's userdata keeps apps installed by the
+          # run that saved the cache (a release-signed OpenLife), which made
+          # the debug install fail while Gradle still reported success.
+          emulator-options: -no-snapshot -wipe-data -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           # android-emulator-runner executes each line separately; keep the
           # golden/test switch on one line.
           script: |
