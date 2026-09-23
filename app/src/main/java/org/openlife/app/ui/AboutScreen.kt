@@ -12,19 +12,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
+import org.openlife.app.VaultFailureDiagnostics
 import org.openlife.app.ui.brand.FoldedCornerCard
 
 @Composable
 fun AboutScreen() {
     val context = LocalContext.current
-    val licenseText = produceState(initialValue = "") {
+    val resources = LocalResources.current
+    val licenseText = produceState(initialValue = "", resources) {
         value = withContext(Dispatchers.IO) {
-            context.resources.openRawResource(R.raw.ofl_1_1).bufferedReader().use { it.readText() }
+            resources.openRawResource(R.raw.ofl_1_1).bufferedReader().use { it.readText() }
         }
     }.value
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -43,6 +46,10 @@ fun AboutScreen() {
             FoldedCornerCard(modifier = Modifier.padding(top = 24.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.about_font_credits))
+                    Text(
+                        stringResource(R.string.about_vault_diagnostics, VaultFailureDiagnostics.summary(context)),
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                     if (licenseText.isNotEmpty()) {
                         Text(
                             licenseText,
