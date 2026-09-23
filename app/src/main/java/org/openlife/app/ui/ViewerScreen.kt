@@ -314,6 +314,7 @@ private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) 
     OcrFailureReason.CANCELLED -> stringResource(R.string.ocr_failure_cancelled)
     OcrFailureReason.PROCESS_RESTART -> stringResource(R.string.ocr_failure_process_restart)
     OcrFailureReason.TIMEOUT -> stringResource(R.string.ocr_failure_timeout)
+    OcrFailureReason.STORAGE_FAILURE -> stringResource(R.string.ocr_failure_storage)
 }
 
 @Composable

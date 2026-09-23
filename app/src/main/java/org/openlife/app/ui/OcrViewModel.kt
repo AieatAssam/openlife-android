@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
+import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRunResult
 import java.util.UUID
@@ -21,6 +22,29 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
     val states: StateFlow<Map<UUID, OcrUiState>> = _states.asStateFlow()
     private val jobs = mutableMapOf<UUID, Job>()
     private val unregisterResetCallback = application.registerPreResetCallback(::clearSensitiveContent)
+
+    init {
+        forgetDeletedSources()
+    }
+
+    /**
+     * P2-02-R6: when a source leaves the visible list (it was deleted), cancel
+     * its OCR job and drop its text from memory, so the panel clears and a
+     * late engine result cannot resurface.
+     */
+    private fun forgetDeletedSources() {
+        viewModelScope.launch {
+            val access = application.vault() as? VaultAccess.Ready ?: return@launch
+            access.viewRepository.observeVisibleSources().collect { sources ->
+                val visible = sources.mapTo(HashSet()) { it.id }
+                val gone = (_states.value.keys + jobs.keys).filterNot(visible::contains)
+                if (gone.isNotEmpty()) {
+                    gone.forEach { jobs.remove(it)?.cancel() }
+                    _states.value = _states.value - gone.toSet()
+                }
+            }
+        }
+    }
 
     fun stateFor(sourceId: UUID): OcrUiState = _states.value[sourceId] ?: OcrUiState.Idle
 
@@ -37,7 +61,15 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
 
                 is OcrRunResult.Failed -> setState(sourceId, OcrUiState.Failed(sourceId, result.reason))
 
-                is OcrRunResult.Cancelled -> setState(sourceId, OcrUiState.Cancelled(sourceId))
+                // A timeout is explained, not shown as the user's own Cancel.
+                is OcrRunResult.Cancelled -> setState(
+                    sourceId,
+                    if (result.reason == OcrFailureReason.TIMEOUT) {
+                        OcrUiState.Failed(sourceId, OcrFailureReason.TIMEOUT)
+                    } else {
+                        OcrUiState.Cancelled(sourceId)
+                    },
+                )
 
                 is OcrRunResult.Stale -> setState(sourceId, OcrUiState.Stale(sourceId))
             }
