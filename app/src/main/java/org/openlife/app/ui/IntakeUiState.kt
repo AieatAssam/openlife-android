@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import org.openlife.app.R
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.Orientation
+import org.openlife.vault.storage.VaultUnavailableCause
 import java.util.UUID
 
 enum class IntakeRejectionMessage(
@@ -57,6 +58,6 @@ sealed interface IntakeUiState {
     data object Busy : IntakeUiState
     data object Failed : IntakeUiState
     data object StorageUnavailable : IntakeUiState
-    data class VaultUnavailable(val reason: String) : IntakeUiState
+    data class VaultUnavailable(val cause: VaultUnavailableCause) : IntakeUiState
     data object Cancelled : IntakeUiState
 }

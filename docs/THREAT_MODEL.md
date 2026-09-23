@@ -66,6 +66,26 @@ device gap (`docs/verification/P0-07-ui-foundation.md`). An actual TalkBack acce
 run has not been performed in this environment and remains an open item
 (`docs/reviews/C0-security-self-review.md`), not a passed check.
 
+## Explicit vault reset
+
+Reset is available in Settings after the user types `RESET` and confirms a
+second time. A durable `RESET_IN_PROGRESS` marker is written and synced before
+the database is closed or recognised vault files are removed. Bootstrap stops
+while the marker exists; retrying reset resumes the same ordered deletion and
+removes the marker last. The operation is serialized against imports, clears
+registered plaintext UI state, deletes database sidecars and the wrapped key,
+then attempts to delete the Keystore alias. It also clears `app_lock`
+preferences while retaining the first-run acknowledgement. In C0 there are no
+scheduled reminders; P4-04 must add alarm and notification cancellation to
+this reset path.
+
+Reset removes live app-owned vault files and is not forensic erasure. Database
+corruption can make every saved source unrecoverable because per-source DEKs
+exist only in the encrypted database; there is no separate DEK file or backup.
+An unavailable-vault screen explains the cause and offers retry only for
+retryable causes. Its Settings link reaches the separately confirmed reset;
+no error path silently deletes files or creates a replacement key.
+
 ## Access policy limit (owner decision pending)
 
 The C0 access policy relies on the Android device lock and app sandbox; it has

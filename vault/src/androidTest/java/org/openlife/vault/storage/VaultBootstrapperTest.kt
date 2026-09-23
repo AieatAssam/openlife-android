@@ -3,6 +3,7 @@ package org.openlife.vault.storage
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
+import java.security.KeyStoreException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -12,6 +13,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.crypto.Envelope
+import org.openlife.vault.crypto.EnvelopeAuthenticationException
+import org.openlife.vault.crypto.EnvelopeDomain
+import org.openlife.vault.crypto.EnvelopeCodec
+import org.openlife.vault.storage.VaultUnavailableCause
 
 /**
  * Instrumented because Android Keystore and SQLCipher's native library both
@@ -154,5 +160,39 @@ class VaultBootstrapperTest {
         paths.databaseFile.writeBytes(byteArrayOf(7))
         val missingKey = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
         assertEquals(VaultUnavailableCause.DATABASE_WITHOUT_KEY, missingKey.cause)
+
+        paths.databaseFile.delete()
+        val envelope = wrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET)
+        paths.databaseKeyFile.writeBytes(EnvelopeCodec.encode(envelope))
+        val badAlias = "test.${UUID.randomUUID()}"
+        val badWrapper = KeystoreWrapper(badAlias)
+        try {
+            badWrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET)
+            val unwrapFailed = VaultBootstrapper.bootstrap(paths, badWrapper) as VaultBootstrapResult.Unavailable
+            assertEquals(VaultUnavailableCause.KEY_UNWRAP_FAILED, unwrapFailed.cause)
+        } finally {
+            java.security.KeyStore.getInstance("AndroidKeyStore").apply {
+                load(null)
+                if (containsAlias(badAlias)) deleteEntry(badAlias)
+            }
+        }
+
+        val temporary = object : KeystoreWrapper(alias) {
+            override fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID?): ByteArray {
+                throw EnvelopeAuthenticationException(KeyStoreException("temporarily unavailable"))
+            }
+        }
+        val temporaryFailure = VaultBootstrapper.bootstrap(paths, temporary) as VaultBootstrapResult.Unavailable
+        assertEquals(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE, temporaryFailure.cause)
+
+        paths.databaseKeyFile.delete()
+        paths.databaseKeyFile.mkdirs()
+        val storageFailure = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
+        assertEquals(VaultUnavailableCause.STORAGE_IO_ERROR, storageFailure.cause)
+        paths.databaseKeyFile.deleteRecursively()
+
+        paths.resetMarkerFile.writeBytes(byteArrayOf(1))
+        val incompleteReset = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
+        assertEquals(VaultUnavailableCause.RESET_INCOMPLETE, incompleteReset.cause)
     }
 }
