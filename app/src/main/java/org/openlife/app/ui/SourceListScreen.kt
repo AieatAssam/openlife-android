@@ -90,7 +90,13 @@ fun SourceListScreen(
             if (hasItems) {
                 // The content-slot overload keeps the label a plain Text; the
                 // icon/text overload hides it from semantics while animating.
-                ExtendedFloatingActionButton(onClick = onImportFromPhotoPicker) {
+                ExtendedFloatingActionButton(
+                    onClick = onImportFromPhotoPicker,
+                    // VISUAL_IDENTITY §7: the primary action is filled vermilion,
+                    // not the tonal container M3 uses for FABs by default.
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = 12.dp))
                 }
