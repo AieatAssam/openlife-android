@@ -217,6 +217,47 @@ class DeletionRepositoryTest {
         assertTrue(!blob.exists())
     }
 
+    /** P1-15-R3: removing OCR rows and the Source row is one transaction: both or neither. */
+    @Test
+    fun rowRemovalIsAtomicAcrossOcrAndSourceTables(): Unit = runBlocking {
+        val id = prepareAndSave()
+        insertOcrRevisionFor(id)
+        val delegate = db.sourceDao()
+        val failingBetweenStatements = object : org.openlife.vault.storage.SourceDao by delegate {
+            override suspend fun deleteById(id: String) {
+                throw IllegalStateException("synthetic failure after OCR rows were deleted")
+            }
+        }
+        val failing = DeletionRepository(paths, db, mutationQueue, sourceDao = failingBetweenStatements)
+
+        assertEquals(DeleteResult.Failed, failing.deleteSource(id))
+        assertEquals("OCR rows must roll back with the failed Source removal", 1, db.ocrDao().countRevisions())
+        assertEquals(SourceState.DELETING.name, db.sourceDao().findById(id.toString())!!.state)
+
+        assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
+        assertEquals(0, db.ocrDao().countRevisions())
+    }
+
+    private suspend fun insertOcrRevisionFor(id: UUID) {
+        db.ocrDao().insertRevision(
+            OcrRevision(
+                id = UUID.randomUUID(),
+                sourceId = id,
+                state = OcrRevisionState.READY,
+                engineId = "test-engine",
+                modelVersion = "test",
+                orientation = Orientation.NORMAL,
+                sourceDigest = ByteArray(32) { 1 },
+                startedAt = 1,
+                extractedAt = 2,
+                reviewState = OcrReviewState.UNREVIEWED,
+                failureReason = null,
+                charCount = 4,
+                spanCount = 1,
+            ).toEntity(),
+        )
+    }
+
     private class FailOnceOnBlobDelete(private val blob: File) : ArtefactFileOps {
         private var failed = false
 

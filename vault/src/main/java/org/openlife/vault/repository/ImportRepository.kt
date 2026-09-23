@@ -66,6 +66,9 @@ class ImportRepository(
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
+    /** The one-import-at-a-time rule (design §12); P1-15. */
+    val importSlot = ImportSlot()
+
     suspend fun prepareImport(
         inputStream: InputStream,
         declaredMimeType: String,

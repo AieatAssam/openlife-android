@@ -18,6 +18,15 @@ class MutationQueue {
 
     suspend fun <T> acquire(block: suspend () -> T): T = mutex.withLock { block() }
 
+    /** P1-15 stub: shared read lease (still exclusive until GREEN). */
+    suspend fun <T> withReadLease(block: suspend () -> T): T = acquire(block)
+
+    /** P1-15 stub: exclusive mutation. */
+    suspend fun <T> withMutation(block: suspend () -> T): T = acquire(block)
+
+    /** P1-15 stub: exclusive mutation or null (still the old tryAcquire). */
+    suspend fun <T> tryMutation(block: suspend () -> T): T? = tryAcquire(block)
+
     /** Returns null immediately if a mutation is already in progress. */
     suspend fun <T> tryAcquire(block: suspend () -> T): T? {
         if (!mutex.tryLock()) return null

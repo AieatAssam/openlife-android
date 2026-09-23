@@ -1,5 +1,6 @@
 package org.openlife.vault.repository
 
+import kotlinx.coroutines.Dispatchers
 import android.database.sqlite.SQLiteFullException
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -737,5 +738,81 @@ class ImportRepositoryTest {
         )
         assertTrue(!paths.stageFile(prepared.sourceId).exists())
         assertTrue(paths.blobFile(prepared.sourceId).exists())
+    }
+
+    // --- P1-15: read leases, the one-import slot, verified duplicates ---
+
+    private fun repositoryWithQueue(queue: MutationQueue): ImportRepository = ImportRepository(
+        paths = paths,
+        database = db,
+        keystoreWrapper = wrapper,
+        bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
+        mutationQueue = queue,
+    )
+
+    @Test
+    fun prepareIsNotBusyWhileAViewerReadIsInFlight(): Unit = runBlocking {
+        val queue = MutationQueue()
+        val importer = repositoryWithQueue(queue)
+        val readerIn = CompletableDeferred<Unit>()
+        val releaseReader = CompletableDeferred<Unit>()
+        val reader = async(Dispatchers.Default) {
+            queue.withReadLease { readerIn.complete(Unit); releaseReader.await() }
+        }
+        readerIn.await()
+        try {
+            val result = importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
+            assertTrue("a viewer read must not make an import busy: $result", result is PrepareResult.Prepared)
+            importer.cancelStagedImport((result as PrepareResult.Prepared).sourceId)
+        } finally {
+            releaseReader.complete(Unit)
+            reader.await()
+        }
+    }
+
+    @Test
+    fun aStagedImportAwaitingSaveMakesASecondPrepareBusy(): Unit = runBlocking {
+        val first = repository.prepareImport(ByteArrayInputStream(syntheticJpegBytes(64, 48)), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+        val second = repository.prepareImport(ByteArrayInputStream(syntheticJpegBytes(32, 24)), "image/jpeg", IntakeKind.SHARE)
+        assertEquals("design §12: one import at a time, including an idle preview", PrepareResult.Busy, second)
+
+        repository.cancelStagedImport(first.sourceId)
+        val third = repository.prepareImport(ByteArrayInputStream(syntheticJpegBytes(32, 24)), "image/jpeg", IntakeKind.SHARE)
+        assertTrue("cancelling frees the slot: $third", third is PrepareResult.Prepared)
+        repository.cancelStagedImport((third as PrepareResult.Prepared).sourceId)
+    }
+
+    @Test
+    fun releasingTheImportSlotAllowsANewImport(): Unit = runBlocking {
+        val abandoned = repository.prepareImport(ByteArrayInputStream(syntheticJpegBytes(64, 48)), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+        // The intake screen went away without Save or Cancel (P1-01 later
+        // removes the stage itself). The slot must not lock out new shares.
+        repository.importSlot.release(abandoned.sourceId)
+
+        val next = repository.prepareImport(ByteArrayInputStream(syntheticJpegBytes(32, 24)), "image/jpeg", IntakeKind.SHARE)
+        assertTrue("released slot must allow a new import: $next", next is PrepareResult.Prepared)
+        repository.cancelStagedImport((next as PrepareResult.Prepared).sourceId)
+        repository.cancelStagedImport(abandoned.sourceId)
+    }
+
+    @Test
+    fun duplicateWithTamperedExistingBlobSavesNewAndMarksExistingCorrupt(): Unit = runBlocking {
+        val bytes = syntheticJpegBytes()
+        val existing = repository.prepareImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+        assertTrue(repository.saveImport(existing.sourceId) is SaveResult.Saved)
+        val blob = paths.blobFile(existing.sourceId)
+        val tampered = blob.readBytes().also { it[it.size - 5] = (it[it.size - 5].toInt() xor 0xFF).toByte() }
+        blob.writeBytes(tampered)
+
+        val again = repository.prepareImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+        val saved = repository.saveImport(again.sourceId)
+
+        assertEquals("design §9: an unverifiable original is not a duplicate", SaveResult.Saved(again.sourceId), saved)
+        assertEquals(SourceState.CORRUPT.name, db.sourceDao().findById(existing.sourceId.toString())!!.state)
+        assertTrue("the damaged original is retained for diagnosis", blob.exists())
     }
 }

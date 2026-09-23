@@ -321,4 +321,28 @@ class RecoveryRepositoryTest {
         // A second, immediate re-run finds nothing further to reconcile.
         assertEquals(RecoveryReport(confirmedReady = 1, markedCorrupt = 0), secondPass)
     }
+
+    /** P1-15-R5 / C0-14: a deletion interrupted after marking DELETING is finished by recovery. */
+    @Test
+    fun deletionInterruptedAfterMarkingIsResumed(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val blob = paths.blobFile(id)
+        val interrupting = object : ArtefactFileOps by ArtefactFileOps.Default {
+            override fun deleteIfExists(file: java.io.File): Boolean {
+                if (file == blob) throw IllegalStateException("synthetic interruption before the blob is removed")
+                return ArtefactFileOps.Default.deleteIfExists(file)
+            }
+        }
+        val interrupted = DeletionRepository(paths, db, MutationQueue(), fileOps = interrupting)
+
+        assertEquals(DeleteResult.Failed, interrupted.deleteSource(id))
+        assertEquals(SourceState.DELETING.name, db.sourceDao().findById(id.toString())!!.state)
+        assertTrue(blob.exists())
+
+        val report = recoveryRepository.recover()
+
+        assertEquals(1, report.resumedDeletions)
+        assertEquals(null, db.sourceDao().findById(id.toString()))
+        assertTrue("no artefact survives the resumed deletion", !blob.exists())
+    }
 }

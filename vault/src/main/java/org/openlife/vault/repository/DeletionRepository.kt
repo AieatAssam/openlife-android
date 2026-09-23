@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
@@ -32,12 +33,13 @@ class DeletionRepository(
     private val mutationQueue: MutationQueue,
     private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val sourceDao: SourceDao = database.sourceDao(),
 ) {
 
     suspend fun deleteSource(sourceId: UUID): DeleteResult = withContext(ioDispatcher) {
         mutationQueue.acquire {
             try {
-                val entity = database.sourceDao().findById(sourceId.toString())
+                val entity = sourceDao.findById(sourceId.toString())
                     ?: return@acquire DeleteResult.NotFound
                 val source = entity.toDomain()
 
@@ -52,7 +54,7 @@ class DeletionRepository(
                 // leaves an unambiguous, resumable state (design §12; also handled
                 // by RecoveryRepository's DELETING branch on next startup).
                 if (source.state != SourceState.DELETING) {
-                    database.sourceDao().update(source.copy(state = SourceState.DELETING).toEntity())
+                    sourceDao.update(source.copy(state = SourceState.DELETING).toEntity())
                 }
 
                 val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
@@ -66,7 +68,7 @@ class DeletionRepository(
                 // explicit makes the C1 deletion contract independent of connection
                 // pragma defaults and leaves no dependent provenance row behind.
                 database.ocrDao().deleteForSource(sourceId.toString())
-                database.sourceDao().deleteById(sourceId.toString())
+                sourceDao.deleteById(sourceId.toString())
                 DeleteResult.Deleted
             } catch (error: java.io.IOException) {
                 deleteFailureFor(error)

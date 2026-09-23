@@ -168,4 +168,25 @@ class EnvelopeTamperingThroughRepositoryTest {
         mutation.await()
         assertTrue(read.await() != null)
     }
+
+    @Test
+    fun deletionWaitsForAnActiveViewerRead(): Unit = runBlocking {
+        val sourceId = saveASource()
+        val deletion = DeletionRepository(paths, db, mutationQueue)
+        val readerIn = CompletableDeferred<Unit>()
+        val releaseReader = CompletableDeferred<Unit>()
+        val reader = async(kotlinx.coroutines.Dispatchers.Default) {
+            mutationQueue.withReadLease { readerIn.complete(Unit); releaseReader.await() }
+        }
+        readerIn.await()
+
+        val delete = async(kotlinx.coroutines.Dispatchers.Default) { deletion.deleteSource(sourceId) }
+        kotlinx.coroutines.delay(200)
+        assertTrue("deletion must not overlap an in-flight plaintext read", !delete.isCompleted)
+        assertTrue("the blob is still there while the read holds its lease", paths.blobFile(sourceId).exists())
+
+        releaseReader.complete(Unit)
+        reader.await()
+        assertEquals(DeleteResult.Deleted, delete.await())
+    }
 }
