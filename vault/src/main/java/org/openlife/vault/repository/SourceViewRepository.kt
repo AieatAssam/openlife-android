@@ -1,13 +1,17 @@
 package org.openlife.vault.repository
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
+import org.openlife.vault.storage.toEntity
 import java.util.UUID
 
 /**
@@ -23,6 +27,7 @@ class SourceViewRepository(
     private val database: OpenLifeDatabase,
     keystoreWrapper: KeystoreWrapper,
     private val mutationQueue: MutationQueue,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -33,19 +38,40 @@ class SourceViewRepository(
     suspend fun findSource(sourceId: UUID): Source? = database.sourceDao().findById(sourceId.toString())?.toDomain()
 
     /** The not-yet-saved stage, authenticated from the encrypted file on disk (design §11 step 4). */
-    suspend fun loadStagePreviewBytes(sourceId: UUID): ByteArray? {
-        return mutationQueue.acquire {
+    suspend fun loadStagePreviewBytes(sourceId: UUID): ByteArray? = withContext(ioDispatcher) {
+        mutationQueue.acquire {
             val source = database.sourceDao().findById(sourceId.toString())?.toDomain() ?: return@acquire null
             authenticator.decryptAndVerify(source, paths.stageFile(sourceId))
         }
     }
 
-    /** A saved (READY) source's original bytes, authenticated before use (design §8). */
-    suspend fun loadReadyBytes(sourceId: UUID): ByteArray? {
-        return mutationQueue.acquire {
-            val source = database.sourceDao().findById(sourceId.toString())?.toDomain() ?: return@acquire null
-            if (source.state != SourceState.READY) return@acquire null
-            authenticator.decryptAndVerify(source, paths.blobFile(sourceId))
+    /**
+     * A saved (READY) source's original bytes, authenticated before use
+     * (design §8), with the reason when they cannot be shown. A genuine
+     * authentication or digest failure marks the row CORRUPT under the
+     * mutation queue, keeping its artefact and wrapped key for diagnosis
+     * (design §9). A Keystore or I/O failure marks nothing (P1-13-R5).
+     */
+    suspend fun readReadyBytes(sourceId: UUID): ReadyReadResult = withContext(ioDispatcher) {
+        mutationQueue.acquire {
+            val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
+            if (source == null || source.state != SourceState.READY) return@acquire ReadyReadResult.Unavailable
+            when (val check = authenticator.check(source, paths.blobFile(sourceId))) {
+                is ArtefactCheck.Verified -> ReadyReadResult.Loaded(check.plaintext)
+
+                ArtefactCheck.Corrupt -> {
+                    database.sourceDao().update(source.copy(state = SourceState.CORRUPT).toEntity())
+                    ReadyReadResult.Corrupt
+                }
+
+                ArtefactCheck.Missing -> ReadyReadResult.Missing
+
+                ArtefactCheck.Transient -> ReadyReadResult.Transient
+            }
         }
     }
+
+    /** Convenience for callers that only need the authenticated bytes. */
+    suspend fun loadReadyBytes(sourceId: UUID): ByteArray? =
+        (readReadyBytes(sourceId) as? ReadyReadResult.Loaded)?.bytes
 }

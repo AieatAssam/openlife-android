@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -16,6 +17,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,12 +28,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
+import org.openlife.app.intake.IntakeIntentValidator
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.repository.ImageRejectionReason
 import org.openlife.vault.repository.ImportLimits
 import org.openlife.vault.repository.PrepareResult
 import org.openlife.vault.repository.SaveResult
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
@@ -82,6 +87,9 @@ class IntakeViewModel(
 
     /** The active provider read. Its owner coroutine performs normal closure. */
     private var activeImportJob: Job? = null
+    private var uriImportRequested = false
+    private var attached = false
+    private val lookupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var backgrounded = false
 
     private var sourceId: UUID?
@@ -130,32 +138,107 @@ class IntakeViewModel(
         preOpenedClaim: AtomicBoolean? = null,
     ) {
         activeImportJob?.cancel()
-        val importJob = viewModelScope.launch {
-            try {
-                withContext(providerDispatcher) {
-                    when (val access = application.vault()) {
-                        is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
-
-                        is VaultAccess.Ready -> importFromProvider(
-                            openStream,
-                            declaredMimeType,
-                            intakeKind,
-                            access,
-                        )
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: ProviderOpenException) {
-                _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
-            }
-        }
+        val importJob = viewModelScope.launch { runImport(openStream, declaredMimeType, intakeKind) }
         activeImportJob = importJob
         if (preOpenedStream != null && preOpenedClaim != null) {
             importJob.invokeOnCompletion {
                 if (preOpenedClaim.compareAndSet(false, true)) closeQuietly(preOpenedStream)
             }
         }
+    }
+
+    private suspend fun runImport(openStream: () -> InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
+        try {
+            withContext(providerDispatcher) {
+                when (val access = application.vault()) {
+                    is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
+                    is VaultAccess.Ready -> importFromProvider(openStream, declaredMimeType, intakeKind, access)
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: ProviderOpenException) {
+            _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
+        }
+    }
+
+    /**
+     * Starts an import from a validated `content://` URI (P1-13-R8, F-37).
+     *
+     * The provider type lookup and the open run in [viewModelScope] on the
+     * provider-owned thread, so recreating the activity during Preparing
+     * cannot cancel them. The URI string lives only in this object's memory:
+     * it is never written to [SavedStateHandle], so a new process never
+     * reopens an unconfirmed item from a URI (design §8). Repeated calls
+     * after the first, for example from a recreated activity, are ignored.
+     */
+    fun startImportFromUri(uriString: String, intentMimeType: String?, intakeKind: IntakeKind) {
+        if (uriImportRequested) return
+        uriImportRequested = true
+        val resolver = application.contentResolver
+        val uri = uriString.toUri()
+        activeImportJob?.cancel()
+        activeImportJob = viewModelScope.launch {
+            // getType is not part of the descriptor open/read/close sequence
+            // that must stay on the provider thread (P1-09). It runs in its own
+            // IO scope and is awaited cancellably: a provider stalling here
+            // blocks neither other imports nor Cancel, and an abandoned lookup
+            // finishes on its own and is discarded.
+            val lookup = lookupScope.async { providerTypeOf(resolver, uri) }.await()
+            val providerType = (lookup as? ProviderTypeLookup.Known)?.mimeType
+            when {
+                lookup == ProviderTypeLookup.Refused ->
+                    _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
+
+                providerType == null || !IntakeIntentValidator.mimeTypesMatch(intentMimeType, providerType) ->
+                    _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.TYPE_MISMATCH)
+
+                else -> runImport(
+                    openStream = { resolver.openInputStream(uri) ?: throw FileNotFoundException() },
+                    declaredMimeType = providerType,
+                    intakeKind = intakeKind,
+                )
+            }
+        }
+    }
+
+    /**
+     * Records that an activity is using this instance. Returns true when one
+     * already was: the activity is being recreated for a configuration
+     * change and this ViewModel, with its import, survived.
+     */
+    fun attach(): Boolean {
+        val wasAttached = attached
+        attached = true
+        return wasAttached
+    }
+
+    /**
+     * The activity was restored from saved state into a new process. With
+     * neither an import nor a stage there is nothing to continue: ask the
+     * user to select the item again rather than leaving Preparing up forever
+     * (design §8: a new process must not restore from a URI).
+     */
+    fun onRestoredAfterProcessDeath() {
+        val ownsWork = activeImportJob?.isActive == true || uriImportRequested || sourceId != null
+        if (!ownsWork && _state.value == IntakeUiState.Preparing) {
+            _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
+        }
+    }
+
+    private fun providerTypeOf(resolver: android.content.ContentResolver, uri: android.net.Uri): ProviderTypeLookup =
+        try {
+            ProviderTypeLookup.Known(resolver.getType(uri)?.lowercase())
+        } catch (_: SecurityException) {
+            ProviderTypeLookup.Refused
+        } catch (_: FileNotFoundException) {
+            ProviderTypeLookup.Refused
+        }
+
+    /** A provider that refuses access differs from one that reports no type. */
+    private sealed interface ProviderTypeLookup {
+        data object Refused : ProviderTypeLookup
+        data class Known(val mimeType: String?) : ProviderTypeLookup
     }
 
     private suspend fun importFromProvider(
@@ -363,6 +446,7 @@ class IntakeViewModel(
         // deadline+grace watchdog performs the documented cross-thread
         // last-resort close; do not close an unknown descriptor here.
         activeImportJob?.cancel()
+        lookupScope.cancel()
     }
 
     companion object {

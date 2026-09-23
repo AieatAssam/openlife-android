@@ -3,6 +3,7 @@ package org.openlife.app
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.database.sqlite.SQLiteException
+import android.os.StrictMode
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -50,6 +51,23 @@ class OpenLifeApp : Application() {
     private val sensitiveContentClearers = mutableSetOf<() -> Unit>()
     private val preResetCallbacks = mutableSetOf<() -> Unit>()
     private var bootstrapOverrideForTest: ((VaultPaths, KeystoreWrapper) -> VaultBootstrapResult)? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        if (BuildConfig.DEBUG) {
+            // P1-13-R3: surface main-thread disk and network access during
+            // development. Logging only; instrumented tests enforce it with
+            // StrictModeRule. Release builds never install a policy.
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .penaltyLog()
+                    .build(),
+            )
+        }
+    }
 
     @Synchronized
     fun registerSensitiveContentClearer(clearer: () -> Unit): () -> Unit {

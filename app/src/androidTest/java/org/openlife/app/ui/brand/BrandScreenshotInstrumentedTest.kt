@@ -1,5 +1,6 @@
 package org.openlife.app.ui.brand
 
+import kotlinx.coroutines.awaitCancellation
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
@@ -38,6 +40,9 @@ import org.openlife.vault.model.SourceState
 
 @RunWith(AndroidJUnit4::class)
 class BrandScreenshotInstrumentedTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -101,7 +106,7 @@ class BrandScreenshotInstrumentedTest {
             capture("viewer", darkTheme) {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = {},
                 )

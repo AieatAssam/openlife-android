@@ -53,7 +53,12 @@ helps prevent supported screenshots and non-secure display output, but is not
 universal protection against hostile devices. `MainActivity.onStop()` clears
 decoded list thumbnails and returns the viewer to the list; `IntakeActivity`
 clears authenticated preview state and re-authenticates its staged UUID on
-return. `DisposableEffect` releases decoded viewer/preview bitmaps, and the
+return. `DisposableEffect` recycles the decoded viewer/preview bitmap, whose
+only owner is that screen, and the viewer zeroes its authenticated plaintext
+once decoded. Cached list thumbnails are dropped, not recycled, on eviction,
+trim and backgrounding, because a row still on screen may draw the same
+instance (F-28, P1-13); their pixel memory is released when the bitmap is
+garbage collected, so it can outlive the drop for an unspecified time. The
 thumbnail cache uses a generation barrier so an in-flight decode cannot be
 retained after a background transition. Protected recents remain an effect of
 `FLAG_SECURE` (`applySecureWindow()`), confirmed via `dumpsys window` showing

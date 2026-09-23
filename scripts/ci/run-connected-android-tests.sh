@@ -18,6 +18,10 @@ dump_logcat() {
 trap dump_logcat EXIT
 
 cd "$ROOT"
+# The emulator must not carry an OpenLife signed with another key (for
+# example the release smoke's) or the debug install fails.
+adb uninstall org.openlife >/dev/null 2>&1 || true
+adb uninstall org.openlife.test >/dev/null 2>&1 || true
 for attempt in 1 2; do
   output="connected-attempt-${API_LEVEL}-${attempt}.log"
   set +e
@@ -25,7 +29,8 @@ for attempt in 1 2; do
   status=${PIPESTATUS[0]}
   set -e
   if [[ "$status" -eq 0 ]]; then
-    exit 0
+    bash "$ROOT/scripts/ci/assert-connected-tests-ran.sh" app vault
+    exit $?
   fi
   if "$CLASSIFIER" "$output"; then
     echo "connected test assertion failure; not retrying" >&2

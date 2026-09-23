@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import kotlinx.coroutines.awaitCancellation
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -26,6 +28,9 @@ import org.openlife.vault.ocr.OcrFailureReason
 
 @RunWith(AndroidJUnit4::class)
 class ViewerScreenC1Test {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -47,7 +52,7 @@ class ViewerScreenC1Test {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(sourceId),
-                loadBytes = { null },
+                loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
                 ocrState = OcrUiState.Ready(sourceId, revisionId, listOf(span)),
@@ -80,7 +85,7 @@ class ViewerScreenC1Test {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(sourceId),
-                loadBytes = { null },
+                loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
                 ocrState = OcrUiState.Failed(sourceId, OcrFailureReason.UNSUPPORTED_SCRIPT),
@@ -98,7 +103,7 @@ class ViewerScreenC1Test {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(sourceId, Orientation.ROTATE_90),
-                loadBytes = { null },
+                loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
             )

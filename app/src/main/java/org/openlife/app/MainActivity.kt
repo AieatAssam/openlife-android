@@ -13,12 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import org.openlife.app.intake.IntakeActivity
 import org.openlife.app.navigation.OpenLifeNavHost
 import org.openlife.app.navigation.Routes
@@ -29,6 +30,7 @@ import org.openlife.app.ui.SourceListViewModel
 import org.openlife.app.ui.applySecureWindow
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.IntakeKind
+import org.openlife.vault.repository.ReadyReadResult
 import java.util.UUID
 
 /** Persistent source list and viewer host. Intake remains a separate activity. */
@@ -42,6 +44,7 @@ class MainActivity : ComponentActivity() {
     }
     private val backgroundEpoch = MutableStateFlow(0L)
     private val openSourceRequests = MutableStateFlow<UUID?>(null)
+    private val firstRunAcknowledged = MutableStateFlow<Boolean?>(null)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -58,7 +61,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        // Keep the splash up until the first-run flag has been read off the
+        // main thread, so neither screen flashes before the other.
+        installSplashScreen().setKeepOnScreenCondition { firstRunAcknowledged.value == null }
+        lifecycleScope.launch {
+            firstRunAcknowledged.value = FirstRunPreferences.loadAcknowledged(applicationContext)
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         applySecureWindow()
@@ -67,7 +75,8 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun MainContent() {
-        var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this@MainActivity)) }
+        val firstRun = firstRunAcknowledged.collectAsState().value
+        val acknowledged = firstRun == true
         val navController = rememberNavController()
         val requestedSourceId by openSourceRequests.collectAsState()
         val epoch by backgroundEpoch.collectAsState()
@@ -110,20 +119,20 @@ class MainActivity : ComponentActivity() {
         }
 
         OpenLifeTheme {
-            if (!acknowledged) {
+            if (firstRun == false) {
                 FirstRunExplanationScreen(
                     onContinue = {
-                        FirstRunPreferences.setAcknowledged(this@MainActivity)
-                        acknowledged = true
+                        firstRunAcknowledged.value = true
+                        lifecycleScope.launch { FirstRunPreferences.acknowledge(applicationContext) }
                     },
                 )
-            } else {
+            } else if (acknowledged) {
                 OpenLifeNavHost(
                     listState = listState,
                     thumbnailGeneration = thumbnailGeneration,
                     ocrStates = ocrStates,
                     loadThumbnail = viewModel::loadThumbnail,
-                    loadReadyBytes = { sourceId -> viewModelLoadReadyBytes(sourceId) },
+                    loadReadyContent = { sourceId -> loadReadyContent(sourceId) },
                     delete = { sourceId, onDone -> viewModel.delete(sourceId) { onDone() } },
                     extractText = ocrViewModel::run,
                     cancelOcr = ocrViewModel::cancel,
@@ -161,8 +170,9 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private suspend fun viewModelLoadReadyBytes(sourceId: UUID): ByteArray? =
-        ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.loadReadyBytes(sourceId)
+    private suspend fun loadReadyContent(sourceId: UUID): ReadyReadResult =
+        ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.readReadyBytes(sourceId)
+            ?: ReadyReadResult.Unavailable
 
     companion object {
         const val EXTRA_OPEN_SOURCE_ID = "org.openlife.app.MainActivity.openSourceId"

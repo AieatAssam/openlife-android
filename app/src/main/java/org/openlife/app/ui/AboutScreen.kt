@@ -58,10 +58,16 @@ private fun AboutContent(modifier: Modifier, licenseText: String, context: andro
             FoldedCornerCard(modifier = Modifier.padding(top = 24.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.about_font_credits))
-                    Text(
-                        stringResource(R.string.about_vault_diagnostics, VaultFailureDiagnostics.summary(context)),
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
+                    // The counts live in a preferences file; read it off main (P1-13-R3).
+                    val diagnostics = produceState(initialValue = "", context) {
+                        value = withContext(Dispatchers.IO) { VaultFailureDiagnostics.summary(context) }
+                    }.value
+                    if (diagnostics.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.about_vault_diagnostics, diagnostics),
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                     if (licenseText.isNotEmpty()) {
                         Text(
                             licenseText,

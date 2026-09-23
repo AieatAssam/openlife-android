@@ -180,19 +180,7 @@ private fun SourceRow(
                     if (source.state == SourceState.CORRUPT || deletionPending) {
                         Icon(Icons.Filled.Warning, contentDescription = stringResource(R.string.content_unavailable))
                     } else {
-                        val bitmap by produceState<android.graphics.Bitmap?>(
-                            initialValue = null,
-                            source.id,
-                            thumbnailGeneration,
-                        ) {
-                            value = loadThumbnail(source.id)
-                        }
-                        bitmap?.let {
-                            Image(
-                                bitmap = it.asImageBitmap(),
-                                contentDescription = stringResource(R.string.saved_image_thumbnail_content_description),
-                            )
-                        }
+                        RowThumbnail(source.id, loadThumbnail, thumbnailGeneration)
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -285,3 +273,38 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
 }
 
 private val LIST_BOTTOM_PADDING_FOR_FAB = 96.dp
+
+/**
+ * A negative load shows the unavailable warning rather than an empty box
+ * (P1-13-R4). The bitmap belongs to the view model's cache, which may hand it
+ * to a later composition, so this row never recycles it (P1-13-R6).
+ */
+@Composable
+private fun RowThumbnail(
+    sourceId: UUID,
+    loadThumbnail: suspend (UUID) -> android.graphics.Bitmap?,
+    thumbnailGeneration: Long,
+) {
+    val thumbnail by produceState<ThumbnailState>(ThumbnailState.Loading, sourceId, thumbnailGeneration) {
+        value = loadThumbnail(sourceId)?.let(ThumbnailState::Shown) ?: ThumbnailState.Unavailable
+    }
+    when (val current = thumbnail) {
+        ThumbnailState.Loading -> Unit
+
+        is ThumbnailState.Shown -> Image(
+            bitmap = current.bitmap.asImageBitmap(),
+            contentDescription = stringResource(R.string.saved_image_thumbnail_content_description),
+        )
+
+        ThumbnailState.Unavailable -> Icon(
+            Icons.Filled.Warning,
+            contentDescription = stringResource(R.string.content_unavailable),
+        )
+    }
+}
+
+private sealed interface ThumbnailState {
+    data object Loading : ThumbnailState
+    class Shown(val bitmap: android.graphics.Bitmap) : ThumbnailState
+    data object Unavailable : ThumbnailState
+}

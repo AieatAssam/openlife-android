@@ -65,15 +65,20 @@ files_touched:
 tdd:
   red:
     - name: app androidTest MainThreadPolicyTest.saveViewDeleteAndOcrNeverTouchDiskOrCryptoOnMain (StrictMode rule + full flow)
+    - name: vault androidTest RepositoryDispatcherTest.saveViewAndDeleteCalledFromMainNeverRunKeystoreWorkOnMain (added 2026-09-23; StrictMode cannot see Keystore/AES work)
     - name: vault androidTest SourceViewRepositoryTest.transientKeystoreFailureReturnsTransientAndLeavesRowReady
     - name: vault androidTest SourceViewRepositoryTest.tamperedBlobAtReadMarksCorruptOnce
     - name: app androidTest ViewerScreenTest.unreadableContentIsExplainedWithDeleteActionNotVerifying
+    - name: app androidTest ViewerScreenTest.transientReadOffersRetryAndDoesNotClaimDamage (added 2026-09-23)
     - name: app androidTest SourceListScreenTest.deletingAVisibleRowDoesNotCrashWithRecycledBitmap
+    - name: app androidTest SourceListScreenTest.trimmingWhileRowsAreVisibleDoesNotDrawARecycledBitmap (added 2026-09-23; reproduces F-28 directly)
     - name: app androidTest IntakeAndListFlowTest.rotatingDuringPreparingStillReachesPreviewOrCancelled
-    - name: app androidTest IntakeAndListFlowTest.cancelDuringPreparingClosesStreamAndLeavesNoStage
-    - name: app androidTest IntakeAndListFlowTest.secondShareDuringActivePreviewShowsBusyCopy
+    - name: app androidTest IntakeScreenFlowTest.cancelDuringPreparingClosesStreamAndLeavesNoStage (moved from IntakeAndListFlowTest; a Compose host activity broke that class's ActivityScenario/UiDevice checks)
+    - name: app androidTest IntakeScreenFlowTest.secondShareDuringActiveImportShowsBusyCopy (was ...DuringActivePreview...; Busy during an idle preview needs P1-15's importInProgress flag)
     - name: app androidTest IntakeAndListFlowTest.deletingWhileViewingClearsViewerAndReturnsToList
+    - name: app androidTest FirstRunFlowTest.acknowledgingFirstRunShowsTheListWithoutMainThreadDiskAccess (added 2026-09-23; found by the manual StrictMode flow)
     - name: app test OpenExistingIntentTest.carriesNewTaskAndClearTopFlags
+    - name: app test ManifestBoundaryTest.mainActivityIsSingleTaskSoOpenExistingReusesIt (added 2026-09-23)
   green:
     - "Implement dispatcher ownership, sealed states, StrictMode rule, cancel button, intent flags."
   refactor:

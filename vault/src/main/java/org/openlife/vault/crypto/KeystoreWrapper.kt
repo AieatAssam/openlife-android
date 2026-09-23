@@ -3,9 +3,13 @@ package org.openlife.vault.crypto
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.GeneralSecurityException
+import java.security.InvalidAlgorithmParameterException
 import java.security.KeyStore
+import java.security.ProviderException
 import java.util.UUID
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
+import javax.crypto.IllegalBlockSizeException
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -40,7 +44,7 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
      * bootstrap rule that an existing wrapper is never silently replaced
      * (design §10, C0-R18).
      */
-    fun wrappingKey(): SecretKey {
+    open fun wrappingKey(): SecretKey {
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
@@ -77,7 +81,14 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         return Envelope(iv, ciphertext)
     }
 
-    /** @throws EnvelopeAuthenticationException on any failure; see [AesGcmCodec.decrypt]. */
+    /**
+     * @throws EnvelopeAuthenticationException when the envelope itself fails:
+     *   a wrong tag, nonce or ciphertext (tampering or corruption).
+     * @throws KeystoreUnavailableException when Keystore cannot perform the
+     *   operation (daemon failure, locked or invalidated key). That is never
+     *   evidence about the stored envelope, so callers must not treat it as
+     *   corruption (P1-13-R5).
+     */
     open fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID? = null): ByteArray {
         try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -89,8 +100,19 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
             cipher.updateAAD(aadFor(domain, sourceId))
             return cipher.doFinal(envelope.ciphertext)
         } catch (e: GeneralSecurityException) {
-            throw EnvelopeAuthenticationException(e)
+            throw unwrapFailure(e)
+        } catch (e: ProviderException) {
+            throw KeystoreUnavailableException(e)
         }
+    }
+
+    /** Only a failure of the envelope itself (tag, padding, block size or IV) is authentication. */
+    private fun unwrapFailure(e: GeneralSecurityException): Exception = when (e) {
+        // BadPaddingException includes AEADBadTagException: the GCM tag did not verify.
+        is BadPaddingException, is IllegalBlockSizeException, is InvalidAlgorithmParameterException ->
+            EnvelopeAuthenticationException(e)
+
+        else -> KeystoreUnavailableException(e)
     }
 
     private fun aadFor(domain: EnvelopeDomain, sourceId: UUID?): ByteArray =

@@ -5,13 +5,18 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.MainActivity
 import org.openlife.app.intake.IntakeActivity
 
 @RunWith(AndroidJUnit4::class)
 class SecureWindowTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     @Before
     fun acknowledgeFirstRun() {

@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import org.openlife.vault.repository.ReadyReadResult
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -40,6 +42,9 @@ import org.openlife.vault.model.SourceState
  */
 @RunWith(AndroidJUnit4::class)
 class AccessibilitySemanticsTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     @get:Rule
     val composeRule = createComposeRule()
@@ -188,7 +193,7 @@ class AccessibilitySemanticsTest {
             ) {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { tinyJpeg() },
+                    loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
                     onBack = {},
                     onDeleteRequested = {},
                 )
@@ -204,7 +209,7 @@ class AccessibilitySemanticsTest {
         composeRule.setContent {
             ViewerScreen(
                 source = readySource(),
-                loadBytes = { tinyJpeg() },
+                loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
                 onBack = {},
                 onDeleteRequested = {},
             )

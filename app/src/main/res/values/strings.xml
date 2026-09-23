@@ -62,8 +62,10 @@
     <string name="viewer_back_content_description">Back</string>
     <string name="viewer_delete_content_description">Delete</string>
     <string name="viewer_evidence_region_highlighted">Evidence region highlighted</string>
-    <string name="viewer_saved_content_unreadable">This item’s saved content is unreadable.</string>
     <string name="viewer_verifying">Verifying…</string>
+    <string name="viewer_saved_content_unreadable_explained">This item’s saved content is unreadable. It failed its integrity check or is missing, so OpenLife will not show it. You can delete OpenLife’s copy; the original stays wherever you shared it from.</string>
+    <string name="viewer_read_transient">OpenLife could not open this item right now. Nothing was changed. Try again in a moment.</string>
+    <string name="viewer_try_again">Try again</string>
     <string name="viewer_saved_image_content_description">Saved image</string>
     <string name="viewer_extracted_text_title">Extracted text</string>
     <string name="viewer_extract_text_action">Extract text on this device</string>

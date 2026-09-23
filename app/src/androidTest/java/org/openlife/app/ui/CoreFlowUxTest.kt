@@ -1,5 +1,7 @@
 package org.openlife.app.ui
 
+import org.openlife.vault.repository.ReadyReadResult
+import kotlinx.coroutines.awaitCancellation
 import android.graphics.Bitmap
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -21,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.settings.SettingsScreen
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat
@@ -33,6 +36,9 @@ import org.openlife.vault.model.SourceState
 @RunWith(AndroidJUnit4::class)
 class CoreFlowUxTest {
     @get:Rule
+    val strictMode = StrictModeRule()
+
+    @get:Rule
     val composeRule = createComposeRule()
 
     @Test
@@ -42,7 +48,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = { deleteRequests++ },
                 )
@@ -177,7 +183,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = {},
                 )
@@ -197,7 +203,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(width = 200, height = 100),
-                    loadBytes = { jpeg(200, 100) },
+                    loadContent = { ReadyReadResult.Loaded(jpeg(200, 100)) },
                     onBack = {},
                     onDeleteRequested = {},
                 )
@@ -220,7 +226,7 @@ class CoreFlowUxTest {
             OpenLifeTheme {
                 ViewerScreen(
                     source = readySource(),
-                    loadBytes = { null },
+                    loadContent = { awaitCancellation() },
                     onBack = {},
                     onDeleteRequested = {},
                 )
