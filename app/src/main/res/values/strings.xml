@@ -10,7 +10,9 @@
     <string name="list_title">OpenLife</string>
     <string name="list_import_from_photos">Import from photos</string>
     <string name="list_loading">Loading…</string>
-    <string name="list_empty">Nothing imported yet. Share an image to OpenLife, or use the import action above.</string>
+    <string name="list_empty_title">Nothing kept yet</string>
+    <string name="list_empty">Import a screenshot, receipt or letter you want to keep. OpenLife saves its own encrypted copy on this device only. You can also share an image to OpenLife from another app.</string>
+    <string name="list_more_options">More options</string>
     <string name="content_unavailable">Content unavailable</string>
     <string name="deletion_pending_retry">Deletion pending — retry</string>
     <string name="delete_content_description">Delete</string>
@@ -109,6 +111,7 @@
     <string name="ocr_failure_process_restart">the operation was interrupted by a process restart</string>
 
     <string name="settings_title">Settings</string>
+    <string name="about_title">About</string>
     <string name="vault_unavailable_title">The vault is unavailable</string>
     <string name="vault_unavailable_keystore">The device key store is temporarily unavailable. Unlock the device, then try again.</string>
     <string name="vault_unavailable_corrupt_key">The key file is damaged. OpenLife has not changed or deleted your saved data.</string>

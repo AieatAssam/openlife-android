@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.openlife.app.R
+import org.openlife.app.ui.BackTopAppBar
 import org.openlife.vault.repository.VaultResetResult
 
 @Composable
@@ -35,13 +39,17 @@ fun SettingsScreen(
     onResetComplete: () -> Unit,
     onBack: () -> Unit = {},
 ) {
-    Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge)
-            ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete)
+    Scaffold(
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+        topBar = { BackTopAppBar(title = stringResource(R.string.settings_title), onBack = onBack) },
+    ) { padding ->
+        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete)
+            }
         }
     }
 }

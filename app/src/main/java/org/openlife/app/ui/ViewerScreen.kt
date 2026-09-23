@@ -1,7 +1,5 @@
 package org.openlife.app.ui
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -37,10 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -53,7 +46,6 @@ import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
-import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
@@ -87,10 +79,11 @@ fun ViewerScreen(
     var selectedRegion by remember(source.id) { mutableStateOf<org.openlife.vault.ocr.OcrEvidenceRegion?>(null) }
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }
     var correctionText by remember(source.id) { mutableStateOf("") }
+    var confirmingDelete by remember(source.id) { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { ViewerTopBar(source, onBack, onDeleteRequested) },
+        topBar = { ViewerTopBar(source, onBack, onDelete = { confirmingDelete = true }) },
     ) { padding ->
         ViewerContent(
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -117,6 +110,19 @@ fun ViewerScreen(
         onDismiss = { correctingSpan = null },
         onSave = onCorrect,
     )
+
+    // Design §8 step 5: delete names the item and is confirmed from every
+    // entry point, including this one.
+    if (confirmingDelete) {
+        DeleteConfirmationDialog(
+            itemLabel = sourceLabel(source),
+            onConfirm = {
+                confirmingDelete = false
+                onDeleteRequested()
+            },
+            onDismiss = { confirmingDelete = false },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,7 +178,8 @@ private fun ViewerContent(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            DetailsSection(source = source, verified = verified)
+            // What the user came for (the text and its evidence) comes before
+            // the bookkeeping about the saved copy.
             OcrSection(
                 source = source,
                 state = ocrState,
@@ -182,6 +189,8 @@ private fun ViewerContent(
                 onCorrect = onCorrect,
                 onReview = onReview,
             )
+            PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            DetailsSection(source = source, verified = verified)
         }
     }
 }
@@ -227,58 +236,6 @@ private fun ViewerCorrectionDialog(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
             },
         )
-    }
-}
-
-@Composable
-private fun ViewerImage(source: Source, bytes: ByteArray?, selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?) {
-    val brand = LocalOpenLifeBrandColors.current
-    Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-        val decoded = remember(bytes, source.orientation) {
-            bytes?.let { SampledBitmapDecoder.decode(it, source.orientation ?: Orientation.NORMAL) }
-        }
-        DisposableEffect(decoded) {
-            onDispose {
-                if (decoded != null && !decoded.isRecycled) decoded.recycle()
-            }
-        }
-        when {
-            source.state == SourceState.CORRUPT -> Text(stringResource(R.string.viewer_saved_content_unreadable))
-
-            bytes == null -> Text(stringResource(R.string.viewer_verifying))
-
-            decoded == null -> Text(stringResource(R.string.viewer_saved_content_unreadable))
-
-            // A generic description preserves privacy while still giving a
-            // screen reader a useful stop in the source evidence flow.
-            else -> Image(
-                decoded.asImageBitmap(),
-                contentDescription = stringResource(R.string.viewer_saved_image_content_description),
-            )
-        }
-        val hasDimensions = source.width != null && source.height != null
-        if (decoded != null && selectedRegion != null && hasDimensions) {
-            val sourceWidth = source.width!!
-            val sourceHeight = source.height!!
-            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                val region = selectedRegion
-                val left = region.left.toFloat() / sourceWidth * size.width
-                val top = region.top.toFloat() / sourceHeight * size.height
-                val right = region.right.toFloat() / sourceWidth * size.width
-                val bottom = region.bottom.toFloat() / sourceHeight * size.height
-                drawRect(
-                    color = brand.highlighter.copy(alpha = 0.30f),
-                    topLeft = Offset(left, top),
-                    size = Size(right - left, bottom - top),
-                )
-                drawRect(
-                    color = brand.highlighter,
-                    topLeft = Offset(left, top),
-                    size = Size(right - left, bottom - top),
-                    style = Stroke(width = 3.dp.toPx()),
-                )
-            }
-        }
     }
 }
 
@@ -361,7 +318,7 @@ private fun DetailsSection(source: Source, verified: Boolean) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
-            DetailRow(stringResource(R.string.viewer_imported_label), sourceLabel(source))
+            DetailRow(stringResource(R.string.viewer_imported_label), importedTime(source), valueIsData = true)
             DetailRow(
                 stringResource(R.string.viewer_route_label),
                 stringResource(
@@ -389,7 +346,6 @@ private fun DetailsSection(source: Source, verified: Boolean) {
             )
         }
     }
-    PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
 }
 
 @Composable
@@ -412,8 +368,12 @@ private fun DisplayOrientationNotice(orientation: Orientation?) {
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
-    Text(stringResource(R.string.viewer_detail_row, label, value), modifier = Modifier.padding(top = 4.dp))
+private fun DetailRow(label: String, value: String, valueIsData: Boolean = false) {
+    val row = stringResource(R.string.viewer_detail_row, label, value)
+    Text(
+        if (valueIsData) withDataSpan(row, value) else androidx.compose.ui.text.AnnotatedString(row),
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 private const val DISPLAY_ROTATION_90 = 90
