@@ -8,33 +8,39 @@ import android.os.Bundle
 import android.os.Parcelable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
+import org.openlife.app.R
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
+import org.openlife.app.ui.IntakeRejectionMessage
 import org.openlife.app.ui.IntakeScreen
 import org.openlife.app.ui.IntakeUiState
 import org.openlife.app.ui.IntakeViewModel
 import org.openlife.app.ui.applySecureWindow
+import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.IntakeKind
+import java.io.FileNotFoundException
 
 /**
  * The single exported intake activity (design §8/§11). Every incoming
  * intent is validated here regardless of the declared `<intent-filter>`,
  * because an exported activity can be started directly with an arbitrary
  * intent (design §8: "Validate every incoming intent regardless of the
- * filter"). Hands a validated, already-opened, bounded stream to
+ * filter"). Hands a validated stream opener to
  * [IntakeViewModel] without ever letting a `Uri`, filename, or claimed
  * sender identity reach the vault layer (design §7 repository layout).
  *
@@ -50,7 +56,7 @@ class IntakeActivity : ComponentActivity() {
     }
 
     /** Test-only observation seam for the C0-05/C0-02/C0-03 instrumented tests. */
-    fun currentStatusForTest(): String = describeForTest(viewModel.state.value)
+    fun currentStatusForTest(): String = describeForTest(this, viewModel.state.value)
 
     override fun onStart() {
         super.onStart()
@@ -63,7 +69,9 @@ class IntakeActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         applySecureWindow()
 
         // Validate only on a fresh launch. On a configuration-change
@@ -80,13 +88,13 @@ class IntakeActivity : ComponentActivity() {
 
         setContent {
             var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
-            MaterialTheme {
+            OpenLifeTheme {
                 if (!acknowledged) {
                     FirstRunExplanationScreen(
                         onContinue = {
                             FirstRunPreferences.setAcknowledged(this)
                             acknowledged = true
-                        }
+                        },
                     )
                 } else {
                     if (validation != null) {
@@ -94,8 +102,9 @@ class IntakeActivity : ComponentActivity() {
                             when (validation) {
                                 is IntakeValidationResult.Rejected ->
                                     viewModel.showRejected(describeIntentRejection(validation.reason))
+
                                 is IntakeValidationResult.Valid ->
-                                    startImportFromUri(Uri.parse(validation.uriString))
+                                    startImportFromUri(validation.uriString.toUri())
                             }
                         }
                     }
@@ -110,7 +119,7 @@ class IntakeActivity : ComponentActivity() {
                                 Intent(this, MainActivity::class.java).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                     putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
-                                }
+                                },
                             )
                             finish()
                         },
@@ -121,75 +130,40 @@ class IntakeActivity : ComponentActivity() {
     }
 
     private fun startImportFromUri(uri: Uri) {
-        // contentResolver.getType/openInputStream are ordinary blocking JVM
-        // calls into another (possibly slow or hostile) content provider,
-        // with no timeout of their own - calling them directly from this
-        // LaunchedEffect (the main/Compose thread) blocks the entire UI for
-        // as long as the provider takes to answer. A ~6s test provider
-        // delay reproduced a real Android ANR ("Input dispatching timed
-        // out... Waited 5000ms") during Stage 8's C0-17 pass; the 15s
-        // cooperative-cancellation deadline in IntakeViewModel.startImport
-        // only covers reading an *already-opened* stream, not this open
-        // call itself. Dispatching to Dispatchers.IO keeps the open call
-        // off the main thread so a slow provider degrades to a stuck
-        // "Preparing…" spinner (recoverable by leaving the screen) instead
-        // of freezing the app.
+        // contentResolver.getType is a blocking call into another (possibly
+        // slow or hostile) provider. Keep metadata lookup off the main thread;
+        // the ViewModel later opens and reads the stream on its provider-owned
+        // dispatcher.
         lifecycleScope.launch(Dispatchers.IO) {
-            var openedStream: java.io.InputStream? = null
-            try {
-                val providerType = try {
-                    contentResolver.getType(uri)
-                } catch (e: SecurityException) {
-                    viewModel.showRejected("could not access the selected item; please select it again")
-                    return@launch
-                } catch (e: java.io.FileNotFoundException) {
-                    viewModel.showRejected("could not access the selected item; please select it again")
-                    return@launch
-                } ?: run {
-                    viewModel.showRejected("the selected item type did not match its contents")
-                    return@launch
-                }
-                val normalizedProviderType = providerType.lowercase()
-                if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
-                    viewModel.showRejected("the selected item type did not match its contents")
-                    return@launch
-                }
-                openedStream = try {
-                    contentResolver.openInputStream(uri)
-                } catch (e: SecurityException) {
-                    // Missing or expired URI grant (design §11 step 1: "If a
-                    // share grant expires or a provider disappears, ask the
-                    // user to select the item again").
-                    viewModel.showRejected("could not access the selected item; please select it again")
-                    return@launch
-                } catch (e: java.io.FileNotFoundException) {
-                    viewModel.showRejected("could not access the selected item; please select it again")
-                    return@launch
-                }
-                val stream = openedStream ?: run {
-                    viewModel.showRejected("could not access the selected item; please select it again")
-                    return@launch
-                }
-                val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
-                    IntakeKind.PHOTO_PICKER
-                } else {
-                    IntakeKind.SHARE
-                }
-                viewModel.startImport(stream, normalizedProviderType, intakeKind)
-                // Ownership transfers to IntakeViewModel, which closes it on
-                // completion, cancellation, failure, or teardown.
-                openedStream = null
-            } finally {
-                // If lifecycle cancellation or a rejected validation happens
-                // after open but before handoff, do not leak the descriptor.
-                openedStream?.let { stream ->
-                    try {
-                        stream.close()
-                    } catch (_: Exception) {
-                        // Best-effort release on a hostile provider.
-                    }
-                }
+            val providerType = try {
+                contentResolver.getType(uri)
+            } catch (_: SecurityException) {
+                viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
+                return@launch
+            } catch (_: FileNotFoundException) {
+                viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
+                return@launch
+            } ?: run {
+                viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
+                return@launch
             }
+            val normalizedProviderType = providerType.lowercase()
+            if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
+                viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
+                return@launch
+            }
+            val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+                IntakeKind.PHOTO_PICKER
+            } else {
+                IntakeKind.SHARE
+            }
+            viewModel.startImport(
+                openStream = {
+                    contentResolver.openInputStream(uri) ?: throw FileNotFoundException()
+                },
+                declaredMimeType = normalizedProviderType,
+                intakeKind = intakeKind,
+            )
         }
     }
 
@@ -226,26 +200,49 @@ class IntakeActivity : ComponentActivity() {
     }
 }
 
-private fun describeIntentRejection(reason: IntakeRejectionReason): String = when (reason) {
-    IntakeRejectionReason.WRONG_ACTION -> "unsupported action"
-    IntakeRejectionReason.NO_CANDIDATE -> "no image was included"
-    IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES -> "more than one item was included"
-    IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> "unsupported source"
-    IntakeRejectionReason.OWN_AUTHORITY -> "invalid source"
-    IntakeRejectionReason.MALFORMED_URI -> "invalid source"
-    IntakeRejectionReason.MISSING_READ_GRANT -> "the selected item was not shared with read access"
-    IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> "unsupported or missing image type"
+private fun describeIntentRejection(reason: IntakeRejectionReason): IntakeRejectionMessage = when (reason) {
+    IntakeRejectionReason.WRONG_ACTION -> IntakeRejectionMessage.UNSUPPORTED_ACTION
+
+    IntakeRejectionReason.NO_CANDIDATE -> IntakeRejectionMessage.NO_IMAGE
+
+    IntakeRejectionReason.MULTIPLE_OR_CONFLICTING_CANDIDATES -> IntakeRejectionMessage.MULTIPLE_ITEMS
+
+    IntakeRejectionReason.UNSUPPORTED_URI_SCHEME -> IntakeRejectionMessage.UNSUPPORTED_SOURCE
+
+    IntakeRejectionReason.OWN_AUTHORITY,
+    IntakeRejectionReason.MALFORMED_URI,
+    -> IntakeRejectionMessage.INVALID_SOURCE
+
+    IntakeRejectionReason.MISSING_READ_GRANT -> IntakeRejectionMessage.MISSING_READ_ACCESS
+
+    IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> IntakeRejectionMessage.UNSUPPORTED_OR_MISSING_TYPE
 }
 
-private fun describeForTest(state: IntakeUiState): String = when (state) {
+private fun describeForTest(activity: IntakeActivity, state: IntakeUiState): String = when (state) {
     IntakeUiState.Preparing -> "Preparing"
+
     is IntakeUiState.Preview -> "Prepared ${state.format} ${state.width}x${state.height}"
+
     is IntakeUiState.Saving -> "Saving"
+
     is IntakeUiState.Saved -> "Saved on this device"
+
     is IntakeUiState.Duplicate -> "Not imported again"
-    is IntakeUiState.Rejected -> "Not imported: ${state.message}"
+
+    // C0-R12: a vanished provider must prompt reselection. Report the same
+    // user-visible copy the screen shows, not the enum name.
+    is IntakeUiState.Rejected -> activity.getString(
+        R.string.intake_not_imported,
+        activity.getString(state.message.stringRes),
+    )
+
     IntakeUiState.Busy -> "Another import is already in progress."
+
     IntakeUiState.Failed -> "Import failed"
+
+    IntakeUiState.StorageUnavailable -> "Storage unavailable"
+
     is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.reason}"
+
     IntakeUiState.Cancelled -> "Cancelled"
 }

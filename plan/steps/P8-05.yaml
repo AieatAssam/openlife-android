@@ -9,7 +9,7 @@ summary: "C11/C12 verification, security review of the native runtime and model 
 requirements:
   - id: P8-05-R0
     text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
-  - id: P8-04-R1
+  - id: P8-05-R1
     text: "MUST produce the docs and run the checklists; the native runtime build reproducibility is part of P5-03's workflow extended here."
 tdd: {red: [], green: [], refactor: []}
 verification: {commands: ["Full suites; CI; checklists"], evidence_required: ["Docs; tag"]}

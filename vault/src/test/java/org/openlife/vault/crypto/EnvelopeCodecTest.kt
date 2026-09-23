@@ -1,9 +1,9 @@
 package org.openlife.vault.crypto
 
-import java.nio.ByteBuffer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.nio.ByteBuffer
 
 /**
  * Framing-level tests for [EnvelopeCodec]: every length field must be

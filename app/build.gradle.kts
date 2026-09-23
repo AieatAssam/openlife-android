@@ -6,42 +6,121 @@
 // that recorded, reviewed choice, not a blanket deprecation silence.
 @file:Suppress("DEPRECATION")
 
+import com.github.jk1.license.filter.DependencyFilter
+import com.github.jk1.license.filter.LicenseBundleNormalizer
+import com.github.jk1.license.render.InventoryMarkdownReportRenderer
+import com.github.jk1.license.render.ReportRenderer
+import org.cyclonedx.gradle.CyclonedxAggregateTask
+import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.tasks.testing.Test
+import java.util.ArrayDeque
+import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.cyclonedx)
+    alias(libs.plugins.dependency.license.report)
+    alias(libs.plugins.detekt)
+}
+
+val releaseSigningEnvironmentNames = listOf(
+    "OPENLIFE_KEYSTORE_B64",
+    "OPENLIFE_KEYSTORE_PASSWORD",
+    "OPENLIFE_KEY_ALIAS",
+    "OPENLIFE_KEY_PASSWORD",
+)
+val openLifeVersionName = rootProject.extensions.extraProperties["openLifeVersionName"] as String
+val openLifeVersionCode = rootProject.extensions.extraProperties["openLifeVersionCode"] as Int
+
+tasks.withType<CyclonedxAggregateTask>().configureEach {
+    jsonOutput.set(layout.buildDirectory.file("reports/bom/bom.json"))
+    xmlOutput.unsetConvention()
+    includeBomSerialNumber.set(false)
+}
+
+tasks.withType<CyclonedxDirectTask>().configureEach {
+    includeConfigs.set(listOf("releaseRuntimeClasspath"))
 }
 
 android {
     namespace = "org.openlife.app"
     compileSdk = 37
 
+    val signingEnvironment = releaseSigningEnvironmentNames.associateWith { name ->
+        providers.environmentVariable(name).orNull.orEmpty()
+    }
+    val signingValuesPresent = signingEnvironment.values.count(String::isNotEmpty)
+    require(signingValuesPresent == 0 || signingValuesPresent == signingEnvironment.size) {
+        "Release signing requires all four OPENLIFE_* signing variables"
+    }
+    val releaseKeystore = if (signingValuesPresent == signingEnvironment.size) {
+        rootProject.layout.buildDirectory.file("secure/release-upload.jks").get().asFile.apply {
+            parentFile.mkdirs()
+            try {
+                writeBytes(Base64.getDecoder().decode(signingEnvironment.getValue("OPENLIFE_KEYSTORE_B64")))
+            } catch (exception: IllegalArgumentException) {
+                throw GradleException("OPENLIFE_KEYSTORE_B64 is not valid base64", exception)
+            }
+        }
+    } else {
+        null
+    }
+    if (releaseKeystore != null) {
+        gradle.buildFinished {
+            releaseKeystore.delete()
+        }
+    }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("releaseUpload") {
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+                storeFile = releaseKeystore
+                storePassword = signingEnvironment.getValue("OPENLIFE_KEYSTORE_PASSWORD")
+                keyAlias = signingEnvironment.getValue("OPENLIFE_KEY_ALIAS")
+                keyPassword = signingEnvironment.getValue("OPENLIFE_KEY_PASSWORD")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "org.openlife"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.0.1-c0"
+        versionCode = openLifeVersionCode
+        versionName = openLifeVersionName
+        ndk {
+            // The pinned ML Kit native artifact has 4 KB LOAD alignment in
+            // its 32-bit armeabi-v7a/x86 binaries. Keep only architectures
+            // whose packaged native libraries pass the Android 15 16 KB
+            // alignment gate; P2-03 revisits 32-bit support with the OCR
+            // engine replacement.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["profileInstallerReceiverClass"] =
+            "androidx.profileinstaller.ProfileInstallReceiver"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Debug-key signing so CI can produce an installable release
-            // APK/AAB for internal testing without a real keystore secret.
-            // This is not store-distribution signing - replace with a real
-            // signing config (from a secret keystore) before any real
-            // release, per docs/decisions/0001-c0-defaults.md's pending
-            // pre-distribution decisions.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("releaseUpload")
         }
     }
     // Debug-only hostile/adversarial content provider lives in src/debug and
@@ -54,10 +133,22 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        checkReleaseBuilds = true
+        lintConfig = file("lint.xml")
+        warning.add("Accessibility")
+    }
+
     packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
@@ -77,6 +168,9 @@ dependencies {
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.activity.compose)
+    implementation(libs.navigation.compose)
+    implementation(libs.core.splashscreen)
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -88,6 +182,7 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    detektPlugins(libs.detekt.rules.ktlint.wrapper)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -95,4 +190,139 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.uiautomator)
+}
+
+val releaseClasspathReport = layout.buildDirectory.file("reports/classpath-release.txt")
+val writeReleaseRuntimeClasspath = tasks.register("writeReleaseRuntimeClasspath") {
+    notCompatibleWithConfigurationCache("uses Android's resolved release configuration during task execution")
+    outputs.file(releaseClasspathReport)
+    outputs.upToDateWhen { false }
+    doLast {
+        val resolutionResult = configurations.getByName("releaseRuntimeClasspath")
+            .incoming.resolutionResult
+        val coordinates = resolutionResult.allComponents
+            .mapNotNull { component ->
+                component.moduleVersion?.let { id ->
+                    "${id.group}:${id.name}:${id.version}"
+                }
+            }
+            .distinct()
+            .sorted()
+        val denylistPaths = linkedSetOf<String>()
+        fun coordinate(component: ResolvedComponentResult): String? = component.moduleVersion?.let { id ->
+            "${id.group}:${id.name}:${id.version}"
+        }
+        fun shortestPathTo(target: ResolvedComponentResult): List<String>? {
+            val queue = ArrayDeque<Pair<ResolvedComponentResult, List<String>>>()
+            val visited = mutableSetOf<String>()
+            queue.add(resolutionResult.root to emptyList())
+            while (queue.isNotEmpty()) {
+                val (component, path) = queue.removeFirst()
+                if (!visited.add(component.id.displayName)) {
+                    continue
+                }
+                val componentCoordinate = coordinate(component)
+                val currentPath = if (componentCoordinate == null) {
+                    path
+                } else {
+                    path + componentCoordinate
+                }
+                if (component.id.displayName == target.id.displayName) {
+                    return currentPath
+                }
+                component.dependencies.filterIsInstance<ResolvedDependencyResult>().forEach { dependency ->
+                    queue.add(dependency.selected to currentPath)
+                }
+            }
+            return null
+        }
+        resolutionResult.allComponents
+            .filter { component ->
+                coordinate(component)?.let { selectedCoordinate ->
+                    selectedCoordinate.startsWith("com.google.firebase") ||
+                        selectedCoordinate.startsWith("com.google.android.datatransport")
+                } == true
+            }
+            .forEach { component ->
+                shortestPathTo(component)?.let { path ->
+                    denylistPaths += "denylist-path: ${path.joinToString(" -> ")}"
+                }
+            }
+        releaseClasspathReport.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(
+                buildString {
+                    appendLine("# Resolved releaseRuntimeClasspath coordinates")
+                    coordinates.forEach(::appendLine)
+                    appendLine("# Denylist dependency paths")
+                    denylistPaths.sorted().forEach(::appendLine)
+                },
+            )
+        }
+    }
+}
+
+licenseReport {
+    outputDir = rootProject.layout.projectDirectory.dir("docs/generated").asFile.absolutePath
+    projects = arrayOf(project)
+    configurations = arrayOf("releaseRuntimeClasspath")
+    renderers = arrayOf<ReportRenderer>(
+        InventoryMarkdownReportRenderer(
+            "THIRD_PARTY_LICENSES.md",
+            "OpenLife runtime dependencies",
+            rootProject.layout.projectDirectory.file("config/license-overrides.txt").asFile,
+            false,
+            true,
+        ),
+    )
+    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
+    allowedLicensesFile = rootProject.layout.projectDirectory.file("config/allowed-licenses.json").asFile
+}
+
+// Font binaries are repository assets rather than Gradle dependencies, so the
+// dependency-license plugin cannot discover their OFL text. Keep the checked-
+// in report complete whenever the report is regenerated.
+tasks.named("generateLicenseReport") {
+    outputs.upToDateWhen { false }
+    doLast {
+        val report = rootProject.file("docs/generated/THIRD_PARTY_LICENSES.md")
+        val marker = "## Bundled font licences"
+        if (!report.readText().contains(marker)) {
+            val licenseText = rootProject.file("app/src/main/res/raw/ofl_1_1.txt").readText().trim()
+            report.appendText("\n\n$marker\n\n$licenseText\n")
+        }
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(writeReleaseRuntimeClasspath)
+    dependsOn("checkLicense")
+    dependsOn("processReleaseMainManifest")
+    dependsOn("processReleaseManifest")
+    systemProperty("openlife.projectDir", rootProject.projectDir.absolutePath)
+}
+
+// Keep the repository boundary tests on the standard lint path so a manifest
+// or source-egress regression cannot pass a lint-only pre-commit invocation.
+tasks.named("lint") {
+    dependsOn("test")
+}
+
+detekt {
+    toolVersion = libs.versions.detekt.get()
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    buildUponDefaultConfig = true
+    autoCorrect = false
+}
+
+val releaseDependencyAudit = tasks.register("releaseDependencyAudit") {
+    group = "verification"
+    description = "Generate and validate all dependency audit artefacts for release."
+    dependsOn(writeReleaseRuntimeClasspath, "checkLicense", "generateLicenseReport", "cyclonedxBom")
+}
+
+tasks.configureEach {
+    if (name == "assembleRelease" || name == "bundleRelease") {
+        dependsOn(releaseDependencyAudit)
+    }
 }

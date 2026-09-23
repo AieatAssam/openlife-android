@@ -253,7 +253,7 @@ class RecoveryRepositoryTest {
 
     @Test
     fun deletingRowWithRemainingFilesIsResumedAndRemoved(): Unit = runBlocking {
-        // Simulates a kill mid-deletion (Stage 5 sets this state; the
+        // Simulates a kill mid-deletion (the
         // recovery branch must already handle it correctly regardless).
         val id = prepareAndSave()
         val entity = db.sourceDao().findById(id.toString())!!

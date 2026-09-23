@@ -1,7 +1,7 @@
 package org.openlife.vault.ocr
 
-import java.util.UUID
 import org.openlife.vault.model.Orientation
+import java.util.UUID
 
 data class OcrRevision(
     val id: UUID,

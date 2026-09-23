@@ -1,13 +1,13 @@
 package org.openlife.vault.crypto
 
-import java.nio.charset.StandardCharsets
-import java.util.UUID
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.nio.charset.StandardCharsets
+import java.util.UUID
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 
 /**
  * Round-trip and adversarial coverage for [AesGcmCodec] and [EnvelopeCodec]
@@ -116,7 +116,7 @@ class AesGcmCodecTest {
         val envelope = AesGcmCodec.encrypt(
             plaintext,
             key,
-            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, realSourceId)
+            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, realSourceId),
         )
         // This is the specific attack the design calls out: a valid
         // ciphertext for one Source must not decrypt under another
@@ -133,7 +133,7 @@ class AesGcmCodecTest {
         val envelope = AesGcmCodec.encrypt(
             plaintext,
             key,
-            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId)
+            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId),
         )
         assertThrows(EnvelopeAuthenticationException::class.java) {
             AesGcmCodec.decrypt(envelope, key, EnvelopeAad.forDomain(EnvelopeDomain.ARTEFACT))
@@ -163,7 +163,7 @@ class AesGcmCodecTest {
         val envelope = AesGcmCodec.encrypt(
             plaintext,
             key,
-            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId)
+            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId),
         )
         val bytes = EnvelopeCodec.encode(envelope)
         val decoded = EnvelopeCodec.decode(bytes) // succeeds: framing is valid

@@ -1,13 +1,12 @@
 package org.openlife.vault.ocr
 
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.Orientation
+import java.util.concurrent.atomic.AtomicBoolean
 
 class OcrEngineContractTest {
     @Test

@@ -1,8 +1,8 @@
 package org.openlife.app.ui
 
-import java.util.UUID
 import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrSpan
+import java.util.UUID
 
 sealed interface OcrUiState {
     data object Idle : OcrUiState

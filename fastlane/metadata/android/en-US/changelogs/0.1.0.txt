@@ -1,0 +1,2 @@
+Initial release pipeline milestone. OpenLife remains under active development;
+see the project documentation for the current capability scope.

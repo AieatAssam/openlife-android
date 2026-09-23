@@ -1,5 +1,10 @@
 package org.openlife.vault.repository
 
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -7,11 +12,6 @@ import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
-import org.junit.Test
 
 class BoundedStreamReaderTest {
 
@@ -46,6 +46,33 @@ class BoundedStreamReaderTest {
         val short = "x".toByteArray()
         val result = BoundedStreamReader.read(ByteArrayInputStream(short))
         assertEquals(1, result.bytes.size)
+    }
+
+    @Test
+    fun deadlineCallbackStopsReadingBetweenChunksWithTypedException() {
+        val chunk = ByteArray(64 * 1024)
+        val stream = object : InputStream() {
+            private var reads = 0
+
+            override fun read(): Int = 0
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                reads++
+                chunk.copyInto(buffer, offset, 0, minOf(chunk.size, length))
+                return minOf(chunk.size, length)
+            }
+        }
+        var deadlineChecks = 0
+
+        val failure = assertThrows(ReadDeadlineExceededException::class.java) {
+            BoundedStreamReader.read(stream) {
+                deadlineChecks++
+                deadlineChecks > 1
+            }
+        }
+
+        assertTrue(failure.message?.contains("deadline") == true)
+        assertTrue("deadline must be checked between chunks", deadlineChecks >= 2)
     }
 
     /**

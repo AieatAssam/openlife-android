@@ -1,10 +1,10 @@
 package org.openlife.vault.storage
 
-import java.security.SecureRandom
 import org.openlife.vault.crypto.EnvelopeAuthenticationException
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.KeystoreWrapper
+import java.security.SecureRandom
 
 /** Outcome of [VaultBootstrapper.bootstrap]. See design §10 "Vault bootstrap". */
 sealed interface VaultBootstrapResult {
@@ -43,32 +43,46 @@ object VaultBootstrapper {
 
     fun bootstrap(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         paths.ensureDirectoriesExist()
+        return when (val keyRead = readKey(paths)) {
+            KeyRead.Corrupt -> VaultBootstrapResult.Unavailable("key file is corrupt")
 
-        val keyEnvelope = try {
-            VaultKeyFile.read(paths.databaseKeyFile)
-        } catch (e: EnvelopeCodec.MalformedEnvelopeException) {
-            return VaultBootstrapResult.Unavailable("key file is corrupt")
-        }
+            is KeyRead.Present -> unwrapExisting(keyRead.envelope, wrapper)
 
-        if (keyEnvelope != null) {
-            return try {
-                val secret = wrapper.unwrap(keyEnvelope, EnvelopeDomain.DATABASE_SECRET)
-                VaultBootstrapResult.Ready(secret)
-            } catch (e: EnvelopeAuthenticationException) {
-                VaultBootstrapResult.Unavailable("existing key could not be unwrapped")
+            KeyRead.Absent -> if (paths.databaseFile.exists()) {
+                // A database with no usable key file is exactly the state that
+                // must never be treated as "empty, safe to recreate".
+                VaultBootstrapResult.Unavailable("database exists without a usable key file")
+            } else {
+                createFresh(paths, wrapper)
             }
         }
+    }
 
-        if (paths.databaseFile.exists()) {
-            // A database with no usable key file is exactly the state that
-            // must never be treated as "empty, safe to recreate" — see
-            // design §10 and the C0-12 test row.
-            return VaultBootstrapResult.Unavailable("database exists without a usable key file")
-        }
+    private fun readKey(paths: VaultPaths): KeyRead = try {
+        VaultKeyFile.read(paths.databaseKeyFile)?.let(KeyRead::Present) ?: KeyRead.Absent
+    } catch (_: EnvelopeCodec.MalformedEnvelopeException) {
+        KeyRead.Corrupt
+    }
 
+    private fun unwrapExisting(
+        envelope: org.openlife.vault.crypto.Envelope,
+        wrapper: KeystoreWrapper,
+    ): VaultBootstrapResult = try {
+        VaultBootstrapResult.Ready(wrapper.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET))
+    } catch (_: EnvelopeAuthenticationException) {
+        VaultBootstrapResult.Unavailable("existing key could not be unwrapped")
+    }
+
+    private fun createFresh(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         val secret = ByteArray(DATABASE_SECRET_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
         val envelope = wrapper.wrap(secret, EnvelopeDomain.DATABASE_SECRET)
         VaultKeyFile.writeAndSync(paths.databaseKeyFile, envelope)
         return VaultBootstrapResult.Ready(secret)
+    }
+
+    private sealed interface KeyRead {
+        data object Absent : KeyRead
+        data object Corrupt : KeyRead
+        data class Present(val envelope: org.openlife.vault.crypto.Envelope) : KeyRead
     }
 }

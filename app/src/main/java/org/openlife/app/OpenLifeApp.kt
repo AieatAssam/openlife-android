@@ -1,11 +1,14 @@
 package org.openlife.app
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.ocr.MlKitOcrEngine
+import org.openlife.vault.ocr.OcrEngineRegistry
 import org.openlife.vault.repository.AndroidBitmapSampler
 import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.ImportRepository
@@ -13,8 +16,6 @@ import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryRepository
 import org.openlife.vault.repository.SourceViewRepository
-import org.openlife.vault.ocr.MlKitOcrEngine
-import org.openlife.vault.ocr.OcrEngineRegistry
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
@@ -39,6 +40,25 @@ class OpenLifeApp : Application() {
     private val vaultInitLock = Mutex()
     private var cachedAccess: VaultAccess? = null
     private var cachedDatabase: OpenLifeDatabase? = null
+    private val sensitiveContentClearers = mutableSetOf<() -> Unit>()
+
+    @Synchronized
+    fun registerSensitiveContentClearer(clearer: () -> Unit): () -> Unit {
+        sensitiveContentClearers += clearer
+        return { unregisterSensitiveContentClearer(clearer) }
+    }
+
+    @Synchronized
+    private fun unregisterSensitiveContentClearer(clearer: () -> Unit) {
+        sensitiveContentClearers -= clearer
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (!SensitiveContentTrimPolicy.shouldClear(level)) return
+        val clearers = synchronized(this) { sensitiveContentClearers.toList() }
+        clearers.forEach { it() }
+    }
 
     suspend fun vault(): VaultAccess = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {
@@ -49,10 +69,11 @@ class OpenLifeApp : Application() {
                     val database = OpenLifeDatabaseFactory.create(this@OpenLifeApp, paths, result.databaseSecret)
                     cachedDatabase = database
                     val report = RecoveryRepository(paths, database, keystoreWrapper, mutationQueue).recover()
-                    // Counts only, never content (design §8/§15): safe to log,
-                    // and useful for confirming startup recovery actually ran
-                    // after a real process kill rather than a constructed test state.
-                    android.util.Log.i("OpenLifeRecovery", report.toString())
+                    // Counts only, never content (design §8/§15). Keep this
+                    // diagnostic out of release logcat.
+                    if (BuildConfig.DEBUG) {
+                        android.util.Log.i("OpenLifeRecovery", report.toString())
+                    }
                     VaultAccess.Ready(
                         importRepository = ImportRepository(
                             paths = paths,
@@ -80,5 +101,13 @@ class OpenLifeApp : Application() {
             cachedAccess = access
             access
         }
+    }
+}
+
+internal object SensitiveContentTrimPolicy {
+    @Suppress("FunctionExpressionBody")
+    fun shouldClear(level: Int): Boolean {
+        return level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
     }
 }

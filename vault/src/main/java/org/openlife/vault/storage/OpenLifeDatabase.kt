@@ -49,7 +49,7 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                         BEGIN
                             SELECT RAISE(ABORT, 'READY source requires all validated fields');
                         END;
-                        """.trimIndent()
+                        """.trimIndent(),
                     )
                 }
             }
@@ -76,7 +76,7 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`),
                         FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_ocr_revisions_sourceId` ON `ocr_revisions` (`sourceId`)")
                 db.execSQL(
@@ -95,10 +95,13 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`),
                         FOREIGN KEY(`revisionId`) REFERENCES `ocr_revisions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_ocr_spans_revisionId` ON `ocr_spans` (`revisionId`)")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ocr_spans_revisionId_ordinal` ON `ocr_spans` (`revisionId`, `ordinal`)")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_ocr_spans_revisionId_ordinal` " +
+                        "ON `ocr_spans` (`revisionId`, `ordinal`)",
+                )
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `ocr_user_revisions` (
@@ -109,13 +112,20 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                         `createdAt` INTEGER NOT NULL,
                         `actor` TEXT NOT NULL,
                         PRIMARY KEY(`id`),
-                        FOREIGN KEY(`revisionId`) REFERENCES `ocr_revisions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`revisionId`) REFERENCES `ocr_revisions`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE,
                         FOREIGN KEY(`spanId`) REFERENCES `ocr_spans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_revisionId` ON `ocr_user_revisions` (`revisionId`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_spanId` ON `ocr_user_revisions` (`spanId`)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_revisionId` " +
+                        "ON `ocr_user_revisions` (`revisionId`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_spanId` " +
+                        "ON `ocr_user_revisions` (`spanId`)",
+                )
             }
         }
     }

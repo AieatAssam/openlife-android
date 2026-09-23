@@ -1,26 +1,39 @@
 package org.openlife.vault.repository
 
-import java.io.IOException
-import java.io.InputStream
-import java.security.SecureRandom
-import java.util.UUID
-import javax.crypto.spec.SecretKeySpec
+import android.database.sqlite.SQLiteFullException
+import android.system.ErrnoException
 import org.openlife.vault.crypto.AesGcmCodec
 import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
+import java.io.IOException
+import java.io.InputStream
+import java.security.SecureRandom
+import java.util.UUID
+import javax.crypto.spec.SecretKeySpec
 
 private const val DEK_LENGTH_BYTES = 32
 private const val SCHEMA_ARTEFACT_VERSION = 1
+private const val RESERVED_STORAGE_BYTES = 8L * 1024 * 1024
+private const val MINIMUM_AVAILABLE_STORAGE_BYTES =
+    2L * ImportLimits.MAX_ORIGINAL_BYTES + RESERVED_STORAGE_BYTES
+
+private data class StageWriteRequest(val sourceId: UUID, val plaintext: ByteArray, val dek: ByteArray)
+
+fun interface PlaintextBufferObserver {
+    fun onReleased(bytes: ByteArray)
+}
 
 /**
  * The "Prepare and preview" and "Save" halves of design §11
@@ -43,6 +56,9 @@ class ImportRepository(
     private val mutationQueue: MutationQueue,
     private val clock: () -> Long = System::currentTimeMillis,
     private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
+    private val plaintextBufferObserver: PlaintextBufferObserver = PlaintextBufferObserver { },
+    private val storageSpace: StorageSpace = StorageSpace.Default,
+    private val sourceDao: SourceDao = database.sourceDao(),
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -50,15 +66,22 @@ class ImportRepository(
         inputStream: InputStream,
         declaredMimeType: String,
         intakeKind: IntakeKind,
-    ): PrepareResult =
-        mutationQueue.tryAcquire { prepareImportLocked(inputStream, declaredMimeType, intakeKind) }
-            ?: PrepareResult.Busy
+        deadline: () -> Boolean = { false },
+    ): PrepareResult = mutationQueue.tryAcquire {
+        prepareImportLocked(inputStream, declaredMimeType, intakeKind, deadline)
+    }
+        ?: PrepareResult.Busy
 
     private suspend fun prepareImportLocked(
         inputStream: InputStream,
         declaredMimeType: String,
         intakeKind: IntakeKind,
+        deadline: () -> Boolean,
     ): PrepareResult {
+        if (!hasEnoughStorage()) {
+            return PrepareResult.Rejected(ImageRejectionReason.STORAGE_UNAVAILABLE)
+        }
+
         val sourceId = UUID.randomUUID()
         val dek = ByteArray(DEK_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
 
@@ -81,57 +104,124 @@ class ImportRepository(
             // The STAGED row, with its wrapped key, is committed before any
             // file is written - this is what lets recovery find interrupted
             // work (design §11 step 2).
-            database.sourceDao().insert(stagedSource.toEntity())
+            val insertFailure = insertStagedSource(stagedSource)
+            if (insertFailure != null) {
+                return insertFailure
+            }
 
             val read = try {
-                BoundedStreamReader.read(inputStream)
-            } catch (e: IOException) {
+                BoundedStreamReader.read(inputStream, deadline)
+            } catch (_: IOException) {
                 cancelStage(sourceId)
                 return PrepareResult.Failed
-            }
-
-            val validation = ImageHeaderValidator.validate(declaredMimeType, read.bytes)
-            if (validation is ImageValidationResult.Rejected) {
-                cancelStage(sourceId)
-                return PrepareResult.Rejected(validation.reason)
-            }
-            val valid = validation as ImageValidationResult.Valid
-
-            if (!bitmapSampler.canSample(read.bytes)) {
-                cancelStage(sourceId)
-                return PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
             }
 
             try {
-                val artefactEnvelope = AesGcmCodec.encrypt(
-                    read.bytes,
-                    SecretKeySpec(dek, "AES"),
-                    EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, sourceId)
+                val validation = ImageHeaderValidator.validate(declaredMimeType, read.bytes)
+                if (validation is ImageValidationResult.Rejected) {
+                    cancelStage(sourceId)
+                    return PrepareResult.Rejected(validation.reason)
+                }
+                val valid = validation as ImageValidationResult.Valid
+
+                if (!bitmapSampler.canSample(read.bytes)) {
+                    cancelStage(sourceId)
+                    return PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
+                }
+
+                val stageFailure = writeEncryptedStage(StageWriteRequest(sourceId, read.bytes, dek))
+                if (stageFailure != null) {
+                    return stageFailure
+                }
+
+                val updated = stagedSource.copy(
+                    mimeType = valid.format,
+                    byteCount = read.bytes.size.toLong(),
+                    sha256 = read.sha256,
+                    width = valid.width,
+                    height = valid.height,
+                    orientation = if (valid.format == ImageFormat.JPEG) {
+                        ExifOrientationParser.parse(read.bytes)
+                    } else {
+                        Orientation.NORMAL
+                    },
+                    artefactVersion = SCHEMA_ARTEFACT_VERSION,
                 )
-                fileOps.writeAndSync(paths.stageFile(sourceId), EnvelopeCodec.encode(artefactEnvelope))
-            } catch (e: IOException) {
-                cancelStage(sourceId)
-                return PrepareResult.Failed
+                val updateFailure = updatePreparedSource(updated)
+                if (updateFailure != null) {
+                    return updateFailure
+                }
+
+                return PrepareResult.Prepared(
+                    sourceId,
+                    valid.format,
+                    valid.width,
+                    valid.height,
+                    read.bytes.size.toLong(),
+                    updated.orientation ?: Orientation.NORMAL,
+                )
+            } finally {
+                read.bytes.fill(0)
+                plaintextBufferObserver.onReleased(read.bytes)
             }
-
-            val updated = stagedSource.copy(
-                mimeType = valid.format,
-                byteCount = read.bytes.size.toLong(),
-                sha256 = read.sha256,
-                width = valid.width,
-                height = valid.height,
-                // EXIF-derived orientation is out of scope for C0's header
-                // validator; every accepted Source is recorded as already
-                // display-correct until a later capability reads EXIF.
-                orientation = Orientation.NORMAL,
-                artefactVersion = SCHEMA_ARTEFACT_VERSION,
-            )
-            database.sourceDao().update(updated.toEntity())
-
-            return PrepareResult.Prepared(sourceId, valid.format, valid.width, valid.height, read.bytes.size.toLong())
         } finally {
             dek.fill(0)
         }
+    }
+
+    private fun hasEnoughStorage(): Boolean = try {
+        storageSpace.availableBytes(paths.artefactsDir) >= MINIMUM_AVAILABLE_STORAGE_BYTES
+    } catch (_: Exception) {
+        false
+    }
+
+    private suspend fun writeEncryptedStage(request: StageWriteRequest): PrepareResult? = try {
+        val artefactEnvelope = AesGcmCodec.encrypt(
+            request.plaintext,
+            SecretKeySpec(request.dek, "AES"),
+            EnvelopeAad.forSource(EnvelopeDomain.ARTEFACT, request.sourceId),
+        )
+        fileOps.writeAndSync(paths.stageFile(request.sourceId), EnvelopeCodec.encode(artefactEnvelope))
+        null
+    } catch (error: IOException) {
+        cancelStage(request.sourceId)
+        prepareFailureFor(error)
+    } catch (error: ErrnoException) {
+        cancelStage(request.sourceId)
+        prepareFailureFor(error)
+    }
+
+    private fun prepareFailureFor(error: Throwable): PrepareResult =
+        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+            PrepareResult.StorageUnavailable
+        } else {
+            PrepareResult.Failed
+        }
+
+    private suspend fun insertStagedSource(source: Source): PrepareResult? = try {
+        sourceDao.insert(source.toEntity())
+        null
+    } catch (error: IOException) {
+        prepareFailureFor(error)
+    } catch (error: ErrnoException) {
+        prepareFailureFor(error)
+    } catch (error: SQLiteFullException) {
+        prepareFailureFor(error)
+    } catch (_: Exception) {
+        PrepareResult.Failed
+    }
+
+    private suspend fun updatePreparedSource(source: Source): PrepareResult? = try {
+        sourceDao.update(source.toEntity())
+        null
+    } catch (error: IOException) {
+        prepareFailureFor(error)
+    } catch (error: ErrnoException) {
+        prepareFailureFor(error)
+    } catch (error: SQLiteFullException) {
+        prepareFailureFor(error)
+    } catch (_: Exception) {
+        PrepareResult.Failed
     }
 
     /**
@@ -144,7 +234,7 @@ class ImportRepository(
         val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
         val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
         if (!stageRemoved || !blobRemoved) return false
-        database.sourceDao().deleteById(sourceId.toString())
+        sourceDao.deleteById(sourceId.toString())
         return true
     }
 
@@ -156,7 +246,7 @@ class ImportRepository(
      * touch.
      */
     suspend fun cancelStagedImport(sourceId: UUID): Boolean = mutationQueue.acquire {
-        val entity = database.sourceDao().findById(sourceId.toString())
+        val entity = sourceDao.findById(sourceId.toString())
         if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
         cancelStage(sourceId)
     }
@@ -169,7 +259,7 @@ class ImportRepository(
      * resolve; it is never reported as saved.
      */
     suspend fun saveImport(sourceId: UUID): SaveResult = mutationQueue.acquire {
-        val entity = database.sourceDao().findById(sourceId.toString())
+        val entity = sourceDao.findById(sourceId.toString())
         if (entity == null || entity.state != SourceState.STAGED.name) {
             return@acquire SaveResult.StageNotFound
         }
@@ -180,7 +270,7 @@ class ImportRepository(
 
         if (!authenticator.authenticates(source, stageFile)) return@acquire SaveResult.Failed
 
-        val duplicate = database.sourceDao().findReadyDuplicate(source.byteCount!!, source.sha256!!)
+        val duplicate = sourceDao.findReadyDuplicate(source.byteCount!!, source.sha256!!)
         if (duplicate != null) {
             cancelStage(sourceId)
             return@acquire SaveResult.DuplicateFound(UUID.fromString(duplicate.id))
@@ -190,12 +280,22 @@ class ImportRepository(
             val blobFile = paths.blobFile(sourceId)
             if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
             fileOps.syncDirectory(paths.artefactsDir)
-        } catch (e: IOException) {
-            return@acquire SaveResult.Failed
+        } catch (error: IOException) {
+            return@acquire saveFailureFor(error)
+        } catch (error: ErrnoException) {
+            return@acquire saveFailureFor(error)
         }
 
         try {
-            database.sourceDao().update(source.copy(state = SourceState.READY).toEntity())
+            sourceDao.update(source.copy(state = SourceState.READY).toEntity())
+        } catch (error: IOException) {
+            return@acquire saveFailureFor(error)
+        } catch (error: ErrnoException) {
+            return@acquire saveFailureFor(error)
+        } catch (_: SQLiteFullException) {
+            // The rename already happened, but the row remains STAGED when
+            // the final commit is rejected; recovery owns both paths.
+            return@acquire SaveResult.StorageUnavailable
         } catch (_: Exception) {
             // The rename already happened, but the row remains STAGED when
             // the final commit is rejected (for example by the READY
@@ -205,4 +305,11 @@ class ImportRepository(
         }
         SaveResult.Saved(sourceId)
     }
+
+    private fun saveFailureFor(error: Throwable): SaveResult =
+        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+            SaveResult.StorageUnavailable
+        } else {
+            SaveResult.Failed
+        }
 }

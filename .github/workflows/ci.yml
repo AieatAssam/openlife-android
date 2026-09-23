@@ -2,97 +2,232 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build-lint-unit-test:
     name: Build, lint, unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: actions/setup-java@v4
+      - uses: ./.github/actions/gradle-setup
+
+      - name: Validate plan
+        run: scripts/plan-check.sh
+
+      - name: Static analysis, lint, JVM tests, and debug build
+        run: ./gradlew detekt lint :app:test :vault:test assembleDebug
+
+      # Sideloadable debug APK for physical-device testing when emulator
+      # legs fail. Uploaded only after assembleDebug succeeds so a missing
+      # APK is not published; this job's success is independent of later
+      # instrumented jobs.
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          distribution: temurin
-          java-version: "17"
+          name: app-debug-apk
+          retention-days: 30
+          if-no-files-found: error
+          path: app/build/outputs/apk/debug/app-debug.apk
 
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Assemble debug
-        run: ./gradlew assembleDebug
-
-      - name: Lint
-        run: ./gradlew lint
-
-      - name: Unit tests
-        run: ./gradlew :app:test :vault:test
-
-      - name: Upload lint reports
+      - name: Upload static-analysis, lint, and JVM reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: lint-reports
+          name: jvm-and-static-reports
+          retention-days: 30
+          if-no-files-found: warn
           path: |
+            app/build/reports/detekt/**
+            vault/build/reports/detekt/**
             app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.xml
             vault/build/reports/lint-results-*.html
-          if-no-files-found: ignore
-
-      - name: Upload unit test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          path: |
+            vault/build/reports/lint-results-*.xml
             app/build/reports/tests/**
             vault/build/reports/tests/**
-          if-no-files-found: ignore
 
   instrumented-tests:
-    name: Instrumented tests (emulator)
-    runs-on: ubuntu-latest
+    name: Instrumented tests (API ${{ matrix.api-level }})
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ATD does not exist for API 29. Keep google_apis x86_64, which
+          # booted in ~16s on run 35444099558. Drop pixel_7; generic AVD
+          # hardware is enough for connected tests.
+          - api-level: 29
+            target: google_apis
+          # API 36 aosp_atd x86_64 is in the SDK catalog and is the
+          # lightweight CI image. See docs/decisions/0016-ci-emulator-images.md.
+          - api-level: 36
+            target: aosp_atd
+    env:
+      OPENLIFE_API_LEVEL: ${{ matrix.api-level }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: ./.github/actions/gradle-setup
 
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
 
-      # API 34 rather than the app's minSdk (29): a faster, widely-cached
-      # image for routine CI signal. minSdk 29 is not verified by this
-      # workflow - see docs/decisions/0001-c0-defaults.md item 4, which
-      # already records that gap for local development too.
-      - name: Run instrumented tests
-        uses: reactivecircus/android-emulator-runner@v2
+      # GHA ubuntu images already ship ANDROID_HOME/cmdline-tools. The older
+      # emulator-runner pin used `sudo mkdir` and died with "File exists"
+      # plus spawn adb ENOENT (run 35439433360). Keep KVM on the udev step
+      # above — do not pass enable-kvm; that input is not in every pin.
+      # Pinning ubuntu-22.04 avoids ubuntu-24.04 XDG_CONFIG_HOME AVD path
+      # drift; ANDROID_* homes are still set explicitly.
+      - name: Prepare Android SDK cmdline-tools and adb
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          {
+            echo "ANDROID_HOME=${sdk_root}"
+            echo "ANDROID_SDK_ROOT=${sdk_root}"
+            echo "ANDROID_USER_HOME=${HOME}/.android"
+            echo "ANDROID_EMULATOR_HOME=${HOME}/.android"
+            echo "ANDROID_AVD_HOME=${HOME}/.android/avd"
+          } >> "${GITHUB_ENV}"
+          mkdir -p "${HOME}/.android/avd"
+
+          cmdline_latest="${sdk_root}/cmdline-tools/latest"
+          if [ -d "${sdk_root}/cmdline-tools" ] && [ ! -e "${cmdline_latest}" ]; then
+            newest="$(find "${sdk_root}/cmdline-tools" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1 || true)"
+            if [ -n "${newest}" ]; then
+              ln -sfn "$(basename "${newest}")" "${cmdline_latest}"
+            fi
+          fi
+
+          if [ -d "${sdk_root}/platform-tools" ]; then
+            echo "${sdk_root}/platform-tools" >> "${GITHUB_PATH}"
+          fi
+          if [ -d "${cmdline_latest}/bin" ]; then
+            echo "${cmdline_latest}/bin" >> "${GITHUB_PATH}"
+          fi
+
+      - name: AVD snapshot cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: avd-cache
         with:
-          api-level: 34
-          target: google_apis
+          path: |
+            ~/.android/avd/*
+            ~/.android/*.img
+            ~/.android/adb*
+          key: avd-ubuntu-22.04-${{ matrix.api-level }}-${{ matrix.target }}-x86_64-2048M-v1
+
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
           arch: x86_64
-          profile: pixel_7
-          disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest :vault:connectedDebugAndroidTest
+          cores: 2
+          ram-size: 2048M
+          force-avd-creation: false
+          emulator-boot-timeout: 300
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: echo Generated AVD snapshot for caching.
 
-      - name: Upload instrumented test results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Run connected tests with one retry for infrastructure flakes
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
-          name: instrumented-test-results
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          cores: 2
+          ram-size: 2048M
+          force-avd-creation: false
+          emulator-boot-timeout: 300
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            bash scripts/ci/run-connected-android-tests.sh
+            bash scripts/ci/run-release-validation.sh
+
+      - name: Capture filtered OpenLife logcat
+        if: always()
+        timeout-minutes: 1
+        run: |
+          timeout 20s adb logcat -d 2>/dev/null | grep -E 'org\.openlife|OpenLifeRecovery' > "logcat-openlife-${{ matrix.api-level }}.txt" || true
+
+      - name: Upload instrumented results and logcat
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: instrumented-results-api-${{ matrix.api-level }}
+          retention-days: 30
+          if-no-files-found: warn
           path: |
             app/build/outputs/androidTest-results/**
             vault/build/outputs/androidTest-results/**
-          if-no-files-found: ignore
+            app/build/reports/androidTests/**
+            vault/build/reports/androidTests/**
+            connected-attempt-${{ matrix.api-level }}-*.log
+            logcat-openlife-${{ matrix.api-level }}.txt
+
+  release-inspection:
+    name: Release APK boundary inspection
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - uses: ./.github/actions/gradle-setup
+
+      - name: Assemble release APK
+        run: ./gradlew assembleRelease
+
+      - name: Inspect release APK boundary and size
+        run: |
+          release_apk=app/build/outputs/apk/release/app-release.apk
+          if [[ ! -f "$release_apk" ]]; then
+            release_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
+          scripts/inspect-release-apk.sh "$release_apk" | tee release-inspection.txt
+          apk_size_bytes="$(awk -F= '$1 == "APK_SIZE_BYTES" { print $2; exit }' release-inspection.txt)"
+          {
+            echo "## Release APK"
+            echo
+            echo "- Boundary inspection: pass"
+            echo "- APK size: ${apk_size_bytes} bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check release native alignment
+        run: |
+          release_apk=app/build/outputs/apk/release/app-release.apk
+          if [[ ! -f "$release_apk" ]]; then
+            release_apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
+          bash scripts/check-16kb-alignment.sh "$release_apk"
+
+      - name: Upload release inspection report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-apk-inspection
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            release-inspection.txt
+            app/build/outputs/apk/release/app-release.apk

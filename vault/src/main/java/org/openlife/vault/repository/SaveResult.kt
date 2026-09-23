@@ -11,6 +11,9 @@ sealed interface SaveResult {
     /** The referenced STAGED row/file is gone - already saved, cancelled, or cleaned up elsewhere. */
     data object StageNotFound : SaveResult
 
+    /** A durable write could not complete because storage is full or unavailable. */
+    data object StorageUnavailable : SaveResult
+
     /** Authentication, rename, or commit failed; the row is left STAGED for recovery to resolve. */
     data object Failed : SaveResult
 }

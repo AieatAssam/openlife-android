@@ -2,18 +2,17 @@ package org.openlife.vault.ocr
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.graphics.Rect
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import org.openlife.vault.model.Orientation
+import org.openlife.vault.model.OrientationTransform
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Bundled, Latin-only ML Kit adapter. It owns no persistence and has no URI or
@@ -33,8 +32,8 @@ class MlKitOcrEngine : OcrEngine {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
             val text = awaitTask(recognizer.process(InputImage.fromBitmap(display, 0)))
-            val displaySourceWidth = if (swapsAxes(input.orientation)) input.height else input.width
-            val displaySourceHeight = if (swapsAxes(input.orientation)) input.width else input.height
+            val displaySourceWidth = OrientationTransform.displayWidth(input.width, input.height, input.orientation)
+            val displaySourceHeight = OrientationTransform.displayHeight(input.width, input.height, input.orientation)
             val scaleX = displaySourceWidth.toDouble() / display.width.toDouble()
             val scaleY = displaySourceHeight.toDouble() / display.height.toDouble()
             val spans = text.textBlocks.flatMap { block ->
@@ -42,7 +41,15 @@ class MlKitOcrEngine : OcrEngine {
                     OcrSpanDraft(
                         text = line.text,
                         confidence = line.confidence,
-                        region = line.boundingBox?.let { scaleRegion(it, display.width, display.height, scaleX, scaleY) }
+                        region = line.boundingBox?.let {
+                            scaleRegion(
+                                it,
+                                display.width,
+                                display.height,
+                                scaleX,
+                                scaleY,
+                            )
+                        }
                             ?.let {
                                 OcrCoordinateMapper.toSourcePixels(
                                     it,
@@ -88,24 +95,7 @@ class MlKitOcrEngine : OcrEngine {
     }
 
     private fun orient(bitmap: Bitmap, orientation: Orientation): Bitmap {
-        if (orientation == Orientation.NORMAL) return bitmap
-        val matrix = Matrix()
-        when (orientation) {
-            Orientation.ROTATE_90 -> matrix.setRotate(90f)
-            Orientation.ROTATE_180 -> matrix.setRotate(180f)
-            Orientation.ROTATE_270 -> matrix.setRotate(270f)
-            Orientation.FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
-            Orientation.FLIP_VERTICAL -> matrix.setScale(1f, -1f)
-            Orientation.TRANSPOSE -> {
-                matrix.setRotate(90f)
-                matrix.postScale(-1f, 1f)
-            }
-            Orientation.TRANSVERSE -> {
-                matrix.setRotate(270f)
-                matrix.postScale(-1f, 1f)
-            }
-            Orientation.NORMAL -> Unit
-        }
+        val matrix = OrientationTransform.matrixFor(orientation) ?: return bitmap
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
@@ -121,15 +111,6 @@ class MlKitOcrEngine : OcrEngine {
         val right = kotlin.math.ceil(rect.right * scaleX).toInt().coerceIn(left, displayWidth)
         val bottom = kotlin.math.ceil(rect.bottom * scaleY).toInt().coerceIn(top, displayHeight)
         return OcrEvidenceRegion(left, top, right, bottom)
-    }
-
-    private fun swapsAxes(orientation: Orientation): Boolean = when (orientation) {
-        Orientation.ROTATE_90,
-        Orientation.ROTATE_270,
-        Orientation.TRANSPOSE,
-        Orientation.TRANSVERSE,
-        -> true
-        else -> false
     }
 
     private suspend fun <T> awaitTask(task: Task<T>): T = suspendCancellableCoroutine { continuation ->

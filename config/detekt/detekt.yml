@@ -1,0 +1,28 @@
+config:
+  validation: true
+
+complexity:
+  LongMethod:
+    allowedLines: 80
+  CyclomaticComplexMethod:
+    allowedComplexity: 15
+  TooManyFunctions:
+    allowedFunctionsPerInterface: 15
+    allowedFunctionsPerObject: 15
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated:
+      - Composable
+
+ktlint:
+  code_style: ktlint_official
+  autoCorrect: false
+  MaximumLineLength:
+    maxLineLength: 120
+
+style:
+  MaxLineLength:
+    maxLineLength: 120
+  ReturnCount:
+    max: 10

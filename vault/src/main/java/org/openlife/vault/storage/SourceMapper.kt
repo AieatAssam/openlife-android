@@ -1,11 +1,11 @@
 package org.openlife.vault.storage
 
-import java.util.UUID
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import java.util.UUID
 
 fun Source.toEntity(): SourceEntity = SourceEntity(
     id = id.toString(),

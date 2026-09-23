@@ -1,12 +1,12 @@
 package org.openlife.vault.repository
 
-import java.util.UUID
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
+import java.util.UUID
 
 /**
  * Startup recovery per design §11's table. Runs once, under the same
@@ -17,7 +17,7 @@ import org.openlife.vault.storage.toEntity
  * Never infers that missing data means "safe to delete" or "safe to
  * recreate" (design §11): a `READY` row with an unreadable blob becomes
  * `CORRUPT`, not deleted; a `CORRUPT` row is retained until a user
- * confirms deletion (Stage 5); orphaned files are removed only after every
+ * confirms deletion; orphaned files are removed only after every
  * row has been reconciled successfully.
  */
 class RecoveryRepository(
@@ -82,7 +82,7 @@ class RecoveryRepository(
                 }
 
                 SourceState.CORRUPT -> {
-                    // Retained until a user confirms deletion (Stage 5); no
+                    // Retained until a user confirms deletion; no
                     // automatic action.
                 }
             }
@@ -131,13 +131,10 @@ class RecoveryRepository(
             val name = file.name
             val uuidPart = name.substringBeforeLast('.', missingDelimiterValue = "")
             val extension = name.substringAfterLast('.', missingDelimiterValue = "")
-            if (extension != "stage" && extension != "blob") continue
-            val id = try {
-                UUID.fromString(uuidPart)
-            } catch (e: IllegalArgumentException) {
-                continue
+            if (extension == "stage" || extension == "blob") {
+                val id = runCatching { UUID.fromString(uuidPart) }.getOrNull()
+                if (id != null && id !in referencedIds && file.delete()) removed++
             }
-            if (id !in referencedIds && file.delete()) removed++
         }
         return removed
     }

@@ -48,7 +48,7 @@ design_decisions:
 files_touched:
   - VERSION
   - app/build.gradle.kts
-  - app/src/test/java/org/openlife/app/build/VersionCodeTest.kt
+  - app/src/test/java/org/openlife/app/version/VersionCodeTest.kt
   - CHANGELOG.md
   - fastlane/metadata/android/en-US/*
   - docs/runbooks/signing.md

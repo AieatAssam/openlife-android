@@ -1,6 +1,5 @@
 package org.openlife.vault.storage
 
-import java.util.UUID
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.ocr.OcrCoordinateSystem
 import org.openlife.vault.ocr.OcrEvidenceRegion
@@ -10,6 +9,7 @@ import org.openlife.vault.ocr.OcrRevision
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrUserRevision
+import java.util.UUID
 
 fun OcrRevisionEntity.toDomain() = OcrRevision(
     id = UUID.fromString(id),
@@ -50,15 +50,17 @@ fun OcrSpanEntity.toDomain() = OcrSpan(
     text = text,
     confidence = confidence,
     coordinateSystem = OcrCoordinateSystem.valueOf(coordinateSystem),
-    evidenceRegion = if (left == null && top == null && right == null && bottom == null) {
-        null
-    } else {
-        require(left != null && top != null && right != null && bottom != null) {
-            "An OCR evidence rectangle must be complete or absent"
-        }
-        OcrEvidenceRegion(left, top, right, bottom)
-    },
+    evidenceRegion = toEvidenceRegion(left, top, right, bottom),
 )
+
+private fun hasNoEvidence(left: Int?, top: Int?, right: Int?, bottom: Int?): Boolean =
+    listOf(left, top, right, bottom).all { it == null }
+
+private fun toEvidenceRegion(left: Int?, top: Int?, right: Int?, bottom: Int?): OcrEvidenceRegion? = when {
+    hasNoEvidence(left, top, right, bottom) -> null
+    left != null && top != null && right != null && bottom != null -> OcrEvidenceRegion(left, top, right, bottom)
+    else -> error("An OCR evidence rectangle must be complete or absent")
+}
 
 fun OcrSpan.toEntity() = OcrSpanEntity(
     id = id.toString(),

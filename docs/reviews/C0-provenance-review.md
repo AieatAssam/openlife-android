@@ -46,11 +46,11 @@ or derived-value field of any kind is present.
   `IntakeActivityTest.changedBytesAfterOpenAreNotSilentlySubstituted`) prove
   the saved bytes are exactly the bytes read at prepare time, not a later
   or different read of the same nominal source.
-- `orientation` is recorded as separate metadata (currently always
-  `Orientation.NORMAL`, since EXIF-derived orientation is explicitly out of
-  scope for C0 — `ImportRepository.kt` comment, not silently claimed as
-  supported) and is never used to mutate the stored bytes, matching design
-  §4's "Record display orientation separately."
+- `orientation` is recorded as separate metadata by the bounded JPEG EXIF
+  parser at prepare time and is applied only to sampled display/OCR geometry;
+  it never mutates the stored bytes or their digest, matching design §4's
+  "Record display orientation separately." Malformed or unsupported metadata
+  falls back to `Orientation.NORMAL`; PNG `eXIf` orientation remains deferred.
 - Deletion is the one explicit exception to retention (design §4), never a
   mutation — `DeletionRepository` removes the row and file together; there
   is no code path that modifies a retained Source's bytes in place.

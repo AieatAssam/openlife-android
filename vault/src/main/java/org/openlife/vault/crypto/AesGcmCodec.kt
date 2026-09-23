@@ -1,5 +1,6 @@
 package org.openlife.vault.crypto
 
+import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -14,7 +15,7 @@ import javax.crypto.spec.GCMParameterSpec
  * reuse a DEK/nonce pair").
  *
  * This is deliberately separate from Keystore-backed encryption
- * (`KeystoreWrapper`, Stage 2), which must use a provider-generated IV
+ * (`KeystoreWrapper`), which must use a provider-generated IV
  * instead of `SecureRandom` — see design §10 / R5. Do not reuse this object
  * for Keystore-key operations.
  */
@@ -47,11 +48,11 @@ object AesGcmCodec {
             cipher.init(
                 Cipher.DECRYPT_MODE,
                 key,
-                GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce)
+                GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce),
             )
             cipher.updateAAD(aad)
             return cipher.doFinal(envelope.ciphertext)
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
             throw EnvelopeAuthenticationException(e)
         }
     }

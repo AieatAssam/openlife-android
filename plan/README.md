@@ -8,3 +8,6 @@
 Start here: `scripts/plan-status.sh` prints the next runnable steps. Read
 `AGENTS.md` (GPT-5.6 Luna) or `CLAUDE.md` (Claude Sonnet 5) for the
 workflow, then open the step file.
+
+For CI summaries, append `--json`; fixture plans can be supplied as the
+optional final argument, for example `scripts/plan-check.sh --json /tmp/plan`.

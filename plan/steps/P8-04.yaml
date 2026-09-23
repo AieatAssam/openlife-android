@@ -7,11 +7,11 @@ estimate: L
 owner: agent
 summary: "Local questions answered with citations and uncertainty: retrieval over FTS (and optional local embeddings computed on device, stored inside the vault) selects candidate spans/facts; the optional model composes an answer that must cite; without a model, the answer is the ranked evidence list. Uncited sentences are dropped; 'I could not find this' is a first-class outcome. Spec C12.md first."
 requirements:
-  - id: P8-03-R1
+  - id: P8-04-R1
     text: "MUST write C12.md: retrieval pipeline, citation format (source id + span id + region), uncertainty display, limits, no open-ended actions; evaluation set of 100 questions over the eval corpus with citation-correctness gate >= 0.9 and hallucination rate <= 0.02."
-  - id: P8-03-R2
+  - id: P8-04-R2
     text: "MUST implement AskScreen with results that navigate to evidence; the query is never persisted; model output passes CitationValidator."
-  - id: P8-03-R3
+  - id: P8-04-R3
     text: "MUST keep embeddings (if used) inside the SQLCipher database as BLOBs with a versioned model id; deletion cascade covers them."
 files_touched: [docs/capabilities/C12.md, vault recall/*, app ui/ask/*, eval/recall/v1]
 tdd:

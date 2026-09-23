@@ -1,0 +1,1 @@
+net.zetetic:sqlcipher-android:4.19.0|https://github.com/sqlcipher/sqlcipher-android|BSD-3-Clause|https://github.com/sqlcipher/sqlcipher-android/blob/master/LICENSE

@@ -5,6 +5,8 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
@@ -62,7 +64,8 @@ class TestHostileContentProvider : ContentProvider() {
          * deadline). Deliberately a plain bounded sleep, not an unwritten
          * pipe held open indefinitely - the earlier version of "slow
          * provider" support used exactly that and caused the real,
-         * documented fd-corruption hang investigated during Stage 7/8 (see
+         * documented fd-corruption hang investigated during the test-suite
+         * reliability work (see
          * the class doc below). A bounded sleep always returns on its own
          * and carries none of that risk.
          */
@@ -79,7 +82,7 @@ class TestHostileContentProvider : ContentProvider() {
             openCount = 0
         }
 
-        fun uriFor(name: String): Uri = Uri.parse("content://$AUTHORITY/$name")
+        fun uriFor(name: String): Uri = "content://$AUTHORITY/$name".toUri()
 
         /**
          * A real, multi-megabyte decodable JPEG, generated on demand rather
@@ -90,19 +93,19 @@ class TestHostileContentProvider : ContentProvider() {
          * across a real `kill -9` and app respawn. Same-app, same-uid
          * access to this unexported provider needs no URI permission grant
          * at all, unlike a cross-app `content://media/...` URI - the actual
-         * problem this replaced during Stage 8 fault-injection testing.
+         * problem this replaced during fault-injection testing.
          */
         const val LARGE_FIXTURE_NAME = "large-fault-injection.jpg"
 
         /**
          * "noise-<w>x<h>.jpg" generates a real decodable JPEG at the
          * requested dimensions on demand - used by [LARGE_FIXTURE_NAME]
-         * (fixed at 4000x3000) and by Stage 8's §12 performance pass, which
-         * needed a ~4 MiB fixture (the design's own baseline size) rather
-         * than the 16 MiB-adjacent one C0-09/C0-10 wanted.
+         * (fixed at 4000x3000) and by the §12 performance pass, which needed
+         * a ~4 MiB fixture (the design's own baseline size) rather than the
+         * 16 MiB-adjacent one used by the fault-injection checks.
          */
         private fun generateNoiseJpeg(width: Int, height: Int): ByteArray {
-            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            val bitmap = createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
             val random = java.util.Random(42)
             val row = IntArray(width)
             for (y in 0 until height) {

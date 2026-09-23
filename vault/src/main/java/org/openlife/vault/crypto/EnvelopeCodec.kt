@@ -26,7 +26,7 @@ object EnvelopeCodec {
             EnvelopeFormat.HEADER_LENGTH_BYTES +
                 envelope.nonce.size +
                 EnvelopeFormat.CIPHERTEXT_LENGTH_FIELD_BYTES +
-                envelope.ciphertext.size
+                envelope.ciphertext.size,
         )
         out.write(EnvelopeFormat.MAGIC)
         out.write(EnvelopeFormat.VERSION.toInt())
@@ -35,7 +35,7 @@ object EnvelopeCodec {
         out.write(
             ByteBuffer.allocate(EnvelopeFormat.CIPHERTEXT_LENGTH_FIELD_BYTES)
                 .putInt(envelope.ciphertext.size)
-                .array()
+                .array(),
         )
         out.write(envelope.ciphertext)
         return out.toByteArray()
@@ -51,44 +51,44 @@ object EnvelopeCodec {
      */
     fun decode(bytes: ByteArray): Envelope {
         if (bytes.size < EnvelopeFormat.HEADER_LENGTH_BYTES) {
-            throw MalformedEnvelopeException("truncated header: only ${bytes.size} bytes")
+            malformed("truncated header: only ${bytes.size} bytes")
         }
         val buffer = ByteBuffer.wrap(bytes)
 
         val magic = ByteArray(EnvelopeFormat.MAGIC.size)
         buffer.get(magic)
         if (!magic.contentEquals(EnvelopeFormat.MAGIC)) {
-            throw MalformedEnvelopeException("bad magic")
+            malformed("bad magic")
         }
 
         val version = buffer.get()
         if (version != EnvelopeFormat.VERSION) {
-            throw MalformedEnvelopeException("unsupported envelope version $version")
+            malformed("unsupported envelope version $version")
         }
 
         val nonceLength = buffer.get().toInt() and 0xFF
         if (nonceLength != EnvelopeFormat.NONCE_LENGTH_BYTES) {
-            throw MalformedEnvelopeException("unexpected nonce length $nonceLength")
+            malformed("unexpected nonce length $nonceLength")
         }
         if (buffer.remaining() < nonceLength) {
-            throw MalformedEnvelopeException("truncated nonce")
+            malformed("truncated nonce")
         }
         val nonce = ByteArray(nonceLength)
         buffer.get(nonce)
 
         if (buffer.remaining() < EnvelopeFormat.CIPHERTEXT_LENGTH_FIELD_BYTES) {
-            throw MalformedEnvelopeException("truncated ciphertext length field")
+            malformed("truncated ciphertext length field")
         }
         val ciphertextLength = buffer.int
         if (ciphertextLength < 0 || ciphertextLength > EnvelopeFormat.MAX_CIPHERTEXT_LENGTH) {
             // Checked before any allocation below: a forged length field
             // cannot drive an unbounded allocation.
-            throw MalformedEnvelopeException("ciphertext length out of bounds: $ciphertextLength")
+            malformed("ciphertext length out of bounds: $ciphertextLength")
         }
         if (buffer.remaining() != ciphertextLength) {
-            throw MalformedEnvelopeException(
+            malformed(
                 "declared ciphertext length $ciphertextLength does not match " +
-                    "remaining ${buffer.remaining()} bytes"
+                    "remaining ${buffer.remaining()} bytes",
             )
         }
         val ciphertext = ByteArray(ciphertextLength)
@@ -96,4 +96,6 @@ object EnvelopeCodec {
 
         return Envelope(nonce, ciphertext)
     }
+
+    private fun malformed(message: String): Nothing = throw MalformedEnvelopeException(message)
 }

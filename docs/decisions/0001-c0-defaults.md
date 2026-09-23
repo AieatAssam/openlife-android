@@ -66,16 +66,20 @@ environment this repository was built in, on 2026-09-13.
    traceability requirement).** The only installable Android system image in
    this environment is API 36. No API 29 image can be added because
    `$ANDROID_HOME` is a read-only Nix store path — `sdkmanager` cannot write
-   into it, and no writable SDK overlay was created for this build.
+   into it, and no writable SDK overlay was created for this build. P0-04 now
+   defines the required API-29 and API-36 GitHub Actions matrix; until an
+   authenticated CI run produces a URL and artefacts, the matrix is configured
+   but its API-29 evidence is not claimed.
    Consequently:
    - The app is still **built** with `minSdk 29`, preserving support for
      Android 10+ devices.
-   - All instrumented/adversarial tests in this repository's evidence run
-     against API 36 only.
+   - All instrumented/adversarial tests run locally in this repository's
+     evidence against API 36 only; the API-29 leg is delegated to P0-04 CI.
    - `docs/verification/C0.md` and the C0 handoff record the lowest-supported
-     API leg of test C0-16 as **not run in this environment**, rather than
-     reporting it as passed. Closing this gap requires either a writable SDK
-     with an API 29/30 system image, or a physical low-API device.
+     API leg of test C0-16 as **not run locally**, rather than reporting it as
+     passed. Closing the evidence gap requires a successful P0-04 CI run (or a
+     writable SDK with an API 29/30 system image, or a physical low-API
+     device).
 5. **Licence: Apache-2.0**, added at the repository root as `LICENSE`. This
    satisfies P6's "choose a project licence before public distribution" for
    the current development phase; it does not itself constitute public

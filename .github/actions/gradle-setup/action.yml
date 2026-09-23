@@ -1,0 +1,13 @@
+name: OpenLife Gradle setup
+description: Configure the pinned JDK and Gradle action used by CI jobs.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+      with:
+        distribution: temurin
+        java-version: "21"
+        cache: gradle
+
+    - uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda

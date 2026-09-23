@@ -7,7 +7,7 @@ import java.util.UUID
 /**
  * File locations for the vault. Everything lives under
  * `noBackupFilesDir/vault` (design §9): the encrypted database, its wrapped
- * secret, and — from Stage 3 on — per-source artefact stage/blob files.
+ * secret, and per-source artefact stage/blob files.
  * Nothing here is exposed to the UI layer directly; the repository and
  * storage layers are the only things that see real paths.
  */

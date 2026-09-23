@@ -173,7 +173,7 @@ class IntakeActivityTest {
         // C0-17: a real ~6s delay inside a provider's openFile() (a
         // deliberately slower version of this same delay) produced a real
         // Android ANR ("Input dispatching timed out... Waited 5000ms")
-        // during Stage 8, since contentResolver.openInputStream was called
+        // during the performance investigation, since contentResolver.openInputStream was called
         // directly on the composition's main thread with no timeout of its
         // own - found on-device, not by inspection. Fixed by moving that
         // call to Dispatchers.IO in IntakeActivity.startImportFromUri. This

@@ -1,7 +1,7 @@
 package org.openlife.vault.repository
 
-import java.io.File
 import org.openlife.vault.storage.Fsync
+import java.io.File
 
 /**
  * Filesystem operations at the stage/blob durability boundary.

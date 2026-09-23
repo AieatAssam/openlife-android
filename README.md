@@ -2,6 +2,8 @@
 
 ![status](https://img.shields.io/badge/status-work--in--progress-orange?style=for-the-badge)
 
+[![CI](https://github.com/AieatAssam/openlife-android/actions/workflows/ci.yml/badge.svg)](https://github.com/AieatAssam/openlife-android/actions/workflows/ci.yml)
+
 > [!WARNING]
 > ## 🚧 Work in progress — not ready for real use 🚧
 >
@@ -33,6 +35,10 @@ feature set today — no OCR, no extracted facts, no reminders, no export.
 The path from here to a production release is tracked in `plan/plan.yaml`
 (phases, steps, decisions, review findings); each step has a full TDD brief
 under `plan/steps/`. Run `scripts/plan-status.sh` to see what is runnable.
+Start with [`docs/README.md`](docs/README.md) for the documentation index,
+[`docs/PRODUCT_PRINCIPLES.md`](docs/PRODUCT_PRINCIPLES.md) for the product
+rules, [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the privacy boundary,
+and [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md) for the public policy.
 
 ## Repository layout
 
@@ -50,6 +56,34 @@ Ground rules for contributing changes are in `AGENTS.md`.
 ./gradlew assembleDebug
 ./gradlew :vault:test :app:test
 ./gradlew connectedDebugAndroidTest   # needs a running emulator or device
+```
+
+Release dependency checks are offline after the pinned artefacts have been
+cached:
+
+```bash
+./gradlew --offline :app:writeReleaseRuntimeClasspath :app:test :app:cyclonedxBom generateLicenseReport
+```
+
+The build enforces `gradle/verification-metadata.xml`, writes the release SBOM
+to `app/build/reports/bom/bom.json`, and refreshes the committed runtime
+licence inventory at `docs/generated/THIRD_PARTY_LICENSES.md`.
+
+## Releases and verification
+
+Tagged releases use the owner-controlled upload key documented in
+[`docs/runbooks/signing.md`](docs/runbooks/signing.md). Without all four CI
+signing secrets, the release variant is intentionally unsigned and no release
+asset is published; it is never debug-signed. The workflow attaches the APK,
+AAB, SBOM, licence report, `SHA-256SUMS`, and the signing-certificate
+fingerprint to a signed GitHub Release.
+
+Certificate SHA-256 fingerprint: **F9:B0:E9:81:6D:AD:78:35:7B:94:D6:DD:BA:3E:AB:C7:44:E2:39:03:FB:78:AD:D8:AF:09:40:EB:92:47:DF:5A**.
+Verify a downloaded APK with:
+
+```bash
+apksigner verify --verbose --print-certs app-release.apk
+sha256sum --check SHA-256SUMS
 ```
 
 ## Licence
