@@ -74,11 +74,16 @@ class IntakeScreenFlowTest {
             IntakeScreen(state = state, onSave = intake::confirmSave, onCancel = intake::cancel, onDone = {})
         }
         val stagesBefore = stageFiles()
-        intake.startImport(stream, "image/jpeg", IntakeKind.SHARE)
-        awaitCondition { stream.reads > 0 }
+        try {
+            intake.startImport(stream, "image/jpeg", IntakeKind.SHARE)
+            awaitCondition { stream.reads > 0 }
 
-        composeRule.onNodeWithText("Cancel").performClick()
-        awaitState(intake) { it is IntakeUiState.Cancelled }
+            composeRule.onNodeWithText("Cancel").performClick()
+            awaitState(intake) { it is IntakeUiState.Cancelled }
+        } finally {
+            // Never leave the process-wide import slot taken for later tests.
+            intake.cancel()
+        }
 
         assertTrue("provider stream must close", stream.closed)
         awaitCondition(describe = { "new stage files remain: ${stageFiles() - stagesBefore}" }) {
@@ -89,23 +94,46 @@ class IntakeScreenFlowTest {
     /** C0-R29 from the UI: a second share while an import is active is refused with an explanation. */
     @Test
     fun secondShareDuringActiveImportShowsBusyCopy(): Unit = runBlocking {
-        val first = SlowInputStream(syntheticJpegBytes(variant = 9))
+        // Holds the first import inside its provider read until released, so
+        // the check does not depend on read speed or the 15 s deadline.
+        val release = java.util.concurrent.CountDownLatch(1)
+        val first = HeldInputStream(syntheticJpegBytes(variant = 9), release)
         val firstIntake = IntakeViewModel(application, SavedStateHandle())
         val secondIntake = IntakeViewModel(application, SavedStateHandle())
         composeRule.setContent {
             val state by secondIntake.state.collectAsState()
             IntakeScreen(state = state, onSave = {}, onCancel = {}, onDone = {})
         }
-        firstIntake.startImport(first, "image/jpeg", IntakeKind.SHARE)
-        awaitCondition { first.reads > 0 }
+        try {
+            firstIntake.startImport(first, "image/jpeg", IntakeKind.SHARE)
+            awaitCondition { first.reads > 0 }
 
-        secondIntake.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = 10)), "image/jpeg", IntakeKind.SHARE)
-        awaitState(secondIntake) { it is IntakeUiState.Busy }
-        composeRule.onNodeWithText("Another import is already in progress. Finish or cancel it first.")
-            .assertExists()
+            secondIntake.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = 10)), "image/jpeg", IntakeKind.SHARE)
+            awaitState(secondIntake) { it is IntakeUiState.Busy }
+            composeRule.onNodeWithText("Another import is already in progress. Finish or cancel it first.")
+                .assertExists()
+        } finally {
+            // Never leave the process-wide import slot taken for later tests.
+            release.countDown()
+            firstIntake.cancel()
+            secondIntake.cancel()
+            awaitState(firstIntake) { it is IntakeUiState.Cancelled }
+        }
+    }
 
-        firstIntake.cancel()
-        awaitState(firstIntake) { it is IntakeUiState.Cancelled }
+    /** Blocks every read until [release] opens, then serves the bytes. */
+    private class HeldInputStream(bytes: ByteArray, private val release: java.util.concurrent.CountDownLatch) :
+        InputStream() {
+        private val delegate = ByteArrayInputStream(bytes)
+        @Volatile var reads = 0
+
+        override fun read(): Int = delegate.read()
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            reads++
+            release.await(RELEASE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+            return delegate.read(buffer, offset, length)
+        }
     }
 
     private fun syntheticJpegBytes(variant: Int): ByteArray {
@@ -136,6 +164,7 @@ class IntakeScreenFlowTest {
 
     private companion object {
         const val WAIT_MS = 60_000L
+        const val RELEASE_TIMEOUT_SECONDS = 10L
         const val POLL_MS = 50L
     }
 }

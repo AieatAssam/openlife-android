@@ -27,6 +27,15 @@ data class OcrEngineInput(
             "OCR source exceeds the pixel limit"
         }
     }
+
+    /**
+     * Zeroes the authenticated plaintext once the run has finished with it
+     * (P2-02-R5). JVM and native copies made by a decoder cannot be
+     * guaranteed to be erased; see docs/THREAT_MODEL.md.
+     */
+    fun close() {
+        bytes.fill(0)
+    }
 }
 
 data class OcrEngineOutput(val spans: List<OcrSpanDraft>)

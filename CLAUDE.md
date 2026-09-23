@@ -105,6 +105,11 @@ worked reliably in this sandbox.
   package, `net.aieat.netswissknife`, appearing in this project's own
   instrumented-test output — a different session's `connectedAndroidTest`
   ran against the same emulator instance at the same time).
+- Never start an emulator if one is already running (`adb devices`,
+  `pgrep -fa qemu-system`); it belongs to another agent. An emulator you
+  started is yours to use, and you must shut it down (`adb emu kill`,
+  `./gradlew --stop`) as soon as your connected runs finish, because another
+  agent may be waiting for it (owner instruction, 2026-09-23).
 - Before booting the emulator, stop competing local daemons to free a core:
   `./gradlew --stop` and kill any lingering
   `org.jetbrains.kotlin.daemon.KotlinCompileDaemon` process. This alone was

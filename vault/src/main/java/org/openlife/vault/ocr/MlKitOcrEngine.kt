@@ -6,32 +6,34 @@ import android.graphics.Rect
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.OrientationTransform
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /**
  * Bundled, Latin-only ML Kit adapter. It owns no persistence and has no URI or
  * provider access; the caller supplies an already authenticated bounded byte
- * snapshot. The recognizer is closed after every operation so a timed-out or
- * cancelled task cannot retain a decoded bitmap.
+ * snapshot. The deadline is the repository's alone (P2-02-R2). Cancellation
+ * closes the recognizer, which abandons its task, and the decoded bitmap is
+ * recycled only once that task has settled: if it never does, the bitmap is
+ * left to the garbage collector rather than recycled under a running
+ * recognizer (P2-02-R4).
  */
 class MlKitOcrEngine : OcrEngine {
     override val id: String = "mlkit-latin"
     override val modelVersion: String = "16.0.1"
 
-    override suspend fun extract(input: OcrEngineInput): OcrEngineOutput = withTimeout(OcrLimits.DEADLINE_MILLIS) {
+    override suspend fun extract(input: OcrEngineInput): OcrEngineOutput {
         val decoded = decodeBounded(input)
         val display = orient(decoded, input.orientation)
         if (display !== decoded) decoded.recycle()
 
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val task = RecognizerTask(recognizer.process(InputImage.fromBitmap(display, 0)), recognizer)
         try {
-            val text = awaitTask(recognizer.process(InputImage.fromBitmap(display, 0)))
+            val text = awaitEngineTask(task)
             val displaySourceWidth = OrientationTransform.displayWidth(input.width, input.height, input.orientation)
             val displaySourceHeight = OrientationTransform.displayHeight(input.width, input.height, input.orientation)
             val scaleX = displaySourceWidth.toDouble() / display.width.toDouble()
@@ -65,20 +67,15 @@ class MlKitOcrEngine : OcrEngine {
             if (OcrScriptPolicy.classify(spans) == OcrScriptStatus.UNSUPPORTED) {
                 throw OcrUnsupportedScriptException()
             }
-            OcrEngineOutput(spans)
+            return OcrEngineOutput(spans)
         } finally {
             recognizer.close()
-            display.recycle()
+            if (task.isSettled) display.recycle()
         }
     }
 
     private fun decodeBounded(input: OcrEngineInput): Bitmap {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(input.bytes, 0, input.bytes.size, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "OCR source could not be decoded" }
-        require(bounds.outWidth.toLong() * bounds.outHeight.toLong() <= OcrLimits.MAX_SOURCE_PIXELS) {
-            "OCR source exceeds the pixel limit"
-        }
+        val bounds = checkedBounds(input)
 
         var sampleSize = 1
         while ((bounds.outWidth / sampleSize).toLong() * (bounds.outHeight / sampleSize).toLong() >
@@ -91,7 +88,17 @@ class MlKitOcrEngine : OcrEngine {
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
         return BitmapFactory.decodeByteArray(input.bytes, 0, input.bytes.size, options)
-            ?: throw IllegalArgumentException("OCR source could not be decoded")
+            ?: throw OcrDecodeException("OCR source could not be decoded")
+    }
+
+    private fun checkedBounds(input: OcrEngineInput): BitmapFactory.Options {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(input.bytes, 0, input.bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw OcrDecodeException("OCR source could not be decoded")
+        if (bounds.outWidth.toLong() * bounds.outHeight.toLong() > OcrLimits.MAX_SOURCE_PIXELS) {
+            throw OcrLimitExceededException("OCR source exceeds the pixel limit")
+        }
+        return bounds
     }
 
     private fun orient(bitmap: Bitmap, orientation: Orientation): Bitmap {
@@ -113,12 +120,30 @@ class MlKitOcrEngine : OcrEngine {
         return OcrEvidenceRegion(left, top, right, bottom)
     }
 
-    private suspend fun <T> awaitTask(task: Task<T>): T = suspendCancellableCoroutine { continuation ->
-        task.addOnSuccessListener { value ->
-            if (continuation.isActive) continuation.resume(value)
+    /** Adapts an ML Kit task; cancelling closes the recognizer, which abandons the task. */
+    private class RecognizerTask<T>(private val task: Task<T>, private val recognizer: TextRecognizer) : EngineTask<T> {
+        @Volatile var isSettled = false
+            private set
+
+        override fun onSettled(listener: (Result<T>) -> Unit) {
+            task.addOnCompleteListener(Runnable::run) { completed ->
+                isSettled = true
+                listener(
+                    when {
+                        completed.isSuccessful -> Result.success(completed.result)
+
+                        completed.isCanceled -> Result.failure(CancellationException("ML Kit task cancelled"))
+
+                        else -> Result.failure(
+                            OcrEngineException("ML Kit recognition failed", completed.exception),
+                        )
+                    },
+                )
+            }
         }
-        task.addOnFailureListener { error ->
-            if (continuation.isActive) continuation.resumeWithException(error)
+
+        override fun cancel() {
+            recognizer.close()
         }
     }
 }

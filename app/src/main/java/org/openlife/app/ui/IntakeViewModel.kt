@@ -148,6 +148,15 @@ class IntakeViewModel(
     }
 
     private suspend fun runImport(openStream: () -> InputStream, declaredMimeType: String, intakeKind: IntakeKind) {
+        // Refuse a second import at once. Without this, the request would
+        // queue behind the first import's read on the single provider thread
+        // and only learn it is Busy when that read ends. prepareImport keeps
+        // the authoritative check.
+        val early = application.vault()
+        if (early is VaultAccess.Ready && early.importRepository.importSlot.isOccupied) {
+            _state.value = IntakeUiState.Busy
+            return
+        }
         try {
             withContext(providerDispatcher) {
                 when (val access = application.vault()) {

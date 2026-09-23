@@ -1,5 +1,6 @@
 package org.openlife.vault.repository
 
+import kotlinx.coroutines.Dispatchers
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -176,6 +177,144 @@ class OcrRepositoryTest {
         assertEquals(OcrReviewState.ACCEPTED, repository.findRevision(result.revisionId)!!.reviewState)
     }
 
+    // --- P2-02: cancellation-safe, atomic OCR runs ---
+
+    @Test
+    fun commitFailureBetweenRevisionAndSpansLeavesNoReadyRevision(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val delegate = db.ocrDao()
+        val failingSpans = object : org.openlife.vault.storage.OcrDao by delegate {
+            override suspend fun insertSpans(spans: List<org.openlife.vault.storage.OcrSpanEntity>) {
+                throw android.database.sqlite.SQLiteFullException("synthetic failure after READY")
+            }
+        }
+        val repository = repository(TestEngine { OcrEngineOutput(listOf(OcrSpanDraft("hello", null, null))) }, ocrDao = failingSpans)
+
+        val result = runCatching { repository.runOcr(sourceId) }.getOrNull()
+
+        val revisions = db.ocrDao().findRevisionsForSource(sourceId.toString()).map { it.toDomain() }
+        assertTrue("no READY revision without spans: $revisions", revisions.none { it.state == OcrRevisionState.READY })
+        assertTrue("the run must report failure, not success: $result", result is OcrRunResult.Failed)
+        assertEquals(OcrRevisionState.FAILED, revisions.single().state)
+    }
+
+    @Test
+    fun cancellationDuringCaptureMarksRevisionCancelledNotRunning(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val inserted = CompletableDeferred<Unit>()
+        val delegate = db.ocrDao()
+        val suspendingAfterInsert = object : org.openlife.vault.storage.OcrDao by delegate {
+            override suspend fun insertRevision(revision: org.openlife.vault.storage.OcrRevisionEntity) {
+                delegate.insertRevision(revision)
+                inserted.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        val repository = repository(TestEngine { OcrEngineOutput(emptyList()) }, ocrDao = suspendingAfterInsert)
+        val job = launch(Dispatchers.Default) { repository.runOcr(sourceId) }
+        inserted.await()
+        job.cancel()
+        job.join()
+
+        val revision = db.ocrDao().findRevisionsForSource(sourceId.toString()).single().toDomain()
+        assertEquals(OcrRevisionState.CANCELLED, revision.state)
+    }
+
+    @Test
+    fun engineTimeoutIsReportedAsCancelledTimeoutAndDoesNotPropagate(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        // An engine-side timeout (any layer) must not escape as a cancellation of the caller.
+        val repository = repository(TestEngine { kotlinx.coroutines.withTimeout(50) { delay(5_000) }; OcrEngineOutput(emptyList()) })
+
+        val result = runCatching { repository.runOcr(sourceId) }
+        assertTrue("timeout must not propagate: ${result.exceptionOrNull()}", result.isSuccess)
+        val cancelled = result.getOrThrow()
+        assertTrue("expected Cancelled: $cancelled", cancelled is OcrRunResult.Cancelled)
+        assertEquals(OcrFailureReason.TIMEOUT, (cancelled as OcrRunResult.Cancelled).reason)
+        val revision = db.ocrDao().findRevisionsForSource(sourceId.toString()).single().toDomain()
+        assertEquals(OcrRevisionState.CANCELLED, revision.state)
+        assertEquals(OcrFailureReason.TIMEOUT, revision.failureReason)
+    }
+
+    @Test
+    fun repositoryDeadlineIsReportedAsTimeout(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val repository = repository(TestEngine { delay(5_000); OcrEngineOutput(emptyList()) }, deadlineMillis = 100)
+
+        val result = repository.runOcr(sourceId)
+
+        assertEquals(OcrFailureReason.TIMEOUT, (result as OcrRunResult.Cancelled).reason)
+    }
+
+    @Test
+    fun decodeFailureIsEngineFailureNotLimitExceeded(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        // Today's adapter reports an undecodable image with IllegalArgumentException.
+        val repository = repository(TestEngine { throw IllegalArgumentException("OCR source could not be decoded") })
+
+        val result = repository.runOcr(sourceId)
+
+        assertEquals(OcrFailureReason.ENGINE_FAILURE, (result as OcrRunResult.Failed).reason)
+        val limit = repository(TestEngine { throw org.openlife.vault.ocr.OcrLimitExceededException("too many spans") })
+            .runOcr(sourceId)
+        assertEquals(OcrFailureReason.LIMIT_EXCEEDED, (limit as OcrRunResult.Failed).reason)
+    }
+
+    @Test
+    fun inputBytesAreZeroedAfterExtraction(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val seen = AtomicReference<ByteArray>()
+        val repository = repository(TestEngine {
+            seen.set(it.bytes)
+            OcrEngineOutput(listOf(OcrSpanDraft("hello", null, null)))
+        })
+
+        repository.runOcr(sourceId)
+
+        assertTrue("captured plaintext must be zeroed", seen.get().all { it == 0.toByte() })
+    }
+
+    @Test
+    fun cancellingTheJobCancelsTheEngineTaskBeforeBitmapRecycle(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val started = CompletableDeferred<Unit>()
+        val task = SlowToSettleTask(events)
+        val engine = TestEngine {
+            started.complete(Unit)
+            try {
+                org.openlife.vault.ocr.awaitEngineTask(task)
+            } finally {
+                events += "bitmap recycled"
+            }
+        }
+        val job = launch(Dispatchers.Default) { repository(engine).runOcr(sourceId) }
+        started.await()
+        job.cancel()
+        job.join()
+
+        assertEquals(listOf("task cancelled", "task settled", "bitmap recycled"), events.toList())
+    }
+
+    /** Settles only after cancel(), and only later, like a recogniser finishing its frame. */
+    private class SlowToSettleTask(private val events: MutableList<String>) :
+        org.openlife.vault.ocr.EngineTask<OcrEngineOutput> {
+        @Volatile private var listener: ((Result<OcrEngineOutput>) -> Unit)? = null
+
+        override fun onSettled(listener: (Result<OcrEngineOutput>) -> Unit) {
+            this.listener = listener
+        }
+
+        override fun cancel() {
+            events += "task cancelled"
+            Thread {
+                Thread.sleep(200)
+                events += "task settled"
+                listener?.invoke(Result.failure(java.util.concurrent.CancellationException("engine stopped")))
+            }.start()
+        }
+    }
+
     private fun nullOrRevision(result: OcrRunResult): UUID? =
         (result as? OcrRunResult.Failed)?.revisionId
 
@@ -187,12 +326,18 @@ class OcrRepositoryTest {
         return prepared.sourceId
     }
 
-    private fun repository(engine: OcrEngine) = OcrRepository(
+    private fun repository(
+        engine: OcrEngine,
+        ocrDao: org.openlife.vault.storage.OcrDao = db.ocrDao(),
+        deadlineMillis: Long = org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS,
+    ) = OcrRepository(
         paths = paths,
         database = db,
         keystoreWrapper = wrapper,
         engineRegistry = OcrEngineRegistry(listOf(engine), engine.id),
         mutationQueue = mutationQueue,
+        ocrDao = ocrDao,
+        deadlineMillis = deadlineMillis,
     )
 
     private fun syntheticJpegBytes(): ByteArray {

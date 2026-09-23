@@ -1,9 +1,12 @@
 package org.openlife.vault.repository
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.openlife.vault.crypto.KeystoreWrapper
@@ -11,17 +14,15 @@ import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrCoordinateSystem
 import org.openlife.vault.ocr.OcrEngineInput
 import org.openlife.vault.ocr.OcrFailureReason
-import org.openlife.vault.ocr.OcrOutputValidator
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevision
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrRunResult
-import org.openlife.vault.ocr.OcrScriptPolicy
-import org.openlife.vault.ocr.OcrScriptStatus
+import org.openlife.vault.ocr.OcrRunStateMachine
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
-import org.openlife.vault.ocr.OcrUnsupportedScriptException
 import org.openlife.vault.ocr.OcrUserRevision
+import org.openlife.vault.storage.OcrDao
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
@@ -41,6 +42,8 @@ class OcrRepository(
     private val mutationQueue: MutationQueue,
     private val clock: () -> Long = System::currentTimeMillis,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ocrDao: OcrDao = database.ocrDao(),
+    private val deadlineMillis: Long = org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -48,128 +51,113 @@ class OcrRepository(
         val prepared = capture(sourceId)
         if (prepared is Capture.Failure) return@withContext OcrRunResult.Failed(null, prepared.reason)
         prepared as Capture.Ready
+        try {
+            when (val decision = OcrRunStateMachine.decide(extract(prepared))) {
+                is OcrRunStateMachine.Decision.Persist -> persist(sourceId, prepared.revision, decision.spans)
 
-        when (val extracted = extract(prepared)) {
-            is Extraction.Finished -> extracted.result
-            is Extraction.Ready -> persist(sourceId, prepared.revision, extracted.spans)
+                is OcrRunStateMachine.Decision.Terminal -> {
+                    markTerminal(prepared.revision.id, decision.state, decision.reason)
+                    OcrRunStateMachine.resultFor(prepared.revision.id, decision)
+                }
+            }
+        } finally {
+            // P2-02-R5: the captured plaintext is not kept past the run.
+            prepared.input.close()
         }
     }
 
     private suspend fun capture(sourceId: UUID): Capture = mutationQueue.withMutation {
         val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
-        if (source == null) {
-            Capture.Failure(OcrFailureReason.SOURCE_NOT_READY)
-        } else if (!source.isReadyForOcr()) {
-            Capture.Failure(OcrFailureReason.SOURCE_NOT_READY)
-        } else {
-            val bytes = authenticator.decryptAndVerify(source, paths.blobFile(sourceId))
-            if (bytes == null) {
-                Capture.Failure(OcrFailureReason.SOURCE_CORRUPT)
-            } else {
-                val engine = engineRegistry.selected()
-                val revision = OcrRevision(
-                    id = UUID.randomUUID(),
-                    sourceId = source.id,
-                    state = OcrRevisionState.RUNNING,
-                    engineId = engine.id,
-                    modelVersion = engine.modelVersion,
-                    orientation = source.orientation!!,
-                    sourceDigest = source.sha256!!.copyOf(),
-                    startedAt = clock(),
-                    extractedAt = null,
-                    reviewState = org.openlife.vault.ocr.OcrReviewState.UNREVIEWED,
-                    failureReason = null,
-                    charCount = 0,
-                    spanCount = 0,
-                )
-                database.ocrDao().insertRevision(revision.toEntity())
-                Capture.Ready(
-                    revision = revision,
-                    input = OcrEngineInput(
-                        bytes,
-                        source.width!!,
-                        source.height!!,
-                        source.orientation,
-                        source.mimeType!!,
-                    ),
-                )
+        if (source == null || !source.isReadyForOcr()) {
+            return@withMutation Capture.Failure(OcrFailureReason.SOURCE_NOT_READY)
+        }
+        val bytes = authenticator.decryptAndVerify(source, paths.blobFile(sourceId))
+            ?: return@withMutation Capture.Failure(OcrFailureReason.SOURCE_CORRUPT)
+        val input = try {
+            OcrEngineInput(bytes, source.width!!, source.height!!, source.orientation!!, source.mimeType!!)
+        } catch (_: IllegalArgumentException) {
+            bytes.fill(0)
+            return@withMutation Capture.Failure(OcrFailureReason.LIMIT_EXCEEDED)
+        }
+        val engine = engineRegistry.selected()
+        val revision = OcrRevision(
+            id = UUID.randomUUID(),
+            sourceId = source.id,
+            state = OcrRevisionState.RUNNING,
+            engineId = engine.id,
+            modelVersion = engine.modelVersion,
+            orientation = source.orientation,
+            sourceDigest = source.sha256!!.copyOf(),
+            startedAt = clock(),
+            extractedAt = null,
+            reviewState = OcrReviewState.UNREVIEWED,
+            failureReason = null,
+            charCount = 0,
+            spanCount = 0,
+        )
+        try {
+            ocrDao.insertRevision(revision.toEntity())
+            Capture.Ready(revision, input)
+        } catch (cancelled: CancellationException) {
+            // P2-02-R1: a run cancelled once its RUNNING row may exist must not
+            // leave it RUNNING. Marked inside this mutation, not through
+            // markTerminal, which would wait for this same mutation.
+            withContext(NonCancellable) {
+                markTerminalLocked(revision.id, OcrRevisionState.CANCELLED, OcrFailureReason.CANCELLED)
             }
+            input.close()
+            throw cancelled
         }
     }
 
     private fun org.openlife.vault.model.Source.isReadyForOcr(): Boolean = state == SourceState.READY &&
         listOf(byteCount, sha256, width, height, orientation, mimeType).all { it != null }
 
-    private suspend fun extract(prepared: Capture.Ready): Extraction {
-        val output = try {
-            withTimeoutOrNull(org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS) {
-                engineRegistry.selected().extract(prepared.input)
-            }
-        } catch (cancelled: CancellationException) {
-            markCancelled(prepared.revision.id)
+    /**
+     * Runs the engine under the one OCR deadline (P2-02-R2). A timeout from any
+     * layer, including one raised inside the engine while this run is still
+     * active, is [OcrRunStateMachine.EngineOutcome.TimedOut]. A cancellation of
+     * this run marks the revision CANCELLED and propagates.
+     */
+    // The engine is the boundary with third-party code: anything it throws must
+    // end as a typed failure on the revision, never escape the run.
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun extract(prepared: Capture.Ready): OcrRunStateMachine.EngineOutcome = try {
+        withTimeoutOrNull(deadlineMillis) { engineRegistry.selected().extract(prepared.input) }
+            ?.let { OcrRunStateMachine.EngineOutcome.Output(it.spans) }
+            ?: OcrRunStateMachine.EngineOutcome.TimedOut
+    } catch (cancelled: CancellationException) {
+        if (currentCoroutineContext().isActive) {
+            OcrRunStateMachine.EngineOutcome.TimedOut
+        } else {
+            markTerminal(prepared.revision.id, OcrRevisionState.CANCELLED, OcrFailureReason.CANCELLED)
             throw cancelled
-        } catch (_: OcrUnsupportedScriptException) {
-            markFailed(prepared.revision.id, OcrFailureReason.UNSUPPORTED_SCRIPT)
-            return Extraction.Finished(
-                OcrRunResult.Failed(prepared.revision.id, OcrFailureReason.UNSUPPORTED_SCRIPT),
-            )
-        } catch (_: IllegalArgumentException) {
-            markFailed(prepared.revision.id, OcrFailureReason.LIMIT_EXCEEDED)
-            return Extraction.Finished(
-                OcrRunResult.Failed(prepared.revision.id, OcrFailureReason.LIMIT_EXCEEDED),
-            )
-        } catch (_: Exception) {
-            markFailed(prepared.revision.id, OcrFailureReason.ENGINE_FAILURE)
-            return Extraction.Finished(
-                OcrRunResult.Failed(prepared.revision.id, OcrFailureReason.ENGINE_FAILURE),
-            )
         }
-        if (output == null) {
-            markCancelled(prepared.revision.id)
-            return Extraction.Finished(
-                OcrRunResult.Cancelled(prepared.revision.id),
-            )
-        }
-
-        val spans = try {
-            OcrOutputValidator.validate(output.spans)
-        } catch (_: IllegalArgumentException) {
-            markFailed(prepared.revision.id, OcrFailureReason.LIMIT_EXCEEDED)
-            return Extraction.Finished(
-                OcrRunResult.Failed(prepared.revision.id, OcrFailureReason.LIMIT_EXCEEDED),
-            )
-        }
-        if (OcrScriptPolicy.classify(spans) == OcrScriptStatus.UNSUPPORTED) {
-            markFailed(prepared.revision.id, OcrFailureReason.UNSUPPORTED_SCRIPT)
-            return Extraction.Finished(
-                OcrRunResult.Failed(prepared.revision.id, OcrFailureReason.UNSUPPORTED_SCRIPT),
-            )
-        }
-        return Extraction.Ready(spans)
+    } catch (error: Exception) {
+        OcrRunStateMachine.EngineOutcome.Failed(OcrRunStateMachine.reasonFor(error))
     }
 
+    /**
+     * The final commit (P2-02-R1): READY and its spans in one transaction that
+     * cancellation cannot interrupt. A failure rolls both back and ends the
+     * revision FAILED, so there is never a READY revision without its spans.
+     */
     private suspend fun persist(sourceId: UUID, revision: OcrRevision, spans: List<OcrSpanDraft>): OcrRunResult =
-        mutationQueue.withMutation {
-            val current = database.ocrDao().findRevision(revision.id.toString())?.toDomain()
-            val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
-            if (current == null || current.state != OcrRevisionState.RUNNING || source?.state != SourceState.READY) {
-                if (current?.state == OcrRevisionState.RUNNING) {
-                    database.ocrDao().updateRevision(
-                        current.copy(
-                            state = OcrRevisionState.STALE,
-                            failureReason = OcrFailureReason.SOURCE_DELETED,
-                        ).toEntity(),
-                    )
+        withContext(NonCancellable) {
+            mutationQueue.withMutation {
+                val current = ocrDao.findRevision(revision.id.toString())?.toDomain()
+                val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
+                val stillWanted = current?.state == OcrRevisionState.RUNNING && source?.state == SourceState.READY
+                if (current == null || !stillWanted) {
+                    markTerminalLocked(revision.id, OcrRevisionState.STALE, OcrFailureReason.SOURCE_DELETED)
+                    return@withMutation OcrRunResult.Stale(revision.id)
                 }
-                OcrRunResult.Stale(revision.id)
-            } else {
                 val completed = current.copy(
                     state = OcrRevisionState.READY,
                     extractedAt = clock(),
                     charCount = spans.sumOf { it.text.length },
                     spanCount = spans.size,
                 )
-                database.ocrDao().updateRevision(completed.toEntity())
                 val persistedSpans = spans.mapIndexed { ordinal, span ->
                     OcrSpan(
                         id = UUID.randomUUID(),
@@ -181,8 +169,16 @@ class OcrRepository(
                         evidenceRegion = span.region,
                     )
                 }
-                database.ocrDao().insertSpans(persistedSpans.map { it.toEntity() })
-                OcrRunResult.Completed(completed.id, persistedSpans)
+                try {
+                    database.withTransaction {
+                        ocrDao.updateRevision(completed.toEntity())
+                        ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
+                    }
+                    OcrRunResult.Completed(completed.id, persistedSpans)
+                } catch (_: Exception) {
+                    markTerminalLocked(revision.id, OcrRevisionState.FAILED, OcrFailureReason.STORAGE_FAILURE)
+                    OcrRunResult.Failed(revision.id, OcrFailureReason.STORAGE_FAILURE)
+                }
             }
         }
 
@@ -225,40 +221,23 @@ class OcrRepository(
         }
     }
 
-    private suspend fun markCancelled(revisionId: UUID) {
+    /** Ends a RUNNING revision; NonCancellable so a cancelled run still records how it ended. */
+    private suspend fun markTerminal(revisionId: UUID, state: OcrRevisionState, reason: OcrFailureReason) {
         withContext(NonCancellable) {
-            mutationQueue.withMutation {
-                val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain() ?: return@withMutation
-                if (revision.state == OcrRevisionState.RUNNING) {
-                    database.ocrDao().updateRevision(
-                        revision.copy(
-                            state = OcrRevisionState.CANCELLED,
-                            failureReason = OcrFailureReason.CANCELLED,
-                        ).toEntity(),
-                    )
-                }
-            }
+            mutationQueue.withMutation { markTerminalLocked(revisionId, state, reason) }
         }
     }
 
-    private suspend fun markFailed(revisionId: UUID, reason: OcrFailureReason) {
-        mutationQueue.withMutation {
-            val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain() ?: return@withMutation
-            if (revision.state == OcrRevisionState.RUNNING) {
-                database.ocrDao().updateRevision(
-                    revision.copy(state = OcrRevisionState.FAILED, failureReason = reason).toEntity(),
-                )
-            }
+    /** Callers must already hold the mutation. */
+    private suspend fun markTerminalLocked(revisionId: UUID, state: OcrRevisionState, reason: OcrFailureReason) {
+        val revision = ocrDao.findRevision(revisionId.toString())?.toDomain() ?: return
+        if (revision.state == OcrRevisionState.RUNNING) {
+            ocrDao.updateRevision(revision.copy(state = state, failureReason = reason).toEntity())
         }
     }
 
     private sealed interface Capture {
         data class Ready(val revision: OcrRevision, val input: OcrEngineInput) : Capture
         data class Failure(val reason: OcrFailureReason) : Capture
-    }
-
-    private sealed interface Extraction {
-        data class Ready(val spans: List<OcrSpanDraft>) : Extraction
-        data class Finished(val result: OcrRunResult) : Extraction
     }
 }
