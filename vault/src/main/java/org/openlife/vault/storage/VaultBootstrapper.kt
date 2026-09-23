@@ -3,6 +3,7 @@ package org.openlife.vault.storage
 import org.openlife.vault.crypto.EnvelopeAuthenticationException
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
+import org.openlife.vault.crypto.KeystoreUnavailableException
 import org.openlife.vault.crypto.KeystoreWrapper
 import java.io.IOException
 import java.security.GeneralSecurityException
@@ -110,14 +111,18 @@ object VaultBootstrapper {
     ): VaultBootstrapResult = try {
         VaultBootstrapResult.Ready(wrapper.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET))
     } catch (exception: EnvelopeAuthenticationException) {
-        VaultBootstrapResult.Unavailable(
-            if (isTemporaryKeystoreFailure(exception)) {
-                VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
-            } else {
-                VaultUnavailableCause.KEY_UNWRAP_FAILED
-            },
-        )
+        unwrapFailure(exception)
+    } catch (exception: KeystoreUnavailableException) {
+        unwrapFailure(exception)
     }
+
+    private fun unwrapFailure(exception: Exception): VaultBootstrapResult = VaultBootstrapResult.Unavailable(
+        if (isTemporaryKeystoreFailure(exception)) {
+            VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
+        } else {
+            VaultUnavailableCause.KEY_UNWRAP_FAILED
+        },
+    )
 
     private fun createFresh(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         val secret = ByteArray(DATABASE_SECRET_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }

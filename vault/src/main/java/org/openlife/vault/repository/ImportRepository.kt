@@ -2,6 +2,9 @@ package org.openlife.vault.repository
 
 import android.database.sqlite.SQLiteFullException
 import android.system.ErrnoException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.AesGcmCodec
 import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeCodec
@@ -59,6 +62,7 @@ class ImportRepository(
     private val plaintextBufferObserver: PlaintextBufferObserver = PlaintextBufferObserver { },
     private val storageSpace: StorageSpace = StorageSpace.Default,
     private val sourceDao: SourceDao = database.sourceDao(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -245,10 +249,12 @@ class ImportRepository(
      * already cancelled) rather than acting on a row this call shouldn't
      * touch.
      */
-    suspend fun cancelStagedImport(sourceId: UUID): Boolean = mutationQueue.acquire {
-        val entity = sourceDao.findById(sourceId.toString())
-        if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
-        cancelStage(sourceId)
+    suspend fun cancelStagedImport(sourceId: UUID): Boolean = withContext(ioDispatcher) {
+        mutationQueue.acquire {
+            val entity = sourceDao.findById(sourceId.toString())
+            if (entity == null || entity.state != SourceState.STAGED.name) return@acquire false
+            cancelStage(sourceId)
+        }
     }
 
     /**
@@ -258,52 +264,54 @@ class ImportRepository(
      * failure along the way leaves the row STAGED for startup recovery to
      * resolve; it is never reported as saved.
      */
-    suspend fun saveImport(sourceId: UUID): SaveResult = mutationQueue.acquire {
-        val entity = sourceDao.findById(sourceId.toString())
-        if (entity == null || entity.state != SourceState.STAGED.name) {
-            return@acquire SaveResult.StageNotFound
+    suspend fun saveImport(sourceId: UUID): SaveResult = withContext(ioDispatcher) {
+        mutationQueue.acquire {
+            val entity = sourceDao.findById(sourceId.toString())
+            if (entity == null || entity.state != SourceState.STAGED.name) {
+                return@acquire SaveResult.StageNotFound
+            }
+            val source = entity.toDomain()
+
+            val stageFile = paths.stageFile(sourceId)
+            if (!stageFile.exists()) return@acquire SaveResult.StageNotFound
+
+            if (!authenticator.authenticates(source, stageFile)) return@acquire SaveResult.Failed
+
+            val duplicate = sourceDao.findReadyDuplicate(source.byteCount!!, source.sha256!!)
+            if (duplicate != null) {
+                cancelStage(sourceId)
+                return@acquire SaveResult.DuplicateFound(UUID.fromString(duplicate.id))
+            }
+
+            try {
+                val blobFile = paths.blobFile(sourceId)
+                if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
+                fileOps.syncDirectory(paths.artefactsDir)
+            } catch (error: IOException) {
+                return@acquire saveFailureFor(error)
+            } catch (error: ErrnoException) {
+                return@acquire saveFailureFor(error)
+            }
+
+            try {
+                sourceDao.update(source.copy(state = SourceState.READY).toEntity())
+            } catch (error: IOException) {
+                return@acquire saveFailureFor(error)
+            } catch (error: ErrnoException) {
+                return@acquire saveFailureFor(error)
+            } catch (_: SQLiteFullException) {
+                // The rename already happened, but the row remains STAGED when
+                // the final commit is rejected; recovery owns both paths.
+                return@acquire SaveResult.StorageUnavailable
+            } catch (_: Exception) {
+                // The rename already happened, but the row remains STAGED when
+                // the final commit is rejected (for example by the READY
+                // invariant trigger). Recovery owns both possible artefact paths
+                // and will remove them on the next pass; never surface success.
+                return@acquire SaveResult.Failed
+            }
+            SaveResult.Saved(sourceId)
         }
-        val source = entity.toDomain()
-
-        val stageFile = paths.stageFile(sourceId)
-        if (!stageFile.exists()) return@acquire SaveResult.StageNotFound
-
-        if (!authenticator.authenticates(source, stageFile)) return@acquire SaveResult.Failed
-
-        val duplicate = sourceDao.findReadyDuplicate(source.byteCount!!, source.sha256!!)
-        if (duplicate != null) {
-            cancelStage(sourceId)
-            return@acquire SaveResult.DuplicateFound(UUID.fromString(duplicate.id))
-        }
-
-        try {
-            val blobFile = paths.blobFile(sourceId)
-            if (!fileOps.rename(stageFile, blobFile)) return@acquire SaveResult.Failed
-            fileOps.syncDirectory(paths.artefactsDir)
-        } catch (error: IOException) {
-            return@acquire saveFailureFor(error)
-        } catch (error: ErrnoException) {
-            return@acquire saveFailureFor(error)
-        }
-
-        try {
-            sourceDao.update(source.copy(state = SourceState.READY).toEntity())
-        } catch (error: IOException) {
-            return@acquire saveFailureFor(error)
-        } catch (error: ErrnoException) {
-            return@acquire saveFailureFor(error)
-        } catch (_: SQLiteFullException) {
-            // The rename already happened, but the row remains STAGED when
-            // the final commit is rejected; recovery owns both paths.
-            return@acquire SaveResult.StorageUnavailable
-        } catch (_: Exception) {
-            // The rename already happened, but the row remains STAGED when
-            // the final commit is rejected (for example by the READY
-            // invariant trigger). Recovery owns both possible artefact paths
-            // and will remove them on the next pass; never surface success.
-            return@acquire SaveResult.Failed
-        }
-        SaveResult.Saved(sourceId)
     }
 
     private fun saveFailureFor(error: Throwable): SaveResult =

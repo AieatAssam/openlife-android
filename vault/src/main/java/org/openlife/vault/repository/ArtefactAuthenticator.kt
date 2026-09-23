@@ -7,6 +7,7 @@ import org.openlife.vault.crypto.EnvelopeAuthenticationException
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.EnvelopeFormat
+import org.openlife.vault.crypto.KeystoreUnavailableException
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.Source
 import org.openlife.vault.storage.BoundedFileReader
@@ -58,14 +59,22 @@ class ArtefactAuthenticator internal constructor(
     )
 
     fun authenticates(source: Source, artefactFile: File): Boolean {
-        val plaintext = decryptAndVerify(source, artefactFile) ?: return false
-        plaintext.fill(0)
+        val result = check(source, artefactFile) as? ArtefactCheck.Verified ?: return false
+        result.plaintext.fill(0)
         return true
     }
 
     /** Returns the authenticated, digest-verified plaintext, or null on any failure. */
-    fun decryptAndVerify(source: Source, artefactFile: File): ByteArray? {
-        if (!artefactFile.exists()) return null
+    fun decryptAndVerify(source: Source, artefactFile: File): ByteArray? =
+        (check(source, artefactFile) as? ArtefactCheck.Verified)?.plaintext
+
+    /**
+     * Authenticates [artefactFile] for [source] and says why it failed. Only
+     * [ArtefactCheck.Corrupt] is evidence about the stored bytes; a Keystore
+     * or I/O failure is [ArtefactCheck.Transient] (P1-13-R5).
+     */
+    fun check(source: Source, artefactFile: File): ArtefactCheck {
+        if (!artefactFile.exists()) return ArtefactCheck.Missing
         var plaintext: ByteArray? = null
         return try {
             val envelope = EnvelopeCodec.decode(
@@ -76,22 +85,39 @@ class ArtefactAuthenticator internal constructor(
             )
             plaintext = decryptor.decrypt(source, envelope)
             if (MessageDigest.isEqual(source.sha256, MessageDigest.getInstance("SHA-256").digest(plaintext))) {
-                val result = plaintext
+                val verified = ArtefactCheck.Verified(plaintext)
                 plaintext = null
-                result
+                verified
             } else {
-                null
+                ArtefactCheck.Corrupt
             }
         } catch (_: FileTooLargeException) {
-            null
+            ArtefactCheck.Corrupt
         } catch (_: EnvelopeAuthenticationException) {
-            null
+            ArtefactCheck.Corrupt
         } catch (_: EnvelopeCodec.MalformedEnvelopeException) {
-            null
+            ArtefactCheck.Corrupt
+        } catch (_: KeystoreUnavailableException) {
+            ArtefactCheck.Transient
         } catch (_: IOException) {
-            null
+            ArtefactCheck.Transient
         } finally {
             plaintext?.fill(0)
         }
     }
+}
+
+/** Why an artefact did or did not authenticate. */
+sealed interface ArtefactCheck {
+    /** Authenticated plaintext whose digest matches; the caller owns and clears it. */
+    class Verified(val plaintext: ByteArray) : ArtefactCheck
+
+    /** The stored envelope or digest failed: tampered, truncated or damaged content. */
+    data object Corrupt : ArtefactCheck
+
+    /** The artefact file does not exist. */
+    data object Missing : ArtefactCheck
+
+    /** Keystore or I/O failed for a reason unrelated to the stored bytes; retry may succeed. */
+    data object Transient : ArtefactCheck
 }

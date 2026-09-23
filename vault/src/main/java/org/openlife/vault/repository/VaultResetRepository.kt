@@ -1,5 +1,8 @@
 package org.openlife.vault.repository
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.storage.Fsync
 import org.openlife.vault.storage.VaultPaths
@@ -15,9 +18,11 @@ class VaultResetRepository(
     private val mutationQueue: MutationQueue,
     private val closeDatabase: () -> Unit = {},
     private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    suspend fun resetVault(): VaultResetResult =
+    suspend fun resetVault(): VaultResetResult = withContext(ioDispatcher) {
         mutationQueue.tryAcquire { resetWhileLocked() } ?: VaultResetResult.BUSY
+    }
 
     private fun resetWhileLocked(): VaultResetResult = try {
         paths.vaultDir.mkdirs()
