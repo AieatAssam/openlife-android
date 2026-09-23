@@ -23,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.settings.SettingsScreen
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat
@@ -34,6 +35,9 @@ import org.openlife.vault.model.SourceState
 /** P1-17: the core C0 flow is reachable, confirmed and ordered by what the user came for. */
 @RunWith(AndroidJUnit4::class)
 class CoreFlowUxTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @get:Rule
     val composeRule = createComposeRule()
 

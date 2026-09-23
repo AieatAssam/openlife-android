@@ -19,6 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.OpenLifeApp
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.storage.VaultPaths
@@ -31,6 +32,9 @@ import org.openlife.vault.storage.VaultPaths
  */
 @RunWith(AndroidJUnit4::class)
 class IntakeScreenFlowTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     /** Serves a valid JPEG slowly so a test can act while the import is still Preparing. */
     private class SlowInputStream(bytes: ByteArray, private val delayPerReadMs: Long = 400) : InputStream() {

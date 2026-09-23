@@ -11,10 +11,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.vault.model.ImageFormat
 
 @RunWith(AndroidJUnit4::class)
 class IntakeScreenTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     @get:Rule
     val composeRule = createComposeRule()

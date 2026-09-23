@@ -12,8 +12,10 @@ import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.OpenLifeApp
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.SourceState
@@ -27,6 +29,9 @@ import org.openlife.vault.storage.VaultPaths
  */
 @RunWith(AndroidJUnit4::class)
 class DeletionRetryFlowTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     private val application = ApplicationProvider.getApplicationContext<OpenLifeApp>()
 

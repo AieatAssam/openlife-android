@@ -21,8 +21,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
@@ -44,6 +46,9 @@ import org.openlife.vault.repository.DeleteResult
  */
 @RunWith(AndroidJUnit4::class)
 class IntakeAndListFlowTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     private class TrackingInputStream(bytes: ByteArray) : InputStream() {
         private val delegate = ByteArrayInputStream(bytes)

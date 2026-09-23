@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
 
@@ -33,8 +35,17 @@ object FirstRunPreferences {
     private const val PREFS_NAME = "first_run"
     private const val KEY_ACKNOWLEDGED = "acknowledged"
 
+    /**
+     * Reads the flag on [Dispatchers.IO]: the first read of a preferences
+     * file is disk I/O, which must not run on the main thread (P1-13-R3).
+     */
+    suspend fun loadAcknowledged(context: Context): Boolean = withContext(Dispatchers.IO) { isAcknowledged(context) }
+
     fun isAcknowledged(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_ACKNOWLEDGED, false)
+
+    /** Persists the flag on [Dispatchers.IO]; resolving the preferences file touches disk. */
+    suspend fun acknowledge(context: Context) = withContext(Dispatchers.IO) { setAcknowledged(context) }
 
     fun setAcknowledged(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {

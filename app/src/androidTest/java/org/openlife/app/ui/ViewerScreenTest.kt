@@ -14,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
@@ -30,6 +31,9 @@ import org.openlife.vault.repository.ReadyReadResult
  */
 @RunWith(AndroidJUnit4::class)
 class ViewerScreenTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @get:Rule
     val composeRule = createComposeRule()
 

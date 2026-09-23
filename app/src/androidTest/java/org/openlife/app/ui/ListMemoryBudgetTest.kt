@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.OpenLifeApp
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.ImageFormat
@@ -25,6 +26,9 @@ import org.openlife.vault.model.SourceState
 
 @RunWith(AndroidJUnit4::class)
 class ListMemoryBudgetTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
 
     @get:Rule
     val composeRule = createComposeRule()

@@ -15,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -27,6 +28,9 @@ import org.openlife.vault.ocr.OcrFailureReason
 
 @RunWith(AndroidJUnit4::class)
 class ViewerScreenC1Test {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @get:Rule
     val composeRule = createComposeRule()
 

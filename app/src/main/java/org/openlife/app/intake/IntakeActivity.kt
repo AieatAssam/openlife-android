@@ -13,13 +13,10 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
@@ -33,16 +30,16 @@ import org.openlife.app.ui.IntakeViewModel
 import org.openlife.app.ui.applySecureWindow
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.IntakeKind
-import java.io.FileNotFoundException
 
 /**
  * The single exported intake activity (design §8/§11). Every incoming
  * intent is validated here regardless of the declared `<intent-filter>`,
  * because an exported activity can be started directly with an arbitrary
  * intent (design §8: "Validate every incoming intent regardless of the
- * filter"). Hands a validated stream opener to
- * [IntakeViewModel] without ever letting a `Uri`, filename, or claimed
- * sender identity reach the vault layer (design §7 repository layout).
+ * filter"). Hands the validated URI string to [IntakeViewModel], which
+ * owns the provider lookup, open and read (P1-13-R8), without ever letting
+ * a `Uri`, filename, or claimed sender identity reach the vault layer
+ * (design §7 repository layout).
  *
  * Also the entry point for Photo Picker imports: [MainActivity] forwards a
  * picked `content://` URI here as a same-app `ACTION_SEND` intent carrying
@@ -50,6 +47,9 @@ import java.io.FileNotFoundException
  * preview/save UI rather than two parallel implementations.
  */
 class IntakeActivity : ComponentActivity() {
+
+    /** Null until read off the main thread; the splash screen stays up until then. */
+    private val firstRunAcknowledged = MutableStateFlow<Boolean?>(null)
 
     private val viewModel: IntakeViewModel by viewModels {
         IntakeViewModel.factory(application as OpenLifeApp)
@@ -72,7 +72,10 @@ class IntakeActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        installSplashScreen().setKeepOnScreenCondition { firstRunAcknowledged.value == null }
+        lifecycleScope.launch {
+            firstRunAcknowledged.value = FirstRunPreferences.loadAcknowledged(applicationContext)
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         applySecureWindow()
@@ -86,17 +89,20 @@ class IntakeActivity : ComponentActivity() {
         val validation = if (savedInstanceState == null) {
             IntakeIntentValidator.validate(extractShape(intent), packageName)
         } else {
+            viewModel.onActivityRecreated()
             null
         }
 
         setContent {
-            var acknowledged by remember { mutableStateOf(FirstRunPreferences.isAcknowledged(this)) }
+            val acknowledged = firstRunAcknowledged.collectAsState().value
             OpenLifeTheme {
-                if (!acknowledged) {
+                if (acknowledged == null) {
+                    Unit
+                } else if (!acknowledged) {
                     FirstRunExplanationScreen(
                         onContinue = {
-                            FirstRunPreferences.setAcknowledged(this)
-                            acknowledged = true
+                            firstRunAcknowledged.value = true
+                            lifecycleScope.launch { FirstRunPreferences.acknowledge(applicationContext) }
                         },
                     )
                 } else {
@@ -106,8 +112,11 @@ class IntakeActivity : ComponentActivity() {
                                 is IntakeValidationResult.Rejected ->
                                     viewModel.showRejected(describeIntentRejection(validation.reason))
 
-                                is IntakeValidationResult.Valid ->
-                                    startImportFromUri(validation.uriString.toUri())
+                                is IntakeValidationResult.Valid -> viewModel.startImportFromUri(
+                                    uriString = validation.uriString,
+                                    intentMimeType = intent.type,
+                                    intakeKind = intakeKindOf(intent),
+                                )
                             }
                         }
                     }
@@ -132,43 +141,12 @@ class IntakeActivity : ComponentActivity() {
         }
     }
 
-    private fun startImportFromUri(uri: Uri) {
-        // contentResolver.getType is a blocking call into another (possibly
-        // slow or hostile) provider. Keep metadata lookup off the main thread;
-        // the ViewModel later opens and reads the stream on its provider-owned
-        // dispatcher.
-        lifecycleScope.launch(Dispatchers.IO) {
-            val providerType = try {
-                contentResolver.getType(uri)
-            } catch (_: SecurityException) {
-                viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                return@launch
-            } catch (_: FileNotFoundException) {
-                viewModel.showRejected(IntakeRejectionMessage.ACCESS_RETRY)
-                return@launch
-            } ?: run {
-                viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
-                return@launch
-            }
-            val normalizedProviderType = providerType.lowercase()
-            if (!IntakeIntentValidator.mimeTypesMatch(intent.type, normalizedProviderType)) {
-                viewModel.showRejected(IntakeRejectionMessage.TYPE_MISMATCH)
-                return@launch
-            }
-            val intakeKind = if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
-                IntakeKind.PHOTO_PICKER
-            } else {
-                IntakeKind.SHARE
-            }
-            viewModel.startImport(
-                openStream = {
-                    contentResolver.openInputStream(uri) ?: throw FileNotFoundException()
-                },
-                declaredMimeType = normalizedProviderType,
-                intakeKind = intakeKind,
-            )
+    private fun intakeKindOf(intent: Intent): IntakeKind =
+        if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+            IntakeKind.PHOTO_PICKER
+        } else {
+            IntakeKind.SHARE
         }
-    }
 
     private fun extractShape(intent: Intent): IntentShape {
         val extraStreamUri = getParcelableExtraCompat(intent, Intent.EXTRA_STREAM, Uri::class.java)

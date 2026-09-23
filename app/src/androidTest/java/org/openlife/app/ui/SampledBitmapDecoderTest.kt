@@ -5,12 +5,17 @@ import android.graphics.BitmapFactory
 import java.io.ByteArrayOutputStream
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.vault.model.Orientation
 
 @RunWith(AndroidJUnit4::class)
 class SampledBitmapDecoderTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @Test
     fun rotate90ProducesSwappedDimensions() {
         val bitmap = Bitmap.createBitmap(80, 40, Bitmap.Config.ARGB_8888)

@@ -9,8 +9,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.R
 
 /**
@@ -22,6 +24,9 @@ import org.openlife.app.R
  */
 @RunWith(AndroidJUnit4::class)
 class BackupRulesTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     private val context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 

@@ -12,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.test.StrictModeRule
 import org.openlife.app.settings.ResetVaultFlow
 import org.openlife.vault.storage.VaultUnavailableCause
 import org.openlife.vault.repository.VaultResetResult
@@ -28,6 +29,9 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class VaultUnavailableFlowTest {
+    @get:Rule
+    val strictMode = StrictModeRule()
+
     @get:Rule
     val composeRule = createComposeRule()
 

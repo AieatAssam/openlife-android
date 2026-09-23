@@ -19,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +43,7 @@ fun IntakeScreen(
 ) {
     Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         when (state) {
-            IntakeUiState.Preparing -> CenteredMessage(stringResource(R.string.intake_preparing))
+            IntakeUiState.Preparing -> PreparingContent(onCancel)
 
             is IntakeUiState.Preview -> PreviewContent(state, onSave, onCancel)
 
@@ -84,7 +85,25 @@ fun IntakeScreen(
                 TerminalMessage(stringResource(R.string.intake_vault_unavailable), onDone)
             }
 
-            IntakeUiState.Cancelled -> onDone()
+            // Leaving is a side effect; run it once per Cancelled state rather
+            // than on every recomposition (F-43).
+            IntakeUiState.Cancelled -> LaunchedEffect(state) { onDone() }
+        }
+    }
+}
+
+/** Preparing can be cancelled: the read stops, the stream closes and no stage is kept (P1-13-R8). */
+@Composable
+private fun PreparingContent(onCancel: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(stringResource(R.string.intake_preparing))
+            OutlinedButton(onClick = onCancel, modifier = Modifier.padding(top = 16.dp)) {
+                Text(stringResource(R.string.cancel_action))
+            }
         }
     }
 }
