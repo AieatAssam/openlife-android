@@ -46,14 +46,24 @@ class MainThreadPolicyTest {
                 SourceListViewModel(application),
             )
         }
-        withContext(Dispatchers.Main) {
-            intake.startImport(ByteArrayInputStream(uniqueJpeg()), "image/jpeg", IntakeKind.SHARE)
+        // Retry Busy from a read left over by an earlier test (F-29, fixed by P1-15).
+        val bytes = uniqueJpeg()
+        var preview: IntakeUiState.Preview? = null
+        repeat(BUSY_RETRIES) {
+            if (preview != null) return@repeat
+            withContext(Dispatchers.Main) {
+                intake.startImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+            }
+            val settled = await {
+                intake.state.value.takeIf { it is IntakeUiState.Preview || it is IntakeUiState.Busy }
+            }
+            preview = settled as? IntakeUiState.Preview ?: run { delay(BUSY_RETRY_DELAY_MS); null }
         }
-        val preview = await { intake.state.value as? IntakeUiState.Preview }
+        checkNotNull(preview) { "import stayed Busy" }
 
         withContext(Dispatchers.Main) { intake.confirmSave() }
         await { intake.state.value as? IntakeUiState.Saved }
-        val sourceId = preview.sourceId
+        val sourceId = preview!!.sourceId
 
         val access = application.vault() as VaultAccess.Ready
         val read = withContext(Dispatchers.Main) { access.viewRepository.readReadyBytes(sourceId) }
@@ -78,6 +88,11 @@ class MainThreadPolicyTest {
             delay(50)
         }
         throw AssertionError("condition not met within ${timeoutMs}ms")
+    }
+
+    private companion object {
+        const val BUSY_RETRIES = 5
+        const val BUSY_RETRY_DELAY_MS = 500L
     }
 
     private fun uniqueJpeg(): ByteArray {

@@ -139,13 +139,30 @@ class SourceListScreenTest {
 
     private suspend fun saveASource(): UUID {
         val intake = withContext(Dispatchers.Main) { IntakeViewModel(application, SavedStateHandle()) }
-        withContext(Dispatchers.Main) {
-            intake.startImport(ByteArrayInputStream(uniqueJpeg()), "image/jpeg", IntakeKind.SHARE)
-        }
-        val preview = awaitIntake(intake) { it as? IntakeUiState.Preview }
+        val bytes = uniqueJpeg()
+        val preview = previewRetryingBusy(intake, bytes)
         withContext(Dispatchers.Main) { intake.confirmSave() }
         awaitIntake(intake) { it as? IntakeUiState.Saved }
         return preview.sourceId
+    }
+
+    /**
+     * Until P1-15 introduces read leases, a thumbnail read left over from a
+     * previous test holds the shared mutation lock and a new import reports
+     * Busy (F-29). Retry that, as IntakeAndListFlowTest.importUntilPreview does.
+     */
+    private suspend fun previewRetryingBusy(intake: IntakeViewModel, bytes: ByteArray): IntakeUiState.Preview {
+        repeat(BUSY_RETRIES) {
+            withContext(Dispatchers.Main) {
+                intake.startImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+            }
+            val settled = awaitIntake(intake) { state ->
+                state.takeIf { it is IntakeUiState.Preview || it is IntakeUiState.Busy }
+            }
+            if (settled is IntakeUiState.Preview) return settled
+            delay(BUSY_RETRY_DELAY_MS)
+        }
+        throw AssertionError("import stayed Busy after $BUSY_RETRIES attempts")
     }
 
     private suspend fun <T : Any> awaitIntake(intake: IntakeViewModel, pick: (IntakeUiState) -> T?): T {
@@ -168,5 +185,7 @@ class SourceListScreenTest {
 
     private companion object {
         const val FRAMES_AFTER = 5
+        const val BUSY_RETRIES = 5
+        const val BUSY_RETRY_DELAY_MS = 500L
     }
 }
