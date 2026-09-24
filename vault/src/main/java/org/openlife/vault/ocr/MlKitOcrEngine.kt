@@ -1,7 +1,6 @@
 package org.openlife.vault.ocr
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Rect
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
@@ -9,7 +8,6 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.CancellationException
-import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.OrientationTransform
 
 /**
@@ -26,9 +24,7 @@ class MlKitOcrEngine : OcrEngine {
     override val modelVersion: String = "16.0.1"
 
     override suspend fun extract(input: OcrEngineInput): OcrEngineOutput {
-        val decoded = decodeBounded(input)
-        val display = orient(decoded, input.orientation)
-        if (display !== decoded) decoded.recycle()
+        val display = OcrBitmapPreparer.prepare(input)
 
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         val task = RecognizerTask(recognizer.process(InputImage.fromBitmap(display, 0)), recognizer)
@@ -42,7 +38,8 @@ class MlKitOcrEngine : OcrEngine {
                 block.lines.map { line ->
                     OcrSpanDraft(
                         text = line.text,
-                        confidence = line.confidence,
+                        // R6: ML Kit's score is not stored until P2-04 calibrates it.
+                        confidence = OcrConfidencePolicy.stored(line.confidence),
                         region = line.boundingBox?.let {
                             scaleRegion(
                                 it,
@@ -72,38 +69,6 @@ class MlKitOcrEngine : OcrEngine {
             recognizer.close()
             if (task.isSettled) display.recycle()
         }
-    }
-
-    private fun decodeBounded(input: OcrEngineInput): Bitmap {
-        val bounds = checkedBounds(input)
-
-        var sampleSize = 1
-        while ((bounds.outWidth / sampleSize).toLong() * (bounds.outHeight / sampleSize).toLong() >
-            OcrLimits.MAX_DECODE_PIXELS
-        ) {
-            sampleSize = sampleSize shl 1
-        }
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize
-            inPreferredConfig = Bitmap.Config.ARGB_8888
-        }
-        return BitmapFactory.decodeByteArray(input.bytes, 0, input.bytes.size, options)
-            ?: throw OcrDecodeException("OCR source could not be decoded")
-    }
-
-    private fun checkedBounds(input: OcrEngineInput): BitmapFactory.Options {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(input.bytes, 0, input.bytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw OcrDecodeException("OCR source could not be decoded")
-        if (bounds.outWidth.toLong() * bounds.outHeight.toLong() > OcrLimits.MAX_SOURCE_PIXELS) {
-            throw OcrLimitExceededException("OCR source exceeds the pixel limit")
-        }
-        return bounds
-    }
-
-    private fun orient(bitmap: Bitmap, orientation: Orientation): Bitmap {
-        val matrix = OrientationTransform.matrixFor(orientation) ?: return bitmap
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     private fun scaleRegion(

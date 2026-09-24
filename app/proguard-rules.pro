@@ -17,6 +17,9 @@
 # mode. No debug agent is shipped by this rule.
 -dontwarn kotlinx.coroutines.debug.**
 
-# P2-03 must extend this file with the exact JNI keep rules for the selected
-# open-source OCR engine when that engine lands. C0/P0-06 does not invent
-# those classes or their reflection surface early.
+# P2-03 / ADR-0003: tesseract4android ships no consumer rules. Its native code
+# looks up these Java classes, fields and methods by name (for example the
+# native handles and the progress callback), so R8 must keep them intact or
+# OCR fails only in release builds.
+-keep class com.googlecode.tesseract.android.** { *; }
+-keep class com.googlecode.leptonica.android.** { *; }

@@ -14,6 +14,8 @@ import org.openlife.app.lock.AppLockController
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.ocr.MlKitOcrEngine
 import org.openlife.vault.ocr.OcrEngineRegistry
+import org.openlife.vault.ocr.TessdataInstaller
+import org.openlife.vault.ocr.TesseractOcrEngine
 import org.openlife.vault.repository.AndroidBitmapSampler
 import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.ImportRepository
@@ -33,6 +35,7 @@ import org.openlife.vault.storage.VaultOpener
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.VaultUnavailableCause
 import org.openlife.vault.storage.retryable
+import java.io.File
 import java.io.IOException
 
 /**
@@ -137,7 +140,7 @@ class OpenLifeApp : Application() {
                                 paths = paths,
                                 database = database,
                                 keystoreWrapper = keystoreWrapper,
-                                engineRegistry = OcrEngineRegistry(listOf(MlKitOcrEngine()), "mlkit-latin"),
+                                engineRegistry = OcrEngineRegistry(ocrEngines(), SELECTED_OCR_ENGINE),
                                 mutationQueue = mutationQueue,
                             ),
                             lastRecovery = report,
@@ -245,8 +248,19 @@ class OpenLifeApp : Application() {
             VaultUnavailableCause.DATABASE_OPEN_FAILED
         }
 
+    /** Both engines are registered; P2-05 removes ML Kit once P2-04's evaluation gate passes. */
+    private fun ocrEngines() = listOf(
+        TesseractOcrEngine(
+            TessdataInstaller(File(noBackupFilesDir, "ocr"), openAsset = { assets.open(TessdataInstaller.ASSET_PATH) }),
+        ),
+        MlKitOcrEngine(),
+    )
+
     companion object {
         private const val APP_LOCK_PREFERENCES = "app_lock"
+
+        /** P2-03-R3 / ADR-0003: the open-source engine is the default; selection is compile-time. */
+        private const val SELECTED_OCR_ENGINE = TesseractOcrEngine.ID
     }
 }
 

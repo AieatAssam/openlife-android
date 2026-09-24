@@ -84,7 +84,8 @@ class TesseractOcrEngineTest {
     fun cancellationStopsRecognitionAndRecyclesAfterCompletion(): Unit = runBlocking {
         val page = densePage()
         val job = launch(Dispatchers.Default) { engine.extract(input(page, Orientation.NORMAL)) }
-        withTimeout(START_TIMEOUT_MS) { while ("recognition-started" !in events) delay(POLL_MS) }
+        // stop() acts in the recognition phase; layout analysis before it is not interruptible.
+        withTimeout(START_TIMEOUT_MS) { while ("recognizing" !in events) delay(POLL_MS) }
 
         val started = System.nanoTime()
         job.cancelAndJoin()
@@ -96,6 +97,19 @@ class TesseractOcrEngineTest {
         val settled = events.indexOf("settled")
         val recycled = events.indexOf("recycled")
         assertTrue("events: $events", stop in 0 until settled && settled < recycled)
+    }
+
+    /** Cancelled before recognition began: the caller is released and the native state freed once it returns. */
+    @Test
+    fun earlyCancellationFreesNativeStateOnceRecognitionReturns(): Unit = runBlocking {
+        val job = launch(Dispatchers.Default) { engine.extract(input(twoLineReceipt(), Orientation.NORMAL)) }
+        withTimeout(START_TIMEOUT_MS) { while ("recognition-started" !in events) delay(POLL_MS) }
+
+        job.cancelAndJoin()
+
+        assertTrue(job.isCancelled)
+        withTimeout(START_TIMEOUT_MS) { while ("recycled" !in events) delay(POLL_MS) }
+        assertTrue("freed only after the native call settled: $events", events.indexOf("settled") < events.indexOf("recycled"))
     }
 
     private fun input(bitmap: Bitmap, orientation: Orientation): OcrEngineInput {
