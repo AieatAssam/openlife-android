@@ -441,7 +441,7 @@ class IntakeAndListFlowTest {
         assertTrue(stageFileFor(preview.sourceId).exists())
 
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { store.clear() }
-        application.awaitBackgroundWorkForTest()
+        application.importHousekeeping.awaitIdleForTest()
 
         val access = application.vault() as VaultAccess.Ready
         awaitCondition(describe = { "stage row still present" }) {
@@ -467,7 +467,11 @@ class IntakeAndListFlowTest {
 
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { store.clear() }
         release.countDown()
-        application.awaitBackgroundWorkForTest()
+        // The abandoned import finishes on its own once the read returns; the
+        // slot must then be free, not orphaned.
+        val slot = (application.vault() as VaultAccess.Ready).importRepository.importSlot
+        awaitCondition(describe = { "import slot still occupied after the read returned" }) { !slot.isOccupied }
+        application.importHousekeeping.awaitIdleForTest()
 
         awaitCondition(describe = { "orphaned stages: ${stageFiles() - stagesBefore}" }) {
             (stageFiles() - stagesBefore).isEmpty()
@@ -500,7 +504,7 @@ class IntakeAndListFlowTest {
                 assertTrue(stagesBefore.isNotEmpty())
 
                 scenario.recreate()
-                runBlocking { application.awaitBackgroundWorkForTest() }
+                runBlocking { application.importHousekeeping.awaitIdleForTest() }
 
                 awaitStatusPrefix(scenario, "Prepared")
                 assertEquals("rotation must keep the stage", stagesBefore, stageFiles())

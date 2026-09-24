@@ -21,8 +21,11 @@ class ImportSlot {
 
     private val state = AtomicReference<State>(State.Free)
 
-    /** P1-01 stub. */
-    val activeSourceId: UUID? get() = null
+    /** The prepared import awaiting Save or Cancel, if any. */
+    val activeSourceId: UUID? get() = (state.get() as? State.Staged)?.sourceId
+
+    /** True while an import is between taking the slot and producing its stage. */
+    val isPreparing: Boolean get() = state.get() == State.Preparing
 
     /** True while an import is being prepared or awaits a decision. */
     val isOccupied: Boolean get() = state.get() != State.Free

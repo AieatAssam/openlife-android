@@ -282,6 +282,9 @@ class IntakeViewModel(
 
         val deadlineNanos = System.nanoTime() + PROVIDER_READ_DEADLINE_NANOS
         var result: PrepareResult? = null
+        // What the repository actually produced, even if this coroutine was
+        // cancelled or timed out while its provider read was still blocked.
+        var produced: PrepareResult? = null
         try {
             result = try {
                 withTimeout(PROVIDER_READ_DEADLINE_MILLIS) {
@@ -290,12 +293,17 @@ class IntakeViewModel(
                         declaredMimeType,
                         intakeKind,
                         deadline = { System.nanoTime() >= deadlineNanos },
-                    )
+                    ).also { produced = it }
                 }
             } catch (_: TimeoutCancellationException) {
                 PrepareResult.Failed
             }
         } finally {
+            // P1-01: a stage nobody will ever preview (the screen went away,
+            // or the deadline won) is cancelled rather than orphaned with the
+            // import slot still taken.
+            val orphan = (produced as? PrepareResult.Prepared)?.takeIf { produced !== result }
+            if (orphan != null) application.importHousekeeping.cancelAbandonedImport(orphan.sourceId)
             withContext(NonCancellable) {
                 // The normal owner-thread close is in this finally block.
                 // The watchdog can only win after the deadline plus grace
@@ -456,7 +464,19 @@ class IntakeViewModel(
         // last-resort close; do not close an unknown descriptor here.
         activeImportJob?.cancel()
         lookupScope.cancel()
-        sourceId?.let(application::releaseImportSlot)
+        val id = sourceId ?: return
+        val decided = when (_state.value) {
+            is IntakeUiState.Saved, is IntakeUiState.Duplicate, IntakeUiState.Cancelled -> true
+            else -> false
+        }
+        if (decided) {
+            application.importHousekeeping.releaseImportSlot(id)
+        } else {
+            // P1-01-R1: the user walked away from an unsaved preview. Cancel
+            // the stage now rather than at the next process start. viewModelScope
+            // is already cancelled, so this runs on the application scope.
+            application.importHousekeeping.cancelAbandonedImport(id)
+        }
     }
 
     companion object {

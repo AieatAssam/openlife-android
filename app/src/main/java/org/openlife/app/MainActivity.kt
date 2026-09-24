@@ -52,6 +52,11 @@ class MainActivity : ComponentActivity() {
         openSourceIdFrom(intent)?.let { openSourceRequests.value = it }
     }
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.cleanAbandonedStages()
+    }
+
     override fun onStop() {
         // Drop decoded content and make the navigation host return to the list
         // while this content-bearing activity is hidden.

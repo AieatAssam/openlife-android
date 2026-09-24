@@ -2,8 +2,10 @@ package org.openlife.vault.repository
 
 import android.database.sqlite.SQLiteFullException
 import android.system.ErrnoException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.AesGcmCodec
 import org.openlife.vault.crypto.EnvelopeAad
@@ -82,14 +84,24 @@ class ImportRepository(
         // reset stay excluded.
         if (!importSlot.tryBeginPreparing()) return PrepareResult.Busy
         var result: PrepareResult? = null
+        var stagedId: UUID? = null
         try {
             result = mutationQueue.withReadLease {
-                prepareImportLocked(inputStream, declaredMimeType, intakeKind, deadline)
+                prepareImportLocked(inputStream, declaredMimeType, intakeKind, deadline) { stagedId = it }.also {
+                    // Inside the lease: a mutation that reads the slot (for
+                    // example abandoned-stage cleanup, P1-01) then never sees
+                    // this new stage without its owner.
+                    if (it is PrepareResult.Prepared) importSlot.preparedAs(it.sourceId)
+                }
             }
             return result
+        } catch (cancelled: CancellationException) {
+            // Design §11: any failure before a usable preview cancels the
+            // stage, including the caller going away mid-import (P1-01).
+            stagedId?.let { id -> withContext(NonCancellable) { mutationQueue.withReadLease { cancelStage(id) } } }
+            throw cancelled
         } finally {
-            val prepared = result as? PrepareResult.Prepared
-            if (prepared != null) importSlot.preparedAs(prepared.sourceId) else importSlot.preparationEnded()
+            if (result !is PrepareResult.Prepared) importSlot.preparationEnded()
         }
     }
 
@@ -98,6 +110,7 @@ class ImportRepository(
         declaredMimeType: String,
         intakeKind: IntakeKind,
         deadline: () -> Boolean,
+        onStaged: (UUID) -> Unit,
     ): PrepareResult {
         if (!hasEnoughStorage()) {
             return PrepareResult.Rejected(ImageRejectionReason.STORAGE_UNAVAILABLE)
@@ -125,10 +138,8 @@ class ImportRepository(
             // The STAGED row, with its wrapped key, is committed before any
             // file is written - this is what lets recovery find interrupted
             // work (design §11 step 2).
-            val insertFailure = insertStagedSource(stagedSource)
-            if (insertFailure != null) {
-                return insertFailure
-            }
+            insertStagedSource(stagedSource)?.let { return it }
+            onStaged(sourceId)
 
             val read = try {
                 BoundedStreamReader.read(inputStream, deadline)
@@ -222,6 +233,10 @@ class ImportRepository(
     private suspend fun insertStagedSource(source: Source): PrepareResult? = try {
         sourceDao.insert(source.toEntity())
         null
+    } catch (cancelled: CancellationException) {
+        // The row may already be committed; never leave it behind (P1-01).
+        withContext(NonCancellable) { cancelStage(source.id) }
+        throw cancelled
     } catch (error: IOException) {
         prepareFailureFor(error)
     } catch (error: ErrnoException) {
@@ -232,17 +247,29 @@ class ImportRepository(
         PrepareResult.Failed
     }
 
-    private suspend fun updatePreparedSource(source: Source): PrepareResult? = try {
-        sourceDao.update(source.toEntity())
-        null
-    } catch (error: IOException) {
-        prepareFailureFor(error)
-    } catch (error: ErrnoException) {
-        prepareFailureFor(error)
-    } catch (error: SQLiteFullException) {
-        prepareFailureFor(error)
-    } catch (_: Exception) {
-        PrepareResult.Failed
+    /**
+     * Records the validated metadata. Any failure cancels the stage: the
+     * encrypted file is already written, and design §11 says a failure before
+     * a usable preview leaves no stage behind. Cancellation is rethrown, not
+     * reported as a failure (the caller's cleanup handles it).
+     */
+    private suspend fun updatePreparedSource(source: Source): PrepareResult? {
+        val failure = try {
+            sourceDao.update(source.toEntity())
+            return null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: IOException) {
+            prepareFailureFor(error)
+        } catch (error: ErrnoException) {
+            prepareFailureFor(error)
+        } catch (error: SQLiteFullException) {
+            prepareFailureFor(error)
+        } catch (_: Exception) {
+            PrepareResult.Failed
+        }
+        cancelStage(source.id)
+        return failure
     }
 
     /**
