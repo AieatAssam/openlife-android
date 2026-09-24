@@ -173,7 +173,7 @@ class OcrRepositoryTest {
         assertTrue(repository.addCorrection(result.revisionId, spanId, "hullo"))
         assertTrue(repository.setReviewState(result.revisionId, OcrReviewState.ACCEPTED))
 
-        assertEquals("hello", repository.findSpans(result.revisionId).single().text)
+        assertEquals("hello", db.ocrDao().findSpans(result.revisionId.toString()).single().text)
         assertEquals("hullo", db.ocrDao().findUserRevisions(result.revisionId.toString()).single().toDomain().correctedText)
         assertEquals(OcrReviewState.ACCEPTED, repository.findRevision(result.revisionId)!!.reviewState)
     }

@@ -197,28 +197,34 @@ class ViewerScreenC1Test {
         }
         val sourceId = saveSyntheticSource(application)
 
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { ocr.run(sourceId) }
-        val finished = awaitNonNull("OCR finished") {
-            ocr.states.value[sourceId]?.takeIf { it is OcrUiState.Ready || it is OcrUiState.Failed }
-        }
-        val revisionId = (finished as? OcrUiState.Ready)?.revisionId
+        // As in MainActivity: re-request the state when the ViewModel drops held text.
         composeRule.setContent {
-            val states by ocr.states.collectAsState()
+            val generation by ocr.generation.collectAsState()
+            val state by androidx.compose.runtime.remember(generation) { ocr.state(sourceId) }.collectAsState()
             ViewerScreen(
                 source = readySource(sourceId),
                 loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
-                ocrState = states[sourceId] ?: OcrUiState.Idle,
+                ocrState = state,
             )
         }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { ocr.run(sourceId) }
+        val finished = awaitNonNull("OCR finished") {
+            ocr.state(sourceId).value.takeIf { it is OcrUiState.Ready || it is OcrUiState.Failed }
+        }
+        val revisionId = (finished as? OcrUiState.Ready)?.revisionId
         composeRule.onNodeWithText("Extract text on this device").assertDoesNotExist()
 
         val deleted = java.util.concurrent.atomic.AtomicReference<org.openlife.vault.repository.DeleteResult?>(null)
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { list.delete(sourceId) { deleted.set(it) } }
         awaitNonNull("deletion finished") { deleted.get() }
 
-        awaitNonNull("OCR state forgotten after deletion") { Unit.takeIf { ocr.states.value[sourceId] == null } }
+        awaitNonNull("OCR state forgotten after deletion") {
+            // Let the panel recompose and re-read after the ViewModel forgot the source.
+            composeRule.waitForIdle()
+            Unit.takeIf { ocr.state(sourceId).value == OcrUiState.Idle }
+        }
         composeRule.onNodeWithText("Extract text on this device").performScrollTo().assertIsDisplayed()
         val access = application.vault() as org.openlife.app.VaultAccess.Ready
         if (revisionId != null) assertEquals(null, access.ocrRepository.findRevision(revisionId))

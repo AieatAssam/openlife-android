@@ -69,6 +69,8 @@ class MainActivity : FragmentActivity() {
         // Drop decoded content and make the navigation host return to the list
         // while this content-bearing activity is hidden.
         viewModel.clearSensitiveContent()
+        // P2-01-R4: no OCR text stays in memory while hidden; the database is the record.
+        ocrViewModel.clearTransient()
         backgroundEpoch.value += 1
         super.onStop()
     }
@@ -160,7 +162,6 @@ class MainActivity : FragmentActivity() {
         val epoch by backgroundEpoch.collectAsState()
         val epochAtStart = remember { epoch }
         val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
-        val ocrStates by ocrViewModel.states.collectAsState()
         val listState by viewModel.state.collectAsState()
         val lockPolicy by app.appLock.policy.collectAsState()
 
@@ -185,20 +186,18 @@ class MainActivity : FragmentActivity() {
         OpenLifeNavHost(
             listState = listState,
             thumbnailGeneration = thumbnailGeneration,
-            ocrStates = ocrStates,
+            ocrState = { id ->
+                // A new generation after clearTransient re-reads from the database (P2-01-R4).
+                val generation by ocrViewModel.generation.collectAsState()
+                remember(id, generation) { ocrViewModel.state(id) }.collectAsState().value
+            },
             loadThumbnail = viewModel::loadThumbnail,
             loadReadyContent = { sourceId -> loadReadyContent(sourceId) },
             delete = { sourceId, onDone -> viewModel.delete(sourceId) { onDone() } },
             extractText = ocrViewModel::run,
             cancelOcr = ocrViewModel::cancel,
-            correct = { sourceId, span, correctedText ->
-                val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
-                if (ready != null) ocrViewModel.correct(ready.revisionId, span.id, correctedText)
-            },
-            review = { sourceId, reviewState ->
-                val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
-                if (ready != null) ocrViewModel.review(ready.revisionId, reviewState)
-            },
+            correct = ocrViewModel::correct,
+            review = ocrViewModel::review,
             onImportFromPhotoPicker = rememberPhotoPickerLauncher(),
             navController = navController,
             onRetryVault = viewModel::retryVault,

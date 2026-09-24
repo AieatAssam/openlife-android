@@ -86,7 +86,7 @@ class AdaptiveLayoutTest {
         OpenLifeNavHost(
             listState = SourceListUiState.Loaded(listOf(readySource())),
             thumbnailGeneration = 0L,
-            ocrStates = emptyMap(),
+            ocrState = { OcrUiState.Idle },
             loadThumbnail = { null },
             loadReadyContent = { awaitCancellation() },
             delete = { _, _ -> },

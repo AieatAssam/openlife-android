@@ -1,13 +1,9 @@
 package org.openlife.app
 
 import android.content.ComponentCallbacks2
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.openlife.app.ui.OcrTrim
-import org.openlife.app.ui.OcrUiState
-import java.util.UUID
 
 /**
  * P1-16-R3: memory pressure while visible (RUNNING_LOW or worse) and the UI
@@ -26,16 +22,7 @@ class TrimMemoryPolicyTest {
         )
         assertFalse(SensitiveContentTrimPolicy.shouldClear(ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE))
 
-        val ready = UUID.randomUUID()
-        val running = UUID.randomUUID()
-        val failed = UUID.randomUUID()
-        val trimmed = OcrTrim.dropExtractedText(
-            mapOf(
-                ready to OcrUiState.Ready(ready, UUID.randomUUID(), emptyList()),
-                running to OcrUiState.Running(running),
-                failed to OcrUiState.Failed(failed, org.openlife.vault.ocr.OcrFailureReason.TIMEOUT),
-            ),
-        )
-        assertEquals("extracted text is dropped; run state is kept", setOf(running, failed), trimmed.keys)
+        // The OCR half: the trim clearer is OcrPresenter.clearTransient, which drops every
+        // held text (OcrViewModelTest.clearTransientDropsTextAndFlowRepopulates, P2-01).
     }
 }
