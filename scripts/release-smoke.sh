@@ -103,6 +103,23 @@ tap_description() {
     tap_node 'content-desc' "$1"
 }
 
+# Swipes up until [pattern] is in the UI dump; small screens put the OCR panel below the fold.
+scroll_until_visible() {
+    local pattern="$1"
+    local size width height
+    size="$("$adb_bin" shell wm size | tr -d '\r' | awk -F': ' '/size/ {value=$2} END {print value}')"
+    width="${size%x*}"
+    height="${size#*x}"
+    for _ in 1 2 3 4 5 6; do
+        if dump_ui && grep -Eq "$pattern" "$ui_dump"; then
+            return 0
+        fi
+        "$adb_bin" shell input swipe $((width / 2)) $((height * 3 / 4)) $((width / 2)) $((height / 4)) 300
+        sleep 1
+    done
+    wait_for_ui_pattern "$pattern" 5
+}
+
 count_descriptions() {
     { grep -o 'content-desc="Saved image thumbnail"' "$ui_dump" || true; } |
         wc -l | tr -d '[:space:]'
@@ -234,6 +251,15 @@ tap_description 'Saved image thumbnail'
 # decodes; the Details card (with the Verified text) can sit below the fold on
 # small screens since the extracted-text section comes first (P1-17).
 wait_for_ui_pattern 'content-desc="Saved image"|text="[^"]*Verified against the saved copy"' 45
+
+# P2-03: run OCR in the release build. tesseract4android's native code looks up
+# Java members by name, so a missing R8 keep rule fails here, not in debug tests.
+scroll_until_visible 'text="Extract text on this device"'
+tap_text 'Extract text on this device'
+wait_for_ui_pattern 'text="Run again"' 120
+scroll_until_visible 'text="Engine: tesseract-eng-fast[^"]*"'
+assert_no_fatal_exception
+
 tap_description 'Delete'
 # Delete is confirmed from every entry point (C0-R37); tap the dialog action.
 wait_for_ui_pattern 'text="Delete"' 15
