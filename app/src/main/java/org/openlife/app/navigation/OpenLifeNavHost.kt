@@ -51,14 +51,14 @@ import java.util.UUID
 private class SourceScreens(
     val listState: SourceListUiState,
     val thumbnailGeneration: Long,
-    val ocrStates: Map<UUID, org.openlife.app.ui.OcrUiState>,
+    val ocrState: @Composable (UUID) -> org.openlife.app.ui.OcrUiState,
     val loadThumbnail: suspend (UUID) -> android.graphics.Bitmap?,
     val loadReadyContent: suspend (UUID) -> ReadyReadResult,
     val delete: (UUID, () -> Unit) -> Unit,
     val extractText: (UUID) -> Unit,
     val cancelOcr: (UUID) -> Unit,
-    val correct: (UUID, org.openlife.vault.ocr.OcrSpan, String) -> Unit,
-    val review: (UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
+    val correct: (revisionId: UUID, spanId: UUID, correctedText: String) -> Unit,
+    val review: (revisionId: UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     val onImportFromPhotoPicker: () -> Unit,
     val onRetryVault: () -> Unit,
     val onFinishReset: () -> Unit,
@@ -86,16 +86,20 @@ private class SourceScreens(
 
     @Composable
     fun Viewer(source: Source, onClose: () -> Unit) {
+        val ocr = ocrState(source.id)
         ViewerScreen(
             source = source,
             loadContent = { loadReadyContent(source.id) },
             onBack = onClose,
             onDeleteRequested = { delete(source.id, onClose) },
-            ocrState = ocrStates[source.id] ?: org.openlife.app.ui.OcrUiState.Idle,
+            ocrState = ocr,
             onExtractText = { extractText(source.id) },
             onCancelOcr = { cancelOcr(source.id) },
-            onCorrect = { span, correctedText -> correct(source.id, span, correctedText) },
-            onReview = { state -> review(source.id, state) },
+            // Both carry the revision they act on, from the state that was rendered.
+            onCorrect = { span, correctedText -> correct(span.revisionId, span.id, correctedText) },
+            onReview = { state ->
+                (ocr as? org.openlife.app.ui.OcrUiState.Ready)?.let { review(it.revisionId, state) }
+            },
         )
     }
 }
@@ -105,14 +109,14 @@ private class SourceScreens(
 fun OpenLifeNavHost(
     listState: SourceListUiState,
     thumbnailGeneration: Long,
-    ocrStates: Map<UUID, org.openlife.app.ui.OcrUiState>,
+    ocrState: @Composable (UUID) -> org.openlife.app.ui.OcrUiState,
     loadThumbnail: suspend (UUID) -> android.graphics.Bitmap?,
     loadReadyContent: suspend (UUID) -> ReadyReadResult,
     delete: (UUID, () -> Unit) -> Unit,
     extractText: (UUID) -> Unit,
     cancelOcr: (UUID) -> Unit,
-    correct: (UUID, org.openlife.vault.ocr.OcrSpan, String) -> Unit,
-    review: (UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
+    correct: (revisionId: UUID, spanId: UUID, correctedText: String) -> Unit,
+    review: (revisionId: UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     onImportFromPhotoPicker: () -> Unit,
     onRetryVault: () -> Unit,
     onFinishReset: () -> Unit,
@@ -123,7 +127,7 @@ fun OpenLifeNavHost(
     navController: NavHostController = rememberNavController(),
 ) {
     val screens = SourceScreens(
-        listState, thumbnailGeneration, ocrStates, loadThumbnail, loadReadyContent, delete, extractText,
+        listState, thumbnailGeneration, ocrState, loadThumbnail, loadReadyContent, delete, extractText,
         cancelOcr, correct, review, onImportFromPhotoPicker, onRetryVault, onFinishReset,
     )
     val currentEntry by navController.currentBackStackEntryAsStateCompat()

@@ -11,6 +11,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertTrue
@@ -70,10 +71,16 @@ class MainThreadPolicyTest {
         assertTrue("saved source must load", read is ReadyReadResult.Loaded)
         withContext(Dispatchers.Main) { list.loadThumbnail(sourceId) }
 
+        // OCR state is only read while observed (P2-01), so observe it like the viewer does.
+        val ocrState = ocr.state(sourceId)
+        val observer = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch { ocrState.collect {} }
         withContext(Dispatchers.Main) { ocr.run(sourceId) }
         await {
-            ocr.states.value[sourceId]?.takeIf { it !is OcrUiState.Running && it !is OcrUiState.Idle }
+            ocrState.value.takeIf {
+                it !is OcrUiState.Running && it !is OcrUiState.Idle && it !is OcrUiState.Loading
+            }
         }
+        observer.cancel()
 
         val deleted = AtomicReference<DeleteResult?>(null)
         withContext(Dispatchers.Main) { list.delete(sourceId) { deleted.set(it) } }

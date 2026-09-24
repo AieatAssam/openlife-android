@@ -1,20 +1,15 @@
 package org.openlife.app.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +27,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -49,7 +43,6 @@ import org.openlife.app.ui.brand.StampState
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
-import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.repository.ReadyReadResult
@@ -239,82 +232,6 @@ private fun ViewerCorrectionDialog(
             },
         )
     }
-}
-
-@Composable
-private fun OcrSection(
-    source: Source,
-    state: OcrUiState,
-    onExtractText: () -> Unit,
-    onCancel: () -> Unit,
-    onSelectRegion: (org.openlife.vault.ocr.OcrEvidenceRegion) -> Unit,
-    onCorrect: (OcrSpan) -> Unit,
-    onReview: (OcrReviewState) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.viewer_extracted_text_title), style = MaterialTheme.typography.titleMedium)
-        when (state) {
-            OcrUiState.Idle -> Button(onClick = onExtractText, enabled = source.state == SourceState.READY) {
-                Text(stringResource(R.string.viewer_extract_text_action))
-            }
-
-            is OcrUiState.Running -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.viewer_extracting))
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
-            }
-
-            is OcrUiState.Ready -> {
-                if (state.spans.isEmpty()) Text(stringResource(R.string.viewer_no_latin_text))
-                state.spans.forEach { span ->
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(span.text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
-                        span.evidenceRegion?.let { region ->
-                            TextButton(onClick = { onSelectRegion(region) }) {
-                                Text(stringResource(R.string.viewer_show_region))
-                            }
-                        } ?: Text(stringResource(R.string.viewer_ungrounded))
-                        TextButton(onClick = { onCorrect(span) }) { Text(stringResource(R.string.viewer_correct)) }
-                    }
-                }
-                Row {
-                    TextButton(onClick = { onReview(OcrReviewState.ACCEPTED) }) {
-                        Text(stringResource(R.string.viewer_accept_text))
-                    }
-                    TextButton(onClick = { onReview(OcrReviewState.REJECTED) }) {
-                        Text(stringResource(R.string.viewer_reject_text))
-                    }
-                }
-            }
-
-            is OcrUiState.Failed -> Text(
-                stringResource(R.string.viewer_extraction_failed, ocrFailureMessage(state.reason)),
-            )
-
-            is OcrUiState.Cancelled -> Text(stringResource(R.string.viewer_extraction_cancelled))
-
-            is OcrUiState.Stale -> Text(stringResource(R.string.viewer_extraction_stale))
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            stringResource(R.string.viewer_untrusted_notice),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
-}
-
-@Composable
-private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) {
-    OcrFailureReason.SOURCE_NOT_READY -> stringResource(R.string.ocr_failure_source_not_ready)
-    OcrFailureReason.SOURCE_CORRUPT -> stringResource(R.string.ocr_failure_source_corrupt)
-    OcrFailureReason.SOURCE_DELETED -> stringResource(R.string.ocr_failure_source_deleted)
-    OcrFailureReason.LIMIT_EXCEEDED -> stringResource(R.string.ocr_failure_limit_exceeded)
-    OcrFailureReason.UNSUPPORTED_SCRIPT -> stringResource(R.string.ocr_failure_unsupported_script)
-    OcrFailureReason.ENGINE_FAILURE -> stringResource(R.string.ocr_failure_engine)
-    OcrFailureReason.CANCELLED -> stringResource(R.string.ocr_failure_cancelled)
-    OcrFailureReason.PROCESS_RESTART -> stringResource(R.string.ocr_failure_process_restart)
-    OcrFailureReason.TIMEOUT -> stringResource(R.string.ocr_failure_timeout)
-    OcrFailureReason.STORAGE_FAILURE -> stringResource(R.string.ocr_failure_storage)
 }
 
 @Composable

@@ -4,8 +4,14 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -21,8 +27,13 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrRunStateMachine
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
+import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
+import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.storage.OcrDao
+import org.openlife.vault.storage.OcrRevisionEntity
+import org.openlife.vault.storage.OcrSpanEntity
+import org.openlife.vault.storage.OcrUserRevisionEntity
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
@@ -182,11 +193,28 @@ class OcrRepository(
             }
         }
 
+    /**
+     * P2-01-R1: the latest revision for [sourceId] in any state, with its
+     * spans, their latest corrections, a whole-revision correction, and the
+     * earlier revisions as history. Emits null when the source has no
+     * revision, including after the source is deleted. Reads only; the caller
+     * decides whether content may be shown (the app gates it behind its lock).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeOcrView(sourceId: UUID): Flow<OcrView?> {
+        val views = database.ocrViewDao()
+        return views.observeRevisionsNewestFirst(sourceId.toString())
+            .flatMapLatest { revisions ->
+                val latest = revisions.firstOrNull() ?: return@flatMapLatest flowOf(null)
+                combine(views.observeSpans(latest.id), views.observeUserRevisions(latest.id)) { spans, corrections ->
+                    ocrViewOf(latest, revisions.drop(1), spans, corrections)
+                }
+            }
+            .flowOn(ioDispatcher)
+    }
+
     suspend fun findRevision(revisionId: UUID): OcrRevision? =
         database.ocrDao().findRevision(revisionId.toString())?.toDomain()
-
-    suspend fun findSpans(revisionId: UUID): List<OcrSpan> =
-        database.ocrDao().findSpans(revisionId.toString()).map { it.toDomain() }
 
     suspend fun addCorrection(revisionId: UUID, spanId: UUID?, correctedText: String): Boolean =
         withContext(ioDispatcher) {
@@ -240,4 +268,20 @@ class OcrRepository(
         data class Ready(val revision: OcrRevision, val input: OcrEngineInput) : Capture
         data class Failure(val reason: OcrFailureReason) : Capture
     }
+}
+
+private fun ocrViewOf(
+    latest: OcrRevisionEntity,
+    earlier: List<OcrRevisionEntity>,
+    spans: List<OcrSpanEntity>,
+    corrections: List<OcrUserRevisionEntity>,
+): OcrView {
+    // Corrections arrive oldest first, so the last one per span is the latest.
+    val latestBySpan = corrections.associateBy { it.spanId }
+    return OcrView(
+        revision = latest.toDomain(),
+        spans = spans.map { span -> OcrSpanView(span.toDomain(), latestBySpan[span.id]?.toDomain()) },
+        revisionCorrection = latestBySpan[null]?.toDomain(),
+        history = earlier.map { it.toDomain() },
+    )
 }

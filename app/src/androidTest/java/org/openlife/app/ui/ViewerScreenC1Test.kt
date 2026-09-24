@@ -119,6 +119,74 @@ class ViewerScreenC1Test {
             .assertIsDisplayed()
     }
 
+    /** P2-01-R3/P3: a correction is shown under the immutable OCR text, attributed to the user. */
+    @Test
+    fun correctionIsShownBesideImmutableOcrTextAndReviewChipReflectsState() {
+        val sourceId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        val span = OcrSpan(
+            UUID.randomUUID(), revisionId, 0, "Appointment 14 October", null, OcrCoordinateSystem.SOURCE_PIXELS, null,
+        )
+        composeRule.setContent {
+            ViewerScreen(
+                source = readySource(sourceId),
+                loadContent = { awaitCancellation() },
+                onBack = {},
+                onDeleteRequested = {},
+                ocrState = OcrUiState.Ready(
+                    sourceId = sourceId,
+                    revisionId = revisionId,
+                    spans = listOf(span),
+                    corrections = mapOf(span.id to "Appointment 15 October"),
+                    reviewState = org.openlife.vault.ocr.OcrReviewState.ACCEPTED,
+                    engineId = "mlkit-latin",
+                    modelVersion = "16.0.1",
+                    extractedAt = 1_700_000_000_000L,
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("Appointment 14 October").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Corrected by you: Appointment 15 October").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Review: Accepted").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("mlkit-latin 16.0.1", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    /** P2-01-R3: Run again asks for a new revision; earlier revisions stay listed under History. */
+    @Test
+    fun runAgainCreatesANewRevisionAndKeepsHistory() {
+        val sourceId = UUID.randomUUID()
+        var runs = 0
+        composeRule.setContent {
+            ViewerScreen(
+                source = readySource(sourceId),
+                loadContent = { awaitCancellation() },
+                onBack = {},
+                onDeleteRequested = {},
+                ocrState = OcrUiState.Ready(
+                    sourceId = sourceId,
+                    revisionId = UUID.randomUUID(),
+                    spans = emptyList(),
+                    history = listOf(
+                        OcrHistoryItem(
+                            UUID.randomUUID(),
+                            org.openlife.vault.ocr.OcrRevisionState.FAILED,
+                            1_700_000_000_000L,
+                            "mlkit-latin",
+                            "16.0.1",
+                        ),
+                    ),
+                ),
+                onExtractText = { runs++ },
+            )
+        }
+
+        composeRule.onNodeWithText("Run again").performScrollTo().performClick()
+        assertEquals(1, runs)
+        composeRule.onNodeWithText("History (1)").performScrollTo().performClick()
+        composeRule.onNodeWithText("Failed", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
     /** P2-02-R6/R7, C1-R7: deleting the source clears its OCR panel and leaves no OCR rows. */
     @Test
     fun deletingTheSourceWhileOcrTextIsShownClearsItAndRemovesRows(): Unit = kotlinx.coroutines.runBlocking {
@@ -129,28 +197,34 @@ class ViewerScreenC1Test {
         }
         val sourceId = saveSyntheticSource(application)
 
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { ocr.run(sourceId) }
-        val finished = awaitNonNull("OCR finished") {
-            ocr.states.value[sourceId]?.takeIf { it is OcrUiState.Ready || it is OcrUiState.Failed }
-        }
-        val revisionId = (finished as? OcrUiState.Ready)?.revisionId
+        // As in MainActivity: re-request the state when the ViewModel drops held text.
         composeRule.setContent {
-            val states by ocr.states.collectAsState()
+            val generation by ocr.generation.collectAsState()
+            val state by androidx.compose.runtime.remember(generation) { ocr.state(sourceId) }.collectAsState()
             ViewerScreen(
                 source = readySource(sourceId),
                 loadContent = { awaitCancellation() },
                 onBack = {},
                 onDeleteRequested = {},
-                ocrState = states[sourceId] ?: OcrUiState.Idle,
+                ocrState = state,
             )
         }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { ocr.run(sourceId) }
+        val finished = awaitNonNull("OCR finished") {
+            ocr.state(sourceId).value.takeIf { it is OcrUiState.Ready || it is OcrUiState.Failed }
+        }
+        val revisionId = (finished as? OcrUiState.Ready)?.revisionId
         composeRule.onNodeWithText("Extract text on this device").assertDoesNotExist()
 
         val deleted = java.util.concurrent.atomic.AtomicReference<org.openlife.vault.repository.DeleteResult?>(null)
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { list.delete(sourceId) { deleted.set(it) } }
         awaitNonNull("deletion finished") { deleted.get() }
 
-        awaitNonNull("OCR state forgotten after deletion") { Unit.takeIf { ocr.states.value[sourceId] == null } }
+        awaitNonNull("OCR state forgotten after deletion") {
+            // Let the panel recompose and re-read after the ViewModel forgot the source.
+            composeRule.waitForIdle()
+            Unit.takeIf { ocr.state(sourceId).value == OcrUiState.Idle }
+        }
         composeRule.onNodeWithText("Extract text on this device").performScrollTo().assertIsDisplayed()
         val access = application.vault() as org.openlife.app.VaultAccess.Ready
         if (revisionId != null) assertEquals(null, access.ocrRepository.findRevision(revisionId))

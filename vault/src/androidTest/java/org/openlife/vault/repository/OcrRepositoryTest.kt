@@ -13,6 +13,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -172,7 +173,7 @@ class OcrRepositoryTest {
         assertTrue(repository.addCorrection(result.revisionId, spanId, "hullo"))
         assertTrue(repository.setReviewState(result.revisionId, OcrReviewState.ACCEPTED))
 
-        assertEquals("hello", repository.findSpans(result.revisionId).single().text)
+        assertEquals("hello", db.ocrDao().findSpans(result.revisionId.toString()).single().text)
         assertEquals("hullo", db.ocrDao().findUserRevisions(result.revisionId.toString()).single().toDomain().correctedText)
         assertEquals(OcrReviewState.ACCEPTED, repository.findRevision(result.revisionId)!!.reviewState)
     }
@@ -315,6 +316,49 @@ class OcrRepositoryTest {
         }
     }
 
+    /** P2-01-R1: the viewer's view of a source is the latest revision with its spans and corrections. */
+    @Test
+    fun observeOcrViewEmitsLatestRevisionSpansAndCorrections(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val repository = repository(
+            TestEngine { OcrEngineOutput(listOf(OcrSpanDraft("first", null, null), OcrSpanDraft("second", null, null))) },
+        )
+        // Back to back: both runs may start in the same millisecond, so "latest" needs a tie-break.
+        val older = repository.runOcr(sourceId) as OcrRunResult.Completed
+        val latest = repository.runOcr(sourceId) as OcrRunResult.Completed
+        val spanId = latest.spans.first().id
+        assertTrue(repository.addCorrection(latest.revisionId, spanId, "corrected one"))
+        assertTrue(repository.addCorrection(latest.revisionId, spanId, "corrected two"))
+        assertTrue(repository.addCorrection(latest.revisionId, null, "whole revision note"))
+        assertTrue(repository.setReviewState(latest.revisionId, org.openlife.vault.ocr.OcrReviewState.ACCEPTED))
+
+        val view = kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) {
+            repository.observeOcrView(sourceId).first { view ->
+                view != null && view.revision.reviewState == org.openlife.vault.ocr.OcrReviewState.ACCEPTED &&
+                    view.revisionCorrection != null
+            }
+        }!!
+
+        assertEquals(latest.revisionId, view.revision.id)
+        assertEquals(listOf("first", "second"), view.spans.map { it.span.text })
+        assertEquals("the latest correction wins", "corrected two", view.spans[0].correction?.correctedText)
+        assertEquals(null, view.spans[1].correction)
+        assertEquals("whole revision note", view.revisionCorrection?.correctedText)
+        assertEquals("earlier revisions are history", listOf(older.revisionId), view.history.map { it.id })
+    }
+
+    @Test
+    fun observeOcrViewEmitsNullAfterSourceDeletion(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val repository = repository(TestEngine { OcrEngineOutput(listOf(OcrSpanDraft("gone soon", null, null))) })
+        assertTrue(repository.runOcr(sourceId) is OcrRunResult.Completed)
+        kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) { repository.observeOcrView(sourceId).first { it != null } }
+
+        assertTrue(DeletionRepository(paths, db, mutationQueue).deleteSource(sourceId) is DeleteResult.Deleted)
+
+        kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) { repository.observeOcrView(sourceId).first { it == null } }
+    }
+
     private fun nullOrRevision(result: OcrRunResult): UUID? =
         (result as? OcrRunResult.Failed)?.revisionId
 
@@ -354,5 +398,9 @@ class OcrRepositoryTest {
         override val id: String = "test-engine"
         override val modelVersion: String = "test"
         override suspend fun extract(input: OcrEngineInput): OcrEngineOutput = block(input)
+    }
+
+    private companion object {
+        const val VIEW_TIMEOUT_MS = 10_000L
     }
 }

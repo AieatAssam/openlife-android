@@ -17,6 +17,8 @@ abstract class OpenLifeDatabase : RoomDatabase() {
     abstract fun sourceDao(): SourceDao
     abstract fun ocrDao(): OcrDao
 
+    abstract fun ocrViewDao(): OcrViewDao
+
     companion object {
         /**
          * Room 2.8.x has no declarative way to express "every validated
