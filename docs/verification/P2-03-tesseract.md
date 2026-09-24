@@ -87,15 +87,12 @@ fixture ran three times after a warm-up.
 | mlkit-latin | screenshot 1080x2400 | 7570, 7942, 7626 | 128,457 | 20 |
 | mlkit-latin | dense 1200x1600 | 11019, 9123, 7698 | 139,968 | 40 |
 
-## Gaps and owner decisions
+## Owner decisions (2026-09-24) and gaps
 
-- **R5, ABI set.** armeabi-v7a is not shipped because its libraries are 4 KB
-  aligned. The owner can scope the 16 KB gate to 64-bit, or have Tesseract
-  built from source in CI (ADR-0003).
-- **Bundled native licences.** IJG (libjpeg) and libpng are not on the
-  policy allowlist; the owner decides.
-- **JitPack.** A new artefact repository, restricted to one group and
-  SHA-256 pinned, needs the owner's acknowledgement.
-- **R7 fixtures and CI.** The measurements use synthetic fixtures, not P2-04's,
-  and there is no CI-emulator run yet.
-- **Physical devices.** No physical-device run.
+- **ABI set:** no 32-bit ARM; the shipped set is arm64-v8a and x86_64.
+- **JitPack:** approved as the source of tesseract4android.
+- **Bundled native licences:** IJG and libpng-2.0 are permitted as listed
+  exceptions (`docs/dependency-policy.md`).
+- **Gap, R7:** measured on synthetic fixtures, not P2-04's, and not on the CI
+  emulator.
+- **Gap, physical devices:** no physical-device run.
