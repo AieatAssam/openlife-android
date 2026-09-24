@@ -22,6 +22,9 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
     val states: StateFlow<Map<UUID, OcrUiState>> = _states.asStateFlow()
     private val jobs = mutableMapOf<UUID, Job>()
     private val unregisterResetCallback = application.registerPreResetCallback(::clearSensitiveContent)
+    private val unregisterTrimCallback = application.registerSensitiveContentClearer {
+        _states.value = OcrTrim.dropExtractedText(_states.value)
+    }
 
     init {
         forgetDeletedSources()
@@ -108,6 +111,7 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     override fun onCleared() {
         unregisterResetCallback()
+        unregisterTrimCallback()
         clearSensitiveContent()
     }
 

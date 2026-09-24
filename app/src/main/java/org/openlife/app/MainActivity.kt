@@ -21,6 +21,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.openlife.app.intake.IntakeActivity
 import org.openlife.app.lock.AppLockGate
@@ -165,12 +166,15 @@ class MainActivity : FragmentActivity() {
 
         LaunchedEffect(requestedSourceId) {
             requestedSourceId?.let {
+                // The NavHost sets its graph during layout (P1-16 BoxWithConstraints); wait for it.
+                navController.currentBackStackEntryFlow.first()
                 navController.navigate(Routes.Viewer(it.toString()))
                 openSourceRequests.value = null
             }
         }
         LaunchedEffect(epoch) {
             if (epoch != epochAtStart) {
+                navController.currentBackStackEntryFlow.first()
                 navController.navigate(Routes.List) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = false }
                     launchSingleTop = true
@@ -208,6 +212,9 @@ class MainActivity : FragmentActivity() {
             },
         )
     }
+
+    /** Test seam (P1-16-R2): how many times hiding the activity has scrubbed content. */
+    internal fun scrubCountForTest(): Long = backgroundEpoch.value
 
     /** Test seam: the Photo Picker result path (P1-02). */
     internal fun forwardPickedUriForTest(uri: Uri) = forwardPickedUri(uri)

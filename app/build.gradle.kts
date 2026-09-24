@@ -171,6 +171,7 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.core.splashscreen)
     implementation(libs.biometric)
+    implementation(libs.window.core)
     implementation(libs.lifecycle.process)
     implementation(libs.kotlinx.serialization.json)
 

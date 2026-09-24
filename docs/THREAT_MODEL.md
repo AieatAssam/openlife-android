@@ -67,7 +67,11 @@ P0-07 applies the shared `applySecureWindow()` policy from both activities and
 keeps the static assertion in `SecureWindowTest` alongside the manifest
 predictive-back check. It
 helps prevent supported screenshots and non-secure display output, but is not
-universal protection against hostile devices. `MainActivity.onStop()` clears
+universal protection against hostile devices. In multi-window mode an activity can be visible
+without focus (STARTED, not RESUMED). Content is therefore scrubbed on
+`onStop` (hidden), never on `onPause` (focus lost), and a split-screen
+partner app sees only what a screenshot-protected window shows (P1-16,
+`MultiWindowScrubTest`). `MainActivity.onStop()` clears
 decoded list thumbnails and returns the viewer to the list; `IntakeActivity`
 clears authenticated preview state and re-authenticates its staged UUID on
 return. `DisposableEffect` recycles the decoded viewer/preview bitmap, whose

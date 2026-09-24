@@ -139,6 +139,8 @@
     <string name="app_lock_offer_enable">Turn on app lock</string>
     <string name="app_lock_offer_skip">Not now</string>
     <string name="about_title">About</string>
+    <string name="list_detail_placeholder">Select an item to see it here.</string>
+    <string name="about_low_ram_warning">This is a low-memory device. OpenLife supports devices with at least 2 GB of RAM; large imports may fail or be slow here.</string>
     <string name="vault_unavailable_title">The vault is unavailable</string>
     <string name="vault_unavailable_keystore">The device key store is temporarily unavailable. Unlock the device, then try again.</string>
     <string name="vault_unavailable_corrupt_key">The key file is damaged. OpenLife has not changed or deleted your saved data.</string>
