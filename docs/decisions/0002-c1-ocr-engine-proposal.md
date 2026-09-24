@@ -1,6 +1,8 @@
 # Decision 0002 — Capability 1 OCR engine proposal
 
-Status: **accepted first slice; owner approved 2026-09-15**.
+Status: **accepted first slice; owner approved 2026-09-15**. The engine
+choice is **superseded by ADR-0003** (Tesseract, P2-03). Every other C1
+boundary recorded here stays in force.
 
 This record selects the first C1 engine without changing the no-network,
 no-telemetry, or preserved-byte C0 boundary. It follows
