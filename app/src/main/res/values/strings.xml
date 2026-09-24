@@ -4,7 +4,7 @@
 
     <string name="first_run_title">Before you import anything</string>
     <string name="first_run_body">OpenLife keeps what you import only on this device. There is no cloud backup and no sync — uninstalling the app or losing this device can permanently lose everything you have saved here.</string>
-    <string name="first_run_device_lock">Anyone who can unlock this device can open OpenLife. There is no separate app passcode in this version.</string>
+    <string name="first_run_device_lock">Anyone who can unlock this device can open OpenLife, unless you turn on app lock. OpenLife has no passcode of its own.</string>
     <string name="first_run_continue">I understand</string>
 
     <string name="list_title">OpenLife</string>
@@ -117,6 +117,27 @@
     <string name="ocr_failure_storage">the result could not be saved on this device</string>
 
     <string name="settings_title">Settings</string>
+    <string name="lock_title">OpenLife is locked</string>
+    <string name="lock_body">Use your fingerprint, face or screen lock to see what you have kept.</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_prompt_title">Unlock OpenLife</string>
+    <string name="lock_not_verified">OpenLife could not verify you. Try again, or wait if the device has paused attempts.</string>
+    <string name="lock_cannot_verify_title">OpenLife can\'t verify you</string>
+    <string name="lock_cannot_verify_body">This device has no screen lock or fingerprint that OpenLife can use right now, so your items stay locked. Set a screen lock in the system Settings app, then come back and choose Check again.</string>
+    <string name="lock_check_again">Check again</string>
+    <string name="app_lock_title">App lock</string>
+    <string name="app_lock_explanation">Ask for your fingerprint, face or screen lock before OpenLife shows anything. This is an access gate, not extra encryption: your items are encrypted the same way whether it is on or off.</string>
+    <string name="app_lock_not_enrolled">App lock needs a screen lock. Set one in the system Settings app first, then turn app lock on here.</string>
+    <string name="app_lock_unavailable">This device cannot verify you right now, so app lock cannot be turned on. Try again later.</string>
+    <string name="app_lock_timeout_title">Lock after leaving OpenLife</string>
+    <string name="app_lock_timeout_immediately">Immediately</string>
+    <string name="app_lock_timeout_30s">After 30 seconds</string>
+    <string name="app_lock_timeout_5m">After 5 minutes</string>
+    <string name="app_lock_timeout_15m">After 15 minutes</string>
+    <string name="app_lock_offer_title">Lock OpenLife too?</string>
+    <string name="app_lock_offer_body">Anyone who can unlock this phone can open OpenLife. App lock asks for your fingerprint, face or screen lock again before OpenLife shows anything. It is an access gate, not extra encryption. You can change this later in Settings.</string>
+    <string name="app_lock_offer_enable">Turn on app lock</string>
+    <string name="app_lock_offer_skip">Not now</string>
     <string name="about_title">About</string>
     <string name="vault_unavailable_title">The vault is unavailable</string>
     <string name="vault_unavailable_keystore">The device key store is temporarily unavailable. Unlock the device, then try again.</string>

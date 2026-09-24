@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -15,12 +14,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.R
+import org.openlife.app.lock.AppLockGate
+import org.openlife.app.lock.LockStatus
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.IntakeRejectionMessage
@@ -46,7 +48,7 @@ import org.openlife.vault.model.IntakeKind
  * a one-shot [EXTRA_PICKER_NONCE], so both routes share one validated
  * pipeline and one preview/save UI rather than two parallel implementations.
  */
-class IntakeActivity : ComponentActivity() {
+class IntakeActivity : FragmentActivity() {
 
     /** Null until read off the main thread; the splash screen stays up until then. */
     private val firstRunAcknowledged = MutableStateFlow<Boolean?>(null)
@@ -72,7 +74,10 @@ class IntakeActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen().setKeepOnScreenCondition { firstRunAcknowledged.value == null }
+        val app = application as OpenLifeApp
+        installSplashScreen().setKeepOnScreenCondition {
+            firstRunAcknowledged.value == null || app.appLock.status.value == LockStatus.UNKNOWN
+        }
         lifecycleScope.launch {
             firstRunAcknowledged.value = FirstRunPreferences.loadAcknowledged(applicationContext)
         }
@@ -96,6 +101,7 @@ class IntakeActivity : ComponentActivity() {
 
         setContent {
             val acknowledged = firstRunAcknowledged.collectAsState().value
+            val lockStatus by app.appLock.status.collectAsState()
             OpenLifeTheme {
                 if (acknowledged == null) {
                     Unit
@@ -107,36 +113,40 @@ class IntakeActivity : ComponentActivity() {
                         },
                     )
                 } else {
-                    if (validation != null) {
-                        LaunchedEffect(validation) {
-                            when (validation) {
-                                is IntakeValidationResult.Rejected ->
-                                    viewModel.showRejected(describeIntentRejection(validation.reason))
+                    // P1-07-R5: while locked nothing below is composed, so the
+                    // share's stream is opened only after the user unlocks.
+                    AppLockGate(lockStatus, app.appLock.state, app.appLock.authenticator, this) {
+                        if (validation != null) {
+                            LaunchedEffect(validation) {
+                                when (validation) {
+                                    is IntakeValidationResult.Rejected ->
+                                        viewModel.showRejected(describeIntentRejection(validation.reason))
 
-                                is IntakeValidationResult.Valid -> viewModel.startImportFromUri(
-                                    uriString = validation.uriString,
-                                    intentMimeType = intent.type,
-                                    intakeKind = intakeKindOf(intent),
-                                )
+                                    is IntakeValidationResult.Valid -> viewModel.startImportFromUri(
+                                        uriString = validation.uriString,
+                                        intentMimeType = intent.type,
+                                        intakeKind = intakeKindOf(intent),
+                                    )
+                                }
                             }
                         }
+                        val state by viewModel.state.collectAsState()
+                        IntakeScreen(
+                            state = state,
+                            onSave = viewModel::confirmSave,
+                            onCancel = viewModel::cancel,
+                            onDone = { finish() },
+                            onOpenExisting = { existingSourceId ->
+                                startActivity(
+                                    Intent(this, MainActivity::class.java).apply {
+                                        addFlags(openExistingIntentFlags())
+                                        putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
+                                    },
+                                )
+                                finish()
+                            },
+                        )
                     }
-                    val state by viewModel.state.collectAsState()
-                    IntakeScreen(
-                        state = state,
-                        onSave = viewModel::confirmSave,
-                        onCancel = viewModel::cancel,
-                        onDone = { finish() },
-                        onOpenExisting = { existingSourceId ->
-                            startActivity(
-                                Intent(this, MainActivity::class.java).apply {
-                                    addFlags(openExistingIntentFlags())
-                                    putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
-                                },
-                            )
-                            finish()
-                        },
-                    )
                 }
             }
         }

@@ -58,7 +58,7 @@ class AppLockFlowTest {
     @After
     fun tearDown() {
         // The lock is process-wide: never leave it on for the next test class.
-        app.resetAppLockForTest()
+        app.appLock.resetForTest()
         TestHostileContentProvider.reset()
         runBlocking {
             val access = app.vault() as? VaultAccess.Ready ?: return@runBlocking
@@ -70,8 +70,8 @@ class AppLockFlowTest {
     fun lockedMainActivityComposesNoContentAndNoBytesAreLoaded() {
         val id = saveSyntheticSource()
         val authenticator = ScriptedAuthenticator()
-        app.setAppLockForTest(authenticator, AppLockPolicy(enabled = true))
-        val readsBefore = app.contentReads.get()
+        app.appLock.setForTest(authenticator, AppLockPolicy(enabled = true))
+        val readsBefore = app.appLock.contentReads.get()
         val intent = Intent(context, MainActivity::class.java)
             .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
 
@@ -80,12 +80,12 @@ class AppLockFlowTest {
             authenticator.awaitRequest()
             device.waitForIdle()
             assertFalse("list composed while locked", device.hasObject(By.desc("More options")))
-            assertEquals("bytes read while locked", readsBefore, app.contentReads.get())
+            assertEquals("bytes read while locked", readsBefore, app.appLock.contentReads.get())
 
             authenticator.complete(AuthOutcome.Succeeded)
 
             // The requested item opens after unlock, and only now are its bytes read.
-            awaitTrue("no content read after unlock") { app.contentReads.get() > readsBefore }
+            awaitTrue("no content read after unlock") { app.appLock.contentReads.get() > readsBefore }
             assertTrue(device.wait(Until.gone(By.text(LOCKED_TITLE)), WAIT_MS))
         }
     }
@@ -93,7 +93,7 @@ class AppLockFlowTest {
     @Test
     fun shareIntentWhileLockedOpensStreamOnlyAfterUnlock() {
         val authenticator = ScriptedAuthenticator()
-        app.setAppLockForTest(authenticator, AppLockPolicy(enabled = true))
+        app.appLock.setForTest(authenticator, AppLockPolicy(enabled = true))
         TestHostileContentProvider.bytesToServe = syntheticJpegBytes(seed = 7_001)
         val intent = Intent(Intent.ACTION_SEND).apply {
             component = ComponentName(context.packageName, IntakeActivity::class.java.name)
@@ -121,7 +121,7 @@ class AppLockFlowTest {
 
     @Test
     fun enablingWithoutEnrolledCredentialIsRefusedWithExplanation() {
-        app.setAppLockForTest(
+        app.appLock.setForTest(
             ScriptedAuthenticator(available = LockAvailability.NOT_ENROLLED),
             AppLockPolicy(enabled = false),
         )
@@ -142,7 +142,7 @@ class AppLockFlowTest {
     @Test
     fun credentialRemovedWhileLockEnabledStaysLockedWithInstructions() {
         val authenticator = ScriptedAuthenticator(available = LockAvailability.NOT_ENROLLED)
-        app.setAppLockForTest(authenticator, AppLockPolicy(enabled = true))
+        app.appLock.setForTest(authenticator, AppLockPolicy(enabled = true))
 
         ActivityScenario.launch(MainActivity::class.java).use {
             assertTrue(

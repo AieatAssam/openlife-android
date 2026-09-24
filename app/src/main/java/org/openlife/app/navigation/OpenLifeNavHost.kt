@@ -38,6 +38,7 @@ fun OpenLifeNavHost(
     onFinishReset: () -> Unit,
     onResetVault: suspend () -> VaultResetResult,
     onVerifyAll: suspend () -> VerifyReport?,
+    appLock: org.openlife.app.settings.AppLockSettings,
     onResetComplete: () -> Unit,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -105,6 +106,7 @@ fun OpenLifeNavHost(
                 onResetComplete,
                 onBack = { navController.popBackStack() },
                 onVerifyAll = onVerifyAll,
+                appLock = appLock,
             )
         }
         composable<Routes.About> { AboutScreen(onBack = { navController.popBackStack() }) }
