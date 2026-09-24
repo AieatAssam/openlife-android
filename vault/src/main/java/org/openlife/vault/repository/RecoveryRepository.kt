@@ -154,16 +154,7 @@ class RecoveryRepository(
         val SKIP = Any()
     }
 
-    private fun removeArtefactFiles(sourceId: UUID): Boolean {
-        val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
-        val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
-        return stageRemoved && blobRemoved
-    }
-
-    private fun deleteIfExists(file: java.io.File): Boolean {
-        if (!file.exists()) return true
-        return file.delete() && !file.exists()
-    }
+    private fun removeArtefactFiles(sourceId: UUID): Boolean = ArtefactFileOps.Default.deleteArtefacts(paths, sourceId)
 
     /**
      * Deletes only `.stage`/`.blob` files whose UUID has no corresponding

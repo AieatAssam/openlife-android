@@ -1,7 +1,9 @@
 package org.openlife.vault.repository
 
 import org.openlife.vault.storage.Fsync
+import org.openlife.vault.storage.VaultPaths
 import java.io.File
+import java.util.UUID
 
 /**
  * Filesystem operations at the stage/blob durability boundary.
@@ -36,4 +38,16 @@ interface ArtefactFileOps {
             return file.delete() && !file.exists()
         }
     }
+}
+
+/**
+ * Removes both possible artefacts of a Source (its stage and its blob); true
+ * only when neither remains, and both are always attempted. An extension, not
+ * an interface member, so a delegating fault-injection wrapper's own
+ * [ArtefactFileOps.deleteIfExists] is the one called.
+ */
+fun ArtefactFileOps.deleteArtefacts(paths: VaultPaths, sourceId: UUID): Boolean {
+    val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
+    val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
+    return stageRemoved && blobRemoved
 }
