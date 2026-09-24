@@ -171,6 +171,9 @@ class OpenLifeApp : Application() {
      * or Cancel, so the next share is not refused as busy (P1-15). The stage
      * itself is left for recovery; P1-01 removes it sooner.
      */
+    /** P1-01 stub: waits for application-scoped cleanup started so far. */
+    internal suspend fun awaitBackgroundWorkForTest() = Unit
+
     fun releaseImportSlot(sourceId: java.util.UUID) {
         (cachedAccess as? VaultAccess.Ready)?.importRepository?.importSlot?.release(sourceId)
     }

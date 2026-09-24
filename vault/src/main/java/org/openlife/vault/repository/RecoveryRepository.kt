@@ -113,6 +113,10 @@ class RecoveryRepository(
         }
     }
 
+    /** P1-01 stub: removes abandoned STAGED imports; null when a mutation is in progress. */
+    @Suppress("UnusedParameter", "FunctionOnlyReturningConstant")
+    suspend fun cleanAbandonedStages(activeSourceId: UUID?): Int? = 0
+
     private fun removeArtefactFiles(sourceId: UUID): Boolean {
         val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
         val blobRemoved = deleteIfExists(paths.blobFile(sourceId))

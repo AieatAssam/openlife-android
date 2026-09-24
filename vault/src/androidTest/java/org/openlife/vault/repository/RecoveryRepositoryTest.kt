@@ -1,5 +1,6 @@
 package org.openlife.vault.repository
 
+import kotlinx.coroutines.async
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -45,6 +46,7 @@ class RecoveryRepositoryTest {
     private lateinit var wrapper: KeystoreWrapper
     private lateinit var db: OpenLifeDatabase
     private lateinit var importRepository: ImportRepository
+    private lateinit var queueForTest: MutationQueue
     private lateinit var recoveryRepository: RecoveryRepository
 
     private fun syntheticJpegBytes(): ByteArray {
@@ -64,6 +66,7 @@ class RecoveryRepositoryTest {
         val ready = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Ready
         db = OpenLifeDatabaseFactory.create(context, paths, ready.databaseSecret)
         val mutationQueue = MutationQueue()
+        queueForTest = mutationQueue
         importRepository = ImportRepository(
             paths = paths,
             database = db,
@@ -349,5 +352,60 @@ class RecoveryRepositoryTest {
         assertEquals(1, report.resumedDeletions)
         assertEquals(null, db.sourceDao().findById(id.toString()))
         assertTrue("no artefact survives the resumed deletion", !blob.exists())
+    }
+
+    /** P1-01-R2: abandoned stages go, the active one and every other state stay. */
+    @Test
+    fun cleanAbandonedStagesRemovesOtherStagedRowsButKeepsTheActiveOne(): Unit = runBlocking {
+        val ready = prepareAndSave()
+        val active = prepareOnly()
+        val abandoned = prepareOnly()
+        assertTrue(paths.stageFile(abandoned).exists())
+
+        val cleaned = recoveryRepository.cleanAbandonedStages(activeSourceId = active)
+
+        assertEquals(1, cleaned)
+        assertEquals(null, db.sourceDao().findById(abandoned.toString()))
+        assertTrue("abandoned stage file removed", !paths.stageFile(abandoned).exists())
+        assertEquals(SourceState.STAGED, db.sourceDao().findById(active.toString())!!.toDomain().state)
+        assertTrue("active stage file kept", paths.stageFile(active).exists())
+        assertEquals(SourceState.READY, db.sourceDao().findById(ready.toString())!!.toDomain().state)
+        assertTrue(paths.blobFile(ready).exists())
+    }
+
+    @Test
+    fun cleanAbandonedStagesLeavesRowWhenFileCannotBeRemoved(): Unit = runBlocking {
+        val id = prepareOnly()
+        val stage = paths.stageFile(id)
+        assertTrue(stage.delete())
+        assertTrue(stage.mkdir())
+        java.io.File(stage, "occupied").writeText("x")
+
+        val cleaned = recoveryRepository.cleanAbandonedStages(activeSourceId = null)
+
+        assertEquals(0, cleaned)
+        assertEquals(SourceState.STAGED, db.sourceDao().findById(id.toString())!!.toDomain().state)
+        assertTrue(java.io.File(stage, "occupied").delete())
+        assertTrue(stage.delete())
+    }
+
+    /** P1-01-R3: a pass that finds a mutation in progress skips (null) rather than waiting. */
+    @Test
+    fun cleanAbandonedStagesSkipsWhileAMutationIsInProgress(): Unit = runBlocking {
+        val id = prepareOnly()
+        val holding = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val queue = queueForTest
+        val mutation = async(kotlinx.coroutines.Dispatchers.Default) {
+            queue.withMutation { holding.complete(Unit); release.await() }
+        }
+        holding.await()
+        try {
+            assertEquals(null, recoveryRepository.cleanAbandonedStages(activeSourceId = null))
+            assertEquals(SourceState.STAGED, db.sourceDao().findById(id.toString())!!.toDomain().state)
+        } finally {
+            release.complete(Unit)
+            mutation.await()
+        }
     }
 }
