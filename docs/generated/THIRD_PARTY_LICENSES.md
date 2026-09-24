@@ -626,6 +626,10 @@
 **157** **Group:** `com.google.mlkit` **Name:** `vision-interfaces` **Version:** `16.3.0` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
+## Unknown
+
+**158** **Group:** `cz.adaptech.tesseract4android` **Name:** `tesseract4android-openmp` **Version:** `4.9.0` 
+
 
 
 

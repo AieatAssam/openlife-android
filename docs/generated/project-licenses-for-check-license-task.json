@@ -1847,6 +1847,16 @@
             ]
         },
         {
+            "moduleName": "cz.adaptech.tesseract4android:tesseract4android-openmp",
+            "moduleVersion": "4.9.0",
+            "moduleUrls": [
+                
+            ],
+            "moduleLicenses": [
+                
+            ]
+        },
+        {
             "moduleName": "javax.inject:javax.inject",
             "moduleVersion": "1",
             "moduleUrls": [

@@ -1,1 +1,2 @@
 net.zetetic:sqlcipher-android:4.19.0|https://github.com/sqlcipher/sqlcipher-android|BSD-3-Clause|https://github.com/sqlcipher/sqlcipher-android/blob/master/LICENSE
+cz.adaptech.tesseract4android:tesseract4android-openmp:4.9.0|https://github.com/adaptech-cz/Tesseract4Android|Apache-2.0|https://github.com/adaptech-cz/Tesseract4Android/blob/4.9.0/LICENSE
