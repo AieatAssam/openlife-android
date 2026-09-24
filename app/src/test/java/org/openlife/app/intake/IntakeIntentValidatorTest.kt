@@ -1,8 +1,6 @@
 package org.openlife.app.intake
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -13,6 +11,8 @@ import org.junit.Test
 class IntakeIntentValidatorTest {
 
     private val ownPackage = "org.openlife"
+
+    private fun check(intent: String?, provider: String?) = IntakeIntentValidator.checkProviderType(intent, provider)
 
     private fun shape(
         action: String? = "android.intent.action.SEND",
@@ -62,13 +62,20 @@ class IntakeIntentValidatorTest {
                 shape(extraStreamUri = "content://com.example.provider/image1", intentMimeType = type),
                 ownPackage,
             )
-            assertEquals("intent type $type", IntakeValidationResult.Valid("content://com.example.provider/image1"), result)
+            assertEquals(
+                "intent type $type",
+                IntakeValidationResult.Valid("content://com.example.provider/image1"),
+                result,
+            )
         }
         val text = IntakeIntentValidator.validate(
             shape(extraStreamUri = "content://com.example.provider/image1", intentMimeType = "text/plain"),
             ownPackage,
         )
-        assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE), text)
+        assertEquals(
+            IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE),
+            text,
+        )
     }
 
     @Test
@@ -102,14 +109,14 @@ class IntakeIntentValidatorTest {
 
     @Test
     fun providerTypeDecidesUnderAWildcardAndMustAgreeWithASpecificType() {
-        assertEquals(ProviderTypeCheck.Match("image/jpeg"), IntakeIntentValidator.checkProviderType("image/*", "image/jpeg"))
-        assertEquals(ProviderTypeCheck.Match("image/png"), IntakeIntentValidator.checkProviderType("IMAGE/PNG", "image/png"))
-        assertEquals(ProviderTypeCheck.Match("image/jpeg"), IntakeIntentValidator.checkProviderType("image/jpg", "image/jpg"))
-        assertEquals(ProviderTypeCheck.Match("image/jpeg"), IntakeIntentValidator.checkProviderType("image/jpeg", "image/jpg"))
-        assertEquals(ProviderTypeCheck.UnsupportedFormat, IntakeIntentValidator.checkProviderType("image/*", "image/webp"))
-        assertEquals(ProviderTypeCheck.UnsupportedFormat, IntakeIntentValidator.checkProviderType("image/*", "image/heic"))
-        assertEquals(ProviderTypeCheck.UnsupportedFormat, IntakeIntentValidator.checkProviderType("image/*", null))
-        assertEquals(ProviderTypeCheck.Mismatch, IntakeIntentValidator.checkProviderType("image/jpeg", "image/png"))
+        assertEquals(ProviderTypeCheck.Match("image/jpeg"), check("image/*", "image/jpeg"))
+        assertEquals(ProviderTypeCheck.Match("image/png"), check("IMAGE/PNG", "image/png"))
+        assertEquals(ProviderTypeCheck.Match("image/jpeg"), check("image/jpg", "image/jpg"))
+        assertEquals(ProviderTypeCheck.Match("image/jpeg"), check("image/jpeg", "image/jpg"))
+        assertEquals(ProviderTypeCheck.UnsupportedFormat, check("image/*", "image/webp"))
+        assertEquals(ProviderTypeCheck.UnsupportedFormat, check("image/*", "image/heic"))
+        assertEquals(ProviderTypeCheck.UnsupportedFormat, check("image/*", null))
+        assertEquals(ProviderTypeCheck.Mismatch, check("image/jpeg", "image/png"))
     }
 
     @Test

@@ -183,6 +183,15 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            // Design §3 R3 / F-47: the picker may serve items from a cloud
+            // media provider; say so, and that OpenLife itself never uploads.
+            if (state.intakeKind == org.openlife.vault.model.IntakeKind.PHOTO_PICKER) {
+                Text(
+                    stringResource(R.string.intake_cloud_provider_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
             OutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) {

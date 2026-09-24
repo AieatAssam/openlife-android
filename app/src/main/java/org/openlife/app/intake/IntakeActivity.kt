@@ -43,8 +43,8 @@ import org.openlife.vault.model.IntakeKind
  *
  * Also the entry point for Photo Picker imports: [MainActivity] forwards a
  * picked `content://` URI here as a same-app `ACTION_SEND` intent carrying
- * [EXTRA_INTAKE_KIND], so both routes share one validated pipeline and one
- * preview/save UI rather than two parallel implementations.
+ * a one-shot [EXTRA_PICKER_NONCE], so both routes share one validated
+ * pipeline and one preview/save UI rather than two parallel implementations.
  */
 class IntakeActivity : ComponentActivity() {
 
@@ -142,8 +142,9 @@ class IntakeActivity : ComponentActivity() {
         }
     }
 
+    /** PHOTO_PICKER only with this process's one-shot picker nonce; anything else is a share (F-34). */
     private fun intakeKindOf(intent: Intent): IntakeKind =
-        if (intent.getStringExtra(EXTRA_INTAKE_KIND) == IntakeKind.PHOTO_PICKER.name) {
+        if ((application as OpenLifeApp).pickerNonce.consume(intent.getStringExtra(EXTRA_PICKER_NONCE))) {
             IntakeKind.PHOTO_PICKER
         } else {
             IntakeKind.SHARE
@@ -178,7 +179,8 @@ class IntakeActivity : ComponentActivity() {
         }
 
     companion object {
-        const val EXTRA_INTAKE_KIND = "org.openlife.app.intake.EXTRA_INTAKE_KIND"
+        /** Carries [OpenLifeApp.pickerNonce]; a caller-supplied route claim is never trusted. */
+        const val EXTRA_PICKER_NONCE = "org.openlife.app.intake.EXTRA_PICKER_NONCE"
     }
 }
 

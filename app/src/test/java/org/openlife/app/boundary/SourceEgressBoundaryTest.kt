@@ -69,7 +69,9 @@ class SourceEgressBoundaryTest {
         val violations = sourceFiles().flatMap { file ->
             Files.readAllLines(file).mapIndexedNotNull { index, line ->
                 val code = line.substringBefore("//")
-                if (code.contains("takePersistableUriPermission") || code.contains("FLAG_GRANT_PERSISTABLE_URI_PERMISSION")) {
+                val persistable = code.contains("takePersistableUriPermission") ||
+                    code.contains("FLAG_GRANT_PERSISTABLE_URI_PERMISSION")
+                if (persistable) {
                     "$file:${index + 1}: persistable URI grant"
                 } else {
                     null

@@ -105,7 +105,9 @@ class PhotoPickerRouteTest {
                     setClassName(context.packageName, IntakeActivity::class.java.name)
                     type = "image/jpeg"
                     putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("spoof.jpg"))
-                    putExtra(IntakeActivity.EXTRA_INTAKE_KIND, IntakeKind.PHOTO_PICKER.name)
+                    // The route extra an attacker would try, and a guessed nonce.
+                    putExtra("org.openlife.app.intake.EXTRA_INTAKE_KIND", IntakeKind.PHOTO_PICKER.name)
+                    putExtra(IntakeActivity.EXTRA_PICKER_NONCE, "0".repeat(32))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 },
             )

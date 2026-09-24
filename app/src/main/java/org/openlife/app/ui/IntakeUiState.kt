@@ -25,6 +25,7 @@ enum class IntakeRejectionMessage(
     UNSUPPORTED_OR_MISSING_TYPE(R.string.rejection_unsupported_or_missing_type),
     ACCESS_RETRY(R.string.rejection_access_retry),
     TYPE_MISMATCH(R.string.rejection_type_mismatch),
+    UNSUPPORTED_PICKED_FORMAT(R.string.rejection_unsupported_picked_format),
     STORAGE_UNAVAILABLE(R.string.intake_storage_unavailable),
 }
 
@@ -40,7 +41,7 @@ sealed interface IntakeUiState {
         /** Authenticated stage bytes for the preview image; null if sampling isn't available. */
         val previewBytes: ByteArray?,
         val orientation: Orientation = Orientation.NORMAL,
-        /** P1-02 stub: how the item arrived; drives the cloud-provider note. */
+        /** How the item arrived; a picked item gets the cloud-provider note (P1-02-R8). */
         val intakeKind: org.openlife.vault.model.IntakeKind = org.openlife.vault.model.IntakeKind.SHARE,
     ) : IntakeUiState
 

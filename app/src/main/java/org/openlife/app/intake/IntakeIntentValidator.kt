@@ -83,26 +83,34 @@ object IntakeIntentValidator {
     }
 
     /**
-     * The sender-declared type and the provider's reported type must agree
-     * exactly on one supported image format before any bytes are opened. The
-     * repository still checks the provider type against the actual magic
-     * bytes; this check closes the gap where the incoming Intent type was
-     * previously ignored.
+     * Relates the provider's reported type to the incoming intent's type
+     * (P1-02-R7). The provider type is decisive and must be JPEG or PNG
+     * (image/jpg is normalised). A wildcard intent type defers to it; a
+     * specific supported intent type must agree with it. The repository
+     * still checks the actual bytes against this type.
      */
-    /** P1-02 stub: today's exact-match rule expressed as a typed check. */
-    fun checkProviderType(intentMimeType: String?, providerMimeType: String?): ProviderTypeCheck =
-        if (mimeTypesMatch(intentMimeType, providerMimeType)) {
-            ProviderTypeCheck.Match(providerMimeType!!.lowercase())
+    fun checkProviderType(intentMimeType: String?, providerMimeType: String?): ProviderTypeCheck {
+        val provider = normalise(providerMimeType)
+        if (provider !in SUPPORTED_TYPES) return ProviderTypeCheck.UnsupportedFormat
+        val intent = normalise(intentMimeType)
+        return if (intent == WILDCARD_IMAGE || intent == provider) {
+            ProviderTypeCheck.Match(provider!!)
         } else {
             ProviderTypeCheck.Mismatch
         }
+    }
 
-    fun mimeTypesMatch(intentMimeType: String?, providerMimeType: String?): Boolean =
-        isSupportedMimeType(intentMimeType) &&
-            intentMimeType.equals(providerMimeType, ignoreCase = true)
+    private fun isSupportedMimeType(mimeType: String?): Boolean {
+        val type = normalise(mimeType)
+        return type == WILDCARD_IMAGE || type in SUPPORTED_TYPES
+    }
 
-    private fun isSupportedMimeType(mimeType: String?): Boolean = mimeType.equals("image/jpeg", ignoreCase = true) ||
-        mimeType.equals("image/png", ignoreCase = true)
+    private fun normalise(mimeType: String?): String? =
+        mimeType?.lowercase()?.let { type -> if (type == "image/jpg") JPEG else type }
+
+    private const val JPEG = "image/jpeg"
+    private const val WILDCARD_IMAGE = "image/*"
+    private val SUPPORTED_TYPES = setOf(JPEG, "image/png")
 }
 
 /** How the provider's reported type relates to the incoming intent's type (P1-02-R7). */
