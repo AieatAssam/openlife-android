@@ -58,9 +58,7 @@ class DeletionRepository(
                     sourceDao.update(source.copy(state = SourceState.DELETING).toEntity())
                 }
 
-                val stageRemoved = fileOps.deleteIfExists(paths.stageFile(sourceId))
-                val blobRemoved = fileOps.deleteIfExists(paths.blobFile(sourceId))
-                if (!stageRemoved || !blobRemoved) {
+                if (!fileOps.deleteArtefacts(paths, sourceId)) {
                     return@withMutation DeleteResult.Failed
                 }
 

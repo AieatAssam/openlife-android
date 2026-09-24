@@ -113,16 +113,48 @@ class RecoveryRepository(
         }
     }
 
-    private fun removeArtefactFiles(sourceId: UUID): Boolean {
-        val stageRemoved = deleteIfExists(paths.stageFile(sourceId))
-        val blobRemoved = deleteIfExists(paths.blobFile(sourceId))
-        return stageRemoved && blobRemoved
+    /**
+     * Light recovery for a running process (P1-01-R2): removes every STAGED
+     * import except [activeSourceId], with its stage and blob files. READY,
+     * DELETING and CORRUPT rows and unreferenced files are left to [recover].
+     * A row whose files cannot be removed stays for a later pass. Returns the
+     * number removed, or null without waiting when a mutation is in progress
+     * (P1-01-R3: try again on the next foreground).
+     */
+    suspend fun cleanAbandonedStages(activeSourceId: UUID?): Int? = cleanAbandonedStages { activeSourceId }
+
+    /**
+     * As above, reading the active import inside the mutation so a prepare
+     * that completes just before cannot have its fresh stage mistaken for an
+     * abandoned one. Skips (null) while an import is still preparing.
+     */
+    suspend fun cleanAbandonedStages(importSlot: ImportSlot): Int? = cleanAbandonedStages {
+        if (importSlot.isPreparing) SKIP else importSlot.activeSourceId
     }
 
-    private fun deleteIfExists(file: java.io.File): Boolean {
-        if (!file.exists()) return true
-        return file.delete() && !file.exists()
+    private suspend fun cleanAbandonedStages(active: () -> Any?): Int? = withContext(ioDispatcher) {
+        mutationQueue.tryMutation {
+            val activeNow = active()
+            if (activeNow === SKIP) return@tryMutation null
+            var cleaned = 0
+            database.sourceDao().findAll()
+                .filter { it.state == SourceState.STAGED.name && it.id != activeNow?.toString() }
+                .forEach { row ->
+                    val id = UUID.fromString(row.id)
+                    if (removeArtefactFiles(id)) {
+                        database.sourceDao().deleteById(row.id)
+                        cleaned++
+                    }
+                }
+            cleaned
+        }
     }
+
+    private companion object {
+        val SKIP = Any()
+    }
+
+    private fun removeArtefactFiles(sourceId: UUID): Boolean = ArtefactFileOps.Default.deleteArtefacts(paths, sourceId)
 
     /**
      * Deletes only `.stage`/`.blob` files whose UUID has no corresponding

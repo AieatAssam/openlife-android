@@ -47,7 +47,7 @@ class OpenLifeApp : Application() {
     private val mutationQueue = MutationQueue()
     private val vaultInitLock = Mutex()
 
-    // Read outside vaultInitLock by releaseImportSlot, so publish it safely.
+    // Read outside vaultInitLock by importHousekeeping's slot lookup, so publish it safely.
     @Volatile
     private var cachedAccess: VaultAccess? = null
 
@@ -111,7 +111,8 @@ class OpenLifeApp : Application() {
                     try {
                         val database = OpenLifeDatabaseFactory.create(this@OpenLifeApp, paths, result.databaseSecret)
                         cachedDatabase = database
-                        val report = RecoveryRepository(paths, database, keystoreWrapper, mutationQueue).recover()
+                        val recoveryRepository = RecoveryRepository(paths, database, keystoreWrapper, mutationQueue)
+                        val report = recoveryRepository.recover()
                         if (BuildConfig.DEBUG) {
                             android.util.Log.i("OpenLifeRecovery", report.toString())
                         }
@@ -133,6 +134,7 @@ class OpenLifeApp : Application() {
                                 mutationQueue = mutationQueue,
                             ),
                             lastRecovery = report,
+                            recoveryRepository = recoveryRepository,
                         )
                     } catch (exception: IOException) {
                         cachedDatabase?.let(OpenLifeDatabaseFactory::close)
@@ -166,14 +168,11 @@ class OpenLifeApp : Application() {
         }
     }
 
-    /**
-     * Frees the one-import slot when an intake screen goes away without Save
-     * or Cancel, so the next share is not refused as busy (P1-15). The stage
-     * itself is left for recovery; P1-01 removes it sooner.
-     */
-    fun releaseImportSlot(sourceId: java.util.UUID) {
-        (cachedAccess as? VaultAccess.Ready)?.importRepository?.importSlot?.release(sourceId)
-    }
+    /** Import cleanup that must outlive a screen (P1-15, P1-01); owns the application scope. */
+    val importHousekeeping = ImportHousekeeping(
+        vault = { vault() },
+        currentSlot = { (cachedAccess as? VaultAccess.Ready)?.importRepository?.importSlot },
+    )
 
     suspend fun retryVault() = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {

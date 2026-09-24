@@ -124,6 +124,11 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
         }
     }
 
+    /** P1-01-R3: on foreground, remove stages no screen owns; a busy vault is retried next time. */
+    fun cleanAbandonedStages() {
+        viewModelScope.launch { application.importHousekeeping.cleanAbandonedStages() }
+    }
+
     /** Drop decoded thumbnails when the app leaves the foreground. */
     fun clearSensitiveContent() {
         thumbnailCache.clear()

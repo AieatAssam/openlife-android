@@ -432,6 +432,147 @@ class IntakeAndListFlowTest {
         (application.vault() as VaultAccess.Ready).importRepository.cancelStagedImport(abandoned.sourceId)
     }
 
+    /** P1-01-R1: a preview the user walks away from is cancelled when its ViewModel is cleared. */
+    @Test
+    fun clearingTheIntakeViewModelWithAnUnsavedPreviewCancelsTheStage(): Unit = runBlocking {
+        val store = androidx.lifecycle.ViewModelStore()
+        val intake = retainedIntakeViewModel(store)
+        val preview = importUntilPreview(intake, syntheticJpegBytes(variant = 17))
+        assertTrue(stageFileFor(preview.sourceId).exists())
+
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { store.clear() }
+        application.importHousekeeping.awaitIdleForTest()
+
+        val access = application.vault() as VaultAccess.Ready
+        awaitCondition(describe = { "stage row still present" }) {
+            runBlocking { access.viewRepository.findSource(preview.sourceId) } == null
+        }
+        assertTrue("stage file must be removed", !stageFileFor(preview.sourceId).exists())
+    }
+
+    /**
+     * P1-01 (from the P2-02 note): clearing the screen while the provider read
+     * is still blocked must not orphan the stage or the import slot once the
+     * read returns.
+     */
+    @Test
+    fun clearingDuringABlockedProviderReadLeavesNoStageOnceTheReadReturns(): Unit = runBlocking {
+        val store = androidx.lifecycle.ViewModelStore()
+        val intake = retainedIntakeViewModel(store)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val stream = HeldStream(syntheticJpegBytes(variant = 18), release)
+        val stagesBefore = stageFiles()
+        intake.startImport(stream, "image/jpeg", IntakeKind.SHARE)
+        awaitCondition { stream.reads > 0 }
+
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { store.clear() }
+        release.countDown()
+        // The abandoned import finishes on its own once the read returns; the
+        // slot must then be free, not orphaned.
+        val slot = (application.vault() as VaultAccess.Ready).importRepository.importSlot
+        awaitCondition(describe = { "import slot still occupied after the read returned" }) { !slot.isOccupied }
+        application.importHousekeeping.awaitIdleForTest()
+
+        awaitCondition(describe = { "orphaned stages: ${stageFiles() - stagesBefore}" }) {
+            (stageFiles() - stagesBefore).isEmpty()
+        }
+        val next = IntakeViewModel(application, SavedStateHandle())
+        next.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = 19)), "image/jpeg", IntakeKind.SHARE)
+        val settled = awaitState(next) { it is IntakeUiState.Preview || it is IntakeUiState.Busy }
+        assertTrue("the import slot must be free again; was $settled", settled is IntakeUiState.Preview)
+        next.cancel()
+        awaitState(next) { it is IntakeUiState.Cancelled }
+    }
+
+    /** P1-01-R5: rotation keeps the ViewModel, so the stage survives. */
+    @Test
+    fun recreatingTheIntakeActivityKeepsTheStage() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        FirstRunPreferences.setAcknowledged(context)
+        TestHostileContentProvider.reset()
+        TestHostileContentProvider.bytesToServe = syntheticJpegBytes(variant = 20)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            component = ComponentName(context.packageName, IntakeActivity::class.java.name)
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("keep.jpg"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
+                awaitStatusPrefix(scenario, "Prepared")
+                val stagesBefore = stageFiles()
+                assertTrue(stagesBefore.isNotEmpty())
+
+                scenario.recreate()
+                runBlocking { application.importHousekeeping.awaitIdleForTest() }
+
+                awaitStatusPrefix(scenario, "Prepared")
+                assertEquals("rotation must keep the stage", stagesBefore, stageFiles())
+                scenario.onActivity { it.cancelForTest() }
+                awaitCancelledOrFinished(scenario)
+            }
+        } finally {
+            TestHostileContentProvider.reset()
+        }
+    }
+
+    /** P1-01-R2/R3: foregrounding MainActivity removes stages nobody owns, without a process restart. */
+    @Test
+    fun foregroundingMainActivityCleansAbandonedStages(): Unit = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        FirstRunPreferences.setAcknowledged(context)
+        val access = application.vault() as VaultAccess.Ready
+        val abandoned = access.importRepository.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes(variant = 21)),
+            "image/jpeg",
+            IntakeKind.SHARE,
+        ) as org.openlife.vault.repository.PrepareResult.Prepared
+        // As if its screen vanished without Save or Cancel (for example a crash).
+        access.importRepository.importSlot.release(abandoned.sourceId)
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            awaitCondition(describe = { "abandoned stage still present" }) {
+                runBlocking { access.viewRepository.findSource(abandoned.sourceId) } == null
+            }
+        }
+        assertTrue(!stageFileFor(abandoned.sourceId).exists())
+    }
+
+    private suspend fun retainedIntakeViewModel(store: androidx.lifecycle.ViewModelStore): IntakeViewModel =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                    IntakeViewModel(application, SavedStateHandle()) as T
+            }
+            androidx.lifecycle.ViewModelProvider(store, factory)[IntakeViewModel::class.java]
+        }
+
+    private fun stageFileFor(id: java.util.UUID) = VaultPaths(application).stageFile(id)
+
+    private fun awaitStatusPrefix(scenario: ActivityScenario<IntakeActivity>, prefix: String) {
+        val deadline = System.currentTimeMillis() + CRYPTO_WAIT_MS
+        while (System.currentTimeMillis() < deadline) {
+            if (statusOf(scenario).startsWith(prefix)) return
+            Thread.sleep(POLL_MS)
+        }
+        throw AssertionError("status never reached $prefix; last=${statusOf(scenario)}")
+    }
+
+    /** Blocks every read until [release] opens. */
+    private class HeldStream(bytes: ByteArray, private val release: java.util.concurrent.CountDownLatch) : InputStream() {
+        private val delegate = ByteArrayInputStream(bytes)
+        @Volatile var reads = 0
+
+        override fun read(): Int = delegate.read()
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            reads++
+            release.await(10, java.util.concurrent.TimeUnit.SECONDS)
+            return delegate.read(buffer, offset, length)
+        }
+    }
+
     /** C0-14: deleting the item being viewed clears the viewer and returns to the list. */
     @Test
     fun deletingWhileViewingClearsViewerAndReturnsToList(): Unit = runBlocking {
