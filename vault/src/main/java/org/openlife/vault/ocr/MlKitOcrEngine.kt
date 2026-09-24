@@ -1,6 +1,5 @@
 package org.openlife.vault.ocr
 
-import android.graphics.Bitmap
 import android.graphics.Rect
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage

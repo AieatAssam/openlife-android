@@ -13,7 +13,14 @@ import kotlin.concurrent.thread
 import kotlin.math.ceil
 
 /** One recognised text line in the oriented bitmap's pixels, as the native bridge reports it. */
-data class RecognizedLine(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int, val score: Float?)
+data class RecognizedLine(
+    val text: String,
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+    val score: Float?,
+)
 
 /** The narrow bridge to native Tesseract, so line mapping can be tested without the native library. */
 interface TessRecognizer {
@@ -39,10 +46,10 @@ object TesseractLineMapper {
         orientation: Orientation,
     ): List<OcrSpanDraft> {
         // The engine saw the upright image, possibly sampled down; scale back to upright source pixels.
-        val scaleX = OrientationTransform.displayWidth(sourceWidth, sourceHeight, orientation).toDouble() / bitmapWidth
-        val scaleY = OrientationTransform.displayHeight(sourceWidth, sourceHeight, orientation).toDouble() / bitmapHeight
         val displayWidth = OrientationTransform.displayWidth(sourceWidth, sourceHeight, orientation)
         val displayHeight = OrientationTransform.displayHeight(sourceWidth, sourceHeight, orientation)
+        val scaleX = displayWidth.toDouble() / bitmapWidth
+        val scaleY = displayHeight.toDouble() / bitmapHeight
         return lines.mapNotNull { line ->
             // Tesseract ends lines with a newline and can report blank lines; spans are never empty.
             val text = line.text.trim()
@@ -97,19 +104,7 @@ class TesseractOcrEngine(
 
     override suspend fun extract(input: OcrEngineInput): OcrEngineOutput {
         val bitmap = OcrBitmapPreparer.prepare(input)
-        val recognizer = try {
-            // Installing (a 4 MB copy and digest) and loading the model are disk work.
-            withContext(Dispatchers.IO) { recognizerFactory(installer.install()) }
-        } catch (cancelled: CancellationException) {
-            bitmap.recycle()
-            throw cancelled
-        } catch (failure: IOException) {
-            bitmap.recycle()
-            throw OcrEngineException("the OCR model is unavailable", failure)
-        } catch (failure: OcrEngineException) {
-            bitmap.recycle()
-            throw failure
-        }
+        val recognizer = openRecognizer(bitmap)
         val task = RecognitionTask(recognizer, bitmap, events)
         try {
             val lines = awaitEngineTask(task)
@@ -130,6 +125,19 @@ class TesseractOcrEngine(
                 bitmap.recycle()
                 events("recycled")
             }
+        }
+    }
+
+    /** Installing (a 4 MB copy and digest) and loading the model are disk work; a failure frees [bitmap]. */
+    private suspend fun openRecognizer(bitmap: Bitmap): TessRecognizer {
+        var opened: TessRecognizer? = null
+        try {
+            opened = withContext(Dispatchers.IO) { recognizerFactory(installer.install()) }
+            return opened
+        } catch (failure: IOException) {
+            throw OcrEngineException("the OCR model is unavailable", failure)
+        } finally {
+            if (opened == null) bitmap.recycle()
         }
     }
 
@@ -167,9 +175,11 @@ class TesseractOcrEngine(
                 listener(
                     when {
                         stopped -> Result.failure(CancellationException("Tesseract recognition stopped"))
+
                         outcome.isFailure -> Result.failure(
                             OcrEngineException("Tesseract recognition failed", outcome.exceptionOrNull()),
                         )
+
                         else -> outcome
                     },
                 )

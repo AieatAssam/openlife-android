@@ -44,40 +44,48 @@ class TessdataInstaller(
     private fun copyVerified(tessdata: File, target: File) {
         if (!tessdata.isDirectory && !tessdata.mkdirs()) throw IOException("could not create the OCR model directory")
         val temp = File(tessdata, "$LANGUAGE.traineddata.tmp")
-        val digest = MessageDigest.getInstance(SHA_256)
         try {
-            openAsset().use { input ->
-                FileOutputStream(temp).use { output ->
-                    val buffer = ByteArray(BUFFER_BYTES)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        digest.update(buffer, 0, read)
-                        output.write(buffer, 0, read)
-                    }
-                    output.fd.sync()
-                }
-            }
-            if (hex(digest.digest()) != expectedSha256) {
+            if (writeWithDigest(temp) != expectedSha256) {
                 throw TessdataIntegrityException("the bundled OCR model does not match its pinned digest")
             }
-            if (!temp.renameTo(target)) throw IOException("could not install the OCR model")
-            Fsync.syncDirectory(tessdata)
+            moveIntoPlace(temp, target)
         } finally {
             temp.delete()
         }
     }
 
-    private fun sha256Of(file: File): String {
+    /** Copies the asset to [temp], syncs it, and returns the SHA-256 of exactly what was written. */
+    private fun writeWithDigest(temp: File): String {
         val digest = MessageDigest.getInstance(SHA_256)
-        FileInputStream(file).use { input ->
-            val buffer = ByteArray(BUFFER_BYTES)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
+        openAsset().use { input ->
+            FileOutputStream(temp).use { output ->
+                copy(input) { buffer, count ->
+                    digest.update(buffer, 0, count)
+                    output.write(buffer, 0, count)
+                }
+                output.fd.sync()
             }
         }
+        return hex(digest.digest())
+    }
+
+    private fun moveIntoPlace(temp: File, target: File) {
+        if (!temp.renameTo(target)) throw IOException("could not install the OCR model")
+        Fsync.syncDirectory(target.parentFile!!)
+    }
+
+    private fun copy(input: InputStream, sink: (ByteArray, Int) -> Unit) {
+        val buffer = ByteArray(BUFFER_BYTES)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return
+            sink(buffer, read)
+        }
+    }
+
+    private fun sha256Of(file: File): String {
+        val digest = MessageDigest.getInstance(SHA_256)
+        FileInputStream(file).use { input -> copy(input) { buffer, count -> digest.update(buffer, 0, count) } }
         return hex(digest.digest())
     }
 

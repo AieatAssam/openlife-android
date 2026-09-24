@@ -14,6 +14,7 @@
     { "moduleLicense": "ISC" },
     { "moduleLicense": "Unicode-DFS-2016" },
     { "moduleLicense": "CC0-1.0" },
-    { "moduleLicense": "", "moduleName": "net.zetetic:sqlcipher-android", "moduleVersion": "4.19.0" }
+    { "moduleLicense": "", "moduleName": "net.zetetic:sqlcipher-android", "moduleVersion": "4.19.0" },
+    { "moduleLicense": "", "moduleName": "cz.adaptech.tesseract4android:tesseract4android-openmp", "moduleVersion": "4.9.0" }
   ]
 }

@@ -140,7 +140,7 @@ class OpenLifeApp : Application() {
                                 paths = paths,
                                 database = database,
                                 keystoreWrapper = keystoreWrapper,
-                                engineRegistry = OcrEngineRegistry(ocrEngines(), SELECTED_OCR_ENGINE),
+                                engineRegistry = OcrEngineRegistry(ocrEngines(this@OpenLifeApp), SELECTED_OCR_ENGINE),
                                 mutationQueue = mutationQueue,
                             ),
                             lastRecovery = report,
@@ -248,14 +248,6 @@ class OpenLifeApp : Application() {
             VaultUnavailableCause.DATABASE_OPEN_FAILED
         }
 
-    /** Both engines are registered; P2-05 removes ML Kit once P2-04's evaluation gate passes. */
-    private fun ocrEngines() = listOf(
-        TesseractOcrEngine(
-            TessdataInstaller(File(noBackupFilesDir, "ocr"), openAsset = { assets.open(TessdataInstaller.ASSET_PATH) }),
-        ),
-        MlKitOcrEngine(),
-    )
-
     companion object {
         private const val APP_LOCK_PREFERENCES = "app_lock"
 
@@ -263,6 +255,17 @@ class OpenLifeApp : Application() {
         private const val SELECTED_OCR_ENGINE = TesseractOcrEngine.ID
     }
 }
+
+/** Both engines are registered; P2-05 removes ML Kit once P2-04's evaluation gate passes. */
+private fun ocrEngines(context: android.content.Context) = listOf(
+    TesseractOcrEngine(
+        TessdataInstaller(
+            File(context.noBackupFilesDir, "ocr"),
+            openAsset = { context.assets.open(TessdataInstaller.ASSET_PATH) },
+        ),
+    ),
+    MlKitOcrEngine(),
+)
 
 /** Counts only typed causes; no exception messages, identifiers, or user data are stored. */
 object VaultFailureDiagnostics {
