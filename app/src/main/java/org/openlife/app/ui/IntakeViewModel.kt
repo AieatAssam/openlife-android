@@ -29,6 +29,7 @@ import kotlinx.coroutines.withTimeout
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
 import org.openlife.app.intake.IntakeIntentValidator
+import org.openlife.app.intake.ProviderTypeCheck
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.repository.ImageRejectionReason
@@ -194,19 +195,24 @@ class IntakeViewModel(
             // blocks neither other imports nor Cancel, and an abandoned lookup
             // finishes on its own and is discarded.
             val lookup = lookupScope.async { providerTypeOf(resolver, uri) }.await()
-            val providerType = (lookup as? ProviderTypeLookup.Known)?.mimeType
-            when {
-                lookup == ProviderTypeLookup.Refused ->
-                    _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
-
-                providerType == null || !IntakeIntentValidator.mimeTypesMatch(intentMimeType, providerType) ->
-                    _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.TYPE_MISMATCH)
-
-                else -> runImport(
+            if (lookup == ProviderTypeLookup.Refused) {
+                _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.ACCESS_RETRY)
+                return@launch
+            }
+            val providerType = (lookup as ProviderTypeLookup.Known).mimeType
+            when (val check = IntakeIntentValidator.checkProviderType(intentMimeType, providerType)) {
+                is ProviderTypeCheck.Match -> runImport(
                     openStream = { resolver.openInputStream(uri) ?: throw FileNotFoundException() },
-                    declaredMimeType = providerType,
+                    declaredMimeType = check.mimeType,
                     intakeKind = intakeKind,
                 )
+
+                // P1-02-R4: for example HEIC or WebP from the picker; name the supported formats.
+                ProviderTypeCheck.UnsupportedFormat ->
+                    _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.UNSUPPORTED_PICKED_FORMAT)
+
+                ProviderTypeCheck.Mismatch ->
+                    _state.value = IntakeUiState.Rejected(IntakeRejectionMessage.TYPE_MISMATCH)
             }
         }
     }
@@ -315,14 +321,14 @@ class IntakeViewModel(
         }
         // The terminal state is published only after the descriptor is
         // closed by the same coroutine that opened it.
-        applyPrepareResult(result, access)
+        applyPrepareResult(result, access, intakeKind)
     }
 
     private fun closeOwnedStream(stream: InputStream, ownerClosed: AtomicBoolean) {
         if (ownerClosed.compareAndSet(false, true)) closeQuietly(stream)
     }
 
-    private suspend fun applyPrepareResult(result: PrepareResult, access: VaultAccess.Ready) {
+    private suspend fun applyPrepareResult(result: PrepareResult, access: VaultAccess.Ready, intakeKind: IntakeKind) {
         _state.value = when (result) {
             is PrepareResult.Prepared -> {
                 sourceId = result.sourceId
@@ -340,6 +346,7 @@ class IntakeViewModel(
                         result.byteCount,
                         previewBytes,
                         result.orientation,
+                        intakeKind,
                     )
                 }
             }
@@ -378,6 +385,7 @@ class IntakeViewModel(
                         source.byteCount!!,
                         previewBytes,
                         source.orientation ?: org.openlife.vault.model.Orientation.NORMAL,
+                        source.intakeKind,
                     )
                 }
             }

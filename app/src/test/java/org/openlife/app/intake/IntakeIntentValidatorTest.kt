@@ -1,8 +1,6 @@
 package org.openlife.app.intake
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -13,6 +11,8 @@ import org.junit.Test
 class IntakeIntentValidatorTest {
 
     private val ownPackage = "org.openlife"
+
+    private fun check(intent: String?, provider: String?) = IntakeIntentValidator.checkProviderType(intent, provider)
 
     private fun shape(
         action: String? = "android.intent.action.SEND",
@@ -43,12 +43,9 @@ class IntakeIntentValidatorTest {
     }
 
     @Test
-    fun missingOrWildcardIntentMimeTypeIsRejected() {
+    fun missingIntentMimeTypeIsRejected() {
         val result = IntakeIntentValidator.validate(
-            shape(
-                extraStreamUri = "content://com.example.provider/image1",
-                intentMimeType = "image/*",
-            ),
+            shape(extraStreamUri = "content://com.example.provider/image1", intentMimeType = null),
             ownPackage,
         )
         assertEquals(
@@ -57,13 +54,69 @@ class IntakeIntentValidatorTest {
         )
     }
 
+    // P1-02-R7 / F-35: senders such as the picker forward a wildcard image type; the provider type decides.
     @Test
-    fun senderAndProviderMimeTypesMustMatchExactlyOnSupportedFormat() {
-        assertTrue(IntakeIntentValidator.mimeTypesMatch("image/jpeg", "image/jpeg"))
-        assertTrue(IntakeIntentValidator.mimeTypesMatch("IMAGE/PNG", "image/png"))
-        assertFalse(IntakeIntentValidator.mimeTypesMatch("image/jpeg", "image/png"))
-        assertFalse(IntakeIntentValidator.mimeTypesMatch("image/*", "image/jpeg"))
-        assertFalse(IntakeIntentValidator.mimeTypesMatch(null, "image/jpeg"))
+    fun forwardedPickerIntentWithoutSenderMimeIsAcceptedOnlyWhenMarkedAndExplicit() {
+        listOf("image/*", "image/jpeg", "image/jpg", "image/png").forEach { type ->
+            val result = IntakeIntentValidator.validate(
+                shape(extraStreamUri = "content://com.example.provider/image1", intentMimeType = type),
+                ownPackage,
+            )
+            assertEquals(
+                "intent type $type",
+                IntakeValidationResult.Valid("content://com.example.provider/image1"),
+                result,
+            )
+        }
+        val text = IntakeIntentValidator.validate(
+            shape(extraStreamUri = "content://com.example.provider/image1", intentMimeType = "text/plain"),
+            ownPackage,
+        )
+        assertEquals(
+            IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE),
+            text,
+        )
+    }
+
+    @Test
+    fun forwardedPickerIntentStillRequiresReadGrantAndContentScheme() {
+        assertEquals(
+            IntakeValidationResult.Rejected(IntakeRejectionReason.MISSING_READ_GRANT),
+            IntakeIntentValidator.validate(
+                shape(
+                    extraStreamUri = "content://com.example.provider/image1",
+                    intentMimeType = "image/*",
+                    hasReadUriPermission = false,
+                ),
+                ownPackage,
+            ),
+        )
+        assertEquals(
+            IntakeValidationResult.Rejected(IntakeRejectionReason.UNSUPPORTED_URI_SCHEME),
+            IntakeIntentValidator.validate(
+                shape(extraStreamUri = "file:///sdcard/a.jpg", intentMimeType = "image/*"),
+                ownPackage,
+            ),
+        )
+        assertEquals(
+            IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY),
+            IntakeIntentValidator.validate(
+                shape(extraStreamUri = "content://org.openlife.provider/a", intentMimeType = "image/*"),
+                ownPackage,
+            ),
+        )
+    }
+
+    @Test
+    fun providerTypeDecidesUnderAWildcardAndMustAgreeWithASpecificType() {
+        assertEquals(ProviderTypeCheck.Match("image/jpeg"), check("image/*", "image/jpeg"))
+        assertEquals(ProviderTypeCheck.Match("image/png"), check("IMAGE/PNG", "image/png"))
+        assertEquals(ProviderTypeCheck.Match("image/jpeg"), check("image/jpg", "image/jpg"))
+        assertEquals(ProviderTypeCheck.Match("image/jpeg"), check("image/jpeg", "image/jpg"))
+        assertEquals(ProviderTypeCheck.UnsupportedFormat, check("image/*", "image/webp"))
+        assertEquals(ProviderTypeCheck.UnsupportedFormat, check("image/*", "image/heic"))
+        assertEquals(ProviderTypeCheck.UnsupportedFormat, check("image/*", null))
+        assertEquals(ProviderTypeCheck.Mismatch, check("image/jpeg", "image/png"))
     }
 
     @Test

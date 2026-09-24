@@ -29,7 +29,6 @@ import org.openlife.app.ui.OcrViewModel
 import org.openlife.app.ui.SourceListViewModel
 import org.openlife.app.ui.applySecureWindow
 import org.openlife.app.ui.theme.OpenLifeTheme
-import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.repository.ReadyReadResult
 import java.util.UUID
 
@@ -163,13 +162,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Test seam: the Photo Picker result path (P1-02). */
+    internal fun forwardPickedUriForTest(uri: Uri) = forwardPickedUri(uri)
+
     private fun forwardPickedUri(uri: Uri) {
         startActivity(
             Intent(this, IntakeActivity::class.java).apply {
                 action = Intent.ACTION_SEND
-                type = contentResolver.getType(uri) ?: "image/*"
+                // No ContentResolver call here (P1-02-R1/R2): the intake flow
+                // resolves the provider type off the main thread.
+                type = "image/*"
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(IntakeActivity.EXTRA_INTAKE_KIND, IntakeKind.PHOTO_PICKER.name)
+                putExtra(IntakeActivity.EXTRA_PICKER_NONCE, (application as OpenLifeApp).pickerNonce.issue())
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             },
         )

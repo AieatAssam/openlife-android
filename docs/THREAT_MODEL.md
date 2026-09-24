@@ -29,9 +29,15 @@ adversary.
   notifications or recents previews.
 - The Photo Picker can expose items supplied by a cloud media provider.
   OpenLife reads only the explicitly selected URI and cannot control that
-  provider's download or logging behaviour (R3). This is explained at intake;
-  it is not permission for OpenLife to upload or sync its vault. No durable
-  URI grants are retained in C0 (no `takePersistableUriPermission`).
+  provider's download or logging behaviour (R3). This is explained at intake:
+  a picked item's preview says it may come from a cloud photo service that
+  OpenLife does not control, and that OpenLife never uploads (P1-02). It is
+  not permission for OpenLife to upload or sync its vault. No durable URI
+  grants are retained (no `takePersistableUriPermission`, enforced by a
+  source-scan test), including on the contract's `ACTION_OPEN_DOCUMENT`
+  fallback. The recorded intake route is not caller-controlled: only
+  OpenLife's own picker forwarding, proven by a single-use in-process
+  nonce, is recorded as `PHOTO_PICKER`.
 
 ## Capability 0 threat matrix
 

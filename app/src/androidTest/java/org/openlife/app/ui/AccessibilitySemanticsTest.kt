@@ -96,8 +96,9 @@ class AccessibilitySemanticsTest {
             }
         }
 
+        // Save is pinned below the scrolling details, so it is on screen
+        // without scrolling at 2x font scale.
         composeRule.onNodeWithText("Save")
-            .performScrollTo()
             .assertIsDisplayed()
             .assertHasClickAction()
         composeRule.onNodeWithText("Cancel")

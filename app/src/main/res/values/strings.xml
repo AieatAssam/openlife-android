@@ -39,6 +39,7 @@
     <string name="intake_preview_unavailable">Preview unavailable</string>
     <string name="intake_selected_image_content_description">Selected image preview</string>
     <string name="intake_preview_details">%1$s · %2$d×%3$d · %4$s</string>
+    <string name="intake_cloud_provider_notice">Items chosen in the photo picker may come from a cloud photo service that OpenLife does not control. OpenLife never uploads anything.</string>
     <string name="intake_copy_notice">OpenLife stores its own copy of this image. The original stays with the app you shared it from.</string>
     <string name="intake_size_megabytes">%1$.1f MB</string>
     <string name="intake_size_kilobytes">%1$.1f KB</string>
@@ -58,6 +59,7 @@
     <string name="rejection_unsupported_or_missing_type">unsupported or missing image type</string>
     <string name="rejection_access_retry">could not access the selected item; please select it again</string>
     <string name="rejection_type_mismatch">the selected item type did not match its contents</string>
+    <string name="rejection_unsupported_picked_format">OpenLife imports JPEG and PNG images only, and this item is in a different format</string>
 
     <string name="viewer_back_content_description">Back</string>
     <string name="viewer_delete_content_description">Delete</string>
