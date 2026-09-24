@@ -134,11 +134,9 @@ class OcrViewModelTest {
         var observations = 0
         val finishRun = CompletableDeferred<OcrRunResult>()
 
-        @Suppress("UNCHECKED_CAST")
-        override fun observe(sourceId: UUID): Flow<OcrView?> =
-            kotlinx.coroutines.flow.flow {
-                view.flow.collect { if (it !== ViewSource.PENDING) emit(it as OcrView?) }
-            }.onStart { observations++ }
+        override fun observe(sourceId: UUID): Flow<OcrView?> = kotlinx.coroutines.flow.flow {
+            view.flow.collect { if (it !== ViewSource.PENDING) emit(it as OcrView?) }
+        }.onStart { observations++ }
 
         override suspend fun run(sourceId: UUID): OcrRunResult = finishRun.await()
 
