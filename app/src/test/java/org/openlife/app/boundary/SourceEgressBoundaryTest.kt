@@ -63,6 +63,22 @@ class SourceEgressBoundaryTest {
         assertTrue("mutation queue ownership violations: $violations", violations.isEmpty())
     }
 
+    /** P1-02-R3 / design §8 R3: picker and document grants stay one-shot. */
+    @Test
+    fun noPersistableUriGrantIsEverTaken() {
+        val violations = sourceFiles().flatMap { file ->
+            Files.readAllLines(file).mapIndexedNotNull { index, line ->
+                val code = line.substringBefore("//")
+                if (code.contains("takePersistableUriPermission") || code.contains("FLAG_GRANT_PERSISTABLE_URI_PERMISSION")) {
+                    "$file:${index + 1}: persistable URI grant"
+                } else {
+                    null
+                }
+            }
+        }
+        assertTrue("persistable grant violations: $violations", violations.isEmpty())
+    }
+
     private fun sourceFiles(): List<Path> = sourceRoots.flatMap { root ->
         Files.walk(root).use { stream ->
             stream.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }

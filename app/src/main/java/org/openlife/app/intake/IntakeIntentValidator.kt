@@ -89,10 +89,30 @@ object IntakeIntentValidator {
      * bytes; this check closes the gap where the incoming Intent type was
      * previously ignored.
      */
+    /** P1-02 stub: today's exact-match rule expressed as a typed check. */
+    fun checkProviderType(intentMimeType: String?, providerMimeType: String?): ProviderTypeCheck =
+        if (mimeTypesMatch(intentMimeType, providerMimeType)) {
+            ProviderTypeCheck.Match(providerMimeType!!.lowercase())
+        } else {
+            ProviderTypeCheck.Mismatch
+        }
+
     fun mimeTypesMatch(intentMimeType: String?, providerMimeType: String?): Boolean =
         isSupportedMimeType(intentMimeType) &&
             intentMimeType.equals(providerMimeType, ignoreCase = true)
 
     private fun isSupportedMimeType(mimeType: String?): Boolean = mimeType.equals("image/jpeg", ignoreCase = true) ||
         mimeType.equals("image/png", ignoreCase = true)
+}
+
+/** How the provider's reported type relates to the incoming intent's type (P1-02-R7). */
+sealed interface ProviderTypeCheck {
+    /** Supported; [mimeType] is normalised (image/jpeg or image/png). */
+    data class Match(val mimeType: String) : ProviderTypeCheck
+
+    /** The provider reports a type OpenLife does not import (for example HEIC or WebP). */
+    data object UnsupportedFormat : ProviderTypeCheck
+
+    /** The intent named a specific supported type that the provider contradicts. */
+    data object Mismatch : ProviderTypeCheck
 }

@@ -40,6 +40,8 @@ sealed interface IntakeUiState {
         /** Authenticated stage bytes for the preview image; null if sampling isn't available. */
         val previewBytes: ByteArray?,
         val orientation: Orientation = Orientation.NORMAL,
+        /** P1-02 stub: how the item arrived; drives the cloud-provider note. */
+        val intakeKind: org.openlife.vault.model.IntakeKind = org.openlife.vault.model.IntakeKind.SHARE,
     ) : IntakeUiState
 
     data class Saving(val sourceId: UUID) : IntakeUiState

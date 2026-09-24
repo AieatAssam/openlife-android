@@ -163,6 +163,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Test seam: the Photo Picker result path (P1-02). */
+    internal fun forwardPickedUriForTest(uri: Uri) = forwardPickedUri(uri)
+
     private fun forwardPickedUri(uri: Uri) {
         startActivity(
             Intent(this, IntakeActivity::class.java).apply {

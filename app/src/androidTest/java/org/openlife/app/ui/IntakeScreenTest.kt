@@ -44,6 +44,30 @@ class IntakeScreenTest {
         composeRule.onNodeWithText("Save").assertIsNotEnabled()
     }
 
+    /** P1-02-R8 / F-47 / design §3 R3: picked items may come from a cloud provider OpenLife does not control. */
+    @Test
+    fun photoPickerPreviewExplainsCloudProviders() {
+        composeRule.setContent {
+            IntakeScreen(
+                state = IntakeUiState.Preview(
+                    sourceId = UUID.randomUUID(),
+                    format = ImageFormat.JPEG,
+                    width = 100,
+                    height = 100,
+                    byteCount = 1,
+                    previewBytes = null,
+                    intakeKind = org.openlife.vault.model.IntakeKind.PHOTO_PICKER,
+                ),
+                onSave = {},
+                onCancel = {},
+                onDone = {},
+            )
+        }
+
+        composeRule.onNodeWithText("may come from a cloud photo service", substring = true).assertExists()
+        composeRule.onNodeWithText("OpenLife never uploads", substring = true).assertExists()
+    }
+
     @Test
     fun duplicateOffersOpenExistingOrCancel() {
         val existingId = UUID.randomUUID()
