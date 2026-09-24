@@ -1,8 +1,5 @@
 package org.openlife.vault.repository
 
-import java.security.ProviderException
-import java.security.GeneralSecurityException
-import org.openlife.vault.crypto.MissingWrappingKeyException
 import android.database.sqlite.SQLiteFullException
 import android.system.ErrnoException
 import kotlinx.coroutines.CancellationException
@@ -15,6 +12,7 @@ import org.openlife.vault.crypto.EnvelopeAad
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.crypto.MissingWrappingKeyException
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -27,6 +25,8 @@ import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
 import java.io.IOException
 import java.io.InputStream
+import java.security.GeneralSecurityException
+import java.security.ProviderException
 import java.security.SecureRandom
 import java.util.UUID
 import javax.crypto.spec.SecretKeySpec
@@ -123,7 +123,7 @@ class ImportRepository(
         val dek = ByteArray(DEK_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
 
         try {
-            val wrappedDekEnvelope = wrapSourceKey(dek, sourceId) ?: return PrepareResult.Failed
+            val wrappedDekEnvelope = keystoreWrapper.wrapSourceKeyOrNull(dek, sourceId) ?: return PrepareResult.Failed
             val stagedSource = Source(
                 id = sourceId,
                 state = SourceState.STAGED,
@@ -202,17 +202,6 @@ class ImportRepository(
         } finally {
             dek.fill(0)
         }
-    }
-
-    /** Null when Keystore cannot wrap, including a lost wrapping key, which is never recreated here (P1-14-R2). */
-    private fun wrapSourceKey(dek: ByteArray, sourceId: UUID) = try {
-        keystoreWrapper.wrap(dek, EnvelopeDomain.SOURCE_KEY, sourceId)
-    } catch (_: MissingWrappingKeyException) {
-        null
-    } catch (_: GeneralSecurityException) {
-        null
-    } catch (_: ProviderException) {
-        null
     }
 
     private fun hasEnoughStorage(): Boolean = try {
@@ -391,4 +380,15 @@ class ImportRepository(
         } else {
             SaveResult.Failed
         }
+}
+
+/** Null when Keystore cannot wrap, including a lost wrapping key, which is never recreated here (P1-14-R2). */
+private fun KeystoreWrapper.wrapSourceKeyOrNull(dek: ByteArray, sourceId: UUID) = try {
+    wrap(dek, EnvelopeDomain.SOURCE_KEY, sourceId)
+} catch (_: MissingWrappingKeyException) {
+    null
+} catch (_: GeneralSecurityException) {
+    null
+} catch (_: ProviderException) {
+    null
 }

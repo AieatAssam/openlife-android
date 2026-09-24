@@ -25,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -93,13 +94,22 @@ private fun VerifyAllSection(onVerifyAll: suspend () -> VerifyReport?) {
         when (val current = outcome) {
             is VerifyOutcome.Done -> {
                 val report = current.report
-                Text(stringResource(R.string.verify_all_result, report.verified, report.markedCorrupt, report.transient))
+                Text(
+                    listOf(
+                        pluralStringResource(R.plurals.verify_all_verified, report.verified, report.verified),
+                        pluralStringResource(R.plurals.verify_all_damaged, report.markedCorrupt, report.markedCorrupt),
+                        pluralStringResource(R.plurals.verify_all_unchecked, report.transient, report.transient),
+                    ).joinToString(", "),
+                )
                 if (report.transient > 0) Text(stringResource(R.string.verify_all_transient_hint))
             }
 
             VerifyOutcome.Unavailable -> Text(stringResource(R.string.verify_all_unavailable))
 
-            VerifyOutcome.Failed -> Text(stringResource(R.string.verify_all_failed), color = MaterialTheme.colorScheme.error)
+            VerifyOutcome.Failed -> Text(
+                stringResource(R.string.verify_all_failed),
+                color = MaterialTheme.colorScheme.error,
+            )
 
             null -> Unit
         }

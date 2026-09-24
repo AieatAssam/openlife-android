@@ -135,7 +135,18 @@
     <string name="verify_all_action">Verify all items</string>
     <string name="verify_all_explanation">Checks every saved item against its encryption and fingerprint. Items that fail are marked damaged; nothing is deleted.</string>
     <string name="verify_all_running">Verifying…</string>
-    <string name="verify_all_result">%1$d verified, %2$d damaged, %3$d could not be checked.</string>
+    <plurals name="verify_all_verified">
+        <item quantity="one">%d verified</item>
+        <item quantity="other">%d verified</item>
+    </plurals>
+    <plurals name="verify_all_damaged">
+        <item quantity="one">%d damaged</item>
+        <item quantity="other">%d damaged</item>
+    </plurals>
+    <plurals name="verify_all_unchecked">
+        <item quantity="one">%d could not be checked</item>
+        <item quantity="other">%d could not be checked</item>
+    </plurals>
     <string name="verify_all_transient_hint">Items that could not be checked are unchanged. Unlock the device and try again.</string>
     <string name="verify_all_failed">Verification stopped before it finished. Nothing was deleted; try again.</string>
     <string name="verify_all_unavailable">The vault is unavailable, so nothing was checked.</string>

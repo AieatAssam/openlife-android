@@ -115,7 +115,9 @@ object EnvelopeCodec {
         buffer.get(magic)
         if (!magic.contentEquals(EnvelopeFormat.MAGIC)) malformed("bad magic")
         if (buffer.get() != EnvelopeFormat.VERSION) malformed("unsupported envelope version")
-        if ((buffer.get().toInt() and 0xFF) != EnvelopeFormat.NONCE_LENGTH_BYTES) malformed("unexpected nonce length")
+        if (java.lang.Byte.toUnsignedInt(buffer.get()) != EnvelopeFormat.NONCE_LENGTH_BYTES) {
+            malformed("unexpected nonce length")
+        }
         buffer.position(buffer.position() + EnvelopeFormat.NONCE_LENGTH_BYTES)
         val ciphertextLength = buffer.int
         if (ciphertextLength < 0 || ciphertextLength > EnvelopeFormat.MAX_CIPHERTEXT_LENGTH) {

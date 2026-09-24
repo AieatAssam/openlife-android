@@ -78,6 +78,20 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun rememberPhotoPickerLauncher(): () -> Unit {
+        val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let(::forwardPickedUri)
+        }
+        return {
+            pickMedia.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                ),
+            )
+        }
+    }
+
+    @Composable
     private fun MainContent() {
         val firstRun = firstRunAcknowledged.collectAsState().value
         val acknowledged = firstRun == true
@@ -111,16 +125,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            uri?.let(::forwardPickedUri)
-        }
-        val launchPhotoPicker = {
-            pickMedia.launch(
-                androidx.activity.result.PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly,
-                ),
-            )
-        }
+        val launchPhotoPicker = rememberPhotoPickerLauncher()
 
         OpenLifeTheme {
             if (firstRun == false) {
