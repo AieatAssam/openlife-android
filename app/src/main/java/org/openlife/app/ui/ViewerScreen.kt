@@ -254,6 +254,9 @@ private fun OcrSection(
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.viewer_extracted_text_title), style = MaterialTheme.typography.titleMedium)
         when (state) {
+            // Nothing to offer until the persisted state is known (P2-01).
+            OcrUiState.Loading -> Unit
+
             OcrUiState.Idle -> Button(onClick = onExtractText, enabled = source.state == SourceState.READY) {
                 Text(stringResource(R.string.viewer_extract_text_action))
             }

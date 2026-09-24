@@ -182,6 +182,10 @@ class OcrRepository(
             }
         }
 
+    /** P2-01 stub. */
+    fun observeOcrView(sourceId: UUID): kotlinx.coroutines.flow.Flow<org.openlife.vault.ocr.OcrView?> =
+        kotlinx.coroutines.flow.flowOf(null)
+
     suspend fun findRevision(revisionId: UUID): OcrRevision? =
         database.ocrDao().findRevision(revisionId.toString())?.toDomain()
 

@@ -51,6 +51,9 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     fun stateFor(sourceId: UUID): OcrUiState = _states.value[sourceId] ?: OcrUiState.Idle
 
+    /** P2-01 stub. */
+    fun state(sourceId: UUID): StateFlow<OcrUiState> = MutableStateFlow(stateFor(sourceId))
+
     fun run(sourceId: UUID) {
         jobs[sourceId]?.cancel()
         setState(sourceId, OcrUiState.Running(sourceId))
