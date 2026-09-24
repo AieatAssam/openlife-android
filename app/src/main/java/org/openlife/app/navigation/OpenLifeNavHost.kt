@@ -18,6 +18,7 @@ import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
 import org.openlife.vault.repository.ReadyReadResult
 import org.openlife.vault.repository.VaultResetResult
+import org.openlife.vault.repository.VerifyReport
 import java.util.UUID
 
 @Composable
@@ -36,6 +37,7 @@ fun OpenLifeNavHost(
     onRetryVault: () -> Unit,
     onFinishReset: () -> Unit,
     onResetVault: suspend () -> VaultResetResult,
+    onVerifyAll: suspend () -> VerifyReport?,
     onResetComplete: () -> Unit,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -98,7 +100,12 @@ fun OpenLifeNavHost(
             }
         }
         composable<Routes.Settings> {
-            SettingsScreen(onResetVault, onResetComplete, onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onResetVault,
+                onResetComplete,
+                onBack = { navController.popBackStack() },
+                onVerifyAll = onVerifyAll,
+            )
         }
         composable<Routes.About> { AboutScreen(onBack = { navController.popBackStack() }) }
     }

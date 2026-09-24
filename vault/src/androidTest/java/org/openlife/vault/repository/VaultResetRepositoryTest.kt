@@ -45,6 +45,7 @@ class VaultResetRepositoryTest {
     @Test
     fun resetRemovesArtefactsDatabaseKeyFileAndKeystoreAliasThenFreshBootstrapSucceeds(): Unit = runBlocking {
         val secret = ByteArray(32) { it.toByte() }
+        wrapper.ensureWrappingKey()
         val wrapped = wrapper.wrap(secret, EnvelopeDomain.DATABASE_SECRET)
         paths.ensureDirectoriesExist()
         paths.databaseKeyFile.writeBytes(org.openlife.vault.crypto.EnvelopeCodec.encode(wrapped))
@@ -69,6 +70,7 @@ class VaultResetRepositoryTest {
     @Test
     fun interruptedResetLeavesMarkerAndBootstrapReportsResetIncompleteUntilFinishResetSucceeds(): Unit = runBlocking {
         val secret = ByteArray(32) { it.toByte() }
+        wrapper.ensureWrappingKey()
         val wrapped = wrapper.wrap(secret, EnvelopeDomain.DATABASE_SECRET)
         paths.ensureDirectoriesExist()
         paths.databaseKeyFile.writeBytes(org.openlife.vault.crypto.EnvelopeCodec.encode(wrapped))

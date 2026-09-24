@@ -1,8 +1,9 @@
 package org.openlife.vault.crypto
 
 /**
- * This installation's Keystore wrapping key is gone (P1-14-R2). Permanent,
- * not transient, and never repaired by generating a replacement (design
- * §10): the vault's wrapped secrets can no longer be opened.
+ * The Keystore wrapping key for this installation no longer exists (for
+ * example after a lock-screen removal or a restore onto a new device).
+ * Everything wrapped under it is unrecoverable; OpenLife reports this and
+ * never generates a replacement key outside a fresh bootstrap (P1-14-R2).
  */
 class MissingWrappingKeyException : Exception("wrapping key is missing")

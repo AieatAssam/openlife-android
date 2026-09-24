@@ -163,12 +163,13 @@ class VaultBootstrapperTest {
         assertEquals(VaultUnavailableCause.DATABASE_WITHOUT_KEY, missingKey.cause)
 
         paths.databaseFile.delete()
+        wrapper.ensureWrappingKey()
         val envelope = wrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET)
         paths.databaseKeyFile.writeBytes(EnvelopeCodec.encode(envelope))
         val badAlias = "test.${UUID.randomUUID()}"
         val badWrapper = KeystoreWrapper(badAlias)
         try {
-            badWrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET)
+            badWrapper.ensureWrappingKey()
             val unwrapFailed = VaultBootstrapper.bootstrap(paths, badWrapper) as VaultBootstrapResult.Unavailable
             assertEquals(VaultUnavailableCause.KEY_UNWRAP_FAILED, unwrapFailed.cause)
         } finally {

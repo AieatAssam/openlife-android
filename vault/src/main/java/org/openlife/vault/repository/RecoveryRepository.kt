@@ -9,10 +9,15 @@ import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
+import org.openlife.vault.crypto.EnvelopeCodec
+import java.io.FileInputStream
+import java.io.IOException
 import java.util.UUID
 
 /**
- * Startup recovery per design §11's table. Runs once, under the same
+ * Startup recovery per design §11's table. READY rows get only a cheap
+ * existence-and-framing check here; deep authentication is on first read
+ * and in [verifyAll] (P1-14-R3). Runs once, under the same
  * [MutationQueue] as import/save/deletion so it cannot race them, and is
  * idempotent by construction — re-running it after a kill at any point
  * converges to the same end state (design: "Recovery is idempotent").
@@ -65,13 +70,16 @@ class RecoveryRepository(
                         }
                     }
 
-                    SourceState.READY -> {
-                        if (authenticator.authenticates(source, paths.blobFile(source.id))) {
-                            confirmedReady++
-                        } else {
+                    SourceState.READY -> when (blobFraming(source.id)) {
+                        Framing.PLAUSIBLE -> confirmedReady++
+
+                        Framing.BROKEN -> {
                             database.sourceDao().update(source.copy(state = SourceState.CORRUPT).toEntity())
                             markedCorrupt++
                         }
+
+                        // An I/O error says nothing about the stored bytes.
+                        Framing.UNREADABLE -> Unit
                     }
 
                     SourceState.DELETING -> {
@@ -113,9 +121,73 @@ class RecoveryRepository(
         }
     }
 
-    /** P1-14 stub. */
-    @Suppress("FunctionOnlyReturningConstant")
-    suspend fun verifyAll(): VerifyReport = VerifyReport()
+    /**
+     * Settings > Verify all items (P1-14-R3): deep-authenticates every READY
+     * item. Only a genuine authentication failure or a missing blob marks it
+     * CORRUPT; a Keystore or I/O failure changes nothing and is counted as
+     * [VerifyReport.transient]. Each item is checked in its own mutation, so
+     * imports and deletions are not held off for the whole pass.
+     */
+    suspend fun verifyAll(): VerifyReport = withContext(ioDispatcher) {
+        var verified = 0
+        var markedCorrupt = 0
+        var transient = 0
+        val ids = mutationQueue.withReadLease {
+            database.sourceDao().findAll().filter { it.state == SourceState.READY.name }.map { it.id }
+        }
+        for (id in ids) {
+            mutationQueue.withMutation {
+                val source = database.sourceDao().findById(id)?.toDomain()
+                if (source?.state != SourceState.READY) return@withMutation
+                when (val check = authenticator.check(source, paths.blobFile(source.id))) {
+                    is ArtefactCheck.Verified -> {
+                        check.plaintext.fill(0)
+                        verified++
+                    }
+
+                    ArtefactCheck.Corrupt, ArtefactCheck.Missing -> {
+                        database.sourceDao().update(source.copy(state = SourceState.CORRUPT).toEntity())
+                        markedCorrupt++
+                    }
+
+                    ArtefactCheck.Transient -> transient++
+                }
+            }
+        }
+        VerifyReport(verified = verified, markedCorrupt = markedCorrupt, transient = transient)
+    }
+
+    /**
+     * The startup check (P1-14-R3): the blob exists and its envelope framing
+     * is consistent with its length. Reads [EnvelopeCodec.FRAMING_PREFIX_BYTES]
+     * bytes and never touches Keystore, so cold start does not scale with
+     * vault size and a Keystore hiccup cannot mark anything CORRUPT. Deep
+     * authentication happens on first read and in [verifyAll].
+     */
+    private fun blobFraming(sourceId: UUID): Framing {
+        val blob = paths.blobFile(sourceId)
+        if (!blob.exists()) return Framing.BROKEN
+        return try {
+            val prefix = ByteArray(EnvelopeCodec.FRAMING_PREFIX_BYTES)
+            val read = FileInputStream(blob).use { input ->
+                var total = 0
+                while (total < prefix.size) {
+                    val n = input.read(prefix, total, prefix.size - total)
+                    if (n < 0) break
+                    total += n
+                }
+                total
+            }
+            EnvelopeCodec.checkFraming(prefix.copyOf(read), blob.length())
+            Framing.PLAUSIBLE
+        } catch (_: EnvelopeCodec.MalformedEnvelopeException) {
+            Framing.BROKEN
+        } catch (_: IOException) {
+            Framing.UNREADABLE
+        }
+    }
+
+    private enum class Framing { PLAUSIBLE, BROKEN, UNREADABLE }
 
     /**
      * Light recovery for a running process (P1-01-R2): removes every STAGED

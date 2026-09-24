@@ -38,14 +38,13 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
     private val keyStore: KeyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
 
     /**
-     * Returns the existing wrapping key, or creates it if this is the first
-     * use on this installation. Creation and lookup are idempotent: calling
-     * this repeatedly never replaces an existing key, matching the
-     * bootstrap rule that an existing wrapper is never silently replaced
-     * (design §10, C0-R18).
+     * Returns the existing wrapping key, or creates it. Only a fresh vault
+     * bootstrap may call this (P1-14-R2): every other path uses
+     * [existingWrappingKey], so a key lost after install is reported, never
+     * silently replaced (design §10, C0-R18).
      */
-    open fun wrappingKey(): SecretKey {
-        (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
+    fun ensureWrappingKey(): SecretKey {
+        existingWrappingKey()?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
         val spec = KeyGenParameterSpec.Builder(
@@ -63,11 +62,10 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         return generator.generateKey()
     }
 
-    /** P1-14 stub: creates the key if absent (fresh install only, after GREEN). */
-    fun ensureWrappingKey(): SecretKey = wrappingKey()
+    /** The wrapping key if it exists; never creates one. */
+    open fun existingWrappingKey(): SecretKey? = keyStore.getKey(alias, null) as? SecretKey
 
-    /** P1-14 stub: today this still creates a missing key. */
-    open fun existingWrappingKey(): SecretKey? = wrappingKey()
+    private fun requireWrappingKey(): SecretKey = existingWrappingKey() ?: throw MissingWrappingKeyException()
 
     /** True if a wrapping key already exists for this alias, without creating one. */
     fun hasWrappingKey(): Boolean = keyStore.containsAlias(alias)
@@ -77,9 +75,10 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
     }
 
+    /** @throws MissingWrappingKeyException when the wrapping key no longer exists; none is created. */
     open fun wrap(plaintext: ByteArray, domain: EnvelopeDomain, sourceId: UUID? = null): Envelope {
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, wrappingKey())
+        cipher.init(Cipher.ENCRYPT_MODE, requireWrappingKey())
         val iv = cipher.iv
         val aad = aadFor(domain, sourceId)
         cipher.updateAAD(aad)
@@ -90,6 +89,9 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
     /**
      * @throws EnvelopeAuthenticationException when the envelope itself fails:
      *   a wrong tag, nonce or ciphertext (tampering or corruption).
+     * @throws MissingWrappingKeyException when the wrapping key no longer
+     *   exists. No replacement is created; the envelope is not evidence of
+     *   corruption either.
      * @throws KeystoreUnavailableException when Keystore cannot perform the
      *   operation (daemon failure, locked or invalidated key). That is never
      *   evidence about the stored envelope, so callers must not treat it as
@@ -100,7 +102,7 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
                 Cipher.DECRYPT_MODE,
-                wrappingKey(),
+                requireWrappingKey(),
                 GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce),
             )
             cipher.updateAAD(aadFor(domain, sourceId))

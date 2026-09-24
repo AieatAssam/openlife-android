@@ -1,5 +1,8 @@
 package org.openlife.vault.repository
 
+import java.security.ProviderException
+import java.security.GeneralSecurityException
+import org.openlife.vault.crypto.MissingWrappingKeyException
 import android.database.sqlite.SQLiteFullException
 import android.system.ErrnoException
 import kotlinx.coroutines.CancellationException
@@ -120,7 +123,7 @@ class ImportRepository(
         val dek = ByteArray(DEK_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
 
         try {
-            val wrappedDekEnvelope = keystoreWrapper.wrap(dek, EnvelopeDomain.SOURCE_KEY, sourceId)
+            val wrappedDekEnvelope = wrapSourceKey(dek, sourceId) ?: return PrepareResult.Failed
             val stagedSource = Source(
                 id = sourceId,
                 state = SourceState.STAGED,
@@ -199,6 +202,17 @@ class ImportRepository(
         } finally {
             dek.fill(0)
         }
+    }
+
+    /** Null when Keystore cannot wrap, including a lost wrapping key, which is never recreated here (P1-14-R2). */
+    private fun wrapSourceKey(dek: ByteArray, sourceId: UUID) = try {
+        keystoreWrapper.wrap(dek, EnvelopeDomain.SOURCE_KEY, sourceId)
+    } catch (_: MissingWrappingKeyException) {
+        null
+    } catch (_: GeneralSecurityException) {
+        null
+    } catch (_: ProviderException) {
+        null
     }
 
     private fun hasEnoughStorage(): Boolean = try {

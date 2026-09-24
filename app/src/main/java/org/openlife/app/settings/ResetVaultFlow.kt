@@ -39,7 +39,7 @@ fun SettingsScreen(
     onResetVault: suspend () -> VaultResetResult,
     onResetComplete: () -> Unit,
     onBack: () -> Unit = {},
-    onVerifyAll: (suspend () -> VerifyReport)? = null,
+    onVerifyAll: (suspend () -> VerifyReport?)? = null,
 ) {
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
@@ -50,10 +50,68 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                onVerifyAll?.let { VerifyAllSection(it) }
                 ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete)
             }
         }
     }
+}
+
+/**
+ * P1-14-R3: deep verification is explicit. [onVerifyAll] returns null when
+ * the vault is unavailable; the result stays on screen until run again.
+ */
+@Composable
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+private fun VerifyAllSection(onVerifyAll: suspend () -> VerifyReport?) {
+    var running by remember { mutableStateOf(false) }
+    var outcome by remember { mutableStateOf<VerifyOutcome?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.verify_all_explanation), style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(
+            enabled = !running,
+            onClick = {
+                scope.launch {
+                    running = true
+                    try {
+                        outcome = onVerifyAll()?.let(VerifyOutcome::Done) ?: VerifyOutcome.Unavailable
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // A reset or storage failure mid-pass; items already checked keep their state.
+                        outcome = VerifyOutcome.Failed
+                    } finally {
+                        running = false
+                    }
+                }
+            },
+        ) {
+            Text(stringResource(if (running) R.string.verify_all_running else R.string.verify_all_action))
+        }
+        when (val current = outcome) {
+            is VerifyOutcome.Done -> {
+                val report = current.report
+                Text(stringResource(R.string.verify_all_result, report.verified, report.markedCorrupt, report.transient))
+                if (report.transient > 0) Text(stringResource(R.string.verify_all_transient_hint))
+            }
+
+            VerifyOutcome.Unavailable -> Text(stringResource(R.string.verify_all_unavailable))
+
+            VerifyOutcome.Failed -> Text(stringResource(R.string.verify_all_failed), color = MaterialTheme.colorScheme.error)
+
+            null -> Unit
+        }
+    }
+}
+
+private sealed interface VerifyOutcome {
+    data class Done(val report: VerifyReport) : VerifyOutcome
+
+    data object Unavailable : VerifyOutcome
+
+    data object Failed : VerifyOutcome
 }
 
 @Composable

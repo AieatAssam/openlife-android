@@ -153,6 +153,7 @@ class MainActivity : ComponentActivity() {
                     onRetryVault = viewModel::retryVault,
                     onFinishReset = viewModel::finishVaultReset,
                     onResetVault = { (application as OpenLifeApp).resetVault() },
+                    onVerifyAll = { (application as OpenLifeApp).verifyAllItems() },
                     onResetComplete = {
                         viewModel.retryVault()
                         navController.navigate(Routes.List) { launchSingleTop = true }

@@ -22,10 +22,13 @@ import org.openlife.vault.repository.RecoveryRepository
 import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.repository.VaultResetRepository
 import org.openlife.vault.repository.VaultResetResult
+import org.openlife.vault.repository.VerifyReport
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
 import org.openlife.vault.storage.VaultBootstrapper
+import org.openlife.vault.storage.VaultOpenResult
+import org.openlife.vault.storage.VaultOpener
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.VaultUnavailableCause
 import org.openlife.vault.storage.retryable
@@ -34,8 +37,9 @@ import java.io.IOException
 /**
  * Composition root. No dependency-injection framework is used for C0
  * (openlife-design-v0.2.md §7) — dependencies are constructed explicitly
- * here. Vault access is lazy and off the main thread: [vault] does the
- * Keystore/SQLCipher bootstrap and one startup-recovery pass on first call,
+ * here. Vault access is lazy and off the main thread: [vault] opens the
+ * vault through [VaultOpener] (bootstrap, SQLCipher open and migration as
+ * one typed result) and runs one shallow startup-recovery pass on first call,
  * from whichever caller's coroutine invokes it (always `Dispatchers.IO`
  * here, never the caller's own dispatcher). A [Mutex] guards against two
  * callers racing bootstrap; only non-retryable failures are cached.
@@ -106,11 +110,12 @@ class OpenLifeApp : Application() {
             }
 
             val bootstrap = bootstrapOverrideForTest ?: VaultBootstrapper::bootstrap
-            val access = when (val result = bootstrap(paths, keystoreWrapper)) {
-                is VaultBootstrapResult.Ready -> {
+            val opened = VaultOpener.open(this@OpenLifeApp, paths, keystoreWrapper, bootstrap = bootstrap)
+            val access = when (opened) {
+                is VaultOpenResult.Ready -> {
+                    val database = opened.database
+                    cachedDatabase = database
                     try {
-                        val database = OpenLifeDatabaseFactory.create(this@OpenLifeApp, paths, result.databaseSecret)
-                        cachedDatabase = database
                         val recoveryRepository = RecoveryRepository(paths, database, keystoreWrapper, mutationQueue)
                         val report = recoveryRepository.recover()
                         if (BuildConfig.DEBUG) {
@@ -155,7 +160,7 @@ class OpenLifeApp : Application() {
                     }
                 }
 
-                is VaultBootstrapResult.Unavailable -> VaultAccess.Unavailable(result.cause)
+                is VaultOpenResult.Unavailable -> VaultAccess.Unavailable(opened.cause)
             }
 
             if (access !is VaultAccess.Unavailable || !access.cause.retryable) {
@@ -176,6 +181,9 @@ class OpenLifeApp : Application() {
         vault = { vault() },
         currentSlot = { (cachedAccess as? VaultAccess.Ready)?.importRepository?.importSlot },
     )
+
+    /** Settings > Verify all items (P1-14-R3); null when the vault is unavailable. */
+    suspend fun verifyAllItems(): VerifyReport? = (vault() as? VaultAccess.Ready)?.recoveryRepository?.verifyAll()
 
     suspend fun retryVault() = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {

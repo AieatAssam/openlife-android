@@ -220,18 +220,25 @@ class OcrDatabaseTest {
         v1.close()
 
         val migrated = helper.runMigrationsAndValidate(name, 2, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
-        val rejected = runCatching {
+        fun insertReady(id: String, mimeType: String?) = runCatching {
             migrated.execSQL(
                 """
                 INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
                     orientation, wrappedDek, artefactVersion)
-                VALUES ('bad', 'READY', 1, 'SHARE', NULL, 10, X'01', 10, 10, 'NORMAL', X'02', 1)
+                VALUES ('$id', 'READY', 1, 'SHARE', ${mimeType?.let { "'$it'" } ?: "NULL"}, 10, X'01', 10, 10,
+                    'NORMAL', X'02', 1)
                 """.trimIndent(),
             )
-        }.isFailure
+        }
+        val valid = insertReady("good", "image/jpeg")
+        val invalid = insertReady("bad", null)
         migrated.close()
         InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
 
-        assertTrue("a READY row with a NULL validated field must be rejected after migration", rejected)
+        assertTrue("positive control: a complete READY row inserts (${valid.exceptionOrNull()})", valid.isSuccess)
+        assertTrue(
+            "a READY row with a NULL validated field must be rejected by the trigger: ${invalid.exceptionOrNull()}",
+            invalid.exceptionOrNull()?.message?.contains("READY source requires all validated fields") == true,
+        )
     }
 }
