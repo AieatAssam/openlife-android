@@ -170,6 +170,8 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.navigation.compose)
     implementation(libs.core.splashscreen)
+    implementation(libs.biometric)
+    implementation(libs.lifecycle.process)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(platform(libs.compose.bom))

@@ -74,7 +74,10 @@ class TestHostileContentProvider : ContentProvider() {
         /** Bounded delay inside getType, the metadata lookup that precedes open (F-37). */
         @Volatile var getTypeDelayMillis: Long = 0
 
-        private var openCount = 0
+        @Volatile private var openCount = 0
+
+        /** How many times a stream was opened since [reset] (P1-07: no open while locked). */
+        val openCountForTest: Int get() = openCount
 
         fun reset() {
             bytesToServe = ByteArray(0)

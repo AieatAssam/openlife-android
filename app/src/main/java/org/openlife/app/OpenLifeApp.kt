@@ -224,6 +224,23 @@ class OpenLifeApp : Application() {
         }
     }
 
+    /** P1-07 stub: counts item-content decrypts started by the UI. */
+    val contentReads = java.util.concurrent.atomic.AtomicInteger()
+
+    /** P1-07 stub: stores the policy only; nothing enforces it yet. */
+    internal fun setAppLockForTest(
+        authenticator: org.openlife.app.lock.BiometricAuthenticator,
+        policy: org.openlife.app.lock.AppLockPolicy,
+    ) {
+        check(authenticator.availability() != null)
+        org.openlife.app.lock.AppLockPolicyStore.write(this, policy)
+    }
+
+    /** P1-07 stub. */
+    internal fun resetAppLockForTest() {
+        org.openlife.app.lock.AppLockPolicyStore.write(this, org.openlife.app.lock.AppLockPolicy())
+    }
+
     internal fun setBootstrapOverrideForTest(override: ((VaultPaths, KeystoreWrapper) -> VaultBootstrapResult)?) {
         cachedDatabase?.let(OpenLifeDatabaseFactory::close)
         cachedDatabase = null
