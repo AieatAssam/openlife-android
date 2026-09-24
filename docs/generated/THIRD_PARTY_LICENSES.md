@@ -603,27 +603,33 @@
 > - **POM Project URL**: [http://jspecify.org/](http://jspecify.org/)
 > - **POM License**: Apache License, Version 2.0 - [https://www.apache.org/licenses/LICENSE-2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
+## Apache-2.0
+
+**151** **Group:** `cz.adaptech.tesseract4android` **Name:** `tesseract4android-openmp` **Version:** `4.9.0` 
+> - **Project URL**: [https://github.com/adaptech-cz/Tesseract4Android](https://github.com/adaptech-cz/Tesseract4Android)
+> - **License URL**: [https://github.com/adaptech-cz/Tesseract4Android/blob/4.9.0/LICENSE](Apache-2.0)
+
 ## ML Kit Terms of Service
 
-**151** **Group:** `com.google.android.gms` **Name:** `play-services-mlkit-text-recognition` **Version:** `19.0.1` 
+**152** **Group:** `com.google.android.gms` **Name:** `play-services-mlkit-text-recognition` **Version:** `19.0.1` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
-**152** **Group:** `com.google.android.gms` **Name:** `play-services-mlkit-text-recognition-common` **Version:** `19.1.0` 
+**153** **Group:** `com.google.android.gms` **Name:** `play-services-mlkit-text-recognition-common` **Version:** `19.1.0` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
-**153** **Group:** `com.google.mlkit` **Name:** `common` **Version:** `18.11.0` 
+**154** **Group:** `com.google.mlkit` **Name:** `common` **Version:** `18.11.0` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
-**154** **Group:** `com.google.mlkit` **Name:** `text-recognition` **Version:** `16.0.1` 
+**155** **Group:** `com.google.mlkit` **Name:** `text-recognition` **Version:** `16.0.1` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
-**155** **Group:** `com.google.mlkit` **Name:** `text-recognition-bundled-common` **Version:** `17.0.0` 
+**156** **Group:** `com.google.mlkit` **Name:** `text-recognition-bundled-common` **Version:** `17.0.0` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
-**156** **Group:** `com.google.mlkit` **Name:** `vision-common` **Version:** `17.3.0` 
+**157** **Group:** `com.google.mlkit` **Name:** `vision-common` **Version:** `17.3.0` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
-**157** **Group:** `com.google.mlkit` **Name:** `vision-interfaces` **Version:** `16.3.0` 
+**158** **Group:** `com.google.mlkit` **Name:** `vision-interfaces` **Version:** `16.3.0` 
 > - **POM License**: ML Kit Terms of Service - [https://developers.google.com/ml-kit/terms](https://developers.google.com/ml-kit/terms)
 
 

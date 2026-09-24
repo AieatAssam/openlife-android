@@ -81,6 +81,7 @@ dependencies {
     // the app manifest removes INTERNET and network-state permissions, so no
     // outbound transport is available in a shipped variant.
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.tesseract4android.openmp)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
