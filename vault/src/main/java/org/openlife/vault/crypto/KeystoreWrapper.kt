@@ -63,6 +63,12 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         return generator.generateKey()
     }
 
+    /** P1-14 stub: creates the key if absent (fresh install only, after GREEN). */
+    fun ensureWrappingKey(): SecretKey = wrappingKey()
+
+    /** P1-14 stub: today this still creates a missing key. */
+    open fun existingWrappingKey(): SecretKey? = wrappingKey()
+
     /** True if a wrapping key already exists for this alias, without creating one. */
     fun hasWrappingKey(): Boolean = keyStore.containsAlias(alias)
 

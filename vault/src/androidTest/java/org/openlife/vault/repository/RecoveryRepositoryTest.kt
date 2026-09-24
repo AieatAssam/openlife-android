@@ -408,4 +408,54 @@ class RecoveryRepositoryTest {
             mutation.await()
         }
     }
+
+    /** P1-14-R3/R4: startup is shallow; it never decrypts, so a Keystore hiccup cannot poison state. */
+    @Test
+    fun startupDoesNotDecryptReadyBlobsAndTransientKeystoreErrorLeavesRowReady(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val unwraps = java.util.concurrent.atomic.AtomicInteger()
+        val failing = object : org.openlife.vault.crypto.KeystoreWrapper(alias) {
+            override fun unwrap(
+                envelope: org.openlife.vault.crypto.Envelope,
+                domain: org.openlife.vault.crypto.EnvelopeDomain,
+                sourceId: UUID?,
+            ): ByteArray {
+                unwraps.incrementAndGet()
+                throw org.openlife.vault.crypto.KeystoreUnavailableException(java.security.KeyStoreException("synthetic"))
+            }
+        }
+
+        RecoveryRepository(paths, db, failing, MutationQueue()).recover()
+
+        assertEquals("startup must not unwrap or decrypt any blob", 0, unwraps.get())
+        assertEquals(SourceState.READY, db.sourceDao().findById(id.toString())!!.toDomain().state)
+    }
+
+    @Test
+    fun missingOrMalformedBlobHeaderStillMarksCorrupt(): Unit = runBlocking {
+        val missing = prepareAndSave()
+        val malformed = prepareAndSave2()
+        assertTrue(paths.blobFile(missing).delete())
+        paths.blobFile(malformed).writeBytes("not an OpenLife envelope".toByteArray())
+
+        recoveryRepository.recover()
+
+        assertEquals(SourceState.CORRUPT, db.sourceDao().findById(missing.toString())!!.toDomain().state)
+        assertEquals(SourceState.CORRUPT, db.sourceDao().findById(malformed.toString())!!.toDomain().state)
+        assertTrue("a malformed blob is kept for diagnosis", paths.blobFile(malformed).exists())
+    }
+
+    /** A second, distinct saved source (the default fixture bytes would be a duplicate). */
+    private suspend fun prepareAndSave2(): UUID {
+        val bitmap = Bitmap.createBitmap(32, 24, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(0xFF336699.toInt())
+        val out = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        bitmap.recycle()
+        val prepared = importRepository.prepareImport(
+            ByteArrayInputStream(out.toByteArray()), "image/jpeg", IntakeKind.SHARE,
+        ) as PrepareResult.Prepared
+        assertTrue(importRepository.saveImport(prepared.sourceId) is SaveResult.Saved)
+        return prepared.sourceId
+    }
 }

@@ -1,5 +1,6 @@
 package org.openlife.vault.crypto
 
+import org.junit.Assert.assertFalse
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.security.KeyStore
 import java.util.UUID
@@ -92,6 +93,36 @@ class KeystoreWrapperTest {
         tampered[0] = (tampered[0].toInt() xor 0x01).toByte()
         assertThrows(EnvelopeAuthenticationException::class.java) {
             wrapper.unwrap(Envelope(envelope.nonce, tampered), EnvelopeDomain.DATABASE_SECRET)
+        }
+    }
+
+    /** P1-14-R2 / design §10: a lost wrapping key is never silently replaced. */
+    @Test
+    fun unwrapWithMissingAliasFailsAndDoesNotCreateAKey() {
+        val envelope = wrapper.wrap(ByteArray(32) { 7 }, EnvelopeDomain.DATABASE_SECRET)
+        deleteAlias()
+
+        val failure = runCatching { wrapper.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+
+        assertTrue("expected MissingWrappingKeyException, was $failure", failure is MissingWrappingKeyException)
+        assertFalse("unwrap must not generate a replacement key", wrapper.hasWrappingKey())
+    }
+
+    @Test
+    fun wrapWithMissingAliasFailsAndDoesNotCreateAKey() {
+        wrapper.ensureWrappingKey()
+        deleteAlias()
+
+        val failure = runCatching { wrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+
+        assertTrue("expected MissingWrappingKeyException, was $failure", failure is MissingWrappingKeyException)
+        assertFalse("wrap must not generate a replacement key", wrapper.hasWrappingKey())
+    }
+
+    private fun deleteAlias() {
+        KeyStore.getInstance("AndroidKeyStore").apply {
+            load(null)
+            deleteEntry(alias)
         }
     }
 }

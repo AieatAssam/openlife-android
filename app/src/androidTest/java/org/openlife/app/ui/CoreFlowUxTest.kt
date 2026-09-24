@@ -1,6 +1,7 @@
 package org.openlife.app.ui
 
 import org.openlife.vault.repository.ReadyReadResult
+import org.openlife.vault.repository.VerifyReport
 import kotlinx.coroutines.awaitCancellation
 import android.graphics.Bitmap
 import androidx.compose.ui.test.assertCountEquals
@@ -164,6 +165,33 @@ class CoreFlowUxTest {
 
         composeRule.onNodeWithContentDescription("Back").performClick()
         assertTrue(back)
+    }
+
+    /** P1-14-R3: deep verification is an explicit Settings action that reports counts. */
+    @Test
+    fun settingsVerifyAllItemsRunsOnceAndShowsCounts() {
+        var runs = 0
+        composeRule.setContent {
+            OpenLifeTheme {
+                SettingsScreen(
+                    onResetVault = { throw AssertionError("reset must not run") },
+                    onResetComplete = {},
+                    onVerifyAll = {
+                        runs++
+                        VerifyReport(verified = 3, markedCorrupt = 1, transient = 2)
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Verify all items").performClick()
+
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("3 verified", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("1 damaged", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("2 could not be checked", substring = true).assertIsDisplayed()
+        assertEquals(1, runs)
     }
 
     @Test

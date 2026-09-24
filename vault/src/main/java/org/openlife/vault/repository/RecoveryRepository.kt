@@ -113,6 +113,10 @@ class RecoveryRepository(
         }
     }
 
+    /** P1-14 stub. */
+    @Suppress("FunctionOnlyReturningConstant")
+    suspend fun verifyAll(): VerifyReport = VerifyReport()
+
     /**
      * Light recovery for a running process (P1-01-R2): removes every STAGED
      * import except [activeSourceId], with its stage and blob files. READY,

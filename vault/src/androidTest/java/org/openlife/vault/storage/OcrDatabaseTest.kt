@@ -202,4 +202,36 @@ class OcrDatabaseTest {
         wrappedDek = ByteArray(16) { 2 },
         artefactVersion = 1,
     )
+
+    /** P1-14-R5: the migration runs on SQLCipher and the READY invariant triggers survive it. */
+    @Test
+    fun migrationOnSqlCipherPreservesReadyInvariantTriggers() {
+        val passphrase = ByteArray(32) { 5 }
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            OpenLifeDatabase::class.java,
+            emptyList(),
+            SupportOpenHelperFactory(passphrase.copyOf()),
+        )
+        val name = "p114-triggers-${UUID.randomUUID()}"
+        val v1 = helper.createDatabase(name, 1)
+        // A version-1 install created these through the Room callback.
+        OpenLifeDatabase.readyInvariantCallback.onCreate(v1)
+        v1.close()
+
+        val migrated = helper.runMigrationsAndValidate(name, 2, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
+        val rejected = runCatching {
+            migrated.execSQL(
+                """
+                INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
+                    orientation, wrappedDek, artefactVersion)
+                VALUES ('bad', 'READY', 1, 'SHARE', NULL, 10, X'01', 10, 10, 'NORMAL', X'02', 1)
+                """.trimIndent(),
+            )
+        }.isFailure
+        migrated.close()
+        InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
+
+        assertTrue("a READY row with a NULL validated field must be rejected after migration", rejected)
+    }
 }

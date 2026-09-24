@@ -9,3 +9,6 @@ data class RecoveryReport(
     val removedOrphanFiles: Int = 0,
     val markedStaleOcrRevisions: Int = 0,
 )
+
+/** Outcome of an explicit "Verify all items" pass (P1-14-R3). */
+data class VerifyReport(val verified: Int = 0, val markedCorrupt: Int = 0, val transient: Int = 0)

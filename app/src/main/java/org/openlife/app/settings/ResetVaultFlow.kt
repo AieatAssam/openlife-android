@@ -32,12 +32,14 @@ import kotlinx.coroutines.launch
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
 import org.openlife.vault.repository.VaultResetResult
+import org.openlife.vault.repository.VerifyReport
 
 @Composable
 fun SettingsScreen(
     onResetVault: suspend () -> VaultResetResult,
     onResetComplete: () -> Unit,
     onBack: () -> Unit = {},
+    onVerifyAll: (suspend () -> VerifyReport)? = null,
 ) {
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
