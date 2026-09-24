@@ -1,6 +1,6 @@
 # OpenLife privacy policy
 
-Last updated: 2026-09-17
+Last updated: 2026-09-24
 
 OpenLife is designed to keep the information you deliberately import on your
 Android device. This policy describes the current local-only implementation;
@@ -22,6 +22,17 @@ The vault is under Android's private `noBackupFilesDir`. The database and
 artefacts are encrypted, but this policy does not promise protection from a
 compromised operating system, an authorised device service, or someone who
 already has the unlocked device.
+
+## App lock
+
+You can turn on an optional app lock in onboarding or Settings. OpenLife then
+asks for your fingerprint, face or screen lock, through Android's own
+prompt, before it shows anything. It is an access gate against someone using
+your unlocked phone. It is not extra encryption: your items are encrypted the
+same way whether it is on or off. OpenLife never sees or stores your
+fingerprint, face data or screen-lock credential. It only receives
+"verified" or "not verified" from Android. The lock setting itself is stored
+on the device, and resetting the vault turns it off.
 
 ## What leaves the device
 

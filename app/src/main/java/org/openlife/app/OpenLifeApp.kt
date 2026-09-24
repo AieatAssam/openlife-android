@@ -221,6 +221,8 @@ class OpenLifeApp : Application() {
             if (result == VaultResetResult.COMPLETED) {
                 cachedAccess = null
                 getSharedPreferences(APP_LOCK_PREFERENCES, MODE_PRIVATE).edit(commit = true) { clear() }
+                // Reset turns the app lock off (ADR-0005 scope); keep the running process in step.
+                appLock.state.onPolicyChanged(org.openlife.app.lock.AppLockPolicy())
             } else if (paths.resetMarkerFile.exists()) {
                 cachedAccess = VaultAccess.Unavailable(VaultUnavailableCause.RESET_INCOMPLETE)
                 cachedDatabase = null

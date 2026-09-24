@@ -108,13 +108,28 @@ An unavailable-vault screen explains the cause and offers retry only for
 retryable causes. Its Settings link reaches the separately confirmed reset;
 no error path silently deletes files or creates a replacement key.
 
-## Access policy limit (owner decision pending)
+## Access policy (resolved by ADR-0004, P1-07)
 
-The C0 access policy relies on the Android device lock and app sandbox; it has
-no separate biometric or passcode lock. This does not protect against someone
-using an already-unlocked phone. An app-lock requirement must be settled before
-distributing C0 to real users, since changing authentication-bound key access
-affects the key lifecycle design. Tracked in `docs/decisions/0001-c0-defaults.md`.
+By default, the access policy relies on the Android device lock and app
+sandbox. An optional app lock gates every content-bearing screen with
+BiometricPrompt, using a biometric or the device credential, until the user
+authenticates.
+- **When it locks:** on process start, and after a configurable time in the
+  background, measured on a monotonic clock that keeps counting through sleep.
+- **While locked:** no content is composed, and no item bytes are decrypted or
+  shared streams opened.
+- **What it protects against:** someone using an already-unlocked phone.
+- **What it does not add:** cryptographic protection. Keystore keys are not
+  bound to authentication, so a credential change cannot make the vault
+  unrecoverable.
+- **Limits:**
+  - It does not protect against anyone who knows the device credential.
+  - It does not protect against a compromised OS.
+  - While OpenLife's own Photo Picker trip is open, returning to OpenLife is
+    not re-gated.
+- **If the device can no longer verify the user** (screen lock removed):
+  OpenLife stays locked and explains how to restore a screen lock. It never
+  unlocks silently.
 
 ## Environment-specific gaps in this build (recorded, not hidden)
 
