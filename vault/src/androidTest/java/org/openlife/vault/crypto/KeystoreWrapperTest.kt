@@ -1,5 +1,6 @@
 package org.openlife.vault.crypto
 
+import org.junit.Assert.assertFalse
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.security.KeyStore
 import java.util.UUID
@@ -43,9 +44,9 @@ class KeystoreWrapperTest {
     @Test
     fun firstUseCreatesAKeyAndSubsequentCallsReuseIt() {
         assertTrue(!wrapper.hasWrappingKey())
-        val first = wrapper.wrappingKey()
+        val first = wrapper.ensureWrappingKey()
         assertTrue(wrapper.hasWrappingKey())
-        val second = wrapper.wrappingKey()
+        val second = wrapper.ensureWrappingKey()
         // Same Keystore-backed key handle for the same alias, not a fresh
         // generation on every call (design §10: an existing wrapper is
         // never silently replaced).
@@ -55,11 +56,12 @@ class KeystoreWrapperTest {
     @Test
     fun wrappingKeyIsNotExportable() {
         // A non-exportable Keystore SecretKey reports no encoded material.
-        assertNull(wrapper.wrappingKey().encoded)
+        assertNull(wrapper.ensureWrappingKey().encoded)
     }
 
     @Test
     fun wrapThenUnwrapRoundTrips() {
+        wrapper.ensureWrappingKey()
         val plaintext = "database secret material".toByteArray()
         val envelope = wrapper.wrap(plaintext, EnvelopeDomain.DATABASE_SECRET)
         val decrypted = wrapper.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET)
@@ -68,6 +70,7 @@ class KeystoreWrapperTest {
 
     @Test
     fun eachWrapUsesAFreshProviderGeneratedIv() {
+        wrapper.ensureWrappingKey()
         val plaintext = "database secret material".toByteArray()
         val first = wrapper.wrap(plaintext, EnvelopeDomain.DATABASE_SECRET)
         val second = wrapper.wrap(plaintext, EnvelopeDomain.DATABASE_SECRET)
@@ -76,6 +79,7 @@ class KeystoreWrapperTest {
 
     @Test
     fun sourceBoundWrapRejectsWrongUuidOnUnwrap() {
+        wrapper.ensureWrappingKey()
         val sourceId = UUID.randomUUID()
         val plaintext = "per-source DEK".toByteArray()
         val envelope = wrapper.wrap(plaintext, EnvelopeDomain.SOURCE_KEY, sourceId)
@@ -86,12 +90,44 @@ class KeystoreWrapperTest {
 
     @Test
     fun tamperedCiphertextFailsClosed() {
+        wrapper.ensureWrappingKey()
         val plaintext = "database secret material".toByteArray()
         val envelope = wrapper.wrap(plaintext, EnvelopeDomain.DATABASE_SECRET)
         val tampered = envelope.ciphertext.copyOf()
         tampered[0] = (tampered[0].toInt() xor 0x01).toByte()
         assertThrows(EnvelopeAuthenticationException::class.java) {
             wrapper.unwrap(Envelope(envelope.nonce, tampered), EnvelopeDomain.DATABASE_SECRET)
+        }
+    }
+
+    /** P1-14-R2 / design §10: a lost wrapping key is never silently replaced. */
+    @Test
+    fun unwrapWithMissingAliasFailsAndDoesNotCreateAKey() {
+        wrapper.ensureWrappingKey()
+        val envelope = wrapper.wrap(ByteArray(32) { 7 }, EnvelopeDomain.DATABASE_SECRET)
+        deleteAlias()
+
+        val failure = runCatching { wrapper.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+
+        assertTrue("expected MissingWrappingKeyException, was $failure", failure is MissingWrappingKeyException)
+        assertFalse("unwrap must not generate a replacement key", wrapper.hasWrappingKey())
+    }
+
+    @Test
+    fun wrapWithMissingAliasFailsAndDoesNotCreateAKey() {
+        wrapper.ensureWrappingKey()
+        deleteAlias()
+
+        val failure = runCatching { wrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+
+        assertTrue("expected MissingWrappingKeyException, was $failure", failure is MissingWrappingKeyException)
+        assertFalse("wrap must not generate a replacement key", wrapper.hasWrappingKey())
+    }
+
+    private fun deleteAlias() {
+        KeyStore.getInstance("AndroidKeyStore").apply {
+            load(null)
+            deleteEntry(alias)
         }
     }
 }

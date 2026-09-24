@@ -5,6 +5,7 @@ import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.KeystoreUnavailableException
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.crypto.MissingWrappingKeyException
 import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.KeyStoreException
@@ -114,6 +115,10 @@ object VaultBootstrapper {
         unwrapFailure(exception)
     } catch (exception: KeystoreUnavailableException) {
         unwrapFailure(exception)
+    } catch (_: MissingWrappingKeyException) {
+        // The key file outlived its Keystore key: the vault is unrecoverable
+        // and no replacement key is generated (P1-14-R2).
+        VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED)
     }
 
     private fun unwrapFailure(exception: Exception): VaultBootstrapResult = VaultBootstrapResult.Unavailable(
@@ -127,6 +132,8 @@ object VaultBootstrapper {
     private fun createFresh(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         val secret = ByteArray(DATABASE_SECRET_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
         return try {
+            // The only place a wrapping key may be created: a fresh install.
+            wrapper.ensureWrappingKey()
             val envelope = wrapper.wrap(secret, EnvelopeDomain.DATABASE_SECRET)
             VaultKeyFile.writeAndSync(paths.databaseKeyFile, envelope)
             VaultBootstrapResult.Ready(secret)
@@ -142,6 +149,10 @@ object VaultBootstrapper {
         } catch (exception: SecurityException) {
             secret.fill(0)
             VaultBootstrapResult.Unavailable(classify(exception))
+        } catch (_: MissingWrappingKeyException) {
+            // The key vanished between creation and use; retrying may succeed.
+            secret.fill(0)
+            VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE)
         }
     }
 

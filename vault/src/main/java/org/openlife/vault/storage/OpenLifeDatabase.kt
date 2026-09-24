@@ -55,6 +55,9 @@ abstract class OpenLifeDatabase : RoomDatabase() {
             }
         }
 
+        /** Every migration, in order; never destructive (design §10). */
+        val MIGRATIONS: List<androidx.room.migration.Migration> by lazy { listOf(MIGRATION_1_2) }
+
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

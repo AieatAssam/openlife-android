@@ -202,4 +202,43 @@ class OcrDatabaseTest {
         wrappedDek = ByteArray(16) { 2 },
         artefactVersion = 1,
     )
+
+    /** P1-14-R5: the migration runs on SQLCipher and the READY invariant triggers survive it. */
+    @Test
+    fun migrationOnSqlCipherPreservesReadyInvariantTriggers() {
+        val passphrase = ByteArray(32) { 5 }
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            OpenLifeDatabase::class.java,
+            emptyList(),
+            SupportOpenHelperFactory(passphrase.copyOf()),
+        )
+        val name = "p114-triggers-${UUID.randomUUID()}"
+        val v1 = helper.createDatabase(name, 1)
+        // A version-1 install created these through the Room callback.
+        OpenLifeDatabase.readyInvariantCallback.onCreate(v1)
+        v1.close()
+
+        val migrated = helper.runMigrationsAndValidate(name, 2, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
+        fun insertReady(id: String, mimeType: String?) = runCatching {
+            migrated.execSQL(
+                """
+                INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
+                    orientation, wrappedDek, artefactVersion)
+                VALUES ('$id', 'READY', 1, 'SHARE', ${mimeType?.let { "'$it'" } ?: "NULL"}, 10, X'01', 10, 10,
+                    'NORMAL', X'02', 1)
+                """.trimIndent(),
+            )
+        }
+        val valid = insertReady("good", "image/jpeg")
+        val invalid = insertReady("bad", null)
+        migrated.close()
+        InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
+
+        assertTrue("positive control: a complete READY row inserts (${valid.exceptionOrNull()})", valid.isSuccess)
+        assertTrue(
+            "a READY row with a NULL validated field must be rejected by the trigger: ${invalid.exceptionOrNull()}",
+            invalid.exceptionOrNull()?.message?.contains("READY source requires all validated fields") == true,
+        )
+    }
 }

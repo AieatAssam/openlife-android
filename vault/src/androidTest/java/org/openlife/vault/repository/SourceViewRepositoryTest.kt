@@ -49,9 +49,9 @@ class SourceViewRepositoryTest {
     private class FlakyKeystoreWrapper(alias: String) : KeystoreWrapper(alias) {
         @Volatile var failKeyAccess = false
 
-        override fun wrappingKey(): SecretKey {
+        override fun existingWrappingKey(): SecretKey? {
             if (failKeyAccess) throw KeyStoreException("synthetic keystore failure")
-            return super.wrappingKey()
+            return super.existingWrappingKey()
         }
     }
 

@@ -1,5 +1,6 @@
 package org.openlife.vault.storage
 
+import org.junit.Assert.assertFalse
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
@@ -162,12 +163,13 @@ class VaultBootstrapperTest {
         assertEquals(VaultUnavailableCause.DATABASE_WITHOUT_KEY, missingKey.cause)
 
         paths.databaseFile.delete()
+        wrapper.ensureWrappingKey()
         val envelope = wrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET)
         paths.databaseKeyFile.writeBytes(EnvelopeCodec.encode(envelope))
         val badAlias = "test.${UUID.randomUUID()}"
         val badWrapper = KeystoreWrapper(badAlias)
         try {
-            badWrapper.wrap(ByteArray(32), EnvelopeDomain.DATABASE_SECRET)
+            badWrapper.ensureWrappingKey()
             val unwrapFailed = VaultBootstrapper.bootstrap(paths, badWrapper) as VaultBootstrapResult.Unavailable
             assertEquals(VaultUnavailableCause.KEY_UNWRAP_FAILED, unwrapFailed.cause)
         } finally {
@@ -194,5 +196,21 @@ class VaultBootstrapperTest {
         paths.resetMarkerFile.writeBytes(byteArrayOf(1))
         val incompleteReset = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
         assertEquals(VaultUnavailableCause.RESET_INCOMPLETE, incompleteReset.cause)
+    }
+
+    /** P1-14-R2: a key file whose wrapping key has vanished is unrecoverable; no key is created. */
+    @Test
+    fun missingAliasWithExistingKeyFileIsUnrecoverableAndCreatesNoKey() {
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+        java.security.KeyStore.getInstance("AndroidKeyStore").apply {
+            load(null)
+            deleteEntry(alias)
+        }
+
+        val result = VaultBootstrapper.bootstrap(paths, KeystoreWrapper(alias))
+
+        assertEquals(VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED), result)
+        assertFalse("bootstrap must not generate a replacement key", KeystoreWrapper(alias).hasWrappingKey())
+        assertTrue("the key file is kept", paths.databaseKeyFile.exists())
     }
 }

@@ -9,6 +9,7 @@ import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.EnvelopeFormat
 import org.openlife.vault.crypto.KeystoreUnavailableException
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.crypto.MissingWrappingKeyException
 import org.openlife.vault.model.Source
 import org.openlife.vault.storage.BoundedFileReader
 import org.openlife.vault.storage.FileTooLargeException
@@ -98,6 +99,9 @@ class ArtefactAuthenticator internal constructor(
         } catch (_: EnvelopeCodec.MalformedEnvelopeException) {
             ArtefactCheck.Corrupt
         } catch (_: KeystoreUnavailableException) {
+            ArtefactCheck.Transient
+        } catch (_: MissingWrappingKeyException) {
+            // A lost key says nothing about this file's bytes (P1-14-R2).
             ArtefactCheck.Transient
         } catch (_: IOException) {
             ArtefactCheck.Transient

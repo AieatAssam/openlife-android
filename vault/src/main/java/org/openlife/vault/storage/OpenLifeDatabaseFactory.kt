@@ -2,6 +2,7 @@ package org.openlife.vault.storage
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 /**
@@ -30,11 +31,17 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
  * `Migration`, per design §10 ("destructive Room migration is prohibited").
  */
 object OpenLifeDatabaseFactory {
-    fun create(context: Context, paths: VaultPaths, databaseSecret: ByteArray): OpenLifeDatabase {
+    fun create(
+        context: Context,
+        paths: VaultPaths,
+        databaseSecret: ByteArray,
+        migrations: List<Migration> = OpenLifeDatabase.MIGRATIONS,
+        databasePath: String = paths.databaseFile.absolutePath,
+    ): OpenLifeDatabase {
         System.loadLibrary("sqlcipher")
-        return Room.databaseBuilder(context, OpenLifeDatabase::class.java, paths.databaseFile.absolutePath)
+        return Room.databaseBuilder(context, OpenLifeDatabase::class.java, databasePath)
             .openHelperFactory(SupportOpenHelperFactory(databaseSecret))
-            .addMigrations(OpenLifeDatabase.MIGRATION_1_2)
+            .addMigrations(*migrations.toTypedArray())
             .addCallback(OpenLifeDatabase.readyInvariantCallback)
             .build()
     }

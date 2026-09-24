@@ -51,6 +51,17 @@ adversary.
 | Compromised dependency or release | Gradle SHA-256 dependency verification fails on unverified bytes; the release classpath denylist, CycloneDX SBOM, committed licence inventory, and manifest/egress checks make resolved release inputs auditable | Source availability alone does not prove binary integrity; ML Kit's documented transport exception expires at P2-05 |
 | Resource exhaustion by a provider | Byte and pixel ceilings, bounded preview, and a 15s provider-read deadline checked between 64 KiB chunks; the owner coroutine closes the descriptor in `finally` on its single-thread provider dispatcher, while an independent deadline+5s watchdog may close only a provider read that never returns | A provider that ignores close can still delay the hard stop; the watchdog's cross-thread close is a documented last resort because concurrent descriptor close has platform/provider hazards; in-process native decoding cannot guarantee a hard time bound |
 
+**Key loss.** The Keystore wrapping key protects the database secret and
+every item's key. Android can remove it, for example when the lock screen is
+removed or the app data is restored onto another device. OpenLife then reports
+the vault as unavailable (`KEY_UNWRAP_FAILED`) and keeps the key file,
+database and artefacts exactly as they are. A key is created only by a fresh
+bootstrap, where no key file and no database exist yet. Wrap and unwrap never
+generate a replacement (`MissingWrappingKeyException`), because a new key
+could not decrypt anything and would hide the loss. Everything wrapped under
+a lost key is unrecoverable; there is no escrow or cloud copy. Reset is the
+only way forward, and it is explicit and destructive (P1-14).
+
 `FLAG_SECURE` is required on all content-bearing windows and dialogs (R6).
 P0-07 applies the shared `applySecureWindow()` policy from both activities and
 keeps the static assertion in `SecureWindowTest` alongside the manifest
