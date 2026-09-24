@@ -60,5 +60,24 @@ These tests passed on the unchanged tree:
 | Manual: real system picker, synthetic WebP | "Not imported: OpenLife imports JPEG and PNG images only, and this item is in a different format"; 0 stage files |
 | Manual: real system picker, synthetic PNG | preview `PNG · 1×1 · 68 B` plus the cloud-provider note; cancelled |
 
+## CI follow-up: pinned preview actions
+
+- **What failed.** The first PR run (35958567421) failed the two
+  picker-preview cases on both API levels ("preview never appeared"). On
+  CI's 320×640 screen, the new cloud-provider note pushed Save below the
+  fold, where UiAutomator cannot see it.
+- **Local reproduction.** At `wm size 320x640` / `wm density 160` on
+  dev36, the picker previews failed and the share preview (no note)
+  passed. One attempt at that size was first blocked by an emulator
+  "System UI isn't responding" dialog, an environmental problem that was
+  dismissed before the reproducing run.
+- **RED.** `IntakeScreenTest.previewActionsStayVisibleOnASmallScreenWithTheCloudNote`
+  failed with "Save … is not displayed".
+- **Fix.** The preview details now scroll while Cancel and Save stay
+  pinned below them.
+  `AccessibilitySemanticsTest.previewActionsKeepSaveReachableAtLargeFontScale`
+  no longer needs to scroll to Save.
+- **Result.** App connected 83/83 on dev36; static gate pass.
+
 The synthetic WebP and PNG were generated in this session and deleted from
 `/sdcard/Pictures` afterwards.

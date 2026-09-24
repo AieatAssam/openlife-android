@@ -133,11 +133,10 @@ private fun DuplicateContent(existingSourceId: UUID, onOpenExisting: (UUID) -> U
 
 @Composable
 private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onCancel: () -> Unit) {
-    Column(
-        // Intake details and actions must remain reachable at large font
-        // scales; scrolling is preferable to clipping the confirmation row.
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-    ) {
+    // The details scroll; Cancel and Save stay pinned below them, so the
+    // decision is always on screen at any window size or font scale
+    // (VISUAL_IDENTITY §7: primary action at the bottom).
+    Column(modifier = Modifier.fillMaxSize()) {
         // P1-13-R2: decode off the main thread. The preview owns this bitmap,
         // so it is recycled when replaced or when the preview leaves.
         val preview by produceState<PreviewImage>(PreviewImage.Loading, state.previewBytes, state.orientation) {
@@ -154,46 +153,54 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
             onDispose { (current as? PreviewImage.Shown)?.bitmap?.let { if (!it.isRecycled) it.recycle() } }
         }
         val bitmap = (current as? PreviewImage.Shown)?.bitmap
-        FoldedCornerCard {
-            Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-                when {
-                    bitmap != null -> Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = stringResource(R.string.intake_selected_image_content_description),
-                    )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, top = 24.dp, end = 24.dp),
+        ) {
+            FoldedCornerCard {
+                Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
+                    when {
+                        bitmap != null -> Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = stringResource(R.string.intake_selected_image_content_description),
+                        )
 
-                    current == PreviewImage.Loading -> Text(stringResource(R.string.intake_preparing))
+                        current == PreviewImage.Loading -> Text(stringResource(R.string.intake_preparing))
 
-                    else -> Text(stringResource(R.string.intake_preview_unavailable))
+                        else -> Text(stringResource(R.string.intake_preview_unavailable))
+                    }
                 }
-            }
-            Text(
-                stringResource(
-                    R.string.intake_preview_details,
-                    state.format,
-                    state.width,
-                    state.height,
-                    formatBytes(state.byteCount),
-                ),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(16.dp),
-            )
-            Text(
-                stringResource(R.string.intake_copy_notice),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            // Design §3 R3 / F-47: the picker may serve items from a cloud
-            // media provider; say so, and that OpenLife itself never uploads.
-            if (state.intakeKind == org.openlife.vault.model.IntakeKind.PHOTO_PICKER) {
                 Text(
-                    stringResource(R.string.intake_cloud_provider_notice),
+                    stringResource(
+                        R.string.intake_preview_details,
+                        state.format,
+                        state.width,
+                        state.height,
+                        formatBytes(state.byteCount),
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(16.dp),
+                )
+                Text(
+                    stringResource(R.string.intake_copy_notice),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+                // Design §3 R3 / F-47: the picker may serve items from a cloud
+                // media provider; say so, and that OpenLife itself never uploads.
+                if (state.intakeKind == org.openlife.vault.model.IntakeKind.PHOTO_PICKER) {
+                    Text(
+                        stringResource(R.string.intake_cloud_provider_notice),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
+        Row(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.End) {
             OutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) {
                 Text(stringResource(R.string.cancel_action))
             }
