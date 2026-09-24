@@ -12,3 +12,8 @@ sealed interface OcrUiState {
     data class Cancelled(val sourceId: UUID) : OcrUiState
     data class Stale(val sourceId: UUID) : OcrUiState
 }
+
+/** P1-16 stub. */
+internal object OcrTrim {
+    fun dropExtractedText(states: Map<UUID, OcrUiState>): Map<UUID, OcrUiState> = states
+}

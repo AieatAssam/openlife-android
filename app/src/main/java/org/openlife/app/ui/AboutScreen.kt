@@ -24,7 +24,7 @@ import org.openlife.app.VaultFailureDiagnostics
 import org.openlife.app.ui.brand.FoldedCornerCard
 
 @Composable
-fun AboutScreen(onBack: () -> Unit = {}) {
+fun AboutScreen(onBack: () -> Unit = {}, lowRamDevice: Boolean = false) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val licenseText = produceState(initialValue = "", resources) {

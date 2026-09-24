@@ -209,6 +209,9 @@ class MainActivity : FragmentActivity() {
         )
     }
 
+    /** Test seam (P1-16-R2): how many times hiding the activity has scrubbed content. */
+    internal fun scrubCountForTest(): Long = backgroundEpoch.value
+
     /** Test seam: the Photo Picker result path (P1-02). */
     internal fun forwardPickedUriForTest(uri: Uri) = forwardPickedUri(uri)
 
