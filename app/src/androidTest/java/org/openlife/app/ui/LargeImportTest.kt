@@ -81,11 +81,11 @@ class LargeImportTest {
 
     private companion object {
         const val TAG = "P116LargeImport"
-        const val WIDTH = 4000
-        const val HEIGHT = 3000
+        const val WIDTH = 4600
+        const val HEIGHT = 3450
         const val SEED = 16L
         const val OPAQUE = 0xFF000000.toInt()
-        const val MIN_FIXTURE_BYTES = 12L * 1024 * 1024
+        const val MIN_FIXTURE_BYTES = 14L * 1024 * 1024
         val QUALITIES = (95 downTo 70).toList()
     }
 }

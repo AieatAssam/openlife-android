@@ -13,7 +13,12 @@ sealed interface OcrUiState {
     data class Stale(val sourceId: UUID) : OcrUiState
 }
 
-/** P1-16 stub. */
+/**
+ * P1-16-R3: under memory pressure or when hidden, extracted text leaves
+ * memory; run state (running, failed, cancelled) is kept so the panel stays
+ * truthful and a running extraction is not silently lost.
+ */
 internal object OcrTrim {
-    fun dropExtractedText(states: Map<UUID, OcrUiState>): Map<UUID, OcrUiState> = states
+    fun dropExtractedText(states: Map<UUID, OcrUiState>): Map<UUID, OcrUiState> =
+        states.filterValues { it !is OcrUiState.Ready }
 }

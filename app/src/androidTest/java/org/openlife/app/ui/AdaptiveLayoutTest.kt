@@ -5,6 +5,7 @@ import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
@@ -48,9 +49,11 @@ class AdaptiveLayoutTest {
         composeRule.onNodeWithText(PLACEHOLDER).assertIsDisplayed()
         composeRule.onNodeWithText("Imported", substring = true).performClick()
 
-        composeRule.onNodeWithText("Details").assertIsDisplayed()
-        // The list is still on screen beside the viewer.
-        composeRule.onNodeWithText("Imported", substring = true).assertIsDisplayed()
+        // The viewer's own top bar is in the detail pane (its content scrolls below).
+        composeRule.onNodeWithContentDescription("Back").assertIsDisplayed()
+        composeRule.onNodeWithText(PLACEHOLDER).assertDoesNotExist()
+        // The list, with its import action, is still on screen beside the viewer.
+        composeRule.onNodeWithText("Import from photos").assertIsDisplayed()
     }
 
     @Test

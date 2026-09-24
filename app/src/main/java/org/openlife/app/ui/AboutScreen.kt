@@ -36,12 +36,17 @@ fun AboutScreen(onBack: () -> Unit = {}, lowRamDevice: Boolean = false) {
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = { BackTopAppBar(title = stringResource(R.string.about_title), onBack = onBack) },
     ) { padding ->
-        AboutContent(modifier = Modifier.padding(padding), licenseText = licenseText, context = context)
+        AboutContent(Modifier.padding(padding), licenseText, context, lowRamDevice)
     }
 }
 
 @Composable
-private fun AboutContent(modifier: Modifier, licenseText: String, context: android.content.Context) {
+private fun AboutContent(
+    modifier: Modifier,
+    licenseText: String,
+    context: android.content.Context,
+    lowRamDevice: Boolean,
+) {
     Surface(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -55,6 +60,14 @@ private fun AboutContent(modifier: Modifier, licenseText: String, context: andro
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            if (lowRamDevice) {
+                // P1-16-R4: the supported RAM floor is 2 GB; say so where it applies.
+                Text(
+                    stringResource(R.string.about_low_ram_warning),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
             FoldedCornerCard(modifier = Modifier.padding(top = 24.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.about_font_credits))
