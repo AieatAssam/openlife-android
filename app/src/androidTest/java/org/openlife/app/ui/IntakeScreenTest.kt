@@ -1,5 +1,8 @@
 package org.openlife.app.ui
 
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -66,6 +69,34 @@ class IntakeScreenTest {
 
         composeRule.onNodeWithText("may come from a cloud photo service", substring = true).assertExists()
         composeRule.onNodeWithText("OpenLife never uploads", substring = true).assertExists()
+    }
+
+    /** The preview's Save and Cancel stay on screen however long the explanatory text is. */
+    @Test
+    fun previewActionsStayVisibleOnASmallScreenWithTheCloudNote() {
+        composeRule.setContent {
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier.size(width = 320.dp, height = 480.dp),
+            ) {
+                IntakeScreen(
+                    state = IntakeUiState.Preview(
+                        sourceId = UUID.randomUUID(),
+                        format = ImageFormat.JPEG,
+                        width = 100,
+                        height = 100,
+                        byteCount = 1,
+                        previewBytes = null,
+                        intakeKind = org.openlife.vault.model.IntakeKind.PHOTO_PICKER,
+                    ),
+                    onSave = {},
+                    onCancel = {},
+                    onDone = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Save").assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
     }
 
     @Test
