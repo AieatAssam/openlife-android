@@ -102,10 +102,9 @@ android {
             // The pinned ML Kit native artifact has 4 KB LOAD alignment in
             // its 32-bit armeabi-v7a/x86 binaries. Keep only architectures
             // whose packaged native libraries pass the Android 15 16 KB
-            // alignment gate. P2-03 revisited this: tesseract4android 4.9.0's
-            // armeabi-v7a libraries are 4 KB aligned too, so 32-bit ARM stays
-            // out until the owner scopes the gate to 64-bit or a source build
-            // lands (ADR-0003). x86 is not shipped.
+            // alignment gate. Owner decision 2026-09-24 (ADR-0003): no 32-bit
+            // ARM; the shipped set is arm64-v8a and x86_64, and x86 is not
+            // shipped. Later native additions (P8-01) build for this set.
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
 

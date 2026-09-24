@@ -2,7 +2,8 @@
 
 Date: 2026-09-24
 Status: accepted for P2-03; the engine choice was agreed by the owner on
-2026-09-16 (design v0.3). ML Kit's removal waits for P2-04's gate and the
+2026-09-16 (design v0.3). The owner decided the ABI set, the repository and
+the bundled licences on 2026-09-24 (below). ML Kit's removal waits for P2-04's gate and the
 owner's acknowledgement (P2-05).
 Supersedes: the engine choice in decision 0002. Every C1 boundary 0002 set
 is kept.
@@ -84,26 +85,24 @@ touching provenance rows.
   (0x4000). `check-16kb-alignment.sh` passes on the release APK with 14 native
   libraries.
 
-## Deviations and open owner decisions
+## Owner decisions (2026-09-24)
 
-- **R5: ABI set (armeabi-v7a).** The step asked to ship
-  arm64-v8a, armeabi-v7a and x86_64. tesseract4android 4.9.0's armeabi-v7a
-  libraries are 4 KB aligned (0x1000), as are ML Kit's. The project's 16 KB
-  gate checks every library, so 32-bit ARM stays out; the shipped set remains
-  arm64-v8a and x86_64, and x86 is not shipped. The owner can choose either:
-  - scope the gate to 64-bit ABIs, which is where Android's 16 KB page
-    requirement applies; or
-  - build Tesseract for armeabi-v7a from source with `-Wl,-z,max-page-size=16384`.
-    That is CI-only here, because no NDK is installed locally.
-- **Bundled native licences.** The IJG and libpng licences are permissive but
-  are not on the dependency policy's allowlist. The Gradle licence checker sees
-  only the module licence, which is recorded as Apache-2.0 through
-  `config/license-overrides.txt` and `config/allowed-licenses.json`. The owner
-  should accept or reject IJG and libpng as policy labels.
-- **R7: measurement fixtures.** P2-04 defines the evaluation fixtures and has
-  not landed. Duration and peak PSS were measured on synthetic fixtures instead
-  (`OcrEngineMeasurementTest`, opt-in), on dev36 API 36 locally. A run on the CI
-  emulator is still a gap.
+- **ABI set (R5): no 32-bit ARM.** The shipped set is arm64-v8a and x86_64,
+  and x86 is not shipped. This replaces R5's armeabi-v7a: tesseract4android
+  4.9.0's armeabi-v7a libraries are 4 KB aligned (0x1000), as are ML Kit's, and
+  the 16 KB gate stays unchanged for every shipped library. Later native
+  additions (P8-01) must build for this set.
+- **JitPack approved** as the source of tesseract4android, restricted and
+  pinned as described above.
+- **Bundled native licences permitted as listed exceptions.** IJG (libjpeg
+  v9f) and libpng-2.0 (libpng 1.6.48) are listed in `docs/dependency-policy.md`
+  ("Licence exceptions") and allowed in `config/allowed-licenses.json`.
+
+## Remaining gap
+
+- **R7 fixtures.** P2-04 defines the evaluation fixtures. Duration and peak PSS
+  were measured on synthetic fixtures (`OcrEngineMeasurementTest`, opt-in) on
+  dev36 API 36 locally; a run on the CI emulator is still a gap.
 
 ## Consequences
 
