@@ -43,9 +43,13 @@ class NavigationBackTest {
             "the list must be the navigation start destination",
             hostSource.contains("startDestination = Routes.List"),
         )
+        // P1-07: deep links are consumed inside UnlockedContent, the composable
+        // that also composes the NavHost, so the graph exists and the app is unlocked.
         assertTrue(
             "cold-start deep links must wait until the navigation graph exists",
-            activitySource.contains("LaunchedEffect(acknowledged, initialSourceId)"),
+            activitySource.contains("LaunchedEffect(requestedSourceId)") &&
+                activitySource.indexOf("private fun UnlockedContent(") <
+                activitySource.indexOf("LaunchedEffect(requestedSourceId)"),
         )
         assertFalse("the hand-rolled Screen stack must be removed", activitySource.contains("sealed interface Screen"))
     }

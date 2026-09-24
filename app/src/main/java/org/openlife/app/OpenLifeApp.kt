@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
+import org.openlife.app.lock.AppLockController
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.ocr.MlKitOcrEngine
 import org.openlife.vault.ocr.OcrEngineRegistry
@@ -62,6 +63,7 @@ class OpenLifeApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        appLock.start()
         if (BuildConfig.DEBUG) {
             // P1-13-R3: surface main-thread disk and network access during
             // development. Logging only; instrumented tests enforce it with
@@ -173,6 +175,9 @@ class OpenLifeApp : Application() {
         }
     }
 
+    /** The optional app lock (P1-07); every content read awaits [AppLockController.awaitContentAccess]. */
+    val appLock by lazy { AppLockController(this, importHousekeeping.appScope) }
+
     /** One-shot proof of OpenLife's own Photo Picker forwarding (P1-02-R6). */
     val pickerNonce = org.openlife.app.intake.PickerNonce()
 
@@ -216,6 +221,8 @@ class OpenLifeApp : Application() {
             if (result == VaultResetResult.COMPLETED) {
                 cachedAccess = null
                 getSharedPreferences(APP_LOCK_PREFERENCES, MODE_PRIVATE).edit(commit = true) { clear() }
+                // Reset turns the app lock off (ADR-0005 scope); keep the running process in step.
+                appLock.state.onPolicyChanged(org.openlife.app.lock.AppLockPolicy())
             } else if (paths.resetMarkerFile.exists()) {
                 cachedAccess = VaultAccess.Unavailable(VaultUnavailableCause.RESET_INCOMPLETE)
                 cachedDatabase = null

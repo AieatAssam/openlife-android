@@ -41,6 +41,7 @@ fun SettingsScreen(
     onResetComplete: () -> Unit,
     onBack: () -> Unit = {},
     onVerifyAll: (suspend () -> VerifyReport?)? = null,
+    appLock: AppLockSettings? = null,
 ) {
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
@@ -51,6 +52,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                appLock?.let { AppLockSettingsSection(it) }
                 onVerifyAll?.let { VerifyAllSection(it) }
                 ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete)
             }

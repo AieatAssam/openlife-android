@@ -47,6 +47,10 @@ class FirstRunFlowTest {
             val understand = device.wait(Until.findObject(By.text("I understand")), WAIT_MS)
             assertTrue("first-run explanation was not shown", understand != null)
             understand.click()
+            // P1-07-R1: the optional app lock is offered once, right after the explanation.
+            val notNow = device.wait(Until.findObject(By.text("Not now")), WAIT_MS)
+            assertTrue("the app lock was not offered after the explanation", notNow != null)
+            notNow.click()
             assertTrue(
                 "list did not follow the acknowledgement",
                 device.wait(Until.hasObject(By.desc("More options")), WAIT_MS),

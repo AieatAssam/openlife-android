@@ -173,6 +173,10 @@ fi
 
 if wait_for_ui_pattern 'text="I understand"' 8; then
     tap_text 'I understand'
+    # P1-07: the optional app lock is offered once after the explanation; the smoke leaves it off.
+    if wait_for_ui_pattern 'text="Not now"' 15; then
+        tap_text 'Not now'
+    fi
 fi
 wait_for_ui_pattern 'text="OpenLife"|text="Nothing kept yet"|content-desc="Saved image thumbnail"' 45
 dump_ui

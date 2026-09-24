@@ -52,6 +52,7 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
         jobs[sourceId]?.cancel()
         setState(sourceId, OcrUiState.Running(sourceId))
         jobs[sourceId] = viewModelScope.launch {
+            application.appLock.awaitContentAccess()
             val access = application.vault() as? VaultAccess.Ready ?: return@launch
             when (val result = access.ocrRepository.runOcr(sourceId)) {
                 is OcrRunResult.Completed -> setState(

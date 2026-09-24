@@ -90,6 +90,7 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
             thumbnailCache.contains(sourceId) -> null
 
             else -> {
+                application.appLock.awaitContentAccess()
                 val generation = thumbnailCache.generation()
                 val access = application.vault() as? VaultAccess.Ready
                 if (access == null) {

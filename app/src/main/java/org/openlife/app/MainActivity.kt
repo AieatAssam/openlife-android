@@ -3,7 +3,6 @@ package org.openlife.app
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,16 +12,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.lock.AppLockGate
+import org.openlife.app.lock.AppLockOfferScreen
+import org.openlife.app.lock.AppLockPolicy
+import org.openlife.app.lock.LockAvailability
+import org.openlife.app.lock.LockStatus
 import org.openlife.app.navigation.OpenLifeNavHost
 import org.openlife.app.navigation.Routes
+import org.openlife.app.settings.AppLockSettings
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.OcrViewModel
@@ -33,7 +41,7 @@ import org.openlife.vault.repository.ReadyReadResult
 import java.util.UUID
 
 /** Persistent source list and viewer host. Intake remains a separate activity. */
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: SourceListViewModel by viewModels {
         SourceListViewModel.factory(application as OpenLifeApp)
@@ -67,11 +75,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Keep the splash up until the first-run flag has been read off the
         // main thread, so neither screen flashes before the other.
-        installSplashScreen().setKeepOnScreenCondition { firstRunAcknowledged.value == null }
+        val lock = (application as OpenLifeApp).appLock
+        installSplashScreen().setKeepOnScreenCondition {
+            firstRunAcknowledged.value == null || lock.status.value == LockStatus.UNKNOWN
+        }
         lifecycleScope.launch {
             firstRunAcknowledged.value = FirstRunPreferences.loadAcknowledged(applicationContext)
         }
         super.onCreate(savedInstanceState)
+        // Opened after unlock by UnlockedContent; a recreated activity has already consumed it.
+        if (savedInstanceState == null) openSourceIdFrom(intent)?.let { openSourceRequests.value = it }
         enableEdgeToEdge()
         applySecureWindow()
         setContent { MainContent() }
@@ -79,10 +92,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun rememberPhotoPickerLauncher(): () -> Unit {
+        val lock = (application as OpenLifeApp).appLock
         val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            lock.state.endExternalActivity()
             uri?.let(::forwardPickedUri)
         }
         return {
+            // The picker is another app's activity that OpenLife opened; going there is not leaving (ADR-0004).
+            lock.state.beginExternalActivity()
             pickMedia.launch(
                 androidx.activity.result.PickVisualMediaRequest(
                     ActivityResultContracts.PickVisualMedia.ImageOnly,
@@ -93,31 +110,67 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun MainContent() {
+        val app = application as OpenLifeApp
         val firstRun = firstRunAcknowledged.collectAsState().value
-        val acknowledged = firstRun == true
-        val navController = rememberNavController()
-        val requestedSourceId by openSourceRequests.collectAsState()
-        val epoch by backgroundEpoch.collectAsState()
-        val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
-        val ocrStates by ocrViewModel.states.collectAsState()
-        val listState by viewModel.state.collectAsState()
-        val initialSourceId = remember { openSourceIdFrom(intent) }
+        val lockStatus by app.appLock.status.collectAsState()
+        var offerAppLock by rememberSaveable { mutableStateOf(false) }
 
-        LaunchedEffect(acknowledged, initialSourceId) {
-            if (acknowledged) {
-                initialSourceId?.let { navController.navigate(Routes.Viewer(it.toString())) }
-            }
-        }
-        LaunchedEffect(acknowledged, requestedSourceId) {
-            if (acknowledged) {
-                requestedSourceId?.let {
-                    navController.navigate(Routes.Viewer(it.toString()))
-                    openSourceRequests.value = null
+        OpenLifeTheme {
+            when (firstRun) {
+                null -> Unit
+
+                false -> FirstRunExplanationScreen(
+                    onContinue = {
+                        firstRunAcknowledged.value = true
+                        offerAppLock = true
+                        lifecycleScope.launch { FirstRunPreferences.acknowledge(applicationContext) }
+                    },
+                )
+
+                true -> AppLockGate(lockStatus, app.appLock.state, app.appLock.authenticator, this) {
+                    if (offerAppLock) {
+                        AppLockOfferScreen(
+                            onEnable = {
+                                app.appLock.authenticator.availability().also { availability ->
+                                    if (availability == LockAvailability.AVAILABLE) {
+                                        app.appLock.updatePolicy(AppLockPolicy(enabled = true))
+                                        offerAppLock = false
+                                    }
+                                }
+                            },
+                            onSkip = { offerAppLock = false },
+                        )
+                    } else {
+                        UnlockedContent(app)
+                    }
                 }
             }
         }
-        LaunchedEffect(acknowledged, epoch) {
-            if (acknowledged && epoch > 0L) {
+    }
+
+    /**
+     * Everything content-bearing. Composed only while unlocked (P1-07-R2); a
+     * relock discards it, so unlocking starts again from the list.
+     */
+    @Composable
+    private fun UnlockedContent(app: OpenLifeApp) {
+        val navController = rememberNavController()
+        val requestedSourceId by openSourceRequests.collectAsState()
+        val epoch by backgroundEpoch.collectAsState()
+        val epochAtStart = remember { epoch }
+        val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
+        val ocrStates by ocrViewModel.states.collectAsState()
+        val listState by viewModel.state.collectAsState()
+        val lockPolicy by app.appLock.policy.collectAsState()
+
+        LaunchedEffect(requestedSourceId) {
+            requestedSourceId?.let {
+                navController.navigate(Routes.Viewer(it.toString()))
+                openSourceRequests.value = null
+            }
+        }
+        LaunchedEffect(epoch) {
+            if (epoch != epochAtStart) {
                 navController.navigate(Routes.List) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = false }
                     launchSingleTop = true
@@ -125,47 +178,35 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val launchPhotoPicker = rememberPhotoPickerLauncher()
-
-        OpenLifeTheme {
-            if (firstRun == false) {
-                FirstRunExplanationScreen(
-                    onContinue = {
-                        firstRunAcknowledged.value = true
-                        lifecycleScope.launch { FirstRunPreferences.acknowledge(applicationContext) }
-                    },
-                )
-            } else if (acknowledged) {
-                OpenLifeNavHost(
-                    listState = listState,
-                    thumbnailGeneration = thumbnailGeneration,
-                    ocrStates = ocrStates,
-                    loadThumbnail = viewModel::loadThumbnail,
-                    loadReadyContent = { sourceId -> loadReadyContent(sourceId) },
-                    delete = { sourceId, onDone -> viewModel.delete(sourceId) { onDone() } },
-                    extractText = ocrViewModel::run,
-                    cancelOcr = ocrViewModel::cancel,
-                    correct = { sourceId, span, correctedText ->
-                        val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
-                        if (ready != null) ocrViewModel.correct(ready.revisionId, span.id, correctedText)
-                    },
-                    review = { sourceId, reviewState ->
-                        val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
-                        if (ready != null) ocrViewModel.review(ready.revisionId, reviewState)
-                    },
-                    onImportFromPhotoPicker = launchPhotoPicker,
-                    navController = navController,
-                    onRetryVault = viewModel::retryVault,
-                    onFinishReset = viewModel::finishVaultReset,
-                    onResetVault = { (application as OpenLifeApp).resetVault() },
-                    onVerifyAll = { (application as OpenLifeApp).verifyAllItems() },
-                    onResetComplete = {
-                        viewModel.retryVault()
-                        navController.navigate(Routes.List) { launchSingleTop = true }
-                    },
-                )
-            }
-        }
+        OpenLifeNavHost(
+            listState = listState,
+            thumbnailGeneration = thumbnailGeneration,
+            ocrStates = ocrStates,
+            loadThumbnail = viewModel::loadThumbnail,
+            loadReadyContent = { sourceId -> loadReadyContent(sourceId) },
+            delete = { sourceId, onDone -> viewModel.delete(sourceId) { onDone() } },
+            extractText = ocrViewModel::run,
+            cancelOcr = ocrViewModel::cancel,
+            correct = { sourceId, span, correctedText ->
+                val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
+                if (ready != null) ocrViewModel.correct(ready.revisionId, span.id, correctedText)
+            },
+            review = { sourceId, reviewState ->
+                val ready = ocrStates[sourceId] as? org.openlife.app.ui.OcrUiState.Ready
+                if (ready != null) ocrViewModel.review(ready.revisionId, reviewState)
+            },
+            onImportFromPhotoPicker = rememberPhotoPickerLauncher(),
+            navController = navController,
+            onRetryVault = viewModel::retryVault,
+            onFinishReset = viewModel::finishVaultReset,
+            onResetVault = { app.resetVault() },
+            onVerifyAll = { app.verifyAllItems() },
+            appLock = AppLockSettings(lockPolicy, app.appLock.authenticator::availability, app.appLock::updatePolicy),
+            onResetComplete = {
+                viewModel.retryVault()
+                navController.navigate(Routes.List) { launchSingleTop = true }
+            },
+        )
     }
 
     /** Test seam: the Photo Picker result path (P1-02). */
@@ -185,9 +226,12 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private suspend fun loadReadyContent(sourceId: UUID): ReadyReadResult =
-        ((application as OpenLifeApp).vault() as? VaultAccess.Ready)?.viewRepository?.readReadyBytes(sourceId)
+    private suspend fun loadReadyContent(sourceId: UUID): ReadyReadResult {
+        val app = application as OpenLifeApp
+        app.appLock.awaitContentAccess()
+        return (app.vault() as? VaultAccess.Ready)?.viewRepository?.readReadyBytes(sourceId)
             ?: ReadyReadResult.Unavailable
+    }
 
     companion object {
         const val EXTRA_OPEN_SOURCE_ID = "org.openlife.app.MainActivity.openSourceId"

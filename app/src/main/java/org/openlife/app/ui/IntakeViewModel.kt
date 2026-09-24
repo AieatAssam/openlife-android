@@ -189,6 +189,8 @@ class IntakeViewModel(
         val uri = uriString.toUri()
         activeImportJob?.cancel()
         activeImportJob = viewModelScope.launch {
+            // P1-07-R5: a share that arrives while locked touches the provider only after unlock.
+            application.appLock.awaitContentAccess()
             // getType is not part of the descriptor open/read/close sequence
             // that must stay on the provider thread (P1-09). It runs in its own
             // IO scope and is awaited cancellably: a provider stalling here
@@ -367,6 +369,8 @@ class IntakeViewModel(
 
     private fun restorePreviewIfNeeded(id: UUID) {
         viewModelScope.launch {
+            // A restored or re-shown preview is decrypted only once unlocked (P1-07-R2).
+            application.appLock.awaitContentAccess()
             when (val access = application.vault()) {
                 is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
 

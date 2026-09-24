@@ -40,6 +40,26 @@ class ManifestBoundaryTest {
         assertTrue("forbidden release permissions: $forbidden", forbidden.isEmpty())
     }
 
+    /**
+     * P1-07: USE_BIOMETRIC is the only permission OpenLife added. The other
+     * entry is androidx.core's app-private signature permission for its
+     * non-exported dynamic receivers.
+     */
+    @Test
+    fun releasePermissionsAreExactlyTheAllowlist() {
+        val permissions = elements(readReleaseManifest())
+            .filter { it.localName?.startsWith("uses-permission") == true }
+            .map { it.getAttributeNS(androidNamespace, "name") }
+            .toSet()
+        assertEquals(
+            setOf(
+                "android.permission.USE_BIOMETRIC",
+                "org.openlife.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+            ),
+            permissions,
+        )
+    }
+
     @Test
     fun onlyLauncherAndIntakeAreExported() {
         val document = readReleaseManifest()
