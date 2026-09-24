@@ -57,6 +57,21 @@ the first-run screen. It was dismissed with Wait before the recorded run.
 
 Vault code is unchanged; CI runs the vault suite.
 
+## Hosted CI follow-ups
+
+- **Run 35990662858: brand golden.** Both device legs failed only
+  \`BrandScreenshotInstrumentedTest\`, because the first-run copy changed.
+  - The CI-profile first-run goldens were regenerated with the workflow's
+    \`generate-goldens\` dispatch (run 35991975064), reviewed and committed
+    (8a35aac).
+  - The local 420 dpi profile crops above the changed paragraph and is
+    unchanged.
+- **Run 35992588109: release smoke.** \`CONNECTED_TESTS_RAN\` was app=88 and
+  vault=115 on both legs, but the release smoke timed out on a fresh install.
+  After "I understand" it now meets the one-time app-lock offer.
+  - \`scripts/release-smoke.sh\` taps "Not now" when the offer appears.
+  - Local run on dev36: \`RELEASE_SMOKE_RESULT=pass\`.
+
 ### Manual: real BiometricPrompt, device-credential path (dev36, API 36)
 
 The transcript below uses real `BiometricPrompt` with a PIN set through
