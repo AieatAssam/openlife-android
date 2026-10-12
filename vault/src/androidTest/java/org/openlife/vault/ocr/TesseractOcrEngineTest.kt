@@ -84,7 +84,8 @@ class TesseractOcrEngineTest {
     fun cancellationStopsRecognitionAndRecyclesAfterCompletion(): Unit = runBlocking {
         val page = densePage()
         val job = launch(Dispatchers.Default) { engine.extract(input(page, Orientation.NORMAL)) }
-        // stop() acts in the recognition phase; layout analysis before it is not interruptible.
+        // "recognizing" is the first progress callback with percent > 0.
+        // stop() is sampled between words, so this waits out the cold first word.
         withTimeout(START_TIMEOUT_MS) { while ("recognizing" !in events) delay(POLL_MS) }
 
         val started = System.nanoTime()
@@ -123,15 +124,16 @@ class TesseractOcrEngineTest {
         canvas.drawText("TOTAL 42.50", MARGIN, SECOND_BASELINE, paint)
     }
 
+    /**
+     * Many short words on a narrow page. Cancel is checked once per word, and
+     * the caller gives up after [STOP_BUDGET_MS]. A 2400×3200 line on the API 29
+     * CI emulator (run 38034308154) kept that in-flight word past the budget:
+     * cancelAndJoin returned in 5012ms, which is the 5s settle timeout.
+     */
     private fun densePage(): Bitmap = page(DENSE_WIDTH, DENSE_HEIGHT) { canvas, paint ->
         paint.textSize = DENSE_TEXT_SIZE
         repeat(DENSE_LINES) { line ->
-            canvas.drawText(
-                "Line $line: the quick brown fox jumps over the lazy dog 0123456789",
-                MARGIN,
-                DENSE_LINE_HEIGHT * (line + 1),
-                paint,
-            )
+            canvas.drawText(DENSE_LINE, MARGIN, DENSE_LINE_HEIGHT * (line + 1), paint)
         }
     }
 
@@ -165,11 +167,12 @@ class TesseractOcrEngineTest {
         const val LINE_TOLERANCE = 35f
         const val REGION_TOLERANCE = 12
         const val JPEG_QUALITY = 95
-        const val DENSE_WIDTH = 2400
-        const val DENSE_HEIGHT = 3200
-        const val DENSE_TEXT_SIZE = 42f
-        const val DENSE_LINE_HEIGHT = 62f
-        const val DENSE_LINES = 50
+        const val DENSE_WIDTH = 720
+        const val DENSE_HEIGHT = 1600
+        const val DENSE_TEXT_SIZE = 28f
+        const val DENSE_LINE_HEIGHT = 36f
+        const val DENSE_LINES = 40
+        const val DENSE_LINE = "aa bb cc dd ee ff"
         const val START_TIMEOUT_MS = 30_000L
         const val STOP_BUDGET_MS = 5_000L
         const val POLL_MS = 10L
