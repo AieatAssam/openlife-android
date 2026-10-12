@@ -47,3 +47,10 @@ APK and mapping.txt are not modified.
 The hosted API-29/API-36 emulator legs are the authoritative fresh-device
 smoke verification. Local manual reproduction also verified the MediaStore
 URI grant and prefixed integrity row; no device data was cleared or reset.
+
+Both CI emulator legs use a 320×640, 160 dpi display (`qemu.skin=320x640`).
+API 29's `uiautomator dump` omits nodes outside that viewport; API 36 keeps
+them. After OCR, "Run again" sits under the result block, past the bottom of
+the API 29 fold, so the smoke scrolls until that node is dumped. The intake
+"I understand" check is optional: MainActivity already acknowledged first-run,
+and a miss there is the normal path.
