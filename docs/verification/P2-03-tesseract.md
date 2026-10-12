@@ -96,3 +96,36 @@ fixture ran three times after a warm-up.
 - **Gap, R7:** measured on synthetic fixtures, not P2-04's, and not on the CI
   emulator.
 - **Gap, physical devices:** no physical-device run.
+
+## API 29 CI, run 38034308154 (2026-10-10, commit f0556a5)
+
+Vault `connectedDebugAndroidTest` on API 29: 124 tests, 3 failures. API 36's
+Gradle task succeeded. The same JUnit XML on both APIs counted the two opt-in
+harnesses as failures (`skipped=0`).
+
+| Test | What the artifact showed |
+| --- | --- |
+| `TesseractOcrEngineTest.cancellationStopsRecognitionAndRecyclesAfterCompletion` | `AssertionError: stop() ends recognition promptly (took 5012ms)` at `TesseractOcrEngineTest.kt:95`. API 36: same test 0.445s, passed. |
+| `OcrEngineMeasurementTest.measureEnginesOnSyntheticFixtures` | `AssumptionViolatedException` from `invokeSuspend` at line 43. Device log: `assumption failed`. XML: `<failure>`. |
+| `RecoveryTimingTest.recoveryTimeWithFiftySources` | `AssumptionViolatedException` from `setUp` line 41. Same log and XML shape. |
+
+5012 ms is `ENGINE_SETTLE_TIMEOUT_MILLIS` (5000) plus a little overhead.
+`awaitEngineTask` stopped waiting; the native call had not returned. Tesseract
+checks cancel once per word, and the first progress callback is percent 0,
+before the first word is classified. That word on the 2400×3200 fixture
+outlasted the settle budget on the API 29 emulator. The engine now emits
+`recognizing` only when percent > 0, and the fixture is a 720×1600 page of
+short words (`aa bb cc dd ee ff`, 40 lines). The promptness check is unchanged:
+`stoppedWithinMs < 5000`.
+
+`AssumptionViolatedException` was logged as an assumption on the device and
+stored as `TestAbortedException` in the result proto (so the API 36 Gradle task
+still exited 0), but the JUnit XML wrote `<failure>`. `OptInHarnessRunner`
+ignores `OcrEngineMeasurementTest` and `RecoveryTimingTest` unless
+`p203Measure=true` or `p114Timing=true`. Ignored tests are skips in that XML.
+
+Local re-run of the instrumented tests on an API 29 Google APIs x86_64
+emulator (emulator 37.2.12, `-gpu swiftshader_indirect`, KVM) did not reach a
+guest kernel or an `adb` device, so this change does not include a new
+on-device pass. `./gradlew detekt lint :app:test :vault:test assembleDebug`
+and `:vault:compileDebugAndroidTestKotlin` succeeded on this tree.

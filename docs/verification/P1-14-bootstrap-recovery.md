@@ -95,6 +95,11 @@ corrupt page hit mid-session therefore does not delete the file either.
 | `./gradlew detekt lint :app:test :vault:test assembleDebug` | BUILD SUCCESSFUL (after refactor) |
 | `RecoveryTimingTest` (opt-in, `p114Timing=true`) | see below |
 
+`RecoveryTimingTest` is ignored unless that argument is set. An
+`assumeTrue` in `setUp` was written as a JUnit `<failure>` by the connected-test
+XML (run 38034308154, API 29 and API 36) even though the device runner logged
+`assumption failed`. See `docs/verification/P2-03-tesseract.md`.
+
 The app suite ran before the final refactor, which changed only the count copy
 to plurals and extracted the picker launcher. CI reruns both suites on API 29
 and API 36.
