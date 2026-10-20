@@ -65,13 +65,19 @@ wait_for_ui_pattern() {
         timeout_seconds="$2"
     fi
     local deadline=$((SECONDS + timeout_seconds))
+    local report_timeout=1
+    if [[ "${3:-}" == quiet ]]; then
+        report_timeout=0
+    fi
     while (( SECONDS < deadline )); do
         if dump_ui && grep -Eq "$pattern" "$ui_dump"; then
             return 0
         fi
         sleep 1
     done
-    printf 'timed out waiting for UI pattern: %s\n' "$pattern" >&2
+    if [[ "$report_timeout" -eq 1 ]]; then
+        printf 'timed out waiting for UI pattern: %s\n' "$pattern" >&2
+    fi
     return 1
 }
 
@@ -103,21 +109,56 @@ tap_description() {
     tap_node 'content-desc' "$1"
 }
 
-# Swipes up until [pattern] is in the UI dump; small screens put the OCR panel below the fold.
-scroll_until_visible() {
-    local pattern="$1"
-    local size width height
+# Finger move that reveals content below (down) or above (up) the viewport.
+scroll_once() {
+    local direction="$1"
+    local size width height start_y end_y
     size="$("$adb_bin" shell wm size | tr -d '\r' | awk -F': ' '/size/ {value=$2} END {print value}')"
     width="${size%x*}"
     height="${size#*x}"
-    for _ in 1 2 3 4 5 6; do
-        if dump_ui && grep -Eq "$pattern" "$ui_dump"; then
-            return 0
-        fi
-        "$adb_bin" shell input swipe $((width / 2)) $((height * 3 / 4)) $((width / 2)) $((height / 4)) 300
-        sleep 1
+    if [[ "$direction" == up ]]; then
+        start_y=$((height / 4))
+        end_y=$((height * 3 / 4))
+    else
+        start_y=$((height * 3 / 4))
+        end_y=$((height / 4))
+    fi
+    "$adb_bin" shell input swipe $((width / 2)) "$start_y" $((width / 2)) "$end_y" 300
+}
+
+# CI emulators are 320x640. API 29 uiautomator drops nodes outside that
+# viewport; API 36 keeps them, which is why only API 29 missed "Run again"
+# (it is drawn under the OCR result, past the bottom of the fold). Search
+# down and back up until the pattern is dumped or the timeout elapses.
+scroll_until_visible() {
+    local pattern="$1"
+    local timeout_seconds=20
+    if [[ $# -ge 2 ]]; then
+        timeout_seconds="$2"
+    fi
+    local deadline=$((SECONDS + timeout_seconds))
+    while (( SECONDS < deadline )); do
+        local i
+        for i in 1 2 3 4; do
+            if dump_ui && grep -Eq "$pattern" "$ui_dump"; then
+                return 0
+            fi
+            scroll_once down
+            sleep 1
+        done
+        for i in 1 2 3 4; do
+            if dump_ui && grep -Eq "$pattern" "$ui_dump"; then
+                return 0
+            fi
+            scroll_once up
+            sleep 1
+        done
     done
-    wait_for_ui_pattern "$pattern" 5
+    printf 'timed out waiting for UI pattern: %s\n' "$pattern" >&2
+    if [[ -f "$ui_dump" ]]; then
+        grep -o 'text="[^"]*"' "$ui_dump" | head -n 30 >&2 || true
+    fi
+    return 1
 }
 
 count_descriptions() {
@@ -233,7 +274,9 @@ media_uri="content://media/external/images/media/$media_id"
     --eu android.intent.extra.STREAM "$media_uri" \
     --grant-read-uri-permission \
     -n "$intake_activity" >/dev/null
-if wait_for_ui_pattern 'text="I understand"' 8; then
+# MainActivity already acknowledged first-run. Intake shows "I understand"
+# only when that flag was missed; a miss here is the normal path.
+if wait_for_ui_pattern 'text="I understand"' 8 quiet; then
     tap_text 'I understand'
 fi
 wait_for_ui_pattern 'text="PNG[^<]*"|content-desc="Selected image preview"' 60
@@ -257,7 +300,7 @@ wait_for_ui_pattern 'content-desc="Saved image"|text="[^"]*Verified against the 
 # P2-06: the provenance line is "Extracted by <engine> <model> · <review>".
 scroll_until_visible 'text="Extract text on this device"'
 tap_text 'Extract text on this device'
-wait_for_ui_pattern 'text="Run again"' 120
+scroll_until_visible 'text="Run again"' 120
 scroll_until_visible 'text="Extracted by tesseract-eng-fast[^"]*"'
 assert_no_fatal_exception
 

@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.os.Debug
 import android.util.Log
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -15,20 +14,23 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.Orientation
+import org.openlife.vault.testing.OptInHarness
+import org.openlife.vault.testing.OptInHarnessRunner
 
 /**
  * P2-03-R7 measurement, not a gate: duration and peak PSS per image for each
  * engine on synthetic fixtures. P2-04 defines the evaluation fixtures; until
  * then these stand in. Opt-in with
  * `-Pandroid.testInstrumentationRunnerArguments.p203Measure=true`; results go
- * to logcat under `P203Measure`.
+ * to logcat under `P203Measure`. Without that argument the test is ignored
+ * (a JUnit skip). An assumption inside [runBlocking] was reported as a failure.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(OptInHarnessRunner::class)
+@OptInHarness("p203Measure")
 class OcrEngineMeasurementTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val dataDir = File(context.noBackupFilesDir, "measure-tessdata-${UUID.randomUUID()}")
@@ -40,7 +42,6 @@ class OcrEngineMeasurementTest {
 
     @Test
     fun measureEnginesOnSyntheticFixtures(): Unit = runBlocking {
-        assumeTrue(InstrumentationRegistry.getArguments().getString("p203Measure") == "true")
         val engines = listOf(
             TesseractOcrEngine(TessdataInstaller(dataDir, { context.assets.open(TessdataInstaller.ASSET_PATH) })),
             MlKitOcrEngine(),

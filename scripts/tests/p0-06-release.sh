@@ -81,6 +81,7 @@ require "smoke matches MediaStore paths by basename" "$ROOT/scripts/release-smok
 require "smoke grants the MediaStore URI through intent data" "$ROOT/scripts/release-smoke.sh" '.*-d "\$media_uri"'
 require "smoke matches the prefixed verification row" "$ROOT/scripts/release-smoke.sh" 'text="\[\^"\]\*Verified against the saved copy'
 require "smoke matches the OCR provenance line" "$ROOT/scripts/release-smoke.sh" 'text="Extracted by tesseract-eng-fast'
+require "smoke scrolls the short viewport until Run again is dumped" "$ROOT/scripts/release-smoke.sh" 'scroll_until_visible '"'"'text="Run again"'"'"' 120'
 reject "smoke does not assume a confirmation dialog in the viewer flow" "$ROOT/scripts/release-smoke.sh" 'There is no undo'
 require "release evidence retains mapping" "$RELEASE_WORKFLOW" 'app/build/outputs/mapping/release/mapping\.txt'
 require_file "release smoke script exists" "$ROOT/scripts/release-smoke.sh"
