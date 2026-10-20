@@ -182,11 +182,14 @@ private fun Modifier.evidenceGestures(
  * when a test reads the tree on the next statement.
  */
 private suspend fun PointerInputScope.detectEvidenceTaps(onTap: (Offset) -> Unit, onDoubleTap: () -> Unit) {
-    var lastUpMillis = 0L
+    // Null, not zero: instrumentation clocks start near zero, so a first tap
+    // would otherwise look like a double-tap and zoom instead of selecting.
+    var lastUpMillis: Long? = null
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         val up = awaitRelease(down.id) ?: return@awaitEachGesture
-        val doubleTap = up.uptimeMillis - lastUpMillis <= viewConfiguration.doubleTapTimeoutMillis
+        val previous = lastUpMillis
+        val doubleTap = previous != null && up.uptimeMillis - previous <= viewConfiguration.doubleTapTimeoutMillis
         lastUpMillis = up.uptimeMillis
         if (doubleTap) onDoubleTap() else onTap(up.position)
     }
