@@ -167,5 +167,7 @@ class OcrViewModelTest {
         override suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String) = Unit
 
         override suspend fun review(revisionId: UUID, reviewState: OcrReviewState) = Unit
+
+        override suspend fun rejectSpan(spanId: UUID) = Unit
     }
 }

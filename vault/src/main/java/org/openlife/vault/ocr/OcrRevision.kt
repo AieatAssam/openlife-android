@@ -82,12 +82,7 @@ data class OcrSpan(
 }
 
 /** Per-span review metadata. Rows are append-only; the latest one is current. */
-data class OcrSpanReview(
-    val id: UUID,
-    val spanId: UUID,
-    val reviewState: OcrReviewState,
-    val createdAt: Long,
-) {
+data class OcrSpanReview(val id: UUID, val spanId: UUID, val reviewState: OcrReviewState, val createdAt: Long) {
     init {
         require(createdAt >= 0)
     }

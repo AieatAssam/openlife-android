@@ -68,9 +68,19 @@ abstract class OpenLifeDatabase : RoomDatabase() {
         /** Every migration, in order; never destructive (design §10). */
         val MIGRATIONS: List<androidx.room.migration.Migration> by lazy { listOf(MIGRATION_1_2, MIGRATION_2_3) }
 
-        /** RED stub: does not create `ocr_span_reviews`. The migration test asserts that table. */
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) = Unit
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `ocr_span_reviews` (`id` TEXT NOT NULL, `spanId` TEXT NOT NULL, " +
+                        "`reviewState` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), " +
+                        "FOREIGN KEY(`spanId`) REFERENCES `ocr_spans`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ocr_span_reviews_spanId` " +
+                        "ON `ocr_span_reviews` (`spanId`)",
+                )
+            }
         }
 
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {

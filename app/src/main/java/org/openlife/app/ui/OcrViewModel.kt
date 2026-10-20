@@ -68,6 +68,8 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     fun review(revisionId: UUID, reviewState: OcrReviewState) = presenter.review(revisionId, reviewState)
 
+    fun rejectSpan(spanId: UUID) = presenter.rejectSpan(spanId)
+
     override fun onCleared() {
         unregisterResetCallback()
         unregisterTrimCallback()
@@ -104,5 +106,9 @@ private class AppOcrBackend(private val application: OpenLifeApp) : OcrBackend {
 
     override suspend fun review(revisionId: UUID, reviewState: OcrReviewState) {
         (application.vault() as? VaultAccess.Ready)?.ocrRepository?.setReviewState(revisionId, reviewState)
+    }
+
+    override suspend fun rejectSpan(spanId: UUID) {
+        (application.vault() as? VaultAccess.Ready)?.ocrRepository?.rejectSpan(spanId)
     }
 }

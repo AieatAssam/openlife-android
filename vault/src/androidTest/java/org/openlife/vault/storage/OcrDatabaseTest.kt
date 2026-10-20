@@ -20,6 +20,7 @@ import org.openlife.vault.ocr.OcrEvidenceRegion
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanReview
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.model.Orientation
 
@@ -112,12 +113,16 @@ class OcrDatabaseTest {
         db.ocrDao().insertUserRevision(
             OcrUserRevision(UUID.randomUUID(), revisionId, spanId, "changed", 2).toEntity(),
         )
+        db.ocrSpanReviewDao().insert(
+            OcrSpanReview(UUID.randomUUID(), spanId, OcrReviewState.REJECTED, 3).toEntity(),
+        )
 
         db.sourceDao().deleteById(sourceId.toString())
 
         assertEquals(0, db.ocrDao().countRevisions())
         assertEquals(0, db.ocrDao().countSpans())
         assertEquals(0, db.ocrDao().countUserRevisions())
+        assertEquals(0, db.ocrSpanReviewDao().count())
     }
 
     @Test

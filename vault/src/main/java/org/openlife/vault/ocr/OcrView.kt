@@ -1,11 +1,7 @@
 package org.openlife.vault.ocr
 
 /** One OCR span with its latest attributed user correction, if any. */
-data class OcrSpanView(
-    val span: OcrSpan,
-    val correction: OcrUserRevision?,
-    val review: OcrSpanReview? = null,
-)
+data class OcrSpanView(val span: OcrSpan, val correction: OcrUserRevision?, val review: OcrSpanReview? = null)
 
 /**
  * What the viewer shows for a source (P2-01-R1): the latest revision in any
