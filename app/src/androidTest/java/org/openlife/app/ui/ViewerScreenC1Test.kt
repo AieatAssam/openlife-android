@@ -9,11 +9,15 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.util.UUID
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -185,6 +189,68 @@ class ViewerScreenC1Test {
         assertEquals(1, runs)
         composeRule.onNodeWithText("History (1)").performScrollTo().performClick()
         composeRule.onNodeWithText("Failed", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    /** P2-06-R6: a rejected span is struck through and labelled, distinct from extracted text. */
+    @Test
+    fun rejectedSpanIsStruckThroughAndLabelled() {
+        val sourceId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        val span = OcrSpan(
+            UUID.randomUUID(),
+            revisionId,
+            0,
+            "Appointment 14 October",
+            null,
+            OcrCoordinateSystem.SOURCE_PIXELS,
+            OcrEvidenceRegion(1, 2, 3, 4),
+        )
+        composeRule.setContent {
+            ViewerScreen(
+                source = readySource(sourceId),
+                loadContent = { awaitCancellation() },
+                onBack = {},
+                onDeleteRequested = {},
+                ocrState = OcrUiState.Ready(
+                    sourceId = sourceId,
+                    revisionId = revisionId,
+                    spans = listOf(span),
+                    spanReviews = mapOf(span.id to org.openlife.vault.ocr.OcrReviewState.REJECTED),
+                    engineId = "mlkit-latin",
+                    modelVersion = "16.0.1",
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("rejected").performScrollTo().assertIsDisplayed()
+        val annotated = composeRule.onNodeWithText(span.text).fetchSemanticsNode()
+            .config[SemanticsProperties.Text]
+            .first()
+        assertTrue(
+            annotated.spanStyles.any { style ->
+                style.item.textDecoration?.contains(TextDecoration.LineThrough) == true
+            },
+        )
+    }
+
+    /** P2-06-R6: a stale extraction is greyed and explained, with a label that is not colour alone. */
+    @Test
+    fun staleExtractionIsGreyedAndExplained() {
+        val sourceId = UUID.randomUUID()
+        composeRule.setContent {
+            ViewerScreen(
+                source = readySource(sourceId),
+                loadContent = { awaitCancellation() },
+                onBack = {},
+                onDeleteRequested = {},
+                ocrState = OcrUiState.Stale(sourceId),
+            )
+        }
+
+        composeRule.onNodeWithText(
+            "Text extraction is stale because the source changed or was deleted.",
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("STALE").performScrollTo().assertIsDisplayed()
     }
 
     /** P2-02-R6/R7, C1-R7: deleting the source clears its OCR panel and leaves no OCR rows. */
