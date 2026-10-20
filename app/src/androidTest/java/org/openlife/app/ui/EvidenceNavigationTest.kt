@@ -68,6 +68,7 @@ class EvidenceNavigationTest {
         val region = composeRule.onNodeWithContentDescription("center token").fetchSemanticsNode()
         assertEquals(Role.Button, region.config.getOrNull(SemanticsProperties.Role))
         composeRule.onNodeWithTag("viewer_evidence_canvas").performTouchInput { click() }
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Selected: center token").performScrollTo().assertIsDisplayed()
     }
 

@@ -4,7 +4,8 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.TransformableState
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -147,13 +152,13 @@ private fun Modifier.evidenceGestures(
         .bringIntoViewRequester(bringIntoView)
         .transformable(state = transformable, lockRotationOnZoomPan = true, canPan = { zoomedIn })
         .pointerInput(spans, canvas, zoom.floatValue, pan.value) {
-            detectTapGestures(
+            detectEvidenceTaps(
                 onDoubleTap = {
                     zoom.floatValue = EvidenceGeometry.nextDoubleTapZoom(zoom.floatValue)
                     pan.value = Offset.Zero
                 },
                 onTap = { offset ->
-                    if (canvas == Size.Zero) return@detectTapGestures
+                    if (canvas == Size.Zero) return@detectEvidenceTaps
                     EvidenceGeometry.smallestSpanAt(
                         offset,
                         spans,
@@ -168,6 +173,31 @@ private fun Modifier.evidenceGestures(
                 },
             )
         }
+}
+
+/**
+ * A single tap selects immediately. A second tap inside the double-tap
+ * window zooms. [androidx.compose.foundation.gestures.detectTapGestures]
+ * holds the single tap until that window closes, which drops the selection
+ * when a test reads the tree on the next statement.
+ */
+private suspend fun PointerInputScope.detectEvidenceTaps(onTap: (Offset) -> Unit, onDoubleTap: () -> Unit) {
+    var lastUpMillis = 0L
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val up = awaitRelease(down.id) ?: return@awaitEachGesture
+        val doubleTap = up.uptimeMillis - lastUpMillis <= viewConfiguration.doubleTapTimeoutMillis
+        lastUpMillis = up.uptimeMillis
+        if (doubleTap) onDoubleTap() else onTap(up.position)
+    }
+}
+
+private suspend fun AwaitPointerEventScope.awaitRelease(pointerId: PointerId): PointerInputChange? {
+    while (true) {
+        val event = awaitPointerEvent()
+        val change = event.changes.find { it.id == pointerId } ?: return null
+        if (!change.pressed) return change
+    }
 }
 
 @Suppress("LongParameterList")
