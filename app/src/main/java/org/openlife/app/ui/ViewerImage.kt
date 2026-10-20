@@ -1,12 +1,8 @@
 package org.openlife.app.ui
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -21,12 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -36,12 +26,14 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
+import org.openlife.app.ui.evidence.ZoomableEvidenceImage
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
-import org.openlife.vault.ocr.OcrEvidenceRegion
+import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.repository.ReadyReadResult
+import java.util.UUID
 
 /**
  * Loads and decodes the saved image off the main thread. [attempt] restarts
@@ -104,10 +96,13 @@ private suspend fun decodeForViewer(bytes: ByteArray, orientation: Orientation):
  * content and offer deletion).
  */
 @Composable
+@Suppress("LongParameterList")
 internal fun ViewerImage(
     source: Source,
     content: ViewerContentState,
-    selectedRegion: OcrEvidenceRegion?,
+    spans: List<OcrSpan>,
+    selectedSpanId: UUID?,
+    onSelectSpan: (OcrSpan) -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -128,7 +123,8 @@ internal fun ViewerImage(
             Button(onClick = onRetry) { Text(stringResource(R.string.viewer_try_again)) }
         }
 
-        ViewerContentState.Loading, is ViewerContentState.Shown -> ViewerImageArea(source, content, selectedRegion)
+        ViewerContentState.Loading, is ViewerContentState.Shown ->
+            ViewerImageArea(source, content, spans, selectedSpanId, onSelectSpan)
     }
 }
 
@@ -144,7 +140,13 @@ private fun ViewerLoadProblem(message: String, action: @Composable () -> Unit) {
 }
 
 @Composable
-private fun ViewerImageArea(source: Source, content: ViewerContentState, selectedRegion: OcrEvidenceRegion?) {
+private fun ViewerImageArea(
+    source: Source,
+    content: ViewerContentState,
+    spans: List<OcrSpan>,
+    selectedSpanId: UUID?,
+    onSelectSpan: (OcrSpan) -> Unit,
+) {
     val brand = LocalOpenLifeBrandColors.current
     val maxImageHeight = with(LocalDensity.current) {
         (LocalWindowInfo.current.containerSize.height * MAX_IMAGE_HEIGHT_FRACTION).toDp()
@@ -157,46 +159,24 @@ private fun ViewerImageArea(source: Source, content: ViewerContentState, selecte
                 .testTag("viewer_image_area"),
             contentAlignment = Alignment.Center,
         ) {
-            val bitmap = (content as? ViewerContentState.Shown)?.bitmap
-            if (bitmap == null) {
+            val shown = content as? ViewerContentState.Shown
+            val width = source.width ?: 0
+            val height = source.height ?: 0
+            if (shown == null || width <= 0 || height <= 0) {
                 Text(stringResource(R.string.viewer_verifying))
             } else {
-                // A generic description preserves privacy while still giving a
-                // screen reader a useful stop in the source evidence flow. The
-                // box already has the image's aspect ratio, so Fit fills it
-                // exactly and the evidence overlay below covers the drawn image.
-                Image(
-                    bitmap.asImageBitmap(),
-                    contentDescription = stringResource(R.string.viewer_saved_image_content_description),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
+                ZoomableEvidenceImage(
+                    bitmap = shown.bitmap,
+                    sourceWidth = width,
+                    sourceHeight = height,
+                    orientation = source.orientation ?: Orientation.NORMAL,
+                    spans = spans,
+                    selectedSpanId = selectedSpanId,
+                    onSelectSpan = onSelectSpan,
+                    highlighter = brand.highlighter,
                 )
-                if (selectedRegion != null) EvidenceOverlay(source, selectedRegion, brand.highlighter)
             }
         }
-    }
-}
-
-@Composable
-private fun BoxScope.EvidenceOverlay(source: Source, region: OcrEvidenceRegion, highlighter: Color) {
-    val sourceWidth = source.width ?: return
-    val sourceHeight = source.height ?: return
-    Canvas(modifier = Modifier.matchParentSize()) {
-        val left = region.left.toFloat() / sourceWidth * size.width
-        val top = region.top.toFloat() / sourceHeight * size.height
-        val right = region.right.toFloat() / sourceWidth * size.width
-        val bottom = region.bottom.toFloat() / sourceHeight * size.height
-        drawRect(
-            color = highlighter.copy(alpha = 0.30f),
-            topLeft = Offset(left, top),
-            size = Size(right - left, bottom - top),
-        )
-        drawRect(
-            color = highlighter,
-            topLeft = Offset(left, top),
-            size = Size(right - left, bottom - top),
-            style = Stroke(width = 3.dp.toPx()),
-        )
     }
 }
 

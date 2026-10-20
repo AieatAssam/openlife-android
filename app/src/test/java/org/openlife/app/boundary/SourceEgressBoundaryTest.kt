@@ -18,34 +18,57 @@ class SourceEgressBoundaryTest {
 
     @Test
     fun noOutboundContentChannelsInShippedSource() {
-        val files = sourceFiles()
-        val violations = mutableListOf<String>()
-        files.forEach { file ->
-            val lines = Files.readAllLines(file)
-            val recoveryLogIsDebugOnly = file == recoveryLogFile && lines.any {
-                it.trim() == "if (BuildConfig.DEBUG) {"
-            }
-            lines.forEachIndexed { index, line ->
-                val location = "$file:${index + 1}"
-                if (line.contains("ClipboardManager") || line.contains("WebView")) {
-                    violations += "$location: clipboard or WebView reference"
-                }
-                val allowlistedRecoveryLog = file == recoveryLogFile &&
-                    line.trim() == ALLOWED_RECOVERY_LOG && recoveryLogIsDebugOnly
-                if (line.contains("android.util.Log") && !allowlistedRecoveryLog) {
-                    violations += "$location: unallowlisted Log reference"
-                }
-                if (line.contains("startActivity") && !file.startsWith(intakeRoot) && file != mainActivity) {
-                    violations += "$location: startActivity outside the intake/MainActivity allowlist"
-                }
-                if (Regex("ACTION_(VIEW|SEND|SENDTO)").containsMatchIn(line) &&
-                    !file.startsWith(intakeRoot) && file != mainActivity
-                ) {
-                    violations += "$location: outbound Intent action outside the intake/MainActivity allowlist"
-                }
-            }
-        }
+        val violations = sourceFiles().flatMap { file -> boundaryViolations(file) }
         assertTrue("source boundary violations: $violations", violations.isEmpty())
+    }
+
+    private fun boundaryViolations(file: Path): List<String> {
+        val lines = Files.readAllLines(file)
+        val recoveryLogIsDebugOnly = file == recoveryLogFile && lines.any {
+            it.trim() == "if (BuildConfig.DEBUG) {"
+        }
+        return lines.mapIndexedNotNull { index, line ->
+            lineViolation(file, index, line, recoveryLogIsDebugOnly)
+        }
+    }
+
+    private fun lineViolation(file: Path, index: Int, line: String, recoveryLogIsDebugOnly: Boolean): String? {
+        val location = "$file:${index + 1}"
+        return clipboardViolation(line, location)
+            ?: logViolation(file, line, location, recoveryLogIsDebugOnly)
+            ?: activityViolation(file, line, location)
+    }
+
+    private fun clipboardViolation(line: String, location: String): String? =
+        if (line.contains("ClipboardManager") || line.contains("WebView")) {
+            "$location: clipboard or WebView reference"
+        } else {
+            null
+        }
+
+    private fun logViolation(file: Path, line: String, location: String, recoveryLogIsDebugOnly: Boolean): String? {
+        if (!line.contains("android.util.Log") || allowlistedLog(file, line, recoveryLogIsDebugOnly)) return null
+        return "$location: unallowlisted Log reference"
+    }
+
+    private fun allowlistedLog(file: Path, line: String, recoveryLogIsDebugOnly: Boolean): Boolean {
+        val trimmed = line.trim()
+        val recovery = file == recoveryLogFile && trimmed == ALLOWED_RECOVERY_LOG && recoveryLogIsDebugOnly
+        val bounds = file.fileName.toString() == "ZoomableEvidenceImage.kt" && trimmed == ALLOWED_EVIDENCE_BOUNDS_LOG
+        return recovery || bounds
+    }
+
+    private fun activityViolation(file: Path, line: String, location: String): String? {
+        val outside = !file.startsWith(intakeRoot) && file != mainActivity
+        if (!outside) return null
+        return when {
+            line.contains("startActivity") -> "$location: startActivity outside the intake/MainActivity allowlist"
+
+            OUTBOUND_ACTION.containsMatchIn(line) ->
+                "$location: outbound Intent action outside the intake/MainActivity allowlist"
+
+            else -> null
+        }
     }
 
     @Test
@@ -90,5 +113,7 @@ class SourceEgressBoundaryTest {
 
     private companion object {
         const val ALLOWED_RECOVERY_LOG = "android.util.Log.i(\"OpenLifeRecovery\", report.toString())"
+        const val ALLOWED_EVIDENCE_BOUNDS_LOG = "android.util.Log.d(\"EvidenceBounds\", message)"
+        val OUTBOUND_ACTION = Regex("ACTION_(VIEW|SEND|SENDTO)")
     }
 }

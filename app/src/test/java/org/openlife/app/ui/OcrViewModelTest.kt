@@ -22,6 +22,7 @@ import org.openlife.vault.ocr.OcrRevision
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanReview
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.ocr.OcrView
@@ -74,6 +75,29 @@ class OcrViewModelTest {
         assertEquals("never offer Extract before the database answered", OcrUiState.Loading, state.value)
         backend.view.value = null
         assertEquals(OcrUiState.Idle, state.value)
+        collector.cancel()
+    }
+
+    @Test
+    fun spanReviewFromThePersistedViewIsRejected() = runBlocking {
+        val persisted = readyView("hello")
+        val spanView = persisted.spans.single()
+        backend.view.value = persisted.copy(
+            spans = listOf(
+                spanView.copy(
+                    review = OcrSpanReview(
+                        UUID.randomUUID(),
+                        spanView.span.id,
+                        OcrReviewState.REJECTED,
+                        3L,
+                    ),
+                ),
+            ),
+        )
+        val state = presenter.state(sourceId)
+        val collector = scope.launch { state.collect {} }
+        val ready = state.value as OcrUiState.Ready
+        assertEquals(OcrReviewState.REJECTED, ready.spanReviews[spanView.span.id])
         collector.cancel()
     }
 
@@ -143,5 +167,7 @@ class OcrViewModelTest {
         override suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String) = Unit
 
         override suspend fun review(revisionId: UUID, reviewState: OcrReviewState) = Unit
+
+        override suspend fun rejectSpan(spanId: UUID) = Unit
     }
 }

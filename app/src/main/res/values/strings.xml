@@ -63,7 +63,7 @@
 
     <string name="viewer_back_content_description">Back</string>
     <string name="viewer_delete_content_description">Delete</string>
-    <string name="viewer_evidence_region_highlighted">Evidence region highlighted</string>
+    <string name="viewer_span_selected">Selected: %1$s</string>
     <string name="viewer_verifying">Verifying…</string>
     <string name="viewer_saved_content_unreadable_explained">This item’s saved content is unreadable. It failed its integrity check or is missing, so OpenLife will not show it. You can delete OpenLife’s copy; the original stays wherever you shared it from.</string>
     <string name="viewer_read_transient">OpenLife could not open this item right now. Nothing was changed. Try again in a moment.</string>
@@ -74,11 +74,16 @@
     <string name="viewer_extracting">Extracting locally…</string>
     <string name="viewer_no_latin_text">No Latin text was found.</string>
     <string name="viewer_show_region">Show region</string>
-    <string name="viewer_ungrounded">Ungrounded</string>
+    <string name="viewer_text_without_location">Text without a location</string>
+    <string name="viewer_text_without_location_explanation">This text has no region on the image, so it cannot be selected as evidence.</string>
     <string name="viewer_correct">Correct</string>
     <string name="viewer_corrected_by_you">Corrected by you: %1$s</string>
+    <string name="viewer_user_badge">USER</string>
+    <string name="viewer_reject_span">Reject span</string>
+    <string name="viewer_span_rejected">rejected</string>
     <string name="viewer_run_again">Run again</string>
-    <string name="viewer_ocr_engine">Engine: %1$s %2$s</string>
+    <string name="viewer_ocr_provenance">Extracted by %1$s %2$s · %3$s</string>
+    <string name="viewer_provenance_unreviewed">unreviewed</string>
     <string name="viewer_ocr_extracted_at">Extracted: %1$s</string>
     <string name="viewer_review_state">Review: %1$s</string>
     <string name="viewer_review_unreviewed">Unreviewed</string>

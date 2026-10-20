@@ -29,6 +29,8 @@ interface OcrBackend {
     suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String)
 
     suspend fun review(revisionId: UUID, reviewState: OcrReviewState)
+
+    suspend fun rejectSpan(spanId: UUID)
 }
 
 /**
@@ -138,6 +140,10 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     fun review(revisionId: UUID, reviewState: OcrReviewState) {
         scope.launch { backend.review(revisionId, reviewState) }
     }
+
+    fun rejectSpan(spanId: UUID) {
+        scope.launch { backend.rejectSpan(spanId) }
+    }
 }
 
 /** Whether the database has answered yet, and with what. */
@@ -180,6 +186,9 @@ internal object OcrStateMapper {
                 }.toMap(),
                 revisionCorrection = view.revisionCorrection?.correctedText,
                 reviewState = revision.reviewState,
+                spanReviews = view.spans.mapNotNull { spanView ->
+                    spanView.review?.let { spanView.span.id to it.reviewState }
+                }.toMap(),
                 engineId = revision.engineId,
                 modelVersion = revision.modelVersion,
                 extractedAt = revision.extractedAt,
