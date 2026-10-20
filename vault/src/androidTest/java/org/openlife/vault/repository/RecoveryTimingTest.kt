@@ -3,7 +3,6 @@ package org.openlife.vault.repository
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -11,7 +10,6 @@ import java.util.Random
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,14 +20,19 @@ import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
 import org.openlife.vault.storage.VaultBootstrapper
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.testing.OptInHarness
+import org.openlife.vault.testing.OptInHarnessRunner
 
 /**
  * P1-14 acceptance measurement, not a gate: how long startup recovery takes
  * with 50 saved sources. Opt-in with
  * `-Pandroid.testInstrumentationRunnerArguments.p114Timing=true`; results go
- * to logcat under the tag `P114Timing` and into docs/verification.
+ * to logcat under the tag `P114Timing` and into docs/verification. Without
+ * that argument the test is ignored (a JUnit skip). An assumption in [setUp]
+ * was reported as a failure.
  */
-@RunWith(AndroidJUnit4::class)
+@RunWith(OptInHarnessRunner::class)
+@OptInHarness("p114Timing")
 class RecoveryTimingTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val alias = "test.${UUID.randomUUID()}"
@@ -38,7 +41,6 @@ class RecoveryTimingTest {
 
     @Before
     fun setUp() {
-        assumeTrue(InstrumentationRegistry.getArguments().getString("p114Timing") == "true")
         paths = VaultPaths(context)
         paths.vaultDir.deleteRecursively()
     }

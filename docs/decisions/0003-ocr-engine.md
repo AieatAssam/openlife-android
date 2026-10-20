@@ -66,11 +66,21 @@ touching provenance rows.
 
 **Cancellation**
 - Recognition runs on its own thread. `stop()` works through tesseract4android's
-  progress monitor, which is attached only in the recognition loop.
+  progress monitor, which is attached only in the recognition loop. The native
+  monitor checks the cancel flag once per word, after that word's progress
+  callback and before classifying it. The in-flight word always finishes.
+  Percent stays 0 for the first word (`70 * 0 / n`), and that word also pays
+  for LSTM setup, so the engine reports "recognizing" only once percent is
+  greater than 0.
   - Measured on dev36: a stop during recognition took effect within about
     0.5–1 s.
   - Layout analysis before the recognition loop cannot be interrupted. On a
     2400x3200 page that phase took about 30 s.
+  - API 29 CI (run 38034308154) cancelled on the first callback of that
+    2400×3200 page. `stop()` did not return within the 5 s settle wait
+    (`cancelAndJoin` took 5012 ms, the timeout path). The cancellation fixture
+    is now a narrow page of short words so the in-flight word stays inside
+    that wait. The assertion is still under 5 s, the product settle budget.
 - Native state is freed, and the bitmap recycled, only after the native call
   returns. If the caller has already given up (P2-02's 5 s settle), the task
   frees them itself when the call returns.

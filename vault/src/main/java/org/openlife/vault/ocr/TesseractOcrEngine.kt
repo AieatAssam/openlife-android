@@ -87,8 +87,11 @@ object OcrConfidencePolicy {
  * tessdata_fast English model, LSTM engine, automatic page segmentation.
  *
  * Recognition runs on its own thread. Cancelling calls Tesseract's stop(),
- * which ends the recognition phase within about a second; layout analysis
- * before it cannot be interrupted. Native state is freed and the bitmap
+ * which the native monitor honours only between words: the in-flight word
+ * finishes, then recognition returns. Layout analysis before that loop
+ * cannot be interrupted. A very wide word can therefore outlast the
+ * caller's settle wait; the cancellation test keeps words short so the
+ * check stays inside that wait. Native state is freed and the bitmap
  * recycled only after the native call returns: if the caller stops waiting
  * first (P2-02's bounded settle), the task frees them itself when it
  * returns, never while Tesseract is still using them (P2-02-R4). The
@@ -210,10 +213,16 @@ internal class NativeTessRecognizer(dataPath: File) : TessRecognizer {
     @Volatile private var stopped = false
 
     @Volatile private var onRecognizing: (() -> Unit)? = null
-    private val api = TessBaseAPI { _ ->
-        // Progress is reported only from the recognition loop, which is where stop() takes effect.
-        onRecognizing?.invoke()
-        onRecognizing = null
+    private val api = TessBaseAPI { progress ->
+        // The monitor reports percent 0 for the first word (70 * 0 / n) and
+        // checks cancel only after the callback, before classifying that word.
+        // The first word also pays for LSTM setup. Signal once a later word
+        // has started so a caller that stops on this event is not stuck inside
+        // that setup word.
+        if (progress.percent > 0) {
+            onRecognizing?.invoke()
+            onRecognizing = null
+        }
     }
 
     init {
