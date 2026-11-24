@@ -111,4 +111,8 @@ private class AppOcrBackend(private val application: OpenLifeApp) : OcrBackend {
     override suspend fun rejectSpan(spanId: UUID) {
         (application.vault() as? VaultAccess.Ready)?.ocrRepository?.rejectSpan(spanId)
     }
+
+    override suspend fun undoRejectSpan(spanId: UUID) {
+        TODO("P2-06-R13: $spanId")
+    }
 }

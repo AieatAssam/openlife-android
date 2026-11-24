@@ -68,6 +68,7 @@ fun ViewerScreen(
     onCorrect: (OcrSpan, String) -> Unit = { _, _ -> },
     onReview: (OcrReviewState) -> Unit = {},
     onRejectSpan: (OcrSpan) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onUndoRejectSpan: (OcrSpan) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)

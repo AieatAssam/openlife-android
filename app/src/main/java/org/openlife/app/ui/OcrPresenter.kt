@@ -32,6 +32,8 @@ interface OcrBackend {
     suspend fun review(revisionId: UUID, reviewState: OcrReviewState)
 
     suspend fun rejectSpan(spanId: UUID)
+
+    suspend fun undoRejectSpan(spanId: UUID)
 }
 
 /**
@@ -145,6 +147,8 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     fun rejectSpan(spanId: UUID) {
         scope.launch { backend.rejectSpan(spanId) }
     }
+
+    fun undoRejectSpan(spanId: UUID): Unit = TODO("P2-06-R13: $spanId")
 }
 
 /** Whether the database has answered yet, and with what. */

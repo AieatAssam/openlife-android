@@ -83,13 +83,7 @@ fun OcrSpanReviewEntity.toDomain() = OcrSpanReview(
     spanId = UUID.fromString(spanId),
     reviewState = OcrReviewState.valueOf(reviewState),
     createdAt = createdAt,
-)
-
-fun OcrSpanReview.toEntity() = OcrSpanReviewEntity(
-    id = id.toString(),
-    spanId = spanId.toString(),
-    reviewState = reviewState.name,
-    createdAt = createdAt,
+    sequence = sequence,
 )
 
 fun OcrUserRevisionEntity.toDomain() = OcrUserRevision(

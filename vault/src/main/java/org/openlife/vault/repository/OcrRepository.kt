@@ -27,7 +27,6 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrRunStateMachine
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
-import org.openlife.vault.ocr.OcrSpanReview
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.ocr.OcrView
@@ -270,17 +269,18 @@ class OcrRepository(
             val span = database.ocrDao().findSpan(spanId.toString()) ?: return@withMutation false
             val revision = database.ocrDao().findRevision(span.revisionId)?.toDomain() ?: return@withMutation false
             if (revision.state != OcrRevisionState.READY) return@withMutation false
-            database.ocrSpanReviewDao().insert(
-                OcrSpanReview(
-                    id = UUID.randomUUID(),
-                    spanId = spanId,
-                    reviewState = OcrReviewState.REJECTED,
-                    createdAt = clock(),
-                ).toEntity(),
+            database.ocrSpanReviewDao().append(
+                UUID.randomUUID().toString(),
+                spanId.toString(),
+                OcrReviewState.REJECTED.name,
+                clock(),
             )
             true
         }
     }
+
+    /** Appends a review restoring the state before the span was rejected (P2-06-R13). */
+    suspend fun undoRejectSpan(spanId: UUID): Boolean = TODO("P2-06-R13: $spanId")
 
     suspend fun setReviewState(revisionId: UUID, reviewState: OcrReviewState): Boolean = withContext(ioDispatcher) {
         check(reviewState != OcrReviewState.UNRECOGNISED) { "an unrecognised review state is never written" }
@@ -320,7 +320,7 @@ private suspend fun markTerminalLocked(
     ocrDao.finishRunning(revisionId.toString(), state.name, reason.name)
 }
 
-private fun ocrViewOf(
+internal fun ocrViewOf(
     latest: OcrRevisionEntity,
     earlier: List<OcrRevisionEntity>,
     spans: List<OcrSpanEntity>,

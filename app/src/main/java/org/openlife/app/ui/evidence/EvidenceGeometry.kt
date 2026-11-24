@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.IntRect
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.OrientationTransform
 import org.openlife.vault.ocr.OcrEvidenceRegion
@@ -145,6 +146,13 @@ object EvidenceGeometry {
             null
         }
     }.minWithOrNull(compareBy<Pair<OcrSpan, Float>>({ it.second }, { it.first.ordinal }))?.first
+
+    /**
+     * The whole-pixel box a node is measured and placed at for [rect]
+     * (P2-06-R8, E-01). Edges are rounded independently so neighbouring
+     * boxes share edges; the size is never limited to the canvas.
+     */
+    fun pixelBox(rect: Rect): IntRect = TODO("P2-06-R8: $rect")
 
     fun nextDoubleTapZoom(current: Float): Float =
         if (current < (MIN_ZOOM + DOUBLE_TAP_ZOOM) / 2f) DOUBLE_TAP_ZOOM else MIN_ZOOM

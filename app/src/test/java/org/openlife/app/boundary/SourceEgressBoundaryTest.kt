@@ -1,5 +1,6 @@
 package org.openlife.app.boundary
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -22,8 +23,27 @@ class SourceEgressBoundaryTest {
         assertTrue("source boundary violations: $violations", violations.isEmpty())
     }
 
-    private fun boundaryViolations(file: Path): List<String> {
+    /**
+     * P2-06-R15 (E-08): the EvidenceBounds log is allowed only inside its
+     * BuildConfig.DEBUG guard, as the recovery log is. The mutation (the same
+     * file with the guard line removed) must be reported.
+     */
+    @Test
+    fun evidenceBoundsLogRequiresDebugGuard() {
+        val file = projectDir.resolve("app/src/main/java/org/openlife/app/ui/evidence/ZoomableEvidenceImage.kt")
         val lines = Files.readAllLines(file)
+        assertTrue("the bounds log is still present", lines.any { it.trim() == ALLOWED_EVIDENCE_BOUNDS_LOG })
+        assertTrue("the shipped, guarded log passes: ${boundaryViolations(file, lines)}", boundaryViolations(file, lines).isEmpty())
+
+        val unguarded = lines.filterNot { it.trim() == DEBUG_GUARD }
+        assertTrue("the mutation removes a guard", unguarded.size < lines.size)
+        assertFalse(
+            "an EvidenceBounds log outside BuildConfig.DEBUG must be a violation",
+            boundaryViolations(file, unguarded).isEmpty(),
+        )
+    }
+
+    private fun boundaryViolations(file: Path, lines: List<String> = Files.readAllLines(file)): List<String> {
         val recoveryLogIsDebugOnly = file == recoveryLogFile && lines.any {
             it.trim() == "if (BuildConfig.DEBUG) {"
         }
@@ -114,6 +134,7 @@ class SourceEgressBoundaryTest {
     private companion object {
         const val ALLOWED_RECOVERY_LOG = "android.util.Log.i(\"OpenLifeRecovery\", report.toString())"
         const val ALLOWED_EVIDENCE_BOUNDS_LOG = "android.util.Log.d(\"EvidenceBounds\", message)"
+        const val DEBUG_GUARD = "if (BuildConfig.DEBUG) {"
         val OUTBOUND_ACTION = Regex("ACTION_(VIEW|SEND|SENDTO)")
     }
 }

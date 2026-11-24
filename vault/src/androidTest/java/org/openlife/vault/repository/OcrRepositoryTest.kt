@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -380,6 +382,79 @@ class OcrRepositoryTest {
         assertTrue(DeletionRepository(paths, db, mutationQueue).deleteSource(sourceId) is DeleteResult.Deleted)
 
         kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) { repository.observeOcrView(sourceId).first { it == null } }
+    }
+
+    /**
+     * P2-06-R13/R14 (E-06, E-07): reject and undo only append review rows, never
+     * touch the span text, are refused unless the revision is READY or the
+     * span is in the right state, and reach the viewer through the flow.
+     */
+    @Test
+    fun rejectSpanKeepsTextRequiresReadyAndIsObservedThroughTheFlow(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val repository = repository(TestEngine { OcrEngineOutput(listOf(OcrSpanDraft("hello", null, null))) })
+        val result = repository.runOcr(sourceId) as OcrRunResult.Completed
+        val spanId = result.spans.single().id
+
+        assertTrue(repository.rejectSpan(spanId))
+        assertFalse("a rejected span cannot be rejected twice", repository.rejectSpan(spanId))
+        val rejected = kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) {
+            repository.observeOcrView(sourceId).first { it?.spans?.single()?.review != null }
+        }!!
+        assertEquals(OcrReviewState.REJECTED, rejected.spans.single().review?.reviewState)
+        assertEquals("hello", rejected.spans.single().span.text)
+
+        assertTrue(repository.undoRejectSpan(spanId))
+        assertFalse("nothing left to undo", repository.undoRejectSpan(spanId))
+        val undone = kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) {
+            repository.observeOcrView(sourceId).first {
+                it?.spans?.single()?.review?.reviewState == OcrReviewState.UNREVIEWED
+            }
+        }!!
+        assertEquals("hello", undone.spans.single().span.text)
+        assertEquals("hello", db.ocrDao().findSpans(result.revisionId.toString()).single().text)
+        assertEquals("rows are appended, never updated", 2, db.ocrSpanReviewDao().count())
+
+        // A span on a revision that is not READY cannot be reviewed.
+        val staleRevision = UUID.randomUUID()
+        val staleSpan = UUID.randomUUID()
+        db.ocrDao().insertRevision(
+            db.ocrDao().findRevision(result.revisionId.toString())!!
+                .copy(id = staleRevision.toString(), state = OcrRevisionState.STALE.name),
+        )
+        db.ocrDao().insertSpans(
+            listOf(
+                db.ocrDao().findSpans(result.revisionId.toString()).single()
+                    .copy(id = staleSpan.toString(), revisionId = staleRevision.toString()),
+            ),
+        )
+        assertFalse(repository.rejectSpan(staleSpan))
+        assertFalse(repository.undoRejectSpan(staleSpan))
+        assertFalse("an unknown span is refused", repository.rejectSpan(UUID.randomUUID()))
+        assertEquals(2, db.ocrSpanReviewDao().count())
+    }
+
+    /** P2-06-R17 (E-10): an engine box past the source edge is stored ungrounded, never drawn outside the image. */
+    @Test
+    fun regionBeyondSourceBoundsIsNotPersistedAsGrounded(): Unit = runBlocking {
+        val sourceId = prepareAndSave() // 64x48, NORMAL
+        val repository = repository(
+            TestEngine {
+                OcrEngineOutput(
+                    listOf(
+                        OcrSpanDraft("past the edge", null, org.openlife.vault.ocr.OcrEvidenceRegion(0, 0, 65, 10)),
+                        OcrSpanDraft("inside", null, org.openlife.vault.ocr.OcrEvidenceRegion(0, 0, 64, 48)),
+                    ),
+                )
+            },
+        )
+
+        val result = repository.runOcr(sourceId) as OcrRunResult.Completed
+
+        val stored = db.ocrDao().findSpans(result.revisionId.toString()).map { it.toDomain() }.sortedBy { it.ordinal }
+        assertEquals(listOf("past the edge", "inside"), stored.map { it.text })
+        assertNull(stored[0].evidenceRegion)
+        assertEquals(org.openlife.vault.ocr.OcrEvidenceRegion(0, 0, 64, 48), stored[1].evidenceRegion)
     }
 
     private fun nullOrRevision(result: OcrRunResult): UUID? =

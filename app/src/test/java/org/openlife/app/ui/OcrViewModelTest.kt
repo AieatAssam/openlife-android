@@ -90,6 +90,7 @@ class OcrViewModelTest {
                         spanView.span.id,
                         OcrReviewState.REJECTED,
                         3L,
+                        1L,
                     ),
                 ),
             ),
@@ -99,6 +100,16 @@ class OcrViewModelTest {
         val ready = state.value as OcrUiState.Ready
         assertEquals(OcrReviewState.REJECTED, ready.spanReviews[spanView.span.id])
         collector.cancel()
+    }
+
+    /** P2-06-R13: Reject span and Undo reject each reach the vault once. */
+    @Test
+    fun rejectAndUndoRejectReachTheBackend() {
+        val spanId = UUID.randomUUID()
+        presenter.rejectSpan(spanId)
+        presenter.undoRejectSpan(spanId)
+        assertEquals(listOf(spanId), backend.rejected)
+        assertEquals(listOf(spanId), backend.undone)
     }
 
     @Test
@@ -168,6 +179,15 @@ class OcrViewModelTest {
 
         override suspend fun review(revisionId: UUID, reviewState: OcrReviewState) = Unit
 
-        override suspend fun rejectSpan(spanId: UUID) = Unit
+        val rejected = mutableListOf<UUID>()
+        val undone = mutableListOf<UUID>()
+
+        override suspend fun rejectSpan(spanId: UUID) {
+            rejected += spanId
+        }
+
+        override suspend fun undoRejectSpan(spanId: UUID) {
+            undone += spanId
+        }
     }
 }

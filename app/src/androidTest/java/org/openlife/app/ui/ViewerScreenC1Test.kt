@@ -3,7 +3,12 @@ package org.openlife.app.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.awaitCancellation
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -231,6 +236,115 @@ class ViewerScreenC1Test {
                 style.item.textDecoration?.contains(TextDecoration.LineThrough) == true
             },
         )
+    }
+
+    /**
+     * E-06 / P2-06-R13/R14: pressing Reject span changes the row to Undo reject
+     * (a second reject is impossible), and Undo reject restores Reject span.
+     */
+    @Test
+    fun rejectedSpanOffersUndoAndCannotBeRejectedTwice() {
+        val sourceId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        val span = OcrSpan(
+            UUID.randomUUID(), revisionId, 0, "Total 12.50", null, OcrCoordinateSystem.SOURCE_PIXELS,
+            OcrEvidenceRegion(10, 10, 60, 30),
+        )
+        val reviews = androidx.compose.runtime.mutableStateMapOf<UUID, org.openlife.vault.ocr.OcrReviewState>()
+        var rejects = 0
+        var undos = 0
+        composeRule.setContent {
+            ViewerScreen(
+                source = readySource(sourceId),
+                loadContent = { awaitCancellation() },
+                onBack = {},
+                onDeleteRequested = {},
+                ocrState = OcrUiState.Ready(sourceId, revisionId, listOf(span), spanReviews = reviews.toMap()),
+                onRejectSpan = {
+                    rejects++
+                    reviews[it.id] = org.openlife.vault.ocr.OcrReviewState.REJECTED
+                },
+                onUndoRejectSpan = {
+                    undos++
+                    reviews[it.id] = org.openlife.vault.ocr.OcrReviewState.UNREVIEWED
+                },
+            )
+        }
+
+        composeRule.onNodeWithText("Reject span").performScrollTo().performClick()
+        composeRule.onNodeWithText("Undo reject").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Reject span").assertCountEquals(0)
+        composeRule.onNodeWithText("rejected").performScrollTo().assertIsDisplayed()
+        assertEquals(1, rejects)
+
+        composeRule.onNodeWithText("Undo reject").performScrollTo().performClick()
+        composeRule.onNodeWithText("Reject span").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Undo reject").assertCountEquals(0)
+        assertEquals(1, undos)
+        assertEquals(1, rejects)
+    }
+
+    /**
+     * E-09 / P2-06-R16: at 360 dp, and at 320x640 dp with fontScale 2, the span
+     * text keeps at least 120 dp and every per-span action is fully on screen.
+     */
+    @Test
+    fun spanRowKeepsUsableTextWidthAtNarrowWidthAndLargeFont() {
+        val sourceId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        val span = OcrSpan(
+            UUID.randomUUID(), revisionId, 0, "Appointment 14 October 10:30", null, OcrCoordinateSystem.SOURCE_PIXELS,
+            OcrEvidenceRegion(10, 10, 60, 30),
+        )
+        data class Screen(val width: androidx.compose.ui.unit.Dp, val height: androidx.compose.ui.unit.Dp, val fontScale: Float)
+        var screen by androidx.compose.runtime.mutableStateOf(Screen(360.dp, 640.dp, 1f))
+        composeRule.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    density.density,
+                    fontScale = screen.fontScale,
+                ),
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    androidx.compose.ui.Modifier.requiredSize(screen.width, screen.height),
+                ) {
+                    ViewerScreen(
+                        source = readySource(sourceId),
+                        loadContent = { awaitCancellation() },
+                        onBack = {},
+                        onDeleteRequested = {},
+                        ocrState = OcrUiState.Ready(sourceId, revisionId, listOf(span)),
+                    )
+                }
+            }
+        }
+
+        listOf(Screen(360.dp, 640.dp, 1f), Screen(320.dp, 640.dp, 2f)).forEach { config ->
+            screen = config
+            composeRule.waitForIdle()
+            val density = composeRule.density.density
+            val text = composeRule.onNodeWithText(span.text).performScrollTo().fetchSemanticsNode()
+            assertTrue(
+                "$config: span text is ${text.size.width / density} dp wide",
+                text.size.width / density >= 120f,
+            )
+            val right = config.width.value * density
+            listOf("Show region", "Correct", "Reject span").forEach { label ->
+                val action = composeRule.onNodeWithText(label).performScrollTo().fetchSemanticsNode()
+                val left = action.positionInRoot.x
+                assertTrue(
+                    "$config: $label at $left..${left + action.size.width} must fit 0..$right",
+                    left >= 0f && left + action.size.width <= right + 1f,
+                )
+                assertEquals(
+                    "$config: $label is not clipped",
+                    action.size.width.toFloat(),
+                    action.boundsInRoot.width,
+                    1f,
+                )
+            }
+        }
     }
 
     /** P2-06-R6: a stale extraction is greyed and explained, with a label that is not colour alone. */
