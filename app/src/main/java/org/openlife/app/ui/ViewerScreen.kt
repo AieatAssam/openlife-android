@@ -40,6 +40,7 @@ import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
+import org.openlife.app.ui.evidence.EvidenceSelection
 import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
@@ -68,7 +69,7 @@ fun ViewerScreen(
     onCorrect: (OcrSpan, String) -> Unit = { _, _ -> },
     onReview: (OcrReviewState) -> Unit = {},
     onRejectSpan: (OcrSpan) -> Unit = {},
-    @Suppress("UNUSED_PARAMETER") onUndoRejectSpan: (OcrSpan) -> Unit = {},
+    onUndoRejectSpan: (OcrSpan) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
@@ -85,7 +86,6 @@ fun ViewerScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             source = source,
             content = content,
-            spans = (ocrState as? OcrUiState.Ready)?.spans.orEmpty(),
             selectedSpanId = selectedSpanId,
             onRetryLoad = { loadAttempt++ },
             onDeleteRequested = { confirmingDelete = true },
@@ -99,6 +99,7 @@ fun ViewerScreen(
             },
             onReview = onReview,
             onRejectSpan = onRejectSpan,
+            onUndoRejectSpan = onUndoRejectSpan,
         )
     }
 
@@ -154,7 +155,6 @@ private fun ViewerContent(
     modifier: Modifier,
     source: Source,
     content: ViewerContentState,
-    spans: List<OcrSpan>,
     selectedSpanId: java.util.UUID?,
     onRetryLoad: () -> Unit,
     onDeleteRequested: () -> Unit,
@@ -165,15 +165,21 @@ private fun ViewerContent(
     onCorrect: (OcrSpan) -> Unit,
     onReview: (OcrReviewState) -> Unit,
     onRejectSpan: (OcrSpan) -> Unit,
+    onUndoRejectSpan: (OcrSpan) -> Unit,
 ) {
-    val selectedSpan = spans.find { it.id == selectedSpanId }
+    val ready = ocrState as? OcrUiState.Ready
+    val spans = ready?.spans.orEmpty()
+    val spanReviews = ready?.spanReviews.orEmpty()
+    // P2-06-R13: a span rejected after it was selected stops being the selection.
+    val selectedSpan = EvidenceSelection.selectableSpans(spans, spanReviews).find { it.id == selectedSpanId }
     Surface(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             ViewerImage(
                 source,
                 content,
                 spans,
-                selectedSpanId,
+                spanReviews,
+                selectedSpan?.id,
                 onSelectSpan = onSelectSpan,
                 onRetry = onRetryLoad,
                 onDelete = onDeleteRequested,
@@ -202,6 +208,7 @@ private fun ViewerContent(
                 onCorrect = onCorrect,
                 onReview = onReview,
                 onRejectSpan = onRejectSpan,
+                onUndoRejectSpan = onUndoRejectSpan,
             )
             PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
             DetailsSection(source = source, verified = content is ViewerContentState.Shown)

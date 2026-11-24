@@ -48,17 +48,24 @@ abstract class OpenLifeDatabase : RoomDatabase() {
         /** Every migration, in order; never destructive (design §10). */
         val MIGRATIONS: List<androidx.room.migration.Migration> by lazy { listOf(MIGRATION_1_2, MIGRATION_2_3) }
 
+        /**
+         * Adds per-span review rows (P2-06-R5). The `sequence` column and its
+         * unique (spanId, sequence) index (P2-06-R12) were added to this
+         * migration in place: schema v3 had not shipped in any release or tag
+         * when it was amended. The DDL equals Room's exported v3 schema
+         * (SchemaV3MigrationTest).
+         */
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `ocr_span_reviews` (`id` TEXT NOT NULL, `spanId` TEXT NOT NULL, " +
-                        "`reviewState` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), " +
-                        "FOREIGN KEY(`spanId`) REFERENCES `ocr_spans`(`id`) " +
+                        "`reviewState` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`), FOREIGN KEY(`spanId`) REFERENCES `ocr_spans`(`id`) " +
                         "ON UPDATE NO ACTION ON DELETE CASCADE )",
                 )
                 db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_ocr_span_reviews_spanId` " +
-                        "ON `ocr_span_reviews` (`spanId`)",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_ocr_span_reviews_spanId_sequence` " +
+                        "ON `ocr_span_reviews` (`spanId`, `sequence`)",
                 )
                 // P1-18-R12: every migration ends by re-asserting the READY
                 // invariant triggers on `sources`.

@@ -27,6 +27,9 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrRunStateMachine
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
+import org.openlife.vault.ocr.OcrSpanReviewAction
+import org.openlife.vault.ocr.OcrSpanReviewRules
+import org.openlife.vault.ocr.withinSource
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.ocr.OcrView
@@ -177,6 +180,9 @@ class OcrRepository(
                     charCount = spans.sumOf { it.text.length },
                     spanCount = spans.size,
                 )
+                // A READY source has its size; without one no region can be checked, so none is kept.
+                val sourceWidth = source?.width ?: 0
+                val sourceHeight = source?.height ?: 0
                 val persistedSpans = spans.mapIndexed { ordinal, span ->
                     OcrSpan(
                         id = UUID.randomUUID(),
@@ -185,7 +191,8 @@ class OcrRepository(
                         text = span.text,
                         confidence = span.confidence,
                         coordinateSystem = OcrCoordinateSystem.SOURCE_PIXELS,
-                        evidenceRegion = span.region,
+                        // P2-06-R17: a box past the source edge is not evidence.
+                        evidenceRegion = span.region?.withinSource(sourceWidth, sourceHeight),
                     )
                 }
                 try {
@@ -263,24 +270,26 @@ class OcrRepository(
             }
         }
 
-    /** Appends a REJECTED review for one span. The span text is left unchanged. */
-    suspend fun rejectSpan(spanId: UUID): Boolean = withContext(ioDispatcher) {
-        mutationQueue.withMutation {
-            val span = database.ocrDao().findSpan(spanId.toString()) ?: return@withMutation false
-            val revision = database.ocrDao().findRevision(span.revisionId)?.toDomain() ?: return@withMutation false
-            if (revision.state != OcrRevisionState.READY) return@withMutation false
-            database.ocrSpanReviewDao().append(
-                UUID.randomUUID().toString(),
-                spanId.toString(),
-                OcrReviewState.REJECTED.name,
-                clock(),
-            )
-            true
-        }
-    }
+    /** Appends a REJECTED review for one span; refused if it is already rejected. The span text is unchanged. */
+    suspend fun rejectSpan(spanId: UUID): Boolean = appendSpanReview(spanId, OcrSpanReviewAction.REJECT)
 
-    /** Appends a review restoring the state before the span was rejected (P2-06-R13). */
-    suspend fun undoRejectSpan(spanId: UUID): Boolean = TODO("P2-06-R13: $spanId")
+    /** Appends a review restoring the state before the span was rejected (P2-06-R13); rows are never updated. */
+    suspend fun undoRejectSpan(spanId: UUID): Boolean = appendSpanReview(spanId, OcrSpanReviewAction.UNDO_REJECT)
+
+    private suspend fun appendSpanReview(spanId: UUID, action: OcrSpanReviewAction): Boolean =
+        withContext(ioDispatcher) {
+            mutationQueue.withMutation {
+                database.withTransaction {
+                    val span = database.ocrDao().findSpan(spanId.toString()) ?: return@withTransaction false
+                    val revision = database.ocrDao().findRevision(span.revisionId)?.toDomain()
+                        ?: return@withTransaction false
+                    val reviews = database.ocrSpanReviewDao().findForSpan(span.id).map { it.toDomain() }
+                    val next = OcrSpanReviewRules.next(reviews, revision.state, action) ?: return@withTransaction false
+                    database.ocrSpanReviewDao().append(UUID.randomUUID().toString(), span.id, next.name, clock())
+                    true
+                }
+            }
+        }
 
     suspend fun setReviewState(revisionId: UUID, reviewState: OcrReviewState): Boolean = withContext(ioDispatcher) {
         check(reviewState != OcrReviewState.UNRECOGNISED) { "an unrecognised review state is never written" }
@@ -327,9 +336,10 @@ internal fun ocrViewOf(
     corrections: List<OcrUserRevisionEntity>,
     reviews: List<OcrSpanReviewEntity>,
 ): OcrView {
-    // Corrections and reviews arrive oldest first, so the last one per span is the latest.
+    // Corrections arrive oldest first, so the last one per span is the latest.
+    // A span's current review is its highest sequence, never the clock (P2-06-R12).
     val latestBySpan = corrections.associateBy { it.spanId }
-    val latestReviewBySpan = reviews.associateBy { it.spanId }
+    val latestReviewBySpan = reviews.groupBy { it.spanId }.mapValues { (_, rows) -> rows.maxBy { it.sequence } }
     return OcrView(
         revision = latest.toDomain(),
         spans = spans.map { span ->

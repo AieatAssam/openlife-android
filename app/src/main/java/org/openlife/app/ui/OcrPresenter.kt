@@ -148,7 +148,9 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
         scope.launch { backend.rejectSpan(spanId) }
     }
 
-    fun undoRejectSpan(spanId: UUID): Unit = TODO("P2-06-R13: $spanId")
+    fun undoRejectSpan(spanId: UUID) {
+        scope.launch { backend.undoRejectSpan(spanId) }
+    }
 }
 
 /** Whether the database has answered yet, and with what. */
@@ -226,5 +228,8 @@ internal object OcrStateMapper {
         revision.reviewState == OcrReviewState.UNRECOGNISED ||
         revision.failureReason == OcrFailureReason.UNRECOGNISED ||
         revision.orientation == null ||
-        spans.any { it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED }
+        spans.any {
+            it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED ||
+                it.review?.reviewState == OcrReviewState.UNRECOGNISED
+        }
 }

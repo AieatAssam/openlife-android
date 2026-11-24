@@ -48,15 +48,31 @@ class SourceEgressBoundaryTest {
             it.trim() == "if (BuildConfig.DEBUG) {"
         }
         return lines.mapIndexedNotNull { index, line ->
-            lineViolation(file, index, line, recoveryLogIsDebugOnly)
+            lineViolation(file, lines, index, recoveryLogIsDebugOnly)
         }
     }
 
-    private fun lineViolation(file: Path, index: Int, line: String, recoveryLogIsDebugOnly: Boolean): String? {
+    private fun lineViolation(file: Path, lines: List<String>, index: Int, recoveryLogIsDebugOnly: Boolean): String? {
+        val line = lines[index]
         val location = "$file:${index + 1}"
+        val debugOnly = enclosedByDebugGuard(lines, index)
         return clipboardViolation(line, location)
-            ?: logViolation(file, line, location, recoveryLogIsDebugOnly)
+            ?: logViolation(file, line, location, recoveryLogIsDebugOnly, debugOnly)
             ?: activityViolation(file, line, location)
+    }
+
+    /** True when a block opened by [DEBUG_GUARD] encloses line [index] (brace depth, read backwards). */
+    private fun enclosedByDebugGuard(lines: List<String>, index: Int): Boolean {
+        var depth = 0
+        for (i in index - 1 downTo 0) {
+            val line = lines[i]
+            depth += line.count { it == '}' } - line.count { it == '{' }
+            if (depth < 0) {
+                if (line.trim() == DEBUG_GUARD) return true
+                depth = 0
+            }
+        }
+        return false
     }
 
     private fun clipboardViolation(line: String, location: String): String? =
@@ -66,15 +82,25 @@ class SourceEgressBoundaryTest {
             null
         }
 
-    private fun logViolation(file: Path, line: String, location: String, recoveryLogIsDebugOnly: Boolean): String? {
-        if (!line.contains("android.util.Log") || allowlistedLog(file, line, recoveryLogIsDebugOnly)) return null
+    private fun logViolation(
+        file: Path,
+        line: String,
+        location: String,
+        recoveryLogIsDebugOnly: Boolean,
+        debugOnly: Boolean,
+    ): String? {
+        if (!line.contains("android.util.Log") || allowlistedLog(file, line, recoveryLogIsDebugOnly, debugOnly)) {
+            return null
+        }
         return "$location: unallowlisted Log reference"
     }
 
-    private fun allowlistedLog(file: Path, line: String, recoveryLogIsDebugOnly: Boolean): Boolean {
+    private fun allowlistedLog(file: Path, line: String, recoveryLogIsDebugOnly: Boolean, debugOnly: Boolean): Boolean {
         val trimmed = line.trim()
         val recovery = file == recoveryLogFile && trimmed == ALLOWED_RECOVERY_LOG && recoveryLogIsDebugOnly
-        val bounds = file.fileName.toString() == "ZoomableEvidenceImage.kt" && trimmed == ALLOWED_EVIDENCE_BOUNDS_LOG
+        // P2-06-R15 (E-08): the bounds log must sit inside its BuildConfig.DEBUG block.
+        val bounds = file.fileName.toString() == "ZoomableEvidenceImage.kt" &&
+            trimmed == ALLOWED_EVIDENCE_BOUNDS_LOG && debugOnly
         return recovery || bounds
     }
 

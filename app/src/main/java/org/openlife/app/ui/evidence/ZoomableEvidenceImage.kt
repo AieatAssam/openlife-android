@@ -10,8 +10,6 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
@@ -23,23 +21,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
-import androidx.compose.ui.input.pointer.PointerId
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -47,322 +45,326 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import org.openlife.app.BuildConfig
 import org.openlife.app.R
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.ocr.OcrSpan
-import kotlin.math.roundToInt
+import java.util.UUID
+
+/** Colours for the evidence overlay: the highlighter for evidence, muted ink for rejected spans. */
+internal data class EvidenceColors(val highlighter: Color, val rejected: Color)
+
+/** What the zoomable image shows: the source geometry and its spans (P2-06-R1/R3/R13). */
+internal data class EvidenceContent(
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val orientation: Orientation,
+    val spans: List<OcrSpan>,
+    val rejectedSpanIds: Set<UUID>,
+) {
+    /** Spans whose regions are evidence: grounded and not rejected. */
+    val selectable: List<OcrSpan> = spans.filter { it.evidenceRegion != null && it.id !in rejectedSpanIds }
+}
 
 /**
  * Pinch-zoom and pan over the sampled preview. v0.2.0 does not decode a larger
  * bitmap when the user zooms (P2-06-R7); the same pixels are scaled.
  *
- * The image sits in a fixed box. While zoomed, pan is consumed here so the
+ * The image and every region are measured at their zoomed size and placed by
+ * the one transform in [EvidenceGeometry], so what is drawn and what a tap
+ * hits agree at any zoom (P2-06-R8). While zoomed, pan is consumed here so the
  * viewer column does not scroll at the same time.
  */
 @Composable
-@Suppress("LongParameterList")
 internal fun ZoomableEvidenceImage(
     bitmap: Bitmap,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    orientation: Orientation,
-    spans: List<OcrSpan>,
-    selectedSpanId: java.util.UUID?,
+    content: EvidenceContent,
+    selectedSpanId: UUID?,
     onSelectSpan: (OcrSpan) -> Unit,
-    highlighter: Color,
+    colors: EvidenceColors,
     modifier: Modifier = Modifier,
 ) {
-    val zoom = remember(sourceWidth, sourceHeight, orientation) { mutableFloatStateOf(EvidenceGeometry.MIN_ZOOM) }
-    val pan = remember(sourceWidth, sourceHeight, orientation) { mutableStateOf(Offset.Zero) }
+    val zoom = remember(content.sourceWidth, content.sourceHeight, content.orientation) {
+        mutableFloatStateOf(EvidenceGeometry.MIN_ZOOM)
+    }
+    val pan = remember(content.sourceWidth, content.sourceHeight, content.orientation) { mutableStateOf(Offset.Zero) }
     var canvas by remember { mutableStateOf(Size.Zero) }
     val bringIntoView = remember { BringIntoViewRequester() }
-    Box(
-        modifier.evidenceGestures(
-            sourceWidth,
-            sourceHeight,
-            orientation,
-            spans,
-            canvas,
-            zoom,
-            pan,
-            bringIntoView,
-            onSelectSpan,
-        ) { canvas = it },
-    ) {
-        if (canvas != Size.Zero && sourceWidth > 0 && sourceHeight > 0) {
-            EvidenceCanvas(
-                bitmap,
-                sourceWidth,
-                sourceHeight,
-                orientation,
-                canvas,
-                zoom.floatValue,
-                pan.value,
-                spans,
-                selectedSpanId,
-                highlighter,
-                onSelectSpan,
-            )
+    val view = EvidenceView(content, canvas, zoom, pan)
+    Box(modifier.evidenceGestures(view, bringIntoView, onSelectSpan) { canvas = it }) {
+        if (canvas != Size.Zero && content.sourceWidth > 0 && content.sourceHeight > 0) {
+            EvidenceCanvas(bitmap, view, selectedSpanId, colors, onSelectSpan)
         }
     }
-    RevealSelected(
-        selectedSpanId,
-        spans,
-        sourceWidth,
-        sourceHeight,
-        orientation,
-        canvas,
-        zoom,
-        pan,
-        bringIntoView,
+    RevealSelected(selectedSpanId, view, bringIntoView)
+}
+
+/** The image's geometry with its live zoom and pan; the one transform drawing and hit-testing share. */
+private class EvidenceView(
+    val content: EvidenceContent,
+    val canvas: Size,
+    val zoom: MutableFloatState,
+    val pan: MutableState<Offset>,
+) {
+    fun imageBox(): IntRect = EvidenceGeometry.pixelBox(
+        EvidenceGeometry.contentRect(
+            content.sourceWidth,
+            content.sourceHeight,
+            content.orientation,
+            canvas,
+            ContentScale.Fit,
+            zoom.floatValue,
+            pan.value,
+        ),
     )
+
+    fun regionBox(span: OcrSpan): IntRect? = span.evidenceRegion?.let { region ->
+        EvidenceGeometry.pixelBox(
+            EvidenceGeometry.regionToCanvas(
+                region,
+                content.sourceWidth,
+                content.sourceHeight,
+                content.orientation,
+                canvas,
+                ContentScale.Fit,
+                zoom.floatValue,
+                pan.value,
+            ),
+        )
+    }
+
+    /** The selectable span under [point], or null; rejected and ungrounded spans are never hit (R13). */
+    fun spanAt(point: Offset): OcrSpan? = if (canvas == Size.Zero) {
+        null
+    } else {
+        EvidenceGeometry.smallestSpanAt(
+            point,
+            content.selectable,
+            content.sourceWidth,
+            content.sourceHeight,
+            content.orientation,
+            canvas,
+            ContentScale.Fit,
+            zoom.floatValue,
+            pan.value,
+        )
+    }
 }
 
 @Composable
-@Suppress("LongParameterList")
 private fun Modifier.evidenceGestures(
-    sourceWidth: Int,
-    sourceHeight: Int,
-    orientation: Orientation,
-    spans: List<OcrSpan>,
-    canvas: Size,
-    zoom: MutableFloatState,
-    pan: MutableState<Offset>,
+    view: EvidenceView,
     bringIntoView: BringIntoViewRequester,
     onSelectSpan: (OcrSpan) -> Unit,
     onCanvas: (Size) -> Unit,
 ): Modifier {
-    val transformable = rememberZoomTransform(
-        sourceWidth,
-        sourceHeight,
-        orientation,
-        canvas,
-        zoom,
-        pan,
-    )
-    val zoomedIn = zoom.floatValue > EvidenceGeometry.MIN_ZOOM
+    val transformable = rememberZoomTransform(view)
+    // P2-06-R9: the detector is started once. Zoom, pan, spans and callbacks
+    // are read when a tap ends, so a pan never restarts it or loses a
+    // pending double tap.
+    val currentView by rememberUpdatedState(view)
+    val currentOnSelectSpan by rememberUpdatedState(onSelectSpan)
     return this
         .fillMaxSize()
         .clipToBounds()
         .testTag("viewer_evidence_canvas")
         .onSizeChanged { onCanvas(Size(it.width.toFloat(), it.height.toFloat())) }
         .bringIntoViewRequester(bringIntoView)
-        .transformable(state = transformable, lockRotationOnZoomPan = true, canPan = { zoomedIn })
-        .pointerInput(spans, canvas, zoom.floatValue, pan.value) {
-            detectEvidenceTaps(
-                onDoubleTap = {
-                    zoom.floatValue = EvidenceGeometry.nextDoubleTapZoom(zoom.floatValue)
-                    pan.value = Offset.Zero
-                },
-                onTap = { offset ->
-                    if (canvas == Size.Zero) return@detectEvidenceTaps
-                    EvidenceGeometry.smallestSpanAt(
-                        offset,
-                        spans,
-                        sourceWidth,
-                        sourceHeight,
-                        orientation,
-                        canvas,
-                        ContentScale.Fit,
-                        zoom.floatValue,
-                        pan.value,
-                    )?.let(onSelectSpan)
-                },
-            )
+        .transformable(
+            state = transformable,
+            lockRotationOnZoomPan = true,
+            canPan = { view.zoom.floatValue > EvidenceGeometry.MIN_ZOOM },
+        )
+        .pointerInput(Unit) {
+            val doubleTaps = DoubleTapClock(viewConfiguration.doubleTapTimeoutMillis)
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val tap = TapGesture(down.id.value, down.position, viewConfiguration.touchSlop)
+                val release = awaitTapRelease(tap)
+                if (release == null) {
+                    doubleTaps.reset()
+                    return@awaitEachGesture
+                }
+                when (doubleTaps.onTap(down.uptimeMillis, release.uptimeMillis)) {
+                    DoubleTapClock.Kind.DOUBLE -> {
+                        val zoom = currentView.zoom
+                        zoom.floatValue = EvidenceGeometry.nextDoubleTapZoom(zoom.floatValue)
+                        currentView.pan.value = Offset.Zero
+                    }
+
+                    DoubleTapClock.Kind.SINGLE -> currentView.spanAt(release.position)?.let(currentOnSelectSpan)
+                }
+            }
         }
 }
 
+private class TapRelease(val position: Offset, val uptimeMillis: Long)
+
 /**
- * A single tap selects immediately. A second tap inside the double-tap
- * window zooms. [androidx.compose.foundation.gestures.detectTapGestures]
- * holds the single tap until that window closes, which drops the selection
- * when a test reads the tree on the next statement.
+ * As `waitForUpOrCancellation()`, checking each event in the main pass and
+ * again in the final pass, but every decision is [TapGesture]'s: it also
+ * abandons the tap past touch slop or when a second pointer goes down, which
+ * `waitForUpOrCancellation()` does not.
  */
-private suspend fun PointerInputScope.detectEvidenceTaps(onTap: (Offset) -> Unit, onDoubleTap: () -> Unit) {
-    // Null, not zero: instrumentation clocks start near zero, so a first tap
-    // would otherwise look like a double-tap and zoom instead of selecting.
-    var lastUpMillis: Long? = null
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        val up = awaitRelease(down.id) ?: return@awaitEachGesture
-        val previous = lastUpMillis
-        val doubleTap = previous != null && up.uptimeMillis - previous <= viewConfiguration.doubleTapTimeoutMillis
-        lastUpMillis = up.uptimeMillis
-        if (doubleTap) onDoubleTap() else onTap(up.position)
-    }
-}
-
-private suspend fun AwaitPointerEventScope.awaitRelease(pointerId: PointerId): PointerInputChange? {
+private suspend fun AwaitPointerEventScope.awaitTapRelease(tap: TapGesture): TapRelease? {
     while (true) {
-        val event = awaitPointerEvent()
-        val change = event.changes.find { it.id == pointerId } ?: return null
-        if (!change.pressed) return change
+        val main = awaitPointerEvent(PointerEventPass.Main)
+        when (val step = tap.onMain(main.samples())) {
+            TapGesture.Step.Abandoned -> return null
+            is TapGesture.Step.Released -> return TapRelease(step.position, main.changes.maxOf { it.uptimeMillis })
+            TapGesture.Step.Pending -> Unit
+        }
+        if (tap.onFinal(awaitPointerEvent(PointerEventPass.Final).samples()) == TapGesture.Step.Abandoned) return null
     }
 }
 
-@Suppress("LongParameterList")
-@Composable
-private fun rememberZoomTransform(
-    sourceWidth: Int,
-    sourceHeight: Int,
-    orientation: Orientation,
-    canvas: Size,
-    zoom: MutableFloatState,
-    pan: MutableState<Offset>,
-): TransformableState = rememberTransformableState { _, zoomChange, panChange, _ ->
-    val nextZoom = (zoom.floatValue * zoomChange).coerceIn(EvidenceGeometry.MIN_ZOOM, EvidenceGeometry.MAX_ZOOM)
-    zoom.floatValue = nextZoom
-    pan.value = if (nextZoom == EvidenceGeometry.MIN_ZOOM || canvas == Size.Zero) {
-        Offset.Zero
-    } else {
-        EvidenceGeometry.clampPan(
-            pan.value + panChange,
-            sourceWidth,
-            sourceHeight,
-            orientation,
-            canvas,
-            ContentScale.Fit,
-            nextZoom,
-        )
-    }
-}
+private fun PointerEvent.samples(): List<PointerSample> =
+    changes.map { PointerSample(it.id.value, it.position, it.pressed, it.isConsumed) }
 
 @Composable
-@Suppress("LongParameterList")
-private fun RevealSelected(
-    selectedSpanId: java.util.UUID?,
-    spans: List<OcrSpan>,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    orientation: Orientation,
-    canvas: Size,
-    zoom: MutableFloatState,
-    pan: MutableState<Offset>,
-    bringIntoView: BringIntoViewRequester,
-) {
-    LaunchedEffect(selectedSpanId, canvas) {
-        val region = spans.find { it.id == selectedSpanId }?.evidenceRegion ?: return@LaunchedEffect
-        if (canvas == Size.Zero) return@LaunchedEffect
-        pan.value = EvidenceGeometry.panToReveal(
+private fun rememberZoomTransform(view: EvidenceView): TransformableState =
+    rememberTransformableState { _, zoomChange, panChange, _ ->
+        val content = view.content
+        val nextZoom = (view.zoom.floatValue * zoomChange)
+            .coerceIn(EvidenceGeometry.MIN_ZOOM, EvidenceGeometry.MAX_ZOOM)
+        view.zoom.floatValue = nextZoom
+        view.pan.value = if (nextZoom == EvidenceGeometry.MIN_ZOOM || view.canvas == Size.Zero) {
+            Offset.Zero
+        } else {
+            EvidenceGeometry.clampPan(
+                view.pan.value + panChange,
+                content.sourceWidth,
+                content.sourceHeight,
+                content.orientation,
+                view.canvas,
+                ContentScale.Fit,
+                nextZoom,
+            )
+        }
+    }
+
+@Composable
+private fun RevealSelected(selectedSpanId: UUID?, view: EvidenceView, bringIntoView: BringIntoViewRequester) {
+    LaunchedEffect(selectedSpanId, view.canvas) {
+        val content = view.content
+        val region = content.selectable.find { it.id == selectedSpanId }?.evidenceRegion ?: return@LaunchedEffect
+        if (view.canvas == Size.Zero) return@LaunchedEffect
+        view.pan.value = EvidenceGeometry.panToReveal(
             region,
-            sourceWidth,
-            sourceHeight,
-            orientation,
-            canvas,
+            content.sourceWidth,
+            content.sourceHeight,
+            content.orientation,
+            view.canvas,
             ContentScale.Fit,
-            zoom.floatValue,
-            pan.value,
+            view.zoom.floatValue,
+            view.pan.value,
         )
         bringIntoView.bringIntoView()
     }
 }
 
 @Composable
-@Suppress("LongParameterList")
 private fun EvidenceCanvas(
     bitmap: Bitmap,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    orientation: Orientation,
-    canvas: Size,
-    zoom: Float,
-    pan: Offset,
-    spans: List<OcrSpan>,
-    selectedSpanId: java.util.UUID?,
-    highlighter: Color,
+    view: EvidenceView,
+    selectedSpanId: UUID?,
+    colors: EvidenceColors,
     onSelectSpan: (OcrSpan) -> Unit,
 ) {
-    val imageRect = EvidenceGeometry.contentRect(
-        sourceWidth,
-        sourceHeight,
-        orientation,
-        canvas,
-        ContentScale.Fit,
-        zoom,
-        pan,
-    )
-    PlacedImage(bitmap, imageRect)
-    val grounded = spans.filter { it.evidenceRegion != null }
-        .sortedByDescending { span ->
-            val region = span.evidenceRegion ?: return@sortedByDescending 0
-            (region.right - region.left) * (region.bottom - region.top)
-        }
-    var selectedRect: Rect? = null
-    grounded.forEach { span ->
-        val region = span.evidenceRegion ?: return@forEach
-        val rect = EvidenceGeometry.regionToCanvas(
-            region,
-            sourceWidth,
-            sourceHeight,
-            orientation,
-            canvas,
-            ContentScale.Fit,
-            zoom,
-            pan,
-        )
-        if (span.id == selectedSpanId) selectedRect = rect
-        RegionNode(
-            span = span,
-            rect = rect,
-            selected = span.id == selectedSpanId,
-            highlighter = highlighter,
-            onSelect = { onSelectSpan(span) },
-        )
+    val imageBox = view.imageBox()
+    PlacedImage(bitmap, imageBox)
+    // Larger regions first, so a smaller region inside one is drawn, and reached, on top.
+    val grounded = view.content.spans.mapNotNull { span -> view.regionBox(span)?.let { span to it } }
+        .sortedByDescending { (_, box) -> box.width.toLong() * box.height }
+    var selectedBox: IntRect? = null
+    grounded.forEach { (span, box) ->
+        val rejected = span.id in view.content.rejectedSpanIds
+        val selected = span.id == selectedSpanId && !rejected
+        if (selected) selectedBox = box
+        RegionNode(span, box, selected, rejected, colors) { onSelectSpan(span) }
     }
     if (BuildConfig.DEBUG) {
-        val message = boundsMessage(imageRect, selectedRect)
+        val message = boundsMessage(imageBox, selectedBox)
         SideEffect {
             android.util.Log.d("EvidenceBounds", message)
         }
     }
 }
 
+/**
+ * Measures the node at exactly [box]'s size, even when that is larger than the
+ * canvas (zoomed in), and places it at [box]'s origin in canvas pixels. The
+ * node reports the canvas size to its parent so Compose never re-centres an
+ * oversized child (E-01). Placement is absolute, as the geometry is.
+ */
+private fun Modifier.placeAt(box: IntRect): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(Constraints.fixed(box.width, box.height))
+    val width = if (constraints.hasBoundedWidth) constraints.maxWidth else constraints.minWidth
+    val height = if (constraints.hasBoundedHeight) constraints.maxHeight else constraints.minHeight
+    layout(width, height) { placeable.place(box.left, box.top) }
+}
+
 @Composable
-private fun PlacedImage(bitmap: Bitmap, rect: Rect) {
-    val density = LocalDensity.current
-    if (rect.width <= 0f || rect.height <= 0f) return
+private fun PlacedImage(bitmap: Bitmap, box: IntRect) {
+    if (box.width <= 0 || box.height <= 0) return
     Image(
         bitmap = bitmap.asImageBitmap(),
         contentDescription = stringResource(R.string.viewer_saved_image_content_description),
         modifier = Modifier
-            .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
-            .size(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
+            .placeAt(box)
             .testTag("viewer_evidence_image"),
         contentScale = ContentScale.FillBounds,
     )
 }
 
 @Composable
-private fun RegionNode(span: OcrSpan, rect: Rect, selected: Boolean, highlighter: Color, onSelect: () -> Unit) {
-    val density = LocalDensity.current
-    if (rect.width <= 0f || rect.height <= 0f) return
+private fun RegionNode(
+    span: OcrSpan,
+    box: IntRect,
+    selected: Boolean,
+    rejected: Boolean,
+    colors: EvidenceColors,
+    onSelect: () -> Unit,
+) {
+    if (box.width <= 0 || box.height <= 0) return
     val preview = evidenceSpanPreview(span.text)
+    val rejectedDescription = stringResource(R.string.viewer_region_rejected_description, preview)
     Box(
         Modifier
-            .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
-            .size(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
+            .placeAt(box)
             .then(if (selected) Modifier.testTag("viewer_evidence_overlay") else Modifier)
             .semantics {
-                role = Role.Button
-                contentDescription = preview
-                onClick(label = preview) {
-                    onSelect()
-                    true
+                if (rejected) {
+                    // Drawn so the user sees what was rejected, but not evidence: no click (P2-06-R13).
+                    contentDescription = rejectedDescription
+                } else {
+                    role = Role.Button
+                    contentDescription = preview
+                    onClick(label = preview) {
+                        onSelect()
+                        true
+                    }
                 }
             },
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            if (selected) drawRect(highlighter.copy(alpha = HIGHLIGHT_ALPHA))
-            drawRect(color = highlighter, style = Stroke(width = STROKE_WIDTH.toPx()))
+            val stroke = STROKE_WIDTH.toPx()
+            if (rejected) {
+                val dash = floatArrayOf(stroke * 2f, stroke * 2f)
+                drawRect(color = colors.rejected, style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(dash)))
+            } else {
+                if (selected) drawRect(colors.highlighter.copy(alpha = HIGHLIGHT_ALPHA))
+                drawRect(color = colors.highlighter, style = Stroke(width = stroke))
+            }
         }
     }
 }
 
-private fun boundsMessage(image: Rect, overlay: Rect?): String {
-    fun format(rect: Rect) = "${rect.left},${rect.top},${rect.right},${rect.bottom}"
+private fun boundsMessage(image: IntRect, overlay: IntRect?): String {
+    fun format(box: IntRect) = "${box.left},${box.top},${box.right},${box.bottom}"
     return "image=${format(image)} overlay=${overlay?.let(::format) ?: "none"}"
 }
 

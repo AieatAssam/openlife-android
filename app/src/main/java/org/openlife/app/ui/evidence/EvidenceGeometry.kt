@@ -9,6 +9,7 @@ import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.OrientationTransform
 import org.openlife.vault.ocr.OcrEvidenceRegion
 import org.openlife.vault.ocr.OcrSpan
+import kotlin.math.roundToInt
 
 /**
  * Maps a source-pixel evidence region onto the letterboxed, orientation-corrected
@@ -152,7 +153,12 @@ object EvidenceGeometry {
      * (P2-06-R8, E-01). Edges are rounded independently so neighbouring
      * boxes share edges; the size is never limited to the canvas.
      */
-    fun pixelBox(rect: Rect): IntRect = TODO("P2-06-R8: $rect")
+    fun pixelBox(rect: Rect): IntRect = IntRect(
+        rect.left.roundToInt(),
+        rect.top.roundToInt(),
+        rect.right.roundToInt(),
+        rect.bottom.roundToInt(),
+    )
 
     fun nextDoubleTapZoom(current: Float): Float =
         if (current < (MIN_ZOOM + DOUBLE_TAP_ZOOM) / 2f) DOUBLE_TAP_ZOOM else MIN_ZOOM

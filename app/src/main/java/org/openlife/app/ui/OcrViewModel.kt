@@ -70,6 +70,8 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     fun rejectSpan(spanId: UUID) = presenter.rejectSpan(spanId)
 
+    fun undoRejectSpan(spanId: UUID) = presenter.undoRejectSpan(spanId)
+
     override fun onCleared() {
         unregisterResetCallback()
         unregisterTrimCallback()
@@ -113,6 +115,6 @@ private class AppOcrBackend(private val application: OpenLifeApp) : OcrBackend {
     }
 
     override suspend fun undoRejectSpan(spanId: UUID) {
-        TODO("P2-06-R13: $spanId")
+        (application.vault() as? VaultAccess.Ready)?.ocrRepository?.undoRejectSpan(spanId)
     }
 }

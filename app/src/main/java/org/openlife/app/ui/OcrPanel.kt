@@ -3,6 +3,8 @@ package org.openlife.app.ui
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
+import org.openlife.app.ui.evidence.EvidenceSelection
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
@@ -48,7 +51,9 @@ internal fun OcrSection(
     onCorrect: (OcrSpan) -> Unit,
     onReview: (OcrReviewState) -> Unit,
     onRejectSpan: (OcrSpan) -> Unit,
+    onUndoRejectSpan: (OcrSpan) -> Unit = {},
 ) {
+    val spanActions = SpanActions(onSelectSpan, onCorrect, onRejectSpan, onUndoRejectSpan)
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.viewer_extracted_text_title), style = MaterialTheme.typography.titleMedium)
         val runAgain = @Composable {
@@ -74,7 +79,7 @@ internal fun OcrSection(
             }
 
             is OcrUiState.Ready -> {
-                OcrReadyContent(state, onSelectSpan, onCorrect, onReview, onRejectSpan)
+                OcrReadyContent(state, spanActions, onReview)
                 runAgain()
                 OcrHistory(state.history)
             }
@@ -103,14 +108,16 @@ internal fun OcrSection(
  * shown under it and attributed. Everything is plain, inert Text: no
  * selection, links or clipboard.
  */
+/** What a span row can do; selection is offered only for evidence (grounded, not rejected). */
+private class SpanActions(
+    val onSelect: (OcrSpan) -> Unit,
+    val onCorrect: (OcrSpan) -> Unit,
+    val onReject: (OcrSpan) -> Unit,
+    val onUndoReject: (OcrSpan) -> Unit,
+)
+
 @Composable
-private fun OcrReadyContent(
-    state: OcrUiState.Ready,
-    onSelectSpan: (OcrSpan) -> Unit,
-    onCorrect: (OcrSpan) -> Unit,
-    onReview: (OcrReviewState) -> Unit,
-    onRejectSpan: (OcrSpan) -> Unit,
-) {
+private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onReview: (OcrReviewState) -> Unit) {
     val reviewWord = stringResource(
         when (state.reviewState) {
             OcrReviewState.UNREVIEWED -> R.string.viewer_provenance_unreviewed
@@ -140,16 +147,7 @@ private fun OcrReadyContent(
     )
     if (state.spans.isEmpty()) Text(stringResource(R.string.viewer_no_latin_text))
     val (grounded, ungrounded) = state.spans.partition { it.evidenceRegion != null }
-    grounded.forEach { span ->
-        SpanRow(
-            span,
-            state,
-            selectable = true,
-            onSelectSpan = onSelectSpan,
-            onCorrect = onCorrect,
-            onRejectSpan = onRejectSpan,
-        )
-    }
+    grounded.forEach { span -> SpanRow(span, state, actions) }
     if (ungrounded.isNotEmpty()) {
         Text(
             stringResource(R.string.viewer_text_without_location),
@@ -160,16 +158,7 @@ private fun OcrReadyContent(
             stringResource(R.string.viewer_text_without_location_explanation),
             style = MaterialTheme.typography.bodySmall,
         )
-        ungrounded.forEach { span ->
-            SpanRow(
-                span,
-                state,
-                selectable = false,
-                onSelectSpan = onSelectSpan,
-                onCorrect = onCorrect,
-                onRejectSpan = onRejectSpan,
-            )
-        }
+        ungrounded.forEach { span -> SpanRow(span, state, actions) }
     }
     state.revisionCorrection?.let { CorrectionLine(it) }
     Row {
@@ -182,21 +171,22 @@ private fun OcrReadyContent(
     }
 }
 
+/**
+ * One span: its text uses the full width, the actions wrap on the line below
+ * (P2-06-R15), so a narrow screen or a large font never squeezes the text. A
+ * rejected span offers Undo instead of Reject and is not evidence, so it
+ * cannot be selected (P2-06-R13).
+ */
 @Composable
-private fun SpanRow(
-    span: OcrSpan,
-    state: OcrUiState.Ready,
-    selectable: Boolean,
-    onSelectSpan: (OcrSpan) -> Unit,
-    onCorrect: (OcrSpan) -> Unit,
-    onRejectSpan: (OcrSpan) -> Unit,
-) {
-    val rejected = state.spanReviews[span.id] == OcrReviewState.REJECTED
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+@OptIn(ExperimentalLayoutApi::class)
+private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions) {
+    val rejected = EvidenceSelection.isRejected(span, state.spanReviews)
+    val selectable = span.evidenceRegion != null && !rejected
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Column(
             modifier = Modifier
-                .weight(1f)
-                .then(if (selectable) Modifier.clickable { onSelectSpan(span) } else Modifier),
+                .fillMaxWidth()
+                .then(if (selectable) Modifier.clickable { actions.onSelect(span) } else Modifier),
         ) {
             val value = if (rejected) {
                 buildAnnotatedString {
@@ -211,13 +201,19 @@ private fun SpanRow(
             }
             state.corrections[span.id]?.let { CorrectionLine(it) }
         }
-        if (selectable) {
-            TextButton(onClick = { onSelectSpan(span) }) {
-                Text(stringResource(R.string.viewer_show_region))
+        FlowRow(modifier = Modifier.fillMaxWidth()) {
+            if (selectable) {
+                TextButton(onClick = { actions.onSelect(span) }) {
+                    Text(stringResource(R.string.viewer_show_region))
+                }
+            }
+            TextButton(onClick = { actions.onCorrect(span) }) { Text(stringResource(R.string.viewer_correct)) }
+            if (rejected) {
+                TextButton(onClick = { actions.onUndoReject(span) }) { Text(stringResource(R.string.viewer_undo_reject)) }
+            } else {
+                TextButton(onClick = { actions.onReject(span) }) { Text(stringResource(R.string.viewer_reject_span)) }
             }
         }
-        TextButton(onClick = { onCorrect(span) }) { Text(stringResource(R.string.viewer_correct)) }
-        TextButton(onClick = { onRejectSpan(span) }) { Text(stringResource(R.string.viewer_reject_span)) }
     }
 }
 

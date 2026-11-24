@@ -10,8 +10,9 @@ import java.util.UUID
  * as established evidence).
  */
 internal object EvidenceSelection {
-    fun isRejected(span: OcrSpan, spanReviews: Map<UUID, OcrReviewState>): Boolean = TODO("P2-06-R13 $span $spanReviews")
+    fun isRejected(span: OcrSpan, spanReviews: Map<UUID, OcrReviewState>): Boolean =
+        spanReviews[span.id] == OcrReviewState.REJECTED
 
     fun selectableSpans(spans: List<OcrSpan>, spanReviews: Map<UUID, OcrReviewState>): List<OcrSpan> =
-        TODO("P2-06-R13 $spans $spanReviews")
+        spans.filter { it.evidenceRegion != null && !isRejected(it, spanReviews) }
 }

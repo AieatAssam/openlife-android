@@ -21,11 +21,32 @@ internal class TapGesture(private val pointerId: Long, private val downPosition:
         data class Released(val position: Offset) : Step
     }
 
+    private var abandoned = false
+
     /** An event seen in the main pass, before parents (the scrolling column) react. */
-    fun onMain(changes: List<PointerSample>): Step = TODO("P2-06-R9")
+    fun onMain(changes: List<PointerSample>): Step {
+        if (abandoned) return Step.Abandoned
+        val tracked = changes.firstOrNull { it.id == pointerId }
+        val anotherPointerDown = changes.any { it.id != pointerId && it.pressed }
+        val moved = tracked != null && (tracked.position - downPosition).getDistance() > touchSlop
+        return when {
+            tracked == null || anotherPointerDown || tracked.consumed || moved -> abandon()
+            !tracked.pressed -> Step.Released(tracked.position)
+            else -> Step.Pending
+        }
+    }
 
     /** The same event in the final pass: a change consumed by anyone abandons the tap. */
-    fun onFinal(changes: List<PointerSample>): Step = TODO("P2-06-R9")
+    fun onFinal(changes: List<PointerSample>): Step = when {
+        abandoned -> Step.Abandoned
+        changes.any { it.consumed } -> abandon()
+        else -> Step.Pending
+    }
+
+    private fun abandon(): Step {
+        abandoned = true
+        return Step.Abandoned
+    }
 }
 
 /**
@@ -37,7 +58,18 @@ internal class TapGesture(private val pointerId: Long, private val downPosition:
 internal class DoubleTapClock(private val timeoutMillis: Long) {
     enum class Kind { SINGLE, DOUBLE }
 
-    fun onTap(downMillis: Long, upMillis: Long): Kind = TODO("P2-06-R9: $downMillis $upMillis $timeoutMillis")
+    // Null, not zero: instrumentation clocks start near zero, so a first tap
+    // would otherwise look like the second half of a double tap.
+    private var lastUpMillis: Long? = null
 
-    fun reset(): Unit = TODO("P2-06-R9")
+    fun onTap(downMillis: Long, upMillis: Long): Kind {
+        val previous = lastUpMillis
+        val double = previous != null && downMillis - previous <= timeoutMillis
+        lastUpMillis = if (double) null else upMillis
+        return if (double) Kind.DOUBLE else Kind.SINGLE
+    }
+
+    fun reset() {
+        lastUpMillis = null
+    }
 }

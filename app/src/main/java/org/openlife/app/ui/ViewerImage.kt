@@ -26,7 +26,11 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
+import org.openlife.app.ui.evidence.EvidenceColors
+import org.openlife.app.ui.evidence.EvidenceContent
+import org.openlife.app.ui.evidence.EvidenceSelection
 import org.openlife.app.ui.evidence.ZoomableEvidenceImage
+import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
@@ -101,6 +105,7 @@ internal fun ViewerImage(
     source: Source,
     content: ViewerContentState,
     spans: List<OcrSpan>,
+    spanReviews: Map<UUID, OcrReviewState>,
     selectedSpanId: UUID?,
     onSelectSpan: (OcrSpan) -> Unit,
     onRetry: () -> Unit,
@@ -124,7 +129,7 @@ internal fun ViewerImage(
         }
 
         ViewerContentState.Loading, is ViewerContentState.Shown ->
-            ViewerImageArea(source, content, spans, selectedSpanId, onSelectSpan)
+            ViewerImageArea(source, content, spans, spanReviews, selectedSpanId, onSelectSpan)
     }
 }
 
@@ -144,6 +149,7 @@ private fun ViewerImageArea(
     source: Source,
     content: ViewerContentState,
     spans: List<OcrSpan>,
+    spanReviews: Map<UUID, OcrReviewState>,
     selectedSpanId: UUID?,
     onSelectSpan: (OcrSpan) -> Unit,
 ) {
@@ -167,13 +173,18 @@ private fun ViewerImageArea(
             } else {
                 ZoomableEvidenceImage(
                     bitmap = shown.bitmap,
-                    sourceWidth = width,
-                    sourceHeight = height,
-                    orientation = source.orientation ?: Orientation.NORMAL,
-                    spans = spans,
+                    content = EvidenceContent(
+                        sourceWidth = width,
+                        sourceHeight = height,
+                        orientation = source.orientation ?: Orientation.NORMAL,
+                        spans = spans,
+                        rejectedSpanIds = spans.filter { EvidenceSelection.isRejected(it, spanReviews) }
+                            .map { it.id }
+                            .toSet(),
+                    ),
                     selectedSpanId = selectedSpanId,
                     onSelectSpan = onSelectSpan,
-                    highlighter = brand.highlighter,
+                    colors = EvidenceColors(highlighter = brand.highlighter, rejected = brand.mutedInk),
                 )
             }
         }

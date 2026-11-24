@@ -199,6 +199,7 @@ class MainActivity : FragmentActivity() {
             correct = ocrViewModel::correct,
             review = ocrViewModel::review,
             rejectSpan = ocrViewModel::rejectSpan,
+            undoRejectSpan = ocrViewModel::undoRejectSpan,
             onImportFromPhotoPicker = rememberPhotoPickerLauncher(),
             navController = navController,
             onRetryVault = viewModel::retryVault,

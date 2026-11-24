@@ -26,7 +26,8 @@ data class OcrEvidenceRegion(val left: Int, val top: Int, val right: Int, val bo
  * a box past the image edge is not evidence, and the span is persisted
  * ungrounded rather than clamped to an invented box (P2-06-R17, E-10).
  */
-fun OcrEvidenceRegion.withinSource(sourceWidth: Int, sourceHeight: Int): OcrEvidenceRegion? = TODO("P2-06-R17")
+fun OcrEvidenceRegion.withinSource(sourceWidth: Int, sourceHeight: Int): OcrEvidenceRegion? =
+    takeIf { right <= sourceWidth && bottom <= sourceHeight }
 
 /** Engine output before it receives a revision/span identity. */
 data class OcrSpanDraft(val text: String, val confidence: Float?, val region: OcrEvidenceRegion?) {

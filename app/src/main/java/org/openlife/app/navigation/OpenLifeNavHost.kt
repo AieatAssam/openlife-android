@@ -60,6 +60,7 @@ private class SourceScreens(
     val correct: (revisionId: UUID, spanId: UUID, correctedText: String) -> Unit,
     val review: (revisionId: UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     val rejectSpan: (spanId: UUID) -> Unit,
+    val undoRejectSpan: (spanId: UUID) -> Unit,
     val onImportFromPhotoPicker: () -> Unit,
     val onRetryVault: () -> Unit,
     val onFinishReset: () -> Unit,
@@ -102,6 +103,7 @@ private class SourceScreens(
                 (ocr as? org.openlife.app.ui.OcrUiState.Ready)?.let { review(it.revisionId, state) }
             },
             onRejectSpan = { span -> rejectSpan(span.id) },
+            onUndoRejectSpan = { span -> undoRejectSpan(span.id) },
         )
     }
 }
@@ -120,6 +122,7 @@ fun OpenLifeNavHost(
     correct: (revisionId: UUID, spanId: UUID, correctedText: String) -> Unit,
     review: (revisionId: UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     rejectSpan: (spanId: UUID) -> Unit = {},
+    undoRejectSpan: (spanId: UUID) -> Unit = {},
     onImportFromPhotoPicker: () -> Unit,
     onRetryVault: () -> Unit,
     onFinishReset: () -> Unit,
@@ -131,7 +134,7 @@ fun OpenLifeNavHost(
 ) {
     val screens = SourceScreens(
         listState, thumbnailGeneration, ocrState, loadThumbnail, loadReadyContent, delete, extractText,
-        cancelOcr, correct, review, rejectSpan, onImportFromPhotoPicker, onRetryVault, onFinishReset,
+        cancelOcr, correct, review, rejectSpan, undoRejectSpan, onImportFromPhotoPicker, onRetryVault, onFinishReset,
     )
     val currentEntry by navController.currentBackStackEntryAsStateCompat()
     val isNested = currentEntry?.destination?.route != null &&

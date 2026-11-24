@@ -81,6 +81,8 @@
     <string name="viewer_user_badge">USER</string>
     <string name="viewer_reject_span">Reject span</string>
     <string name="viewer_span_rejected">rejected</string>
+    <string name="viewer_undo_reject">Undo reject</string>
+    <string name="viewer_region_rejected_description">%1$s, rejected, not used as evidence</string>
     <string name="viewer_run_again">Run again</string>
     <string name="viewer_ocr_provenance">Extracted by %1$s %2$s · %3$s</string>
     <string name="viewer_provenance_unreviewed">unreviewed</string>
