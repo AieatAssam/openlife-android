@@ -234,13 +234,6 @@ class ImportRepository(
         prepareFailureFor(error)
     }
 
-    private fun prepareFailureFor(error: Throwable): PrepareResult =
-        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-            PrepareResult.StorageUnavailable
-        } else {
-            PrepareResult.Failed
-        }
-
     private suspend fun insertStagedSource(source: Source): PrepareResult? = try {
         sourceDao.insert(source.toEntity())
         null
@@ -384,40 +377,8 @@ class ImportRepository(
             return saveFailureFor(error)
         }
 
-        return try {
-            // Compare-and-set (P1-18-R13). Losing it cannot happen under the
-            // mutation; if it did, the row was not saved by this call.
-            when (sourceDao.compareAndSetState(sourceId.toString(), SourceState.STAGED, SourceState.READY)) {
-                StateTransition.APPLIED -> SaveResult.Saved(sourceId)
-                StateTransition.LOST_RACE -> SaveResult.Failed
-            }
-        } catch (cancelled: CancellationException) {
-            // P1-18-R9: cancellation reaches the caller; never reported as a
-            // failure for an item that may already be saved.
-            throw cancelled
-        } catch (error: IOException) {
-            saveFailureFor(error)
-        } catch (error: ErrnoException) {
-            saveFailureFor(error)
-        } catch (_: SQLiteFullException) {
-            // The rename already happened, but the row remains STAGED when
-            // the final commit is rejected; recovery owns both paths.
-            SaveResult.StorageUnavailable
-        } catch (_: Exception) {
-            // The rename already happened, but the row remains STAGED when
-            // the final commit is rejected (for example by the READY
-            // invariant trigger). Recovery owns both possible artefact paths
-            // and will remove them on the next pass; never surface success.
-            SaveResult.Failed
-        }
+        return sourceDao.commitReady(sourceId)
     }
-
-    private fun saveFailureFor(error: Throwable): SaveResult =
-        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-            SaveResult.StorageUnavailable
-        } else {
-            SaveResult.Failed
-        }
 }
 
 /** Null when Keystore cannot wrap, including a lost wrapping key, which is never recreated here (P1-14-R2). */
@@ -430,3 +391,45 @@ private fun KeystoreWrapper.wrapSourceKeyOrNull(dek: ByteArray, sourceId: UUID) 
 } catch (_: ProviderException) {
     null
 }
+
+/** The final STAGED -> READY commit of a save; the rename already happened. */
+private suspend fun SourceDao.commitReady(sourceId: UUID): SaveResult = try {
+    // Compare-and-set (P1-18-R13). Losing it cannot happen under the
+    // mutation; if it did, the row was not saved by this call.
+    when (compareAndSetState(sourceId.toString(), SourceState.STAGED, SourceState.READY)) {
+        StateTransition.APPLIED -> SaveResult.Saved(sourceId)
+        StateTransition.LOST_RACE -> SaveResult.Failed
+    }
+} catch (cancelled: CancellationException) {
+    // P1-18-R9: cancellation reaches the caller; never reported as a
+    // failure for an item that may already be saved.
+    throw cancelled
+} catch (error: IOException) {
+    saveFailureFor(error)
+} catch (error: ErrnoException) {
+    saveFailureFor(error)
+} catch (_: SQLiteFullException) {
+    // The rename already happened, but the row remains STAGED when
+    // the final commit is rejected; recovery owns both paths.
+    SaveResult.StorageUnavailable
+} catch (_: Exception) {
+    // The rename already happened, but the row remains STAGED when
+    // the final commit is rejected (for example by the READY
+    // invariant trigger). Recovery owns both possible artefact paths
+    // and will remove them on the next pass; never surface success.
+    SaveResult.Failed
+}
+
+private fun prepareFailureFor(error: Throwable): PrepareResult =
+    if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+        PrepareResult.StorageUnavailable
+    } else {
+        PrepareResult.Failed
+    }
+
+private fun saveFailureFor(error: Throwable): SaveResult =
+    if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+        SaveResult.StorageUnavailable
+    } else {
+        SaveResult.Failed
+    }

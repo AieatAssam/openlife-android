@@ -214,6 +214,6 @@ private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) 
     OcrFailureReason.PROCESS_RESTART -> stringResource(R.string.ocr_failure_process_restart)
     OcrFailureReason.TIMEOUT -> stringResource(R.string.ocr_failure_timeout)
     OcrFailureReason.STORAGE_FAILURE -> stringResource(R.string.ocr_failure_storage)
-    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> stringResource(R.string.ocr_failure_source_temporarily_unavailable)
+    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> stringResource(R.string.ocr_failure_source_unavailable)
     OcrFailureReason.UNRECOGNISED -> stringResource(R.string.ocr_failure_unrecognised)
 }

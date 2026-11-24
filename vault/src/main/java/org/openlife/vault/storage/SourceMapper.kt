@@ -15,7 +15,9 @@ fun Source.toEntity(): SourceEntity = SourceEntity(
     id = id.toString(),
     state = state.also { check(it != SourceState.UNRECOGNISED) { "an unrecognised state is never written back" } }.name,
     importedAt = importedAt,
-    intakeKind = intakeKind.also { check(it != IntakeKind.UNRECOGNISED) { "an unrecognised intake is never written back" } }.name,
+    intakeKind = intakeKind.also {
+        check(it != IntakeKind.UNRECOGNISED) { "an unrecognised intake is never written back" }
+    }.name,
     mimeType = mimeType?.mimeType,
     byteCount = byteCount,
     sha256 = sha256,

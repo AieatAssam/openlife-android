@@ -129,7 +129,7 @@ object VaultBootstrapper {
     }
 
     private fun unwrapFailure(exception: Exception): VaultBootstrapResult = VaultBootstrapResult.Unavailable(
-        if (isTemporaryKeystoreFailure(exception)) {
+        if (KeystoreFailures.isTemporary(exception)) {
             VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
         } else {
             VaultUnavailableCause.KEY_UNWRAP_FAILED
@@ -164,14 +164,11 @@ object VaultBootstrapper {
     }
 
     private fun classify(exception: Exception): VaultUnavailableCause = when {
-        isTemporaryKeystoreFailure(exception) -> VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
-        exception is IOException -> VaultUnavailableCause.STORAGE_IO_ERROR
+        // One classifier shared with KeystoreWrapper (P1-18-R2).
+        KeystoreFailures.isTemporary(exception) -> VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
+
         else -> VaultUnavailableCause.STORAGE_IO_ERROR
     }
-
-    /** One classifier shared with KeystoreWrapper (P1-18-R2). */
-    private fun isTemporaryKeystoreFailure(exception: Throwable): Boolean = KeystoreFailures.isTemporary(exception)
-
 }
 
 /** What reading `database.key` found. */

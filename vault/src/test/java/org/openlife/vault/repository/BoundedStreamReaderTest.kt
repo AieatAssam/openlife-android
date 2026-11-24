@@ -53,8 +53,11 @@ class BoundedStreamReaderTest {
     fun oversizedReadFitsInAHeapThatCannotHoldTwoCopies() {
         val java = java.io.File(System.getProperty("java.home"), "bin/java").path
         val process = ProcessBuilder(
-            java, "-Xmx$PROBE_HEAP", "-XX:+UseSerialGC",
-            "-cp", System.getProperty("java.class.path"),
+            java,
+            "-Xmx$PROBE_HEAP",
+            "-XX:+UseSerialGC",
+            "-cp",
+            System.getProperty("java.class.path"),
             BoundedReadPeakProbe::class.java.name,
         ).redirectErrorStream(true).start()
         val output = process.inputStream.bufferedReader().readText()

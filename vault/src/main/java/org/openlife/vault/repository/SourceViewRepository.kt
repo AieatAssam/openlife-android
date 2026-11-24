@@ -62,7 +62,11 @@ class SourceViewRepository(
                 ArtefactCheck.Corrupt -> {
                     // Compare-and-set: a concurrent mark or deletion wins (P1-18-R13);
                     // either way the original is not shown.
-                    database.sourceDao().compareAndSetState(source.id.toString(), SourceState.READY, SourceState.CORRUPT)
+                    database.sourceDao().compareAndSetState(
+                        source.id.toString(),
+                        SourceState.READY,
+                        SourceState.CORRUPT,
+                    )
                     ReadyReadResult.Corrupt
                 }
 

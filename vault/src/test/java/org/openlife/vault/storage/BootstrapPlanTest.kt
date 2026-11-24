@@ -52,11 +52,21 @@ class BootstrapPlanTest {
     fun noKeyFollowsTheExistingRules() {
         assertEquals(
             BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_WITHOUT_KEY),
-            planBootstrap(keyFileExists = false, readKey = { KeyRead.Absent }, databaseExists = true, hasArtefacts = false),
+            planBootstrap(
+                keyFileExists = false,
+                readKey = { KeyRead.Absent },
+                databaseExists = true,
+                hasArtefacts = false,
+            ),
         )
         assertEquals(
             BootstrapPlan.CreateFresh,
-            planBootstrap(keyFileExists = false, readKey = { KeyRead.Absent }, databaseExists = false, hasArtefacts = false),
+            planBootstrap(
+                keyFileExists = false,
+                readKey = { KeyRead.Absent },
+                databaseExists = false,
+                hasArtefacts = false,
+            ),
         )
     }
 }

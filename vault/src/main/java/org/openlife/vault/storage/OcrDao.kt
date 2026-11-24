@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.Flow
  * OCR rows. Revision state changes are compare-and-set statements that
  * return the number of rows changed (0 = lost race, nothing written), so a
  * stale snapshot is never written back (P1-18-R13). There is no @Update.
+ * One SQL statement per transition is the point, hence the function count.
  */
+@Suppress("TooManyFunctions") // one compare-and-set statement per state transition (P1-18-R13)
 @Dao
 interface OcrDao {
     @Insert

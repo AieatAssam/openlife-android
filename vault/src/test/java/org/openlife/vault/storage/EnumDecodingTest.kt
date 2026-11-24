@@ -22,7 +22,11 @@ class EnumDecodingTest {
 
     @Test
     fun unknownStoredValuesDecodeToFallbackWithoutCrash() {
-        val source = sourceEntity(state = "ARCHIVED_IN_A_FUTURE_BUILD", intakeKind = "CAMERA", orientation = "ROTATE_45")
+        val source = sourceEntity(
+            state = "ARCHIVED_IN_A_FUTURE_BUILD",
+            intakeKind = "CAMERA",
+            orientation = "ROTATE_45",
+        )
             .copy(mimeType = "image/heic")
             .toDomain()
         assertEquals(SourceState.UNRECOGNISED, source.state)

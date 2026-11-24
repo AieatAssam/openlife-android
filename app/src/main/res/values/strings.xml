@@ -133,7 +133,7 @@
     <string name="ocr_failure_process_restart">the operation was interrupted by a process restart</string>
     <string name="ocr_failure_timeout">it took too long, so OpenLife stopped it</string>
     <string name="ocr_failure_storage">the result could not be saved on this device</string>
-    <string name="ocr_failure_source_temporarily_unavailable">the device key store was temporarily unavailable. Your saved image is unchanged; try again</string>
+    <string name="ocr_failure_source_unavailable">the device key store was temporarily unavailable. Your saved image is unchanged; try again</string>
     <string name="ocr_failure_unrecognised">this result was saved by a different version of OpenLife and cannot be shown. Your saved image is unchanged</string>
 
     <string name="settings_title">Settings</string>

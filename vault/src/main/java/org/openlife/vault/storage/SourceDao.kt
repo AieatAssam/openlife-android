@@ -88,7 +88,8 @@ suspend fun SourceDao.compareAndSetState(
     from: org.openlife.vault.model.SourceState,
     to: org.openlife.vault.model.SourceState,
 ): StateTransition {
-    check(from != org.openlife.vault.model.SourceState.UNRECOGNISED && to != org.openlife.vault.model.SourceState.UNRECOGNISED) {
+    val unrecognised = org.openlife.vault.model.SourceState.UNRECOGNISED
+    check(from != unrecognised && to != unrecognised) {
         "an unrecognised state is never written"
     }
     return if (transitionState(id, from.name, to.name) == 1) StateTransition.APPLIED else StateTransition.LOST_RACE

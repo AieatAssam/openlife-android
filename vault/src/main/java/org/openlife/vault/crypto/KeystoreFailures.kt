@@ -31,12 +31,11 @@ object KeystoreFailures {
             .take(MAX_CAUSE_DEPTH)
             .any { it.isKeystoreFailure() }
 
-    private fun Throwable.isKeystoreFailure(): Boolean =
-        this is KeystoreUnavailableException ||
-            this is KeyStoreException ||
-            this is ProviderException ||
-            javaClass.name == PLATFORM_KEYSTORE_EXCEPTION ||
-            javaClass.name.endsWith("UserNotAuthenticatedException")
+    private fun Throwable.isKeystoreFailure(): Boolean = this is KeystoreUnavailableException ||
+        this is KeyStoreException ||
+        this is ProviderException ||
+        javaClass.name == PLATFORM_KEYSTORE_EXCEPTION ||
+        javaClass.name.endsWith("UserNotAuthenticatedException")
 
     private const val MAX_CAUSE_DEPTH = 16
 }

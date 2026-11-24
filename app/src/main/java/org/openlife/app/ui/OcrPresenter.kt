@@ -209,10 +209,9 @@ internal object OcrStateMapper {
         }
     }
 
-    private fun OcrView.hasUnrecognisedValue(): Boolean =
-        revision.state == OcrRevisionState.UNRECOGNISED ||
-            revision.reviewState == OcrReviewState.UNRECOGNISED ||
-            revision.failureReason == OcrFailureReason.UNRECOGNISED ||
-            revision.orientation == null ||
-            spans.any { it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED }
+    private fun OcrView.hasUnrecognisedValue(): Boolean = revision.state == OcrRevisionState.UNRECOGNISED ||
+        revision.reviewState == OcrReviewState.UNRECOGNISED ||
+        revision.failureReason == OcrFailureReason.UNRECOGNISED ||
+        revision.orientation == null ||
+        spans.any { it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED }
 }

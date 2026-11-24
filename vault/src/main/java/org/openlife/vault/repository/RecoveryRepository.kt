@@ -270,7 +270,8 @@ class RecoveryRepository(
             val extension = name.substringAfterLast('.', missingDelimiterValue = "")
             if (extension == "stage" || extension == "blob") {
                 val id = runCatching { UUID.fromString(uuidPart) }.getOrNull()
-                if (id != null && id !in referencedIds && file.exists() && fileOps.deleteIfExists(file)) removed++
+                val orphan = id != null && id !in referencedIds && file.exists()
+                if (orphan && fileOps.deleteIfExists(file)) removed++
             }
         }
         return removed
