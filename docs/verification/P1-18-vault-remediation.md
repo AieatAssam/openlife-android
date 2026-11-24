@@ -49,28 +49,32 @@ fail (1 of 3 tests failed, the other two still passed); reverted.
 
 ## Findings
 
+Outcome wording (review R-04): **fixed** means a test that ran proves it
+(JVM). **implemented; unverified (gap — pending physical-device run)**
+means the only proof is an instrumented test that compiles but has not run.
+
 | Finding | Req | Outcome | Proof |
 |---|---|---|---|
-| V-01 transient Keystore → CORRUPT | R1 | fixed | JVM `KeystoreFailuresTest` (2) ✔; device `KeystoreWrapperTest.nonAeadCipherFailureIsTransientNotAuthentication`, `SourceViewRepositoryTest.keystoreHiccupAtDoFinalLeavesRowReady`: gap — pending physical-device run |
-| V-01 bootstrap KEY_UNWRAP_FAILED | R2 | fixed | JVM `KeystoreFailuresTest.platformKeyStoreExceptionAnywhereInTheChainIsTemporary` ✔; device `VaultBootstrapperTest.androidKeyStoreExceptionAtUnwrapIsRetryable`: gap |
-| V-01 no way back from CORRUPT | R3 | fixed | device `VerifyAllTest.corruptRowThatNowAuthenticatesIsRestoredToReady`, `…WithTransientCheckStaysCorruptAndUnchanged`: gap |
-| V-02 lost DB → blobs deleted | R4 | fixed | JVM `BootstrapPlanTest` (5) ✔; device `VaultBootstrapperTest.missingDatabaseWithKeyAndArtefactsIsDatabaseMissingAndDeletesNothing`: gap |
-| V-03 slot released on kept stage | R5 | fixed | JVM `ImportSlotTest` (2) ✔; device `ImportRepositoryTest.failedSaveThatKeepsTheStageKeepsTheSlot`, `RecoveryRepositoryTest.cleanAbandonedStagesSkipsAStageWhoseSaveFailedTransiently`: gap |
-| V-04 provider read under lease | R6 | fixed | JVM `MutationQueueTest.tryMutationReturnsBusyImmediatelyWhenReadersAreActive` ✔; device `ImportRepositoryTest.slowProviderReadDoesNotBlockViewerReadsOrDeletion`: gap |
+| V-01 transient Keystore → CORRUPT | R1 | fixed (classifier, JVM); end-to-end implemented; unverified (gap — pending physical-device run) | JVM `KeystoreFailuresTest` (4) ✔; device `KeystoreWrapperTest.nonAeadCipherFailureIsTransientNotAuthentication`, `SourceViewRepositoryTest.keystoreHiccupAtDoFinalLeavesRowReady` |
+| V-01 bootstrap KEY_UNWRAP_FAILED | R2 | fixed (JVM); device implemented; unverified (gap — pending physical-device run) | JVM `KeystoreFailuresTest.platformKeyStoreExceptionAnywhereInTheChainIsTemporary`, `BootstrapPlanTest.aFailedTagOnTheKeyFileIsNotRetryable` ✔; device `VaultBootstrapperTest.androidKeyStoreExceptionAtUnwrapIsRetryable`, `…platformKeyStoreExceptionInTheCauseChainIsRetryable`, `…failedTagWithAKeystoreCauseAtUnwrapIsNotRetryable` |
+| V-01 no way back from CORRUPT | R3 | implemented; unverified (gap — pending physical-device run) | device `VerifyAllTest.corruptRowThatNowAuthenticatesIsRestoredToReady`, `…WithTransientCheckStaysCorruptAndUnchanged` |
+| V-02 lost DB → blobs deleted | R4 | fixed (plan, JVM); end-to-end implemented; unverified (gap — pending physical-device run) | JVM `BootstrapPlanTest` (8) ✔; device `VaultBootstrapperTest.missingDatabaseWithKeyAndArtefactsIsDatabaseMissingAndDeletesNothing`, `…savedOriginalsWithoutKeyOrDatabaseAreDatabaseMissingAndKept`, `…zeroByteDatabaseNextToSavedOriginalsIsDatabaseMissing`, `RecoveryRepositoryTest.emptyDatabaseNextToSavedOriginalsDeletesNothingAndReportsIt` |
+| V-03 slot released on kept stage | R5 | fixed (rule, JVM); end-to-end implemented; unverified (gap — pending physical-device run) | JVM `ImportSlotTest` (4) ✔; device `ImportRepositoryTest.failedSaveThatKeepsTheStageKeepsTheSlot`, `RecoveryRepositoryTest.cleanAbandonedStagesSkipsAStageWhoseSaveFailedTransiently` |
+| V-04 provider read under lease | R6 | fixed (`tryMutation`, JVM); read-outside-lease implemented; unverified (gap — pending physical-device run) | JVM `MutationQueueTest.tryMutationReturnsBusyImmediatelyWhenReadersAreActive` ✔; device `ImportRepositoryTest.slowProviderReadDoesNotBlockViewerReadsOrDeletion` |
 | V-06 forSource AAD unpinned | R7 | fixed | JVM `GoldenEnvelopeFixtureTest.forSourceAadArtefactAndWrappedDekMatchCheckedInBytes` ✔ + recorded mutation |
-| V-07 OCR transient → SOURCE_CORRUPT | R8 | fixed | JVM `OcrCaptureFailureTest` (2) ✔; device `OcrRepositoryTest.transientAuthenticationFailureIsRetryableNotSourceCorrupt`: gap |
-| V-08 cancellation swallowed | R9 | fixed | device `ImportRepositoryTest.cancellationAfterReadyCommitPropagatesAndRowIsReady`, `DeletionRepositoryTest.cancellationIsNotSwallowedByGenericCatch`: gap |
-| V-09 torn key file | R10 | fixed | JVM `VaultKeyFileTest.keyFileIsWrittenViaTempAndRename`, `…leftoverTemporaryKeyIsRemovedAndTheKeyIsKept`, `BootstrapPlanTest.tornKeyWithNothingAtStakeIsAFreshInstall` ✔; device `VaultBootstrapperTest.tornKeyFileWithNoDatabaseAndNoArtefactsIsFreshInstall`: gap |
-| V-10 stray file blocks reset | R11 | fixed | JVM `VaultDirectoryWipeTest` (2) ✔; device `VaultResetRepositoryTest.strayNonUuidFileAndJournalDoNotBlockReset`: gap |
-| V-11 triggers only on create | R12 | fixed | device `OcrDatabaseTest.readyInvariantTriggersExistAfterMigratingToCurrentVersion`: gap; the required mutation (drop the shared call from `MIGRATION_1_2`) also needs the device: gap |
-| V-12 hard-coded file ops in recovery | R15 | fixed | device `RecoveryRepositoryTest.injectedFileOpsFaultReachesRecovery`: gap |
-| V-14 schema version check | R17 | **deferred** | P2-06 (PR #23) has not merged; step says leave for a follow-up |
-| V-16 synchronous level | R16 | **undecided — gap** | see below |
-| VS-1 CAS transitions | R13 | fixed | device `SourceDaoTest.compareAndSetStateTransitionLosesRaceExplicitly`: gap |
-| VS-1 tolerant enum decoding | R14 | fixed | JVM `EnumDecodingTest` (3), app `OcrStateMapperTest` (3) ✔; device `RecoveryRepositoryTest.unknownSourceStateIsNeitherShownNorDeleted`: gap |
-| CI OOM (run 45405099804) | addition | fixed in part | see below |
+| V-07 OCR transient → SOURCE_CORRUPT | R8 | fixed (mapping, JVM); end-to-end implemented; unverified (gap — pending physical-device run) | JVM `OcrCaptureFailureTest` (2) ✔; device `OcrRepositoryTest.transientAuthenticationFailureIsRetryableNotSourceCorrupt` |
+| V-08 cancellation swallowed | R9 | fixed for save (JVM, mutation-proven); delete implemented; unverified (gap — pending physical-device run) | JVM `SaveCommitTest` (2) ✔; device `ImportRepositoryTest.cancellationAfterReadyCommitPropagatesAndRowIsReady`, `DeletionRepositoryTest.cancellationIsNotSwallowedByGenericCatch` (both now throw from the DAO seam, review R-02) |
+| V-09 torn key file | R10 | fixed (JVM); end-to-end implemented; unverified (gap — pending physical-device run) | JVM `VaultKeyFileTest` (2), `BootstrapPlanTest.tornKeyWithNothingAtStakeIsAFreshInstall` ✔; device `VaultBootstrapperTest.tornKeyFileWithNoDatabaseAndNoArtefactsIsFreshInstall` |
+| V-10 stray file blocks reset | R11 | fixed (wipe, JVM); end-to-end implemented; unverified (gap — pending physical-device run) | JVM `VaultDirectoryWipeTest` (3, incl. symlink) ✔; device `VaultResetRepositoryTest.strayNonUuidFileAndJournalDoNotBlockReset` |
+| V-11 triggers only on create | R12 | implemented; unverified (gap — pending physical-device run) | device `OcrDatabaseTest.readyInvariantTriggersExistAfterMigratingToCurrentVersion`; its mutation also needs the device |
+| V-12 hard-coded file ops in recovery | R15 | implemented; unverified (gap — pending physical-device run) | device `RecoveryRepositoryTest.injectedFileOpsFaultReachesRecovery` |
+| V-14 schema version check | R17 | **deferred** | P2-06 (PR #23) has not merged; the step says to leave it for a follow-up |
+| V-16 synchronous level | R16 | FULL set on the writer connection (JVM-pinned); effective value implemented; unverified (gap — pending physical-device run) | JVM `DurableWritesTest` ✔; device `DatabasePragmaTest` (WAL/AUTOMATIC and TRUNCATE) |
+| VS-1 CAS transitions | R13 | fixed for the save commit (JVM); DAO implemented; unverified (gap — pending physical-device run) | JVM `SaveCommitTest` ✔; device `SourceDaoTest.compareAndSetStateTransitionLosesRaceExplicitly` |
+| VS-1 tolerant enum decoding | R14 | fixed (JVM); recovery path implemented; unverified (gap — pending physical-device run) | JVM `EnumDecodingTest` (3), app `OcrStateMapperTest` (3) ✔; device `RecoveryRepositoryTest.unknownSourceStateIsNeitherShownNorDeleted` |
+| CI OOM (run 45405099804) | addition | reader fixed (JVM); typed failure implemented; unverified (gap — pending physical-device run) | see below |
 
-Findings refuted: none. V-16 is neither confirmed nor refuted (no device).
+Findings refuted: none. V-16 was decided by the coordinator on the static evidence below; the observed value is still pending.
 
 ### R1 — what AOSP throws
 
@@ -84,21 +88,30 @@ class name). Only `AEADBadTagException` is now authentication
 `KeystoreUnavailableException`. `KeystoreFailures` is the single classifier
 used by `KeystoreWrapper` and `VaultBootstrapper`.
 
-### R16 / V-16 — static evidence only
+### R16 / V-16 — FULL set by coordinator decision (review R-03)
 
 Read from the sqlcipher-android 4.19.0 bytecode (`SQLiteGlobal`,
 `SQLiteConnection`): `getDefaultJournalMode()` = `delete`,
 `getDefaultSyncMode()` = `normal`, `getWALSyncMode()` = `normal`;
 `SQLiteConnection.open()` calls `setWalModeFromConfiguration` (journal mode
 then `setSyncMode`) after the hook's `postKey`, so a `SQLiteDatabaseHook`
-cannot override it. **Prediction:** `DatabasePragmaTest` will observe
-`synchronous = 1 (NORMAL)` and fail its FULL assertion, i.e. V-16 is likely
-confirmed. The step permits setting FULL only when the test shows it is
-needed, so **no pragma change was made**. Candidate fix once measured: set
-`PRAGMA synchronous=FULL` on the primary (writer) connection in Room
-`onOpen`, then re-run the test to confirm a pool reconfigure does not put
-NORMAL back. Acceptance criterion "V-16 is decided by observed pragma values"
-is **not met**.
+cannot override it. Under NORMAL in WAL mode an acknowledged commit can be
+rolled back by power loss; a READY commit the user saw as saved could come
+back STAGED and recovery would then delete it.
+
+Coordinator decision (review R-03): `DurableWrites.callback` runs
+`PRAGMA synchronous = FULL` in Room `onOpen`, which runs on the writer
+connection after SQLCipher's own post-open settings, on every open, in WAL
+and in TRUNCATE (low-RAM `AUTOMATIC`) journal mode. Reader connections keep
+NORMAL; they never commit.
+
+- JVM: `DurableWritesTest.everyOpenSetsFullSynchronousOnTheWriterConnection` ✔
+  (failed on the RED commit: `expected:<[FULL, FULL]> but was:<[]>`).
+- Device: `DatabasePragmaTest` (AUTOMATIC/WAL, and
+  `synchronousIsFullInTruncateJournalModeToo`) — implemented; unverified
+  (gap — pending physical-device run).
+- Write latency of FULL vs NORMAL — **not measured**; gap pending a
+  physical-device run.
 
 ### CI-found addition — OOM on API 29 (run 45405099804)
 
@@ -170,3 +183,30 @@ Plus the R12 mutation (remove `ReadyInvariantTriggers.create(db)` from
 `MIGRATION_1_2`, run `OcrDatabaseTest`, expect failure, revert) and the CI
 API 29/36 legs (P0-04) once the owner pushes; no CI run id exists for this
 branch.
+
+## Review round (R-01..R-09)
+
+RED commit `4bda2cd`: vault JVM 118 tests, 11 failed, 0 skipped, each
+for the intended reason (`KeystoreFailuresTest` ×2, `BootstrapPlanTest` ×3,
+`DurableWritesTest`, `BoundedStreamReaderTest` (1002 chunks allocated),
+`VaultDirectoryWipeTest` (symlink target deleted), `ImportSlotTest`,
+`OrphanPolicyTest` ×2).
+
+GREEN + REFACTOR `1a47912`: `./gradlew detekt :vault:test :app:test
+:vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin`
+=> BUILD SUCCESSFUL; vault JVM 118/118, app JVM 65/65, 0 skipped. Not run
+in this round: `lint`, `assembleDebug`, and any connected test (owner
+instruction: no emulator, no device). `planBootstrap` lost its unused
+`keyFileExists` parameter (the R-05 rule no longer needs it).
+
+| Finding | Change | Proof |
+|---|---|---|
+| R-01 | `isTemporary` is false when the chain holds `AEADBadTagException`, `KeyPermanentlyInvalidatedException` or `MissingWrappingKeyException`; a permanently invalidated key maps to `MissingWrappingKeyException`. AOSP `AndroidKeyStoreCipherSpiBase.engineDoFinal` throws `new AEADBadTagException().initCause(KeyStoreException)` (android-10.0.0_r1 `keystore/…/keystore/` line 517; android-14.0.0_r1 `keystore/…/keystore2/` line 626). Platform exception instances are built with `Unsafe` and the tests use `Assume`, never a silent skip; the bootstrap device test's silent if/else was removed. | JVM ✔; device tests implemented; unverified (gap — pending physical-device run) |
+| R-02 | Cancellation tests throw a synthetic `CancellationException` from the DAO after the commit. | JVM `SaveCommitTest` passed on RED too, so proven by mutation: removing the `CancellationException` rethrow in `commitReady` made `cancellationAfterTheReadyCommitReachesTheCaller` fail (`expected CancellationException, got Failed`), reverted. Device tests implemented; unverified (gap — pending physical-device run) |
+| R-03 | See R16 above. | as above |
+| R-04 | Wording in this record and `plan.yaml` corrected. | — |
+| R-05, R-08 | Bootstrap: no database, or a 0-byte database, next to saved originals is `DATABASE_MISSING`, whatever the key file says. Recovery: `OrphanPolicy` never removes orphans when the database has zero rows and a `.blob` exists; the count is reported as `keptBlobsWithoutRows` and the app answers `DATABASE_MISSING` instead of an empty vault. | JVM `BootstrapPlanTest`, `OrphanPolicyTest` ✔; device tests implemented; unverified (gap — pending physical-device run) |
+| R-06 | The slot rule reads the row and stage only for `Failed`/`StorageUnavailable`; `cancelStage` deletes only a STAGED row (`deleteStaged`, `AND state='STAGED'`); `DuplicateVerifier` (lost race → `Unverifiable`) and `SourceViewRepository` (lost race → `Unavailable`) handle a zero-row compare-and-set. | JVM `ImportSlotTest` ✔; rest implemented; unverified (gap — pending physical-device run) |
+| R-07 | No chunk allocation for zero-byte reads at a boundary; the OOM catch now covers only the bounded read and the stage encryption. | JVM `BoundedStreamReaderTest` ✔ |
+| R-09 | `VaultDirectoryWipe` removes a symlink without following it. The reset `isOccupied` check-then-act window is **accepted** (coordinator decision, review R-09): an import starting between the check and the wipe fails its save and the stage is gone with the wipe. | JVM `VaultDirectoryWipeTest` ✔ |
+

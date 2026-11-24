@@ -146,11 +146,16 @@ whose bytes fully authenticate in Settings > Verify all items is restored to
 READY. A false transient costs a retry; a false `CORRUPT` would cost the
 user's original.
 
-Power-loss durability (V-16): sqlcipher-android 4.19.0 defaults to
-`synchronous=NORMAL` on every connection. Under WAL mode, a commit that
-returned may be lost on power loss, but the database is not corrupted. The
-effective value has not been measured on a device yet
-(`DatabasePragmaTest`), so no change has been made.
+Power-loss durability (V-16, review R-03): sqlcipher-android 4.19.0 sets
+`synchronous=NORMAL` on every connection it opens. Under NORMAL in WAL mode
+a commit that has already returned can be rolled back by power loss. That
+is not only lost metadata: a READY commit the user saw as saved could come
+back STAGED, and recovery would then delete the item as an abandoned
+import. The vault therefore sets `PRAGMA synchronous=FULL` on the writer
+connection in Room `onOpen` (after SQLCipher's own settings), on every
+open and in both WAL and TRUNCATE journal modes. The value observed on a
+device (`DatabasePragmaTest`) and the write-latency cost of FULL are
+pending a physical-device run.
 
 ## Environment-specific gaps in this build (recorded, not hidden)
 
