@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
@@ -29,6 +30,7 @@ class SourceViewRepository(
     keystoreWrapper: KeystoreWrapper,
     private val mutationQueue: MutationQueue,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -37,6 +39,13 @@ class SourceViewRepository(
         database.sourceDao().observeVisibleSources().map { entities -> entities.map { it.toDomain() } }
 
     suspend fun findSource(sourceId: UUID): Source? = database.sourceDao().findById(sourceId.toString())?.toDomain()
+
+    /**
+     * P2-07-R3: records the user's answer to "Is this a message or request
+     * from someone?" with the time ([clock]) they gave it. [kind] null is
+     * "Not sure". Returns false when the source is not READY. RED stub.
+     */
+    suspend fun setUserContentKind(sourceId: UUID, kind: UserContentKind?): Boolean = TODO("P2-07 GREEN")
 
     /** The not-yet-saved stage, authenticated from the encrypted file on disk (design §11 step 4). */
     suspend fun loadStagePreviewBytes(sourceId: UUID): ByteArray? = withContext(ioDispatcher) {

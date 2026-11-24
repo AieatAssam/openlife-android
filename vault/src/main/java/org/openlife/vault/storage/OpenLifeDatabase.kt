@@ -5,8 +5,10 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * Schema v3 adds per-span review metadata. Fact, Record, and Action
- * remain absent — later capabilities add their own migrations.
+ * Schema v3 adds per-span review metadata; v4 adds the communication
+ * assessment state and the user's content-kind label to `sources`. Fact,
+ * Record, and Action remain absent — later capabilities add their own
+ * migrations.
  */
 @Database(
     entities = [
@@ -16,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         OcrUserRevisionEntity::class,
         OcrSpanReviewEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class OpenLifeDatabase : RoomDatabase() {
@@ -46,7 +48,12 @@ abstract class OpenLifeDatabase : RoomDatabase() {
         }
 
         /** Every migration, in order; never destructive (design §10). */
-        val MIGRATIONS: List<androidx.room.migration.Migration> by lazy { listOf(MIGRATION_1_2, MIGRATION_2_3) }
+        val MIGRATIONS: List<androidx.room.migration.Migration> by lazy { listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4) }
+
+        /** P2-07-R1: assessment state and user label on `sources`. RED stub: executes nothing yet. */
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) = Unit
+        }
 
         /**
          * Adds per-span review rows (P2-06-R5). The `sequence` column and its

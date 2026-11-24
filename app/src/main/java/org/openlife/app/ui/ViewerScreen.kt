@@ -69,6 +69,7 @@ fun ViewerScreen(
     onReview: (OcrReviewState) -> Unit = {},
     onRejectSpan: (OcrSpan) -> Unit = {},
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
+    onSetUserContentKind: (org.openlife.vault.model.UserContentKind?) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)

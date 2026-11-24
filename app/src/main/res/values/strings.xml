@@ -133,6 +133,10 @@
     <string name="viewer_display_transverse">Display transform: transverse</string>
     <string name="viewer_saved_bytes_unchanged">Saved bytes are unchanged.</string>
     <string name="viewer_detail_row">%1$s: %2$s</string>
+    <string name="viewer_assessment_not_assessed">TODO</string>
+    <string name="viewer_assessment_other_version">TODO</string>
+    <string name="viewer_content_kind_question">TODO</string>
+    <string name="viewer_content_kind_routing">TODO</string>
     <string name="source_imported">Imported %1$s</string>
 
     <string name="ocr_failure_source_not_ready">the saved image is not ready</string>

@@ -53,6 +53,14 @@ interface SourceDao {
     @Query("UPDATE sources SET state = :to WHERE id = :id AND state = :from")
     suspend fun transitionState(id: String, from: String, to: String): Int
 
+    /**
+     * P2-07-R3: the user's content-kind label and the time they gave it
+     * (actor USER). Compare-and-set on READY: a row that is not saved, or no
+     * longer exists, is not labelled. Never touches `assessmentState`.
+     */
+    @Query("UPDATE sources SET userContentKind = :kind, userContentKindAt = :at WHERE id = :id AND state = 'READY'")
+    suspend fun setUserContentKind(id: String, kind: String?, at: Long): Int
+
     @Query("SELECT * FROM sources WHERE id = :id")
     suspend fun findById(id: String): SourceEntity?
 
