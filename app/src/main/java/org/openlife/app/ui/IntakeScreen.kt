@@ -144,7 +144,9 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
             value = if (bytes == null) {
                 PreviewImage.Unavailable
             } else {
-                withContext(Dispatchers.Default) { SampledBitmapDecoder.decode(bytes, state.orientation) }
+                withContext(Dispatchers.Default) {
+                    SampledBitmapDecoder.decode(bytes, state.orientation)?.also(DecodedBitmapProbe::track)
+                }
                     ?.let(PreviewImage::Shown) ?: PreviewImage.Unavailable
             }
         }

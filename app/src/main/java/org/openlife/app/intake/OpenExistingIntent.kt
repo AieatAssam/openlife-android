@@ -10,3 +10,7 @@ import android.content.Intent
  */
 internal fun openExistingIntentFlags(): Int =
     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+
+/** RED stub (P1-19-R17). */
+internal fun openSourceRequest(rawId: String?, nonce: String?, nonces: PickerNonce): java.util.UUID? =
+    TODO("P1-19-R17 $rawId $nonce $nonces")

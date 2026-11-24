@@ -18,6 +18,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -26,6 +27,7 @@ import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
 import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.intake.currentStatusForTest
 import org.openlife.app.intake.TestHostileContentProvider
 import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.FirstRunPreferences
@@ -74,6 +76,7 @@ class AppLockFlowTest {
         val readsBefore = app.appLock.contentReads.get()
         val intent = Intent(context, MainActivity::class.java)
             .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
+            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
 
         ActivityScenario.launch<MainActivity>(intent).use {
             assertTrue("lock screen not shown", device.wait(Until.hasObject(By.text(LOCKED_TITLE)), WAIT_MS))
@@ -155,6 +158,99 @@ class AppLockFlowTest {
         }
     }
 
+    /**
+     * A-07 (P1-19-R2): MainActivity calls beginExternalActivity() before the
+     * Photo Picker launches and endExternalActivity() only in the result
+     * callback. Here the trip begins and the activity is recreated without a
+     * result ever being delivered, then the app is backgrounded past
+     * max(timeout, 60 s). Before P1-19-R1 the stale flag skipped the
+     * background period entirely, so the lock never engaged.
+     */
+    @Test
+    fun droppedPickerResultDoesNotLeaveTheLockDisabled() {
+        val authenticator = ScriptedAuthenticator()
+        app.appLock.setForTest(authenticator, AppLockPolicy(enabled = true, timeoutSeconds = 0))
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            authenticator.awaitRequest()
+            authenticator.complete(AuthOutcome.Succeeded)
+            awaitTrue("not unlocked") { app.appLock.status.value == LockStatus.UNLOCKED }
+
+            scenario.onActivity { app.appLock.state.beginExternalActivity() }
+            scenario.recreate()
+
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            awaitTrue("process never reported stop") { processStopped() }
+            app.appLock.advanceClockForTest(AppLockState.EXTERNAL_GRACE_MILLIS + 1_000)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+
+            awaitTrue("a dropped picker result left the lock disabled") {
+                app.appLock.status.value == LockStatus.LOCKED
+            }
+            assertTrue("lock screen not shown", device.wait(Until.hasObject(By.text(LOCKED_TITLE)), WAIT_MS))
+        }
+    }
+
+    /**
+     * A-12 (P1-19-R4): on API 29 the DEVICE_CREDENTIAL fallback is a separate
+     * ConfirmDeviceCredential activity. IntakeActivity is noHistory, so the
+     * audit suspects that leaving it for that activity finishes it and drops
+     * the pending share. Needs API 29 and a real PIN, which this test sets
+     * with locksettings (the P1-07 manual procedure) and clears afterwards.
+     */
+    @Test
+    fun deviceCredentialUnlockOnApi29KeepsThePendingShare() {
+        assumeTrue(
+            "A-12 needs API 29 (BIOMETRIC_WEAK|DEVICE_CREDENTIAL); this device is API ${android.os.Build.VERSION.SDK_INT}",
+            android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q,
+        )
+        val pin = InstrumentationRegistry.getArguments().getString("devicePin") ?: TEST_PIN
+        shell("locksettings set-pin $pin")
+        try {
+            val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
+            assumeTrue("locksettings could not set a PIN on this image", keyguard.isDeviceSecure)
+            AppLockPolicyStore.write(context, AppLockPolicy(enabled = true))
+            app.appLock.state.start(AppLockPolicy(enabled = true))
+            TestHostileContentProvider.bytesToServe = syntheticJpegBytes(seed = 7_029)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                component = ComponentName(context.packageName, IntakeActivity::class.java.name)
+                type = "image/jpeg"
+                putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("api29-credential.jpg"))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
+                val usePin = device.wait(Until.findObject(By.textContains("PIN")), WAIT_MS)
+                assumeTrue("the system prompt offered no PIN fallback that UiAutomator can drive", usePin != null)
+                usePin!!.click()
+                device.waitForIdle()
+                shell("input text $pin")
+                device.pressEnter()
+                awaitTrue("the share did not reach Preview after the credential unlock") {
+                    scenario.state != androidx.lifecycle.Lifecycle.State.DESTROYED &&
+                        statusOf(scenario).startsWith("Prepared")
+                }
+                scenario.onActivity { it.cancelForTest() }
+            }
+        } finally {
+            shell("locksettings clear --old $pin")
+        }
+    }
+
+    private fun processStopped(): Boolean {
+        var stopped = false
+        instrumentation.runOnMainSync {
+            stopped = !androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.currentState
+                .isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        }
+        return stopped
+    }
+
+    private fun shell(command: String) {
+        instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+    }
+
     private fun saveSyntheticSource(): UUID = runBlocking {
         val access = app.vault() as VaultAccess.Ready
         val prepared = access.importRepository.prepareImport(
@@ -199,5 +295,6 @@ class AppLockFlowTest {
         const val HEIGHT = 48
         const val JPEG_QUALITY = 90
         const val OPAQUE = 0xFF000000.toInt()
+        const val TEST_PIN = "1357"
     }
 }

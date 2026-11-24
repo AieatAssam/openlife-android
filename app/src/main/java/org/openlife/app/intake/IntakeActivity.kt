@@ -9,6 +9,7 @@ import android.os.Parcelable
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,11 +58,13 @@ class IntakeActivity : FragmentActivity() {
         IntakeViewModel.factory(application as OpenLifeApp)
     }
 
-    /** Test-only observation seam for the C0-05/C0-02/C0-03 instrumented tests. */
-    fun currentStatusForTest(): String = describeForTest(this, viewModel.state.value)
+    /** Test-only observation seam; androidTest's currentStatusForTest() describes it (P1-19-R20). */
+    @VisibleForTesting
+    internal fun currentStateForTest(): IntakeUiState = viewModel.state.value
 
     /** Test-only: cancels the active import deterministically, as the Cancel button would. */
-    fun cancelForTest() = viewModel.cancel()
+    @VisibleForTesting
+    internal fun cancelForTest() = viewModel.cancel()
 
     override fun onStart() {
         super.onStart()
@@ -210,33 +213,4 @@ private fun describeIntentRejection(reason: IntakeRejectionReason): IntakeReject
     IntakeRejectionReason.MISSING_READ_GRANT -> IntakeRejectionMessage.MISSING_READ_ACCESS
 
     IntakeRejectionReason.UNSUPPORTED_OR_MISSING_MIME_TYPE -> IntakeRejectionMessage.UNSUPPORTED_OR_MISSING_TYPE
-}
-
-private fun describeForTest(activity: IntakeActivity, state: IntakeUiState): String = when (state) {
-    IntakeUiState.Preparing -> "Preparing"
-
-    is IntakeUiState.Preview -> "Prepared ${state.format} ${state.width}x${state.height}"
-
-    is IntakeUiState.Saving -> "Saving"
-
-    is IntakeUiState.Saved -> "Saved on this device"
-
-    is IntakeUiState.Duplicate -> "Not imported again"
-
-    // C0-R12: a vanished provider must prompt reselection. Report the same
-    // user-visible copy the screen shows, not the enum name.
-    is IntakeUiState.Rejected -> activity.getString(
-        R.string.intake_not_imported,
-        activity.getString(state.message.stringRes),
-    )
-
-    IntakeUiState.Busy -> "Another import is already in progress."
-
-    IntakeUiState.Failed -> "Import failed"
-
-    IntakeUiState.StorageUnavailable -> "Storage unavailable"
-
-    is IntakeUiState.VaultUnavailable -> "Vault unavailable: ${state.cause.name}"
-
-    IntakeUiState.Cancelled -> "Cancelled"
 }

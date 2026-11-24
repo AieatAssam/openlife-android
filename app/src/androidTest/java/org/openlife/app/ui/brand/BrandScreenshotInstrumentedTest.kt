@@ -117,6 +117,43 @@ class BrandScreenshotInstrumentedTest {
         }
     }
 
+    /**
+     * A-04 (P1-19-R10): the delete confirmation is the app's most common
+     * dialog. Its golden shows the colour roles a dialog draws from
+     * (surfaceContainerHigh, the scrim is outside the capture) and that its
+     * title is Plex, not Fraunces. Goldens are per render profile like the
+     * others; a profile without them is reported as skipped, never passed.
+     */
+    @Test
+    fun deleteDialogMatchesGolden() {
+        val names = listOf("delete-dialog-light.png", "delete-dialog-dark.png")
+        if (!generateGoldens) {
+            val committed = InstrumentationRegistry.getInstrumentation().context.assets
+                .list("golden/$renderProfile").orEmpty().toSet()
+            assumeTrue(
+                "no committed delete-dialog goldens for render profile $renderProfile",
+                committed.containsAll(names),
+            )
+        }
+        val dark = mutableStateOf(false)
+        composeRule.setContent {
+            OpenLifeTheme(darkTheme = dark.value) {
+                org.openlife.app.ui.DeleteConfirmationDialog(
+                    itemLabel = "Synthetic record",
+                    onConfirm = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        listOf(false, true).forEach { darkTheme ->
+            dark.value = darkTheme
+            composeRule.waitForIdle()
+            val bitmap = composeRule.onNode(androidx.compose.ui.test.isDialog()).captureToImage().asAndroidBitmap()
+            val filename = "delete-dialog-${if (darkTheme) "dark" else "light"}.png"
+            if (generateGoldens) writeGolden(filename, bitmap) else assertGolden(filename, bitmap)
+        }
+    }
+
     private fun capture(name: String, darkTheme: Boolean, content: @Composable () -> Unit) {
         val tag = "$name-${if (darkTheme) "dark" else "light"}"
         activeSpec.value = ScreenSpec(tag, darkTheme, content)

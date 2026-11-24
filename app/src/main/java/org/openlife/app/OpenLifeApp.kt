@@ -205,6 +205,9 @@ class OpenLifeApp : Application() {
     /** One-shot proof of OpenLife's own Photo Picker forwarding (P1-02-R6). */
     val pickerNonce = org.openlife.app.intake.PickerNonce()
 
+    /** One-shot proof that an open-source request came from IntakeActivity's "Open existing" (P1-19-R17). */
+    val openSourceNonce = org.openlife.app.intake.PickerNonce()
+
     /** Import cleanup that must outlive a screen (P1-15, P1-01); owns the application scope. */
     val importHousekeeping = ImportHousekeeping(
         vault = { vault() },

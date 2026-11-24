@@ -243,6 +243,9 @@ class MainActivity : FragmentActivity() {
 
     companion object {
         const val EXTRA_OPEN_SOURCE_ID = "org.openlife.app.MainActivity.openSourceId"
+
+        /** Carries [OpenLifeApp.openSourceNonce]; the id is ignored without it (P1-19-R17). */
+        const val EXTRA_OPEN_SOURCE_NONCE = "org.openlife.app.MainActivity.openSourceNonce"
     }
 }
 

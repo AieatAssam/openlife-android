@@ -63,6 +63,7 @@ class MultiWindowScrubTest {
         val id = saveSyntheticSource()
         val intent = Intent(context, MainActivity::class.java)
             .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
+            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
 
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS))
@@ -86,6 +87,51 @@ class MultiWindowScrubTest {
                 device.wait(Until.hasObject(By.desc("More options")), WAIT_MS),
             )
             assertTrue(device.wait(Until.gone(By.desc("Saved image")), WAIT_MS))
+        }
+    }
+
+    /**
+     * A-06 (P1-19-R13, suspected): the viewer's decoded bitmap is freed by a
+     * DisposableEffect, which runs only when Compose recomposes. Checked
+     * while the activity is still stopped (before ON_START): is any decoded
+     * bitmap still alive and not recycled?
+     */
+    @Test
+    fun decodedBitmapsAreReleasedWhileHidden() {
+        val id = saveSyntheticSource()
+        val intent = Intent(context, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
+            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
+
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS))
+            awaitTrue("the viewer bitmap was never decoded") { DecodedBitmapProbe.liveCountForTest() > 0 }
+
+            scenario.moveToState(Lifecycle.State.CREATED)
+            val released = pollWhileStopped { DecodedBitmapProbe.liveCountForTest() == 0 }
+            val live = DecodedBitmapProbe.liveCountForTest()
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            assertTrue("decoded bitmaps alive while hidden: $live", released)
+        }
+    }
+
+    /** Polls with GC for up to [STOPPED_WINDOW_MS]; never moves the activity. */
+    private fun pollWhileStopped(condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + STOPPED_WINDOW_MS
+        while (System.currentTimeMillis() < deadline) {
+            Runtime.getRuntime().gc()
+            instrumentation.waitForIdleSync()
+            if (condition()) return true
+            Thread.sleep(POLL_MS)
+        }
+        return condition()
+    }
+
+    private fun awaitTrue(message: String, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        while (!condition()) {
+            if (System.currentTimeMillis() > deadline) throw AssertionError(message)
+            Thread.sleep(POLL_MS)
         }
     }
 
@@ -114,6 +160,8 @@ class MultiWindowScrubTest {
 
     private companion object {
         const val WAIT_MS = 30_000L
+        const val STOPPED_WINDOW_MS = 3_000L
+        const val POLL_MS = 100L
         const val WIDTH = 64
         const val HEIGHT = 48
         const val JPEG_QUALITY = 90

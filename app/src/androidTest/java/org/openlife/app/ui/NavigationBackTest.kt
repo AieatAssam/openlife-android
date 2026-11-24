@@ -64,6 +64,7 @@ class NavigationBackTest {
         sourceId = createReadySource()
         val intent = Intent(application, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
         }
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -81,6 +82,49 @@ class NavigationBackTest {
             var finishing = true
             scenario.onActivity { finishing = it.isFinishing }
             assertFalse("back from viewer must not finish MainActivity", finishing)
+        }
+    }
+
+    /**
+     * A-10 (P1-19-R14, suspected): after a delete from the viewer, the Room
+     * flow drops the source (ViewerDestination pops on a null source) and the
+     * delete callback also pops. With the flow forced to win (the callback is
+     * held back), the second pop must not remove the List destination.
+     */
+    @Test
+    fun deleteFromViewerKeepsListOnTheBackStack() {
+        sourceId = createReadySource()
+        val intent = Intent(application, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
+        }
+        SourceListViewModel.deleteResultDelayMillisForTest = DELETE_CALLBACK_DELAY_MS
+        try {
+            ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+                val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), 30_000))
+                device.findObject(By.desc("Delete")).click()
+                device.wait(Until.findObject(By.res("delete_confirm")), 5_000)?.click()
+                    ?: device.wait(Until.findObject(By.text("Delete")), 5_000)!!.click()
+
+                assertTrue(
+                    "the flow-driven pop should show the list",
+                    device.wait(Until.hasObject(By.text("Import from photos")), 10_000),
+                )
+                // Let the held-back delete callback run its own pop.
+                Thread.sleep(DELETE_CALLBACK_DELAY_MS * 2)
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                assertTrue(
+                    "the list was popped off the back stack by the second pop",
+                    device.wait(Until.hasObject(By.text("Import from photos")), 2_000),
+                )
+                var finishing = true
+                scenario.onActivity { finishing = it.isFinishing }
+                assertFalse("MainActivity must stay open", finishing)
+            }
+            sourceId = null
+        } finally {
+            SourceListViewModel.deleteResultDelayMillisForTest = 0L
         }
     }
 
@@ -130,5 +174,9 @@ class NavigationBackTest {
         bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output)
         bitmap.recycle()
         return output.toByteArray()
+    }
+
+    private companion object {
+        const val DELETE_CALLBACK_DELAY_MS = 1_500L
     }
 }

@@ -151,6 +151,42 @@ class SourceEgressBoundaryTest {
         assertTrue("persistable grant violations: $violations", violations.isEmpty())
     }
 
+    /**
+     * A-02 (P1-19-R5/R6): a text field that can hold user content must be the
+     * ContentTextField wrapper (no Copy/Cut, no autocorrect, no personalised
+     * IME learning). The reset-confirmation word field holds no content and is
+     * the one named exemption. Mutation recorded in P1-19's evidence: a bare
+     * OutlinedTextField added to ViewerScreen fails this test.
+     */
+    @Test
+    fun everyContentTextFieldUsesTheSafeWrapper() {
+        val violations = textFieldViolations(sourceFiles())
+        assertTrue("text fields outside ContentTextField: $violations", violations.isEmpty())
+
+        val viewer = projectDir.resolve("app/src/main/java/org/openlife/app/ui/ViewerScreen.kt")
+        val mutated = Files.readAllLines(viewer) + "    OutlinedTextField(value = text, onValueChange = {})"
+        assertFalse(
+            "a bare OutlinedTextField in ViewerScreen must be a violation",
+            textFieldLineViolations(viewer, mutated).isEmpty(),
+        )
+    }
+
+    private fun textFieldViolations(files: List<Path>): List<String> =
+        files.flatMap { file -> textFieldLineViolations(file, Files.readAllLines(file)) }
+
+    private fun textFieldLineViolations(file: Path, lines: List<String>): List<String> {
+        if (file.endsWith(CONTENT_TEXT_FIELD_FILE)) return emptyList()
+        return lines.mapIndexedNotNull { index, line ->
+            val exempt = file.endsWith(RESET_FLOW_FILE) &&
+                lines.subList(maxOf(0, index - 3), index + 1).any { RESET_WORD_EXEMPTION in it }
+            if (BARE_TEXT_FIELD.containsMatchIn(line) && !line.trimStart().startsWith("import ") && !exempt) {
+                "$file:${index + 1}: ${line.trim()}"
+            } else {
+                null
+            }
+        }
+    }
+
     private fun sourceFiles(): List<Path> = sourceRoots.flatMap { root ->
         Files.walk(root).use { stream ->
             stream.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }
@@ -163,5 +199,9 @@ class SourceEgressBoundaryTest {
         const val ALLOWED_EVIDENCE_BOUNDS_LOG = "android.util.Log.d(\"EvidenceBounds\", message)"
         const val DEBUG_GUARD = "if (BuildConfig.DEBUG) {"
         val OUTBOUND_ACTION = Regex("ACTION_(VIEW|SEND|SENDTO)")
+        val BARE_TEXT_FIELD = Regex("""(?<![A-Za-z])(TextField|OutlinedTextField|BasicTextField|SecureTextField|OutlinedSecureTextField)\s*\(""")
+        val CONTENT_TEXT_FIELD_FILE: Path = Path.of("app/src/main/java/org/openlife/app/ui/ContentTextField.kt")
+        val RESET_FLOW_FILE: Path = Path.of("app/src/main/java/org/openlife/app/settings/ResetVaultFlow.kt")
+        const val RESET_WORD_EXEMPTION = "P1-19-R5 exemption: reset confirmation word"
     }
 }

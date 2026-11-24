@@ -93,7 +93,9 @@ class AppLockState(private val clock: () -> Long) {
         mutableStatus.value = LockStatus.UNLOCKED
     }
 
-    private companion object {
-        const val MILLIS_PER_SECOND = 1_000L
+    companion object {
+        /** P1-19-R1: the shortest absence on an external trip that still counts as leaving. */
+        const val EXTERNAL_GRACE_MILLIS = 60_000L
+        private const val MILLIS_PER_SECOND = 1_000L
     }
 }

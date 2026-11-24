@@ -1,6 +1,7 @@
 package org.openlife.app.intake
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -263,5 +264,34 @@ class IntakeIntentValidatorTest {
             ownPackage,
         )
         assertEquals(IntakeValidationResult.Rejected(IntakeRejectionReason.MALFORMED_URI), result)
+    }
+
+    /**
+     * A-16 (P1-19-R19): the own-authority check compared the raw authority,
+     * which includes any userinfo and port. On Android a "<userId>@" prefix
+     * still resolves to the named provider (ContentProvider.getAuthorityWithoutUserId),
+     * so "0@org.openlife.x" must be treated as OpenLife's own authority.
+     */
+    @Test
+    fun ownAuthorityCheckCannotBeBypassedWithUserinfoOrPort() {
+        listOf(
+            "content://x@org.openlife.y/a",
+            "content://0@org.openlife.provider/a",
+            "content://org.openlife.y:1/a",
+            "content://ORG.OpenLife.Y/a",
+            "content://0@ORG.OPENLIFE/a",
+            "content://org.openlife/a",
+        ).forEach { uri ->
+            assertEquals(
+                uri,
+                IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY),
+                IntakeIntentValidator.validate(shape(extraStreamUri = uri), ownPackage),
+            )
+        }
+        // A neighbouring package name is not ours, and another provider with a
+        // user prefix (cross-profile share) is still accepted.
+        listOf("content://org.openlifex.y/a", "content://10@com.example.provider/a").forEach { uri ->
+            assertTrue(uri, IntakeIntentValidator.validate(shape(extraStreamUri = uri), ownPackage) is IntakeValidationResult.Valid)
+        }
     }
 }

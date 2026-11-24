@@ -118,13 +118,6 @@ private fun VerifyAllSection(onVerifyAll: suspend () -> VerifyReport?) {
     }
 }
 
-private sealed interface VerifyOutcome {
-    data class Done(val report: VerifyReport) : VerifyOutcome
-
-    data object Unavailable : VerifyOutcome
-
-    data object Failed : VerifyOutcome
-}
 
 @Composable
 @Suppress("TooGenericExceptionCaught", "SwallowedException")
@@ -251,4 +244,3 @@ private fun FinalConfirmationDialog(running: Boolean, failure: String?, onDismis
     )
 }
 
-private enum class ResetStage { CLOSED, TYPE_WORD, FINAL_CONFIRMATION }

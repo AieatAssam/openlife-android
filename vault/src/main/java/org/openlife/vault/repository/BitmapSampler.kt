@@ -18,3 +18,16 @@ fun interface BitmapSampler {
     /** Returns true if a bounded preview could be sampled from [bytes]. */
     fun canSample(bytes: ByteArray): Boolean
 }
+
+/** RED stub (P1-19, P1-18 review OOM addition). */
+internal enum class SampleCheck {
+    SAMPLEABLE,
+    UNDECODABLE,
+    OUT_OF_MEMORY,
+    ;
+
+    fun refusal(): PrepareResult? = TODO("P1-19 OOM $this")
+}
+
+/** RED stub (P1-19, P1-18 review OOM addition). */
+internal fun checkSample(sampler: BitmapSampler, bytes: ByteArray): SampleCheck = TODO("P1-19 OOM $sampler ${bytes.size}")

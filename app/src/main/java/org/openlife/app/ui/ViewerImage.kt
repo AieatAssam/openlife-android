@@ -86,7 +86,7 @@ internal fun rememberViewerContent(
 private suspend fun decodeForViewer(bytes: ByteArray, orientation: Orientation): ViewerContentState =
     withContext(Dispatchers.Default) {
         try {
-            SampledBitmapDecoder.decode(bytes, orientation)
+            SampledBitmapDecoder.decode(bytes, orientation)?.also(DecodedBitmapProbe::track)
         } finally {
             bytes.fill(0)
         }

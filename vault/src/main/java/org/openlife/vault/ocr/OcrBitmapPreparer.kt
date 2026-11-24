@@ -49,4 +49,8 @@ object OcrBitmapPreparer {
         val matrix = OrientationTransform.matrixFor(orientation) ?: return bitmap
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
+
+    /** RED stub (P1-19, P1-18 review OOM addition). */
+    internal fun <B : Any> prepareGuarded(decode: () -> B, orient: (B) -> B, recycle: (B) -> Unit): B =
+        TODO("P1-19 OOM $decode $orient $recycle")
 }

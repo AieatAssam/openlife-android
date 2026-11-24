@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -118,6 +119,50 @@ class IntakeScreenFlowTest {
             firstIntake.cancel()
             secondIntake.cancel()
             awaitState(firstIntake) { it is IntakeUiState.Cancelled }
+        }
+    }
+
+    /**
+     * A-03 (P1-19-R7): Save then Home. IntakeActivity is noHistory, so
+     * stopping it finishes it and clears its ViewModel right after Save is
+     * tapped. The save must still end READY (and listed), or leave no stage
+     * and no row; it must never stay half-done with nothing claiming it.
+     */
+    @Test
+    fun saveThenHomeEndsReadyOrCleanlyCancelledNeverUnknown(): Unit = runBlocking {
+        val store = androidx.lifecycle.ViewModelStore()
+        val intake = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            androidx.lifecycle.ViewModelProvider.create(store, IntakeViewModel.factory(application))[IntakeViewModel::class.java]
+        }
+        val access = application.vault() as org.openlife.app.VaultAccess.Ready
+        intake.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = 19)), "image/jpeg", IntakeKind.SHARE)
+        awaitState(intake) { it is IntakeUiState.Preview && it.previewBytes != null }
+        val id = (intake.state.value as IntakeUiState.Preview).sourceId
+
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            intake.confirmSave()
+            // The activity finishing (noHistory + Home) clears the ViewModel at once.
+            store.clear()
+        }
+        application.importHousekeeping.awaitIdleForTest()
+        awaitCondition(describe = { "source state=${runBlocking { access.viewRepository.findSource(id)?.state }}" }) {
+            val state = runBlocking { access.viewRepository.findSource(id)?.state }
+            state == null || state == org.openlife.vault.model.SourceState.READY
+        }
+        val source = access.viewRepository.findSource(id)
+        try {
+            if (source == null) {
+                assertTrue("a cancelled save leaves no stage behind", id.toString() !in stageFiles().joinToString())
+            } else {
+                val listed = access.viewRepository.observeVisibleSources().first().map { it.id }
+                assertTrue("a READY save is listed", id in listed)
+            }
+            assertTrue(
+                "the import slot is free afterwards",
+                access.importRepository.importSlot.isOccupied.not(),
+            )
+        } finally {
+            if (source != null) access.deletionRepository.deleteSource(id)
         }
     }
 

@@ -92,3 +92,7 @@ object SampledBitmapDecoder {
         return sampleSize
     }
 }
+
+/** RED stub (P1-19, P1-18 review OOM addition). */
+internal fun <B : Any> decodeGuardingMemory(decode: () -> B?, orient: (B) -> B, recycle: (B) -> Unit): B? =
+    TODO("P1-19 OOM $decode $orient $recycle")
