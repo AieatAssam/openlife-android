@@ -133,10 +133,15 @@
     <string name="viewer_display_transverse">Display transform: transverse</string>
     <string name="viewer_saved_bytes_unchanged">Saved bytes are unchanged.</string>
     <string name="viewer_detail_row">%1$s: %2$s</string>
-    <string name="viewer_assessment_not_assessed">TODO</string>
-    <string name="viewer_assessment_other_version">TODO</string>
-    <string name="viewer_content_kind_question">TODO</string>
-    <string name="viewer_content_kind_routing">TODO</string>
+    <string name="viewer_assessment_not_assessed">Safety check: not assessed in this version</string>
+    <string name="viewer_assessment_other_version">Safety check: recorded by another version of OpenLife. This version cannot show the result.</string>
+    <string name="viewer_assessment_explanation">This version of OpenLife does not check messages for scams, false senders or risky requests. Treat any link, payment or request in this item with the same care as the original.</string>
+    <string name="viewer_content_kind_question">Is this a message or request from someone?</string>
+    <string name="viewer_content_kind_yes">Yes</string>
+    <string name="viewer_content_kind_no">No</string>
+    <string name="viewer_content_kind_not_sure">Not sure</string>
+    <string name="viewer_content_kind_routing">Your answer tells OpenLife how to handle this item later. It is routing context, not proof of safety.</string>
+    <string name="viewer_content_kind_answered">Answered by you: %1$s</string>
     <string name="source_imported">Imported %1$s</string>
 
     <string name="ocr_failure_source_not_ready">the saved image is not ready</string>

@@ -88,7 +88,12 @@ class SchemaV4MigrationTest {
         return statements
     }
 
-    private data class ExportedField(val name: String, val affinity: String, val notNull: Boolean, val defaultValue: String?)
+    private data class ExportedField(
+        val name: String,
+        val affinity: String,
+        val notNull: Boolean,
+        val defaultValue: String?,
+    )
 
     /** The `fields` entries Room exported for `sources`, in order. */
     private fun exportedSourceFields(): List<ExportedField> {

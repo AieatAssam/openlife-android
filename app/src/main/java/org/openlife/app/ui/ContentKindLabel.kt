@@ -1,21 +1,47 @@
 package org.openlife.app.ui
 
 import androidx.annotation.StringRes
+import org.openlife.app.R
 import org.openlife.vault.model.AssessmentState
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.UserContentKind
 
 /** The three answers to "Is this a message or request from someone?" (P2-07-R3). */
-enum class ContentKindChoice(val stored: UserContentKind?) {
-    YES(UserContentKind.COMMUNICATION),
-    NO(UserContentKind.NOT_COMMUNICATION),
-    NOT_SURE(null),
+enum class ContentKindChoice(
+    val stored: UserContentKind?,
+    @StringRes val label: Int,
+) {
+    YES(UserContentKind.COMMUNICATION, R.string.viewer_content_kind_yes),
+    NO(UserContentKind.NOT_COMMUNICATION, R.string.viewer_content_kind_no),
+    NOT_SURE(null, R.string.viewer_content_kind_not_sure),
 }
 
-/** P2-07 viewer rules, kept out of Compose so they run on the JVM. RED stub. */
+/** P2-07 viewer rules, kept out of Compose so they run on the JVM. */
 object ContentKindLabel {
-    fun selected(source: Source): ContentKindChoice? = TODO("P2-07 GREEN")
+    /**
+     * The answer the user gave, or null when they never answered. "Not sure"
+     * stores no kind, so the USER timestamp is what tells it apart from
+     * "never answered". A kind this build cannot read selects nothing.
+     */
+    fun selected(source: Source): ContentKindChoice? = when {
+        source.userContentKindAt == null -> null
+        source.userContentKind == UserContentKind.UNRECOGNISED -> null
+        else -> ContentKindChoice.entries.first { it.stored == source.userContentKind }
+    }
 
+    /** The answer to store when the user picks [choice]; null when it is already the stored answer. */
+    fun change(source: Source, choice: ContentKindChoice): ContentKindChoice? = choice.takeIf { it != selected(source) }
+
+    /**
+     * P2-07-R4: this build runs no assessment, so NOT_ASSESSED is shown as
+     * "not assessed in this version". Any other stored state was written by
+     * another build; this one cannot explain it and shows no result for it,
+     * least of all a reassuring one.
+     */
     @StringRes
-    fun assessmentText(state: AssessmentState): Int = TODO("P2-07 GREEN")
+    fun assessmentText(state: AssessmentState): Int = if (state == AssessmentState.NOT_ASSESSED) {
+        R.string.viewer_assessment_not_assessed
+    } else {
+        R.string.viewer_assessment_other_version
+    }
 }

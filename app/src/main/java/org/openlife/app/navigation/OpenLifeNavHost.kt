@@ -42,6 +42,7 @@ import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
 import org.openlife.vault.model.Source
+import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.repository.ReadyReadResult
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
@@ -61,6 +62,7 @@ private class SourceScreens(
     val review: (revisionId: UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     val rejectSpan: (spanId: UUID) -> Unit,
     val undoRejectSpan: (spanId: UUID) -> Unit,
+    val setUserContentKind: (UUID, UserContentKind?) -> Unit,
     val onImportFromPhotoPicker: () -> Unit,
     val onRetryVault: () -> Unit,
     val onFinishReset: () -> Unit,
@@ -104,6 +106,7 @@ private class SourceScreens(
             },
             onRejectSpan = { span -> rejectSpan(span.id) },
             onUndoRejectSpan = { span -> undoRejectSpan(span.id) },
+            onSetUserContentKind = { kind -> setUserContentKind(source.id, kind) },
         )
     }
 }
@@ -123,6 +126,7 @@ fun OpenLifeNavHost(
     review: (revisionId: UUID, org.openlife.vault.ocr.OcrReviewState) -> Unit,
     rejectSpan: (spanId: UUID) -> Unit = {},
     undoRejectSpan: (spanId: UUID) -> Unit = {},
+    setUserContentKind: (UUID, UserContentKind?) -> Unit = { _, _ -> },
     onImportFromPhotoPicker: () -> Unit,
     onRetryVault: () -> Unit,
     onFinishReset: () -> Unit,
@@ -134,7 +138,8 @@ fun OpenLifeNavHost(
 ) {
     val screens = SourceScreens(
         listState, thumbnailGeneration, ocrState, loadThumbnail, loadReadyContent, delete, extractText,
-        cancelOcr, correct, review, rejectSpan, undoRejectSpan, onImportFromPhotoPicker, onRetryVault, onFinishReset,
+        cancelOcr, correct, review, rejectSpan, undoRejectSpan, setUserContentKind, onImportFromPhotoPicker,
+        onRetryVault, onFinishReset,
     )
     val currentEntry by navController.currentBackStackEntryAsStateCompat()
     val isNested = currentEntry?.destination?.route != null &&

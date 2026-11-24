@@ -20,8 +20,11 @@ import java.util.Date
 fun sourceLabel(source: Source): String = stringResource(R.string.source_imported, importedTime(source))
 
 /** The app's own import timestamp; data, so it is set in the data face where shown. */
-fun importedTime(source: Source): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(source.importedAt))
+fun importedTime(source: Source): String = dateTime(source.importedAt)
+
+/** A stored timestamp as the viewer shows it (medium date, short time). */
+fun dateTime(millis: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
 
 /** [text] with every occurrence of [data] set in the data (Plex Mono) face. */
 @Composable

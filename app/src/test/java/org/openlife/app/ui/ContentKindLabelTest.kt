@@ -48,14 +48,31 @@ class ContentKindLabelTest {
     }
 
     @Test
+    fun pickingTheStoredAnswerAgainWritesNothingButAnyOtherAnswerDoes() {
+        val answeredYes = source(UserContentKind.COMMUNICATION, 5)
+        assertNull(ContentKindLabel.change(answeredYes, ContentKindChoice.YES))
+        assertEquals(ContentKindChoice.NOT_SURE, ContentKindLabel.change(answeredYes, ContentKindChoice.NOT_SURE))
+        val neverAnswered = source(null, null)
+        assertEquals(
+            "a first Not sure is an answer",
+            ContentKindChoice.NOT_SURE,
+            ContentKindLabel.change(neverAnswered, ContentKindChoice.NOT_SURE),
+        )
+        assertNull(ContentKindLabel.change(source(null, 5), ContentKindChoice.NOT_SURE))
+    }
+
+    @Test
     fun aKindThisBuildCannotReadSelectsNothing() {
         assertNull(ContentKindLabel.selected(source(UserContentKind.UNRECOGNISED, 5)))
     }
 
     @Test
     fun notAssessedIsShownAsNotAssessedInThisVersion() {
-        assertEquals(R.string.viewer_assessment_not_assessed, ContentKindLabel.assessmentText(AssessmentState.NOT_ASSESSED))
-        assertTrue(strings.contains("<string name=\"viewer_assessment_not_assessed\">Safety check: not assessed in this version</string>"))
+        assertEquals(
+            R.string.viewer_assessment_not_assessed,
+            ContentKindLabel.assessmentText(AssessmentState.NOT_ASSESSED),
+        )
+        assertTrue(strings.contains(NOT_ASSESSED_RESOURCE))
     }
 
     @Test
@@ -70,7 +87,7 @@ class ContentKindLabelTest {
         val routing = Regex("<string name=\"viewer_content_kind_routing\">([^<]*)</string>").find(strings)
         assertTrue("viewer_content_kind_routing missing", routing != null)
         assertTrue(routing!!.groupValues[1], routing.groupValues[1].contains("not proof of safety"))
-        assertTrue(strings.contains("<string name=\"viewer_content_kind_question\">Is this a message or request from someone?</string>"))
+        assertTrue(strings.contains(QUESTION_RESOURCE))
     }
 
     @Test
@@ -96,4 +113,11 @@ class ContentKindLabelTest {
         userContentKind = kind,
         userContentKindAt = at,
     )
+
+    private companion object {
+        const val NOT_ASSESSED_RESOURCE =
+            "<string name=\"viewer_assessment_not_assessed\">Safety check: not assessed in this version</string>"
+        const val QUESTION_RESOURCE =
+            "<string name=\"viewer_content_kind_question\">Is this a message or request from someone?</string>"
+    }
 }

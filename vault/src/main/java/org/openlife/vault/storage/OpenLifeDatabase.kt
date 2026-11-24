@@ -48,11 +48,26 @@ abstract class OpenLifeDatabase : RoomDatabase() {
         }
 
         /** Every migration, in order; never destructive (design §10). */
-        val MIGRATIONS: List<androidx.room.migration.Migration> by lazy { listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4) }
+        val MIGRATIONS: List<androidx.room.migration.Migration> by lazy {
+            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        }
 
-        /** P2-07-R1: assessment state and user label on `sources`. RED stub: executes nothing yet. */
+        /**
+         * P2-07-R1/R2: the communication assessment state (every existing row
+         * becomes NOT_ASSESSED through the column default) and the user's
+         * optional content-kind label with its USER timestamp. Additive only;
+         * each statement equals Room's exported v4 column (SchemaV4MigrationTest).
+         */
         val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
-            override fun migrate(db: SupportSQLiteDatabase) = Unit
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `sources` ADD COLUMN `assessmentState` TEXT NOT NULL DEFAULT 'NOT_ASSESSED'")
+                db.execSQL("ALTER TABLE `sources` ADD COLUMN `userContentKind` TEXT")
+                db.execSQL("ALTER TABLE `sources` ADD COLUMN `userContentKindAt` INTEGER")
+                db.execSQL("ALTER TABLE `sources` ADD COLUMN `assessmentMethodVersion` TEXT")
+                // P1-18-R12: every migration ends by re-asserting the READY
+                // invariant triggers on `sources`.
+                ReadyInvariantTriggers.create(db)
+            }
         }
 
         /**

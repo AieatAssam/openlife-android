@@ -40,6 +40,7 @@ data class SourceEntity(
     val userContentKindAt: Long? = null,
     val assessmentMethodVersion: String? = null,
 ) {
+    @Suppress("CyclomaticComplexMethod") // one comparison per column
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SourceEntity) return false

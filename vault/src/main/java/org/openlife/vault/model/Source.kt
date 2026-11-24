@@ -32,6 +32,7 @@ data class Source(
     /** The assessment method that produced [assessmentState]; null while NOT_ASSESSED. */
     val assessmentMethodVersion: String? = null,
 ) {
+    @Suppress("CyclomaticComplexMethod") // one comparison per column
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Source) return false

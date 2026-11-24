@@ -18,6 +18,7 @@ import org.openlife.app.VaultAccess
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.repository.DeleteResult
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.storage.VaultUnavailableCause
@@ -125,6 +126,16 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
             // A-10 test hook: lets the Room flow win the race against the callback.
             if (deleteResultDelayMillisForTest > 0) kotlinx.coroutines.delay(deleteResultDelayMillisForTest)
             onResult(result)
+        }
+    }
+
+    /**
+     * P2-07-R3: stores the user's answer; the visible-source flow carries the
+     * stored value back to the viewer. Not a safety judgement.
+     */
+    fun setUserContentKind(sourceId: UUID, kind: UserContentKind?) {
+        viewModelScope.launch {
+            (application.vault() as? VaultAccess.Ready)?.viewRepository?.setUserContentKind(sourceId, kind)
         }
     }
 

@@ -43,9 +43,16 @@ class SourceViewRepository(
     /**
      * P2-07-R3: records the user's answer to "Is this a message or request
      * from someone?" with the time ([clock]) they gave it. [kind] null is
-     * "Not sure". Returns false when the source is not READY. RED stub.
+     * "Not sure", still attributed by its timestamp. Returns false when the
+     * source is not READY (compare-and-set). The assessment state is never
+     * touched: a user label is routing context, not proof of safety (design §6).
      */
-    suspend fun setUserContentKind(sourceId: UUID, kind: UserContentKind?): Boolean = TODO("P2-07 GREEN")
+    suspend fun setUserContentKind(sourceId: UUID, kind: UserContentKind?): Boolean = withContext(ioDispatcher) {
+        check(kind != UserContentKind.UNRECOGNISED) { "an unrecognised content kind is never written" }
+        mutationQueue.withMutation {
+            database.sourceDao().setUserContentKind(sourceId.toString(), kind?.name, clock()) == 1
+        }
+    }
 
     /** The not-yet-saved stage, authenticated from the encrypted file on disk (design §11 step 4). */
     suspend fun loadStagePreviewBytes(sourceId: UUID): ByteArray? = withContext(ioDispatcher) {
