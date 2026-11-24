@@ -59,6 +59,7 @@ are WCAG AA at minimum; text on paper is AAA.
 | Highlighter (evidence) | `#FFE45C` | `#D9B93A` | evidence region outline and span highlight |
 | Amber (attention) | `#B7791F` | `#E3B04B` | stale, needs clarification, not assessed |
 | Error | `#8F1D1D` | `#F2B8B5` | destructive confirmations, unreadable content |
+| Outline | `#7D776B` | `#857F75` | meaningful boundaries: text-field and outlined-button borders (≥ 3:1 on every paper/carbon surface) |
 
 Rules: vermilion is the only brand colour on a screen; green appears only on
 confirmed or verified states so it keeps meaning; amber marks uncertainty;
@@ -67,7 +68,21 @@ error colour and an outlined button, never the primary filled button.
 
 Material 3 mapping (P0-07 theme): primary=Vermilion, onPrimary=Surface,
 primaryContainer=Vermilion container, secondary=Ink muted, tertiary=Stamp
-green, surface/onSurface=Surface/Ink, outline=Rule, error=Error.
+green, surface/onSurface=Surface/Ink, outline=Outline, outlineVariant=Rule,
+error=Error.
+
+P1-19 amendments (audit A-04, A-08):
+- **Outline.** Rule is 1.35:1 on paper, which fails this brief's own AA rule
+  (3:1 for UI component boundaries). Outline therefore has its own token.
+  Rule stays for decorative dividers and perforation as `outlineVariant`.
+- **Every Material role is set.** This covers the surface-container steps,
+  inverse roles, scrim, surface tint and the fixed roles. Each is taken from
+  this palette (paper steps between Surface raised and Rule; carbon steps
+  between `#0F0E0B` and Rule), so no Material baseline tone appears in menus,
+  sheets, snackbars or dialogs. The carbon Error `#F2B8B5` happens to equal
+  Material's baseline; it is kept as this brief's value.
+- **Buttons.** Every button uses the 8 dp corner (`OpenLifeButton` and its
+  variants).
 
 ## 5. Typography (all OFL, bundled, licences in About)
 
@@ -77,7 +92,11 @@ green, surface/onSurface=Surface/Ink, outline=Rule, error=Error.
   digests, timestamps, amounts, dates, file sizes. Data looks like data; it
   is visibly distinct from the app's own words.
 - **Fraunces** — display only: wordmark, first-run headline, empty-state
-  headings. Never in lists or dialogs.
+  headings. Never in lists or dialogs. It is set at weight 500 with WONK on
+  (optical size 72) through the variable font's axes, and is used only for
+  Material's display roles. Headlines, titles and dialog titles are Plex
+  Sans 600 (P1-19-R9).
+- Extracted OCR span text is Plex Mono at the 16 sp body size.
 - Minimum body size 16 sp; supports font scale to 2.0×; no text in images.
 
 ## 6. Shape, texture, motion

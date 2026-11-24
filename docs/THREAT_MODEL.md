@@ -27,6 +27,28 @@ adversary.
   No user data is sent to browser, calendar, messaging, email or share
   intents. No content in logs, clipboard, crash attachments, public caches,
   notifications or recents previews.
+  - **Clipboard and keyboard (P1-19-R5).** Every text field that can hold
+    user content is `ContentTextField`. It offers no Copy or Cut in the
+    selection toolbar or the context menu, blocks Ctrl+C, Ctrl+X,
+    Ctrl+Insert, Shift+Delete and the Copy/Cut keys, and refuses the
+    keyboard's own copy and cut requests. It also turns autocorrect off and
+    asks the keyboard not to learn from what is typed
+    (`IME_FLAG_NO_PERSONALIZED_LEARNING`). A boundary test fails on any other
+    text field in the app; the vault-reset word field is the one named
+    exemption, because it holds only a fixed confirmation word.
+  - **Residual:** the no-learning flag is a request. A keyboard that
+    ignores it can still learn what is typed in a correction.
+- **Incoming share grants (P1-19-R18).** The sender sets
+  `FLAG_GRANT_READ_URI_PERMISSION`, so its presence is not a control.
+  OpenLife's defence is that it holds no media or storage permission: it
+  can read a shared URI only if the sender really granted it. A share whose
+  authority names OpenLife itself is refused. The check compares the host
+  only, after removing userinfo and port, so `x@org.openlife...` cannot
+  bypass it.
+- **Open-source requests (P1-19-R17).** The launcher activity is exported.
+  It opens a specific item only when the request carries a single-use,
+  in-process nonce that OpenLife's own "Open existing" button issued. Any
+  other caller just opens the list.
 - The Photo Picker can expose items supplied by a cloud media provider.
   OpenLife reads only the explicitly selected URI and cannot control that
   provider's download or logging behaviour (R3). This is explained at intake:
@@ -120,6 +142,10 @@ BiometricPrompt, using a biometric or the device credential, until the user
 authenticates.
 - **When it locks:** on process start, and after a configurable time in the
   background, measured on a monotonic clock that keeps counting through sleep.
+  - With timeout 0, it locks when `ProcessLifecycleOwner` reports the process
+    stopped, about 700 ms after the last activity stops. Content is not
+    exposed in that window: each activity scrubs its content in its own
+    `onStop`, and `FLAG_SECURE` keeps it out of Recents and screenshots.
 - **While locked:** no content is composed, and no item bytes are decrypted or
   shared streams opened.
 - **What it protects against:** someone using an already-unlocked phone.
@@ -129,8 +155,12 @@ authenticates.
 - **Limits:**
   - It does not protect against anyone who knows the device credential.
   - It does not protect against a compromised OS.
-  - While OpenLife's own Photo Picker trip is open, returning to OpenLife is
-    not re-gated.
+  - A trip to an activity OpenLife started itself (the Photo Picker, the
+    system credential screen) is not re-gated on return if it took less than
+    the longer of the timeout and 60 seconds (P1-19-R1). Within that window,
+    someone else who picks up the phone can return to OpenLife unprompted.
+    A longer trip locks on return, even if the picker's result never
+    arrives.
 - **If the device can no longer verify the user** (screen lock removed):
   OpenLife stays locked and explains how to restore a screen lock. It never
   unlocks silently.
