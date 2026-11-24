@@ -204,10 +204,13 @@ class AppLockFlowTest {
             "A-12 needs API 29 (BIOMETRIC_WEAK|DEVICE_CREDENTIAL); this device is API ${android.os.Build.VERSION.SDK_INT}",
             android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q,
         )
+        val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
+        // Never touch a device that already has a screen lock: set-pin would
+        // fail, and the clear below must only undo a PIN this test set.
+        assumeTrue("the device already has a screen lock; not changing it", !keyguard.isDeviceSecure)
         val pin = InstrumentationRegistry.getArguments().getString("devicePin") ?: TEST_PIN
         shell("locksettings set-pin $pin")
         try {
-            val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
             assumeTrue("locksettings could not set a PIN on this image", keyguard.isDeviceSecure)
             AppLockPolicyStore.write(context, AppLockPolicy(enabled = true))
             app.appLock.state.start(AppLockPolicy(enabled = true))

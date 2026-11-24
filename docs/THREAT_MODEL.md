@@ -160,7 +160,10 @@ authenticates.
     the longer of the timeout and 60 seconds (P1-19-R1). Within that window,
     someone else who picks up the phone can return to OpenLife unprompted.
     A longer trip locks on return, even if the picker's result never
-    arrives.
+    arrives. If a picker result is dropped, though, the trip flag stays set
+    until the next unlock. Every background period until then gets the same
+    60-second grace, so a zero timeout behaves as 60 seconds (audit A-07;
+    clearing the flag in `onStart` waits on device confirmation).
 - **If the device can no longer verify the user** (screen lock removed):
   OpenLife stays locked and explains how to restore a screen lock. It never
   unlocks silently.
