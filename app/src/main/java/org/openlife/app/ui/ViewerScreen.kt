@@ -98,7 +98,12 @@ fun ViewerScreen(
                 correctionText = span.text
             },
             onReview = onReview,
-            onRejectSpan = onRejectSpan,
+            onRejectSpan = { span ->
+                // S-02: a rejected span stops being the selection here, so Undo
+                // does not re-reveal it (scroll jump) or re-announce it.
+                if (span.id == selectedSpanId) selectedSpanId = null
+                onRejectSpan(span)
+            },
             onUndoRejectSpan = onUndoRejectSpan,
         )
     }

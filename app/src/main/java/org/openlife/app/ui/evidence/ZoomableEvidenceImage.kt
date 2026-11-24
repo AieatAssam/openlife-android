@@ -179,16 +179,19 @@ private fun Modifier.evidenceGestures(
             canPan = { view.zoom.floatValue > EvidenceGeometry.MIN_ZOOM },
         )
         .pointerInput(Unit) {
-            val doubleTaps = DoubleTapClock(viewConfiguration.doubleTapTimeoutMillis)
+            val doubleTaps = DoubleTapClock(viewConfiguration.doubleTapTimeoutMillis, DOUBLE_TAP_SLOP.toPx())
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 val tap = TapGesture(down.id.value, down.position, viewConfiguration.touchSlop)
-                val release = awaitTapRelease(tap)
+                // S-06: the down's own final pass; a parent that consumed it (a
+                // touch that stops a fling) means this is not a tap.
+                val downStep = tap.onFinal(awaitPointerEvent(PointerEventPass.Final).samples())
+                val release = if (downStep == TapGesture.Step.Abandoned) null else awaitTapRelease(tap)
                 if (release == null) {
                     doubleTaps.reset()
                     return@awaitEachGesture
                 }
-                when (doubleTaps.onTap(down.uptimeMillis, release.uptimeMillis)) {
+                when (doubleTaps.onTap(down.uptimeMillis, release.uptimeMillis, release.position)) {
                     DoubleTapClock.Kind.DOUBLE -> {
                         val zoom = currentView.zoom
                         zoom.floatValue = EvidenceGeometry.nextDoubleTapZoom(zoom.floatValue)
@@ -370,4 +373,7 @@ private fun boundsMessage(image: IntRect, overlay: IntRect?): String {
 }
 
 private const val HIGHLIGHT_ALPHA = 0.30f
+
+// As android.view.ViewConfiguration's double-tap slop.
+private val DOUBLE_TAP_SLOP = 100.dp
 private val STROKE_WIDTH = 3.dp

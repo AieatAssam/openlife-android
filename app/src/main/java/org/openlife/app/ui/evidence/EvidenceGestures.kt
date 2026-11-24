@@ -51,21 +51,25 @@ internal class TapGesture(private val pointerId: Long, private val downPosition:
 
 /**
  * Double-tap timing that survives zoom and pan (P2-06-R9): the second tap must
- * start within [timeoutMillis] of the first one ending. A double tap is
- * consumed, so a third tap starts a new sequence; an abandoned gesture
- * (drag, pinch) clears the sequence.
+ * start within [timeoutMillis] of the first one ending and land within [slop]
+ * of it (S-04), so two quick taps on different places are two selections. A
+ * double tap is consumed, so a third tap starts a new sequence; an abandoned
+ * gesture (drag, pinch) clears the sequence.
  */
-internal class DoubleTapClock(private val timeoutMillis: Long) {
+internal class DoubleTapClock(private val timeoutMillis: Long, private val slop: Float = Float.POSITIVE_INFINITY) {
     enum class Kind { SINGLE, DOUBLE }
 
     // Null, not zero: instrumentation clocks start near zero, so a first tap
     // would otherwise look like the second half of a double tap.
     private var lastUpMillis: Long? = null
+    private var lastPosition = Offset.Zero
 
-    fun onTap(downMillis: Long, upMillis: Long): Kind {
+    fun onTap(downMillis: Long, upMillis: Long, position: Offset = Offset.Zero): Kind {
         val previous = lastUpMillis
-        val double = previous != null && downMillis - previous <= timeoutMillis
+        val inTime = previous != null && downMillis - previous <= timeoutMillis
+        val double = inTime && (position - lastPosition).getDistance() <= slop
         lastUpMillis = if (double) null else upMillis
+        lastPosition = position
         return if (double) Kind.DOUBLE else Kind.SINGLE
     }
 
