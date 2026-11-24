@@ -101,7 +101,14 @@ byte-identical (`SchemaV4MigrationTest.bothCopiesOfTheV4SchemaAreByteIdentical`)
 
 Existing tests changed: `SaveCommitTest` (its fake `SourceDao` must
 implement the new `setUserContentKind`; it throws as `unused()` like the
-other unused members). No assertion in an existing test changed.
+other unused members) and `ViewerScreenTest` (existing class: new method,
+helpers, imports and a companion object; its two original tests unchanged).
+No assertion in an existing test changed.
+
+Checked: no Compose effect is keyed on the whole `Source` (`rememberViewerContent`
+keys on `source.id` and `source.state`; viewer state on `source.id`; list
+thumbnails on `sourceId`), so a label write, which emits a new `Source`, does
+not reload, re-authenticate or re-decode the image.
 
 ## Instrumented tests awaiting a device
 

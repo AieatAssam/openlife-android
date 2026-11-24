@@ -127,7 +127,8 @@ class ViewerScreenTest {
         try {
             val repository = access.viewRepository
             composeRule.setContent {
-                val sources by repository.observeVisibleSources().collectAsState(initial = emptyList())
+                val sources by androidx.compose.runtime.remember { repository.observeVisibleSources() }
+                    .collectAsState(initial = emptyList())
                 val scope = rememberCoroutineScope()
                 sources.find { it.id == sourceId }?.let { source ->
                     OpenLifeTheme {
