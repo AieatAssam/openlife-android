@@ -3,10 +3,13 @@ package org.openlife.app
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.database.sqlite.SQLiteException
+import android.icu.text.ListFormatter
 import android.os.StrictMode
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -57,14 +60,14 @@ class OpenLifeApp : Application() {
     private val mutationQueue = MutationQueue()
     private val vaultInitLock = Mutex()
 
-    private val mutableReadyVault = kotlinx.coroutines.flow.MutableStateFlow<VaultAccess.Ready?>(null)
+    private val mutableReadyVault = MutableStateFlow<VaultAccess.Ready?>(null)
 
     /**
      * The vault while it is Ready, else null (P1-19-R16). Follows late opens,
      * retries and resets, so observers are not tied to the vault that existed
      * when they started. Collecting it does not open the vault; [vault] does.
      */
-    val readyVault: kotlinx.coroutines.flow.StateFlow<VaultAccess.Ready?> = mutableReadyVault
+    val readyVault: StateFlow<VaultAccess.Ready?> = mutableReadyVault
 
     // Read outside vaultInitLock by importHousekeeping's slot lookup, so publish it safely.
     @Volatile
@@ -322,34 +325,34 @@ object VaultFailureDiagnostics {
         val entries = counts.mapNotNull { (name, count) ->
             val cause = VaultUnavailableCause.entries.firstOrNull { it.name == name } ?: return@mapNotNull null
             context.resources.getQuantityString(
-                org.openlife.app.R.plurals.about_vault_diagnostics_entry,
+                R.plurals.about_vault_diagnostics_entry,
                 count as Int,
                 context.getString(causeLabel(cause)),
                 count,
             )
         }
-        if (entries.isEmpty()) return context.getString(org.openlife.app.R.string.about_vault_diagnostics_empty)
+        if (entries.isEmpty()) return context.getString(R.string.about_vault_diagnostics_empty)
         // P1-19-R20: the locale decides how a list is joined.
-        return android.icu.text.ListFormatter.getInstance(context.resources.configuration.locales[0]).format(entries)
+        return ListFormatter.getInstance(context.resources.configuration.locales[0]).format(entries)
     }
 
     private fun causeLabel(cause: VaultUnavailableCause): Int = when (cause) {
         VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE ->
-            org.openlife.app.R.string.vault_cause_keystore_temporarily_unavailable
+            R.string.vault_cause_keystore_temporarily_unavailable
 
-        VaultUnavailableCause.KEY_FILE_CORRUPT -> org.openlife.app.R.string.vault_cause_key_file_corrupt
+        VaultUnavailableCause.KEY_FILE_CORRUPT -> R.string.vault_cause_key_file_corrupt
 
-        VaultUnavailableCause.KEY_UNWRAP_FAILED -> org.openlife.app.R.string.vault_cause_key_unwrap_failed
+        VaultUnavailableCause.KEY_UNWRAP_FAILED -> R.string.vault_cause_key_unwrap_failed
 
-        VaultUnavailableCause.DATABASE_WITHOUT_KEY -> org.openlife.app.R.string.vault_cause_database_without_key
+        VaultUnavailableCause.DATABASE_WITHOUT_KEY -> R.string.vault_cause_database_without_key
 
-        VaultUnavailableCause.DATABASE_OPEN_FAILED -> org.openlife.app.R.string.vault_cause_database_open_failed
+        VaultUnavailableCause.DATABASE_OPEN_FAILED -> R.string.vault_cause_database_open_failed
 
-        VaultUnavailableCause.STORAGE_IO_ERROR -> org.openlife.app.R.string.vault_cause_storage_io_error
+        VaultUnavailableCause.STORAGE_IO_ERROR -> R.string.vault_cause_storage_io_error
 
-        VaultUnavailableCause.RESET_INCOMPLETE -> org.openlife.app.R.string.vault_cause_reset_incomplete
+        VaultUnavailableCause.RESET_INCOMPLETE -> R.string.vault_cause_reset_incomplete
 
-        VaultUnavailableCause.DATABASE_MISSING -> org.openlife.app.R.string.vault_cause_database_missing
+        VaultUnavailableCause.DATABASE_MISSING -> R.string.vault_cause_database_missing
     }
 }
 
