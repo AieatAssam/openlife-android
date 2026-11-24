@@ -126,6 +126,18 @@ on the API 29 heap (growth limit 16 MiB).
 
 ## Other deviations / owner questions
 
+- Two existing tests were changed in RED 3f86512:
+  `VaultBootstrapperTest.corruptKeyFileIsUnavailableNotReplaced` and
+  `…eachFailureModeReportsItsTypedCause` now write a database file before
+  corrupting the key. Under R10, a torn key file with no database and empty
+  `artefacts/` is a fresh install, so the corrupt-key expectation holds only
+  when a database exists.
+- A missing `artefacts/` directory cannot reach `planBootstrap`, because
+  `bootstrap` calls `ensureDirectoriesExist()` first. "Unlistable" therefore
+  means I/O failure, which counts as "not provably empty".
+- No full-row `sourceDao.update(...)` remains in `vault/src/main` or
+  `app/src/main` (grep).
+
 - No key, no database, artefacts present still bootstraps fresh and recovery
   then removes the artefacts as orphans (V-02-shaped, outside R4's wording).
   Owner question: should that also be `DATABASE_MISSING`-like?
