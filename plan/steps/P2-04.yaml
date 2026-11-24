@@ -29,6 +29,8 @@ requirements:
     text: "MUST define the gate: mean CER <= 0.08 on screenshots, <= 0.15 on receipts, <= 0.10 on letters; box IoU>=0.5 for >= 90% of lines; 100% correct abstention on non-Latin fixtures; p95 duration <= 6 s on the CI emulator; peak PSS delta <= 120 MB. An engine that fails any threshold cannot be selected as default."
   - id: P2-04-R4
     text: "MUST store thresholds in eval/ocr/v1/gate.json read by the harness so the gate cannot drift silently; any change is a reviewed diff."
+  - id: P2-04-R5
+    text: "V-15 (docs/reviews/2026-11-24-vault-audit.md): MUST add fixtures that are Latin text with a few stray non-Latin glyphs (a currency sign, a CJK or Cyrillic character on an otherwise Latin receipt) and measure, for the current whole-revision abstention (OcrRunStateMachine.decideOutput / TesseractOcrEngine.extract) and for a per-span script-status alternative evaluated offline in the harness, the Latin lines lost and any non-Latin text wrongly accepted. Record both results in docs/verification/ocr-eval.md and decide with that data: either keep whole-revision abstention (C1 wording) with the measured cost stated, or open the per-span script status change (VS-3, owned by P3-02's schema work) via an ADR-0003 addendum. No production change in this step."
 
 files_touched:
   - eval/ocr/v1/{fixtures/,truth/,gate.json,README.md}
@@ -41,6 +43,7 @@ tdd:
     - name: eval module test FixtureGeneratorTest.generatesDeterministicImagesAndTruth (same seed -> same bytes)
     - name: "OcrEvaluationTest.metricsAreComputedAgainstTruth (unit-level metric tests with tiny hand-made cases: CER, IoU)"
     - name: OcrEvaluationTest.gateFailsWhenAnyThresholdIsMissed (fake results)
+    - name: OcrEvaluationTest.strayNonLatinGlyphCostIsMeasuredForBothPolicies (V-15)
   green:
     - "Generate fixtures, implement metrics, run both engines, record results."
   refactor: []

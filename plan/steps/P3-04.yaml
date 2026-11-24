@@ -23,6 +23,8 @@ requirements:
     text: "MUST auto-run extraction after an OCR revision reaches READY (user-visible as 'Facts found: n, review them') — proposal only, nothing confirmed."
   - id: P3-04-R5
     text: "MUST mark STALE via FactRepository when: a span gets a new correction, a newer OCR revision becomes READY, or an OCR revision is rejected."
+  - id: P3-04-R6
+    text: "VS-3 (docs/reviews/2026-11-24-vault-audit.md): MUST read only the current-revision pointer and the explicit correction supersession chain from P3-02-R7 (never 'latest createdAt'), extract only from spans whose persisted hasEvidenceRegion is true and scriptStatus is supported, and record the STALE reason from P3-02-R7 rather than a bare STALE."
 
 files_touched:
   - vault/src/main/java/org/openlife/vault/repository/FactExtractionRepository.kt
@@ -37,6 +39,8 @@ tdd:
     - name: FactExtractionRepositoryTest.newOcrRevisionMarksPreviousFactsStale
     - name: FactExtractionRepositoryTest.limitOverflowCommitsNothing
     - name: FactExtractionRepositoryTest.deadlineProducesFailedResultAndNoPartialRows
+    - name: FactExtractionRepositoryTest.ungroundedAndOutOfScriptSpansYieldNoFacts (VS-3)
+    - name: FactExtractionRepositoryTest.usesCurrentRevisionPointerAndCorrectionChain (VS-3)
   green: ["Implement."]
   refactor: []
 

@@ -1,0 +1,165 @@
+id: P1-18
+title: Vault audit remediation
+phase: P1
+status: todo
+depends_on: [P1-01, P1-06, P1-14, P1-15, P2-01, P2-02]
+estimate: L
+owner: agent
+closes_findings: [F-50, F-51, F-52, F-53, F-55]
+
+summary: >
+  Fix the vault defects found by the 2026-11-24 audit of commit 190be81
+  (docs/reviews/2026-11-24-vault-audit.md): a transient Keystore error must
+  never mark an intact item CORRUPT (and CORRUPT must be recoverable after a
+  passing deep check), a missing database must never cause recovery to delete
+  every blob, the import slot and the read lease must be held exactly as long
+  as the state they protect, cancellation must not be swallowed, the key file
+  must be written atomically, reset must survive stray files, the READY
+  invariant triggers and the fault seam must reach every path, and state
+  transitions become compare-and-set with tolerant enum decoding (VS-1).
+
+rationale: >
+  The audit found nothing that needs a redo; envelope format, AAD binding,
+  staged commit order, recovery table and deletion order match design
+  §10-§12. The defects are local but two are High: V-01 (transient Keystore
+  failure -> permanent CORRUPT, or KEY_UNWRAP_FAILED at bootstrap) and V-02
+  (lost database + surviving key file -> every blob deleted as an orphan,
+  breaking §11 "never infer that an unreadable database is empty and delete
+  its files"). VS-1 lands now because facts and records (P3/P4) multiply the
+  writers that today rely only on mutation exclusion.
+
+ethos_check:
+  - "Destructive recovery is never automatic: V-02 turns a silent mass deletion into a typed Unavailable cause; V-01 stops a transient fault from becoming a permanent CORRUPT verdict."
+  - "Original bytes are immutable while retained: nothing in this step rewrites a blob; CORRUPT -> READY only after a full authenticated deep check."
+  - "Never claim a test ran: V-16 is decided by a test that reads the effective pragmas, not by assumption."
+
+constraints:
+  - "No schema change. PR #23 (P2-06) has schema v3 open and conventions.schema_migrations forbids a second migration PR while one is open; every requirement below is achievable without one (V-02 is a bootstrap check, VS-1 is DAO SQL plus mapper code, V-16 is a connection pragma, V-11 moves existing DDL into a shared function without changing it). If an implementer finds a migration unavoidable, stop, record why in notes, and follow conventions.schema_migrations after P2-06 merges."
+  - "V-11 (R10) and P2-06-R11 (E-04) both edit vault/src/androidTest/.../storage/OcrDatabaseTest.kt and the migration helpers; whichever lands second rebases."
+  - "No new runtime dependency."
+
+requirements:
+  - id: P1-18-R1
+    text: "V-01 (confirm first): MUST add a JVM/instrumented test with a fault-injecting Cipher seam in KeystoreWrapper that throws IllegalBlockSizeException and BadPaddingException whose cause is android.security.KeyStoreException, and record in notes what AOSP AndroidKeyStoreCipherSpiBase.engineDoFinal actually throws for unknown keymaster errors (cite the source file and tag read). Regardless of that answer, KeystoreWrapper MUST classify only javax.crypto.AEADBadTagException as an authentication failure (EnvelopeAuthenticationException); every other exception from the Keystore cipher MUST map to KeystoreUnavailableException (transient)."
+  - id: P1-18-R2
+    text: "V-01: MUST make VaultBootstrapper.isTemporaryKeystoreFailure recognise android.security.KeyStoreException (and KeystoreUnavailableException) anywhere in the cause chain, so a transient unwrap failure at bootstrap yields a retryable Unavailable cause, not KEY_UNWRAP_FAILED."
+  - id: P1-18-R3
+    text: "V-01: MUST add a CORRUPT -> READY path: RecoveryRepository.verifyAll (Settings > Verify all items) also deep-checks CORRUPT rows and, when ArtefactAuthenticator.check returns Valid, restores READY through a compare-and-set transition (R13) inside the mutation queue; a Transient result leaves the row unchanged; a Corrupt result leaves it CORRUPT. The report counts restored rows (counts only, no ids)."
+  - id: P1-18-R4
+    text: "V-02: MUST make VaultBootstrapper return Unavailable with a new non-destructive cause DATABASE_MISSING when the wrapped key file exists, the database file is absent, and artefacts/ contains at least one entry; Room is not opened and RecoveryRepository never runs in that state. The unavailable screen copy explains that saved originals were kept and offers Retry and (secondary, ADR-0005) Reset vault. A fresh install (no key file, no database, empty artefacts) is unchanged."
+  - id: P1-18-R5
+    text: "V-03: MUST release the ImportSlot from ImportRepository.saveImport only when the row has left STAGED (READY committed) or the stage has been removed; on SaveResult.Failed that keeps the stage (transient authentication, unverifiable duplicate) the slot stays held by the same import so cleanAbandonedStages skips it and a second import gets Busy; the slot is released when the user cancels or the intake ViewModel is cleared (existing P1-15 paths)."
+  - id: P1-18-R6
+    text: "V-04: MUST restructure prepareImport so the bounded provider read (up to the 15 s deadline + 5 s grace) happens before any read lease or mutation is taken; the lease/mutation covers only the STAGED row insert, the stage write and the row update. MUST make MutationQueue.tryMutation return Busy immediately, without taking the writer gate, when readers are active, and make RecoveryRepository.cleanAbandonedStages check isPreparing before waiting (C0-R12 'skips')."
+  - id: P1-18-R7
+    text: "V-06: MUST add a golden envelope fixture built with EnvelopeAad.forSource(domain, <fixed UUID>) (both an artefact envelope and a wrapped DEK) with checked-in hex, alongside the existing forDomain fixture, so any change to the UUID encoding in the AAD fails a JVM test."
+  - id: P1-18-R8
+    text: "V-07: MUST make OcrRepository use ArtefactAuthenticator.check(): Corrupt -> SOURCE_CORRUPT (unchanged), Transient -> a retryable failure reason (reuse an existing transient reason if one fits, otherwise add an OcrFailureReason value without a schema change because the column is TEXT) whose copy says try again, never 'corrupt'."
+  - id: P1-18-R9
+    text: "V-08: MUST rethrow CancellationException before every generic catch in vault/src/main (at least ImportRepository.kt:361 and DeletionRepository.kt:82); a source-grep boundary test (alongside SourceEgressBoundaryTest's style) is NOT sufficient on its own: add behavioural tests that cancel at the resume point after the READY commit and assert the caller observes cancellation and the row is READY (not Failed for a saved item)."
+  - id: P1-18-R10
+    text: "V-09: MUST write database.key by temp file + fsync + atomic rename + directory fsync (the TessdataInstaller pattern); a leftover temp file is ignored and removed on the next bootstrap; a torn key file with no database and empty artefacts is treated as a fresh install (documented in the docs/decisions/0005-vault-reset.md addendum), never when a database or any artefact exists."
+  - id: P1-18-R11
+    text: "V-10: MUST make VaultResetRepository remove every entry under the vault directory, including names that are not UUIDs and the -journal file (TRUNCATE mode on low-RAM devices), so a stray file can never leave the reset marker set permanently; reset stays explicit and two-step confirmed (ADR-0005)."
+  - id: P1-18-R12
+    text: "V-11: MUST move the READY-invariant trigger DDL from OpenLifeDatabase onCreate into one shared function (e.g. ReadyInvariantTriggers.create(db)) called from onCreate and from every migration that touches `sources`, with a KDoc rule saying any future migration that rebuilds `sources` must call it; the SQLCipher migration test asserts the triggers exist by name and fire after migrating to the current @Database version."
+  - id: P1-18-R13
+    text: "VS-1: MUST replace full-row @Update of stale snapshots for state changes in SourceDao and OcrDao with compare-and-set statements (`UPDATE ... SET state=? WHERE id=? AND state=?` returning the affected row count); a zero count is a typed lost-race result that callers handle explicitly (no silent overwrite). Non-state field updates that legitimately rewrite a row stay, but each remaining @Update is listed with a reason in the DAO KDoc."
+  - id: P1-18-R14
+    text: "VS-1: MUST decode stored enums (SourceState, IntakeKind, Orientation, OcrRevisionState, OcrReviewState, OcrFailureReason, OcrCoordinateSystem) through a tolerant decoder instead of valueOf: an unknown value never crashes; an unknown SourceState is treated as not READY (not shown as content, never deleted by recovery, counted in RecoveryReport as unrecognised); unknown OCR enums make that revision unreadable in the UI with an explanation; the stored text is never rewritten."
+  - id: P1-18-R15
+    text: "V-12: MUST inject ArtefactFileOps into RecoveryRepository (constructor parameter, as the other repositories already do) and remove the hard-coded ArtefactFileOps.Default at RecoveryRepository.kt:233; the existing fault tests gain a recovery-path case."
+  - id: P1-18-R16
+    text: "V-16 (confirm first): MUST add an instrumented test that opens the vault database through the production SQLCipher factory and records the effective `PRAGMA journal_mode` and `PRAGMA synchronous` (and the sqlcipher-android version) in the test output and evidence. Only if synchronous is below FULL (2) while journal_mode is WAL, or below FULL in TRUNCATE/DELETE mode, MUST the factory set `PRAGMA synchronous=FULL` on every connection and the test then asserts FULL; if it is already FULL, the test stays as a regression guard and notes record 'refuted: already FULL'."
+  - id: P1-18-R17
+    text: "V-14 (small cleanup, sequenced after P2-06 merges): MUST delete Vault.SCHEMA_VERSION and the class-file-parsing VaultTest only after replacing them with a test that compares the @Database version with the highest exported schema JSON in vault/schemas and vault/src/androidTest/assets (identical copies). If P2-06 has not merged when this step reaches GREEN, leave V-14 for a follow-up and say so in notes; do not edit code PR #23 depends on."
+  - id: P1-18-R18
+    text: "MUST record every finding V-01..V-04, V-06..V-12, V-14, V-16, VS-1 in docs/verification/P1-18-vault-audit-remediation.md with its outcome (fixed / refuted / deferred with reason) and the test that proves it; nothing is marked fixed without a test run."
+
+design_decisions:
+  - "Authentication failure is exactly AEADBadTagException (and the envelope's own tag/digest checks); anything else from the Keystore is transient. A false transient costs a retry; a false CORRUPT costs the user's original."
+  - "DATABASE_MISSING is an Unavailable cause, not a recovery mode: the app refuses to guess and keeps every file."
+
+files_touched:
+  - vault/src/main/java/org/openlife/vault/crypto/KeystoreWrapper.kt
+  - vault/src/main/java/org/openlife/vault/storage/{VaultBootstrapper.kt,VaultKeyFile.kt,OpenLifeDatabase.kt,OpenLifeDatabaseFactory.kt,SourceDao.kt,OcrDao.kt,SourceMapper.kt,OcrMappers.kt}
+  - vault/src/main/java/org/openlife/vault/repository/{ArtefactAuthenticator.kt,ImportRepository.kt,ImportSlot.kt,MutationQueue.kt,RecoveryRepository.kt,DeletionRepository.kt,DuplicateVerifier.kt,SourceViewRepository.kt,OcrRepository.kt,VaultResetRepository.kt,RecoveryReport.kt}
+  - vault/src/main/java/org/openlife/vault/Vault.kt and vault/src/test/.../VaultTest.kt (R17 only)
+  - app/src/main/java/org/openlife/app/{OpenLifeApp.kt,VaultAccess.kt} and ui/VaultUnavailableScreen.kt (DATABASE_MISSING copy), app/src/main/res/values/strings.xml
+  - vault/src/test/java/org/openlife/vault/crypto/GoldenEnvelopeFixtureTest.kt
+  - vault/src/test/java/org/openlife/vault/repository/MutationQueueTest.kt
+  - vault/src/test/java/org/openlife/vault/storage/{VaultKeyFileTest.kt,EnumDecodingTest.kt}
+  - vault/src/androidTest/java/org/openlife/vault/{crypto/KeystoreWrapperTest.kt,storage/VaultBootstrapperTest.kt,storage/OcrDatabaseTest.kt,storage/DatabasePragmaTest.kt,repository/*Test.kt}
+  - docs/verification/P1-18-vault-audit-remediation.md
+
+tdd:
+  red:
+    - name: vault androidTest KeystoreWrapperTest.nonAeadCipherFailureIsTransientNotAuthentication
+      asserts: "Injected IllegalBlockSizeException(cause android.security.KeyStoreException) from doFinal -> KeystoreUnavailableException; AEADBadTagException -> EnvelopeAuthenticationException."
+    - name: vault androidTest SourceViewRepositoryTest.keystoreHiccupAtDoFinalLeavesRowReady
+    - name: vault androidTest VaultBootstrapperTest.androidKeyStoreExceptionAtUnwrapIsRetryable
+    - name: vault androidTest VerifyAllTest.corruptRowThatNowAuthenticatesIsRestoredToReady
+    - name: vault androidTest VerifyAllTest.corruptRowWithTransientCheckStaysCorruptAndUnchanged
+    - name: vault androidTest VaultBootstrapperTest.missingDatabaseWithKeyAndArtefactsIsDatabaseMissingAndDeletesNothing
+      asserts: "Every .blob file and database.key byte-identical before and after; RecoveryRepository not invoked."
+    - name: vault androidTest ImportRepositoryTest.failedSaveThatKeepsTheStageKeepsTheSlot
+    - name: vault androidTest RecoveryRepositoryTest.cleanAbandonedStagesSkipsAStageWhoseSaveFailedTransiently
+    - name: vault androidTest ImportRepositoryTest.slowProviderReadDoesNotBlockViewerReadsOrDeletion
+      asserts: "With a provider stalled 10 s, a concurrent loadReadyBytes and a delete complete within 1 s."
+    - name: vault test MutationQueueTest.tryMutationReturnsBusyImmediatelyWhenReadersAreActive
+    - name: vault test GoldenEnvelopeFixtureTest.forSourceAadArtefactAndWrappedDekMatchCheckedInBytes
+    - name: vault androidTest OcrRepositoryTest.transientAuthenticationFailureIsRetryableNotSourceCorrupt
+    - name: vault androidTest ImportRepositoryTest.cancellationAfterReadyCommitPropagatesAndRowIsReady
+    - name: vault androidTest DeletionRepositoryTest.cancellationIsNotSwallowedByGenericCatch
+    - name: vault test VaultKeyFileTest.keyFileIsWrittenViaTempAndRename
+    - name: vault androidTest VaultBootstrapperTest.tornKeyFileWithNoDatabaseAndNoArtefactsIsFreshInstall
+    - name: vault androidTest VaultResetRepositoryTest.strayNonUuidFileAndJournalDoNotBlockReset
+    - name: vault androidTest OcrDatabaseTest.readyInvariantTriggersExistAfterMigratingToCurrentVersion
+      asserts: "Mutation: drop the shared trigger call from the migration path -> test fails; revert (recorded in evidence)."
+    - name: vault androidTest SourceDaoTest.compareAndSetStateTransitionLosesRaceExplicitly
+      asserts: "Two writers from the same STAGED snapshot: exactly one affected row; the other gets a typed lost-race result; no field from the stale snapshot is written."
+    - name: vault test EnumDecodingTest.unknownStoredValuesDecodeToFallbackWithoutCrash
+    - name: vault androidTest RecoveryRepositoryTest.unknownSourceStateIsNeitherShownNorDeleted
+    - name: vault androidTest RecoveryRepositoryTest.injectedFileOpsFaultReachesRecovery
+    - name: vault androidTest DatabasePragmaTest.effectiveSynchronousAndJournalModeAreRecorded
+      asserts: "Prints journal_mode/synchronous; asserts synchronous == FULL (2). If it already passes on the unchanged tree, record 'V-16 refuted' with the observed values instead of a fix."
+  green:
+    - "Narrow the Keystore exception mapping; add DATABASE_MISSING; move slot release and the provider read; make tryMutation non-waiting; add the forSource golden; switch OCR to check(); rethrow cancellation; atomic key write; tolerant reset; shared trigger DDL; CAS DAO statements; tolerant enum decoder; inject file ops; set synchronous=FULL only if R16's test shows it is needed."
+  refactor:
+    - "One ExceptionClassifier for Keystore failures shared by KeystoreWrapper and VaultBootstrapper; remove the duplicated class-name checks."
+    - "Delete Vault.SCHEMA_VERSION/VaultTest only under R17's condition."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug"
+    - "./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "scripts/plan-check.sh"
+  evidence_required:
+    - "Commit hashes per TDD phase; JVM and connected counts; the AOSP exception answer for R1 with source reference; observed PRAGMA values for R16; recorded mutations for guard tests; CI API 29/36 run ids."
+
+acceptance_criteria:
+  - "No code path marks a row CORRUPT except an AEAD tag failure or a digest mismatch, and a CORRUPT row whose bytes authenticate is restored to READY by Verify all items."
+  - "A lost database with a surviving key file and artefacts deletes nothing and shows a DATABASE_MISSING explanation."
+  - "A slow provider read never blocks viewer reads, deletion, or the foreground cleanup pass; a save that keeps its stage keeps its slot."
+  - "Every state transition in SourceDao/OcrDao is compare-and-set; no stored enum value can crash decoding."
+  - "Every finding in scope has a recorded outcome in docs/verification/P1-18-vault-audit-remediation.md backed by a test run; V-16 is decided by observed pragma values."
+
+docs_to_update:
+  - docs/verification/P1-18-vault-audit-remediation.md (new)
+  - docs/verification/C0.md (C0-09, C0-11, C0-12 rows)
+  - docs/capabilities/C0.md (C0-R12 skip semantics, C0-R16 slot, DATABASE_MISSING under C0-R36/ADR-0005)
+  - docs/decisions/0005-vault-reset.md (addendum - DATABASE_MISSING, torn key file)
+  - docs/THREAT_MODEL.md (transient vs authentication failure; power-loss durability from R16)
+
+risks:
+  - "Narrowing the authentication mapping could hide a real tamper that surfaces as a non-AEAD exception; mitigated because the envelope also checks its own digest and framing, and R1 records what AOSP actually throws."
+  - "Moving the provider read outside the lease changes timing in ImportRepositoryTest and IntakeScreenFlowTest; keep awaits state-based."
+  - "CAS updates surface races that full-row writes silently hid; each lost-race branch needs an explicit, tested outcome."
+  - "Overlaps P2-06 (PR #23) in OcrDatabaseTest and migration helpers; rebase whichever lands second."
+rollback: "Per-requirement revert; no schema change, so every item reverts independently. Revert R16's pragma separately if it measurably regresses save latency (record the numbers)."
+
+notes: >
+  Added in plan 1.3.0 (2026-11-24). Source: docs/reviews/2026-11-24-vault-audit.md
+  (commit 190be81). Routed elsewhere: V-05 -> P2-05; V-13 -> P1-12;
+  V-15 -> P2-04; VS-2 -> P2-08, P3-02, P4-02; VS-3 -> P3-02, P3-04, P7-02.
+  V-14 is in scope (R17) but sequenced after P2-06 merges.

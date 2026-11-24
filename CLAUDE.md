@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Working procedure for **Claude Sonnet 5** sessions in this repository, plus
+Working procedure for **Claude** sessions in this repository, plus
 notes about *this sandbox*. Product and engineering rules live in `AGENTS.md`
 and `openlife-design-v0.3.md` — read those first; they govern on conflict.
 
@@ -48,10 +48,13 @@ Claude-specific reminders:
   recap: what ran, what passed, what did not, what remains unverified.
 - Use the dedicated Read/Edit/Grep tools for code; use Bash for Gradle,
   adb, and scripts.
-- Do not spawn subagents for a single step. Specification steps (P3-01,
-  P4-01, P5-02, P6-01, P7-01, P7-02, P7-03, P8-01, P8-02) require an
-  adversarial review in their acceptance criteria; spawn one reviewer then
-  and record its findings in the step's `notes`.
+- Owner instruction (2026-11-24): the coordinating session delegates steps
+  to subagents: Haiku for mechanical and documentation steps; Opus for
+  design, crypto, schema, UI architecture and reviews. At most one agent
+  uses Gradle or the emulator at a time on this 4-core host. Specification
+  steps (P3-01, P4-01, P5-02, P6-01, P7-01, P7-02, P7-03, P8-01, P8-02)
+  still require an adversarial review in their acceptance criteria; spawn
+  one reviewer then and record its findings in the step's `notes`.
 - Prefer state-based awaits over sleeps in tests; the shared
   `MutationQueue` and `OpenLifeApp` singleton are per-process, so every
   test that triggers fire-and-forget work must await its terminal state.

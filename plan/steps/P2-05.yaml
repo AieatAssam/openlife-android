@@ -6,6 +6,7 @@ depends_on: [P2-04]
 estimate: S
 owner: agent+owner
 owner_action: OA-2
+closes_findings: [F-54]
 
 summary: >
   Select the open-source engine as the only registered engine, remove the
@@ -22,12 +23,15 @@ requirements:
     text: "MUST keep existing OCR revisions readable: engineId 'mlkit-latin' rows remain valid history; the viewer labels them by engine id; no migration is required."
   - id: P2-05-R4
     text: "MUST record the new release APK size per ABI and the removed transitive dependency list in docs/verification/C1.md."
+  - id: P2-05-R5
+    text: "V-05 (docs/reviews/2026-11-24-vault-audit.md): MUST first move OcrUnsupportedScriptException (used by TesseractOcrEngine) out of MlKitOcrEngine.kt into ocr/OcrEngineExceptions.kt, then delete MlKitOcrEngine (whose rectangles are clamped to the downsampled bitmap instead of the source display size, wrong for images over 4 MP) rather than fixing it, remove its registration in app OpenLifeApp.kt, and correct docs/capabilities/C1.md where it still describes ML Kit coordinates."
 
 tdd:
   red:
     - name: DependencyBoundaryTest.noExceptionsRemainInTheDenylistAllowlist (fails while the ML Kit exception exists)
     - name: ManifestBoundaryTest passes with the tools:node=remove lines deleted
     - name: OcrRepositoryTest.legacyMlKitRevisionsRemainViewable (seed a row with engineId mlkit-latin)
+    - name: OcrEngineContractTest.onlyTesseractIsRegistered (V-05; fails while OpenLifeApp registers ML Kit)
   green:
     - "Remove the dependency and code."
   refactor:
