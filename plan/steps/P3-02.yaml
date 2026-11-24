@@ -23,6 +23,10 @@ requirements:
     text: "MUST extend DeletionRepository's transaction to remove facts (cascade handles rows; explicit DELETE keeps the contract independent of pragma defaults) and extend the FTS triggers if fact values are indexed (P3-07)."
   - id: P3-02-R5
     text: "MUST provide FactRepository: listFacts(sourceId): Flow<List<FactWithLatestRevision>>, addUserFact, review(revisionId, decision), markStaleForSpan(spanId), markStaleForRevision(ocrRevisionId), with all writes under withMutation and withContext(IO)."
+  - id: P3-02-R6
+    text: "VS-2 (docs/reviews/2026-11-24-vault-audit.md): MUST add an explicit dependency-edge table (dependent kind+id -> dependency kind+id, owning source id) and route deletion and stale marking through one traversal over it: ON DELETE CASCADE only for children a single source owns; RESTRICT on edges that cross sources, so deleting a source that another source's retained fact depends on invalidates (marks STALE) the dependent instead of cascading into it; FTS rows for facts are maintained by triggers (P2-08-R8 pattern) so deletion reaches them."
+  - id: P3-02-R7
+    text: "VS-3: MUST give corrections and revisions explicit references: a correction supersedes its predecessor through an explicit supersedesId link (not latest createdAt); an explicit current-revision pointer per source (and per fact) replaces 'several revisions may be ACCEPTED'; STALE is split into distinct reasons (process restart vs source/input deleted vs superseded); each OCR span persists hasEvidenceRegion and scriptStatus so accepting a revision does not implicitly accept ungrounded or out-of-script spans. All changes are additive per conventions.schema_migrations (new columns default to the current meaning; backfill in the migration)."
 
 files_touched:
   - vault/src/main/java/org/openlife/vault/facts/* (model)
@@ -39,6 +43,10 @@ tdd:
     - name: FactRepositoryTest.derivedRevisionWithCyclicInputsIsRejected
     - name: FactRepositoryTest.correctionOnSpanMarksDependentRevisionsStale
     - name: DeletionRepositoryTest.deletingASourceRemovesFactsEvidenceInputsAndReviewEvents
+    - name: DependencyEdgeTest.deletingASourceMarksCrossSourceDependentsStaleInsteadOfCascading (VS-2)
+    - name: DependencyEdgeTest.crossSourceEdgeIsRestrictedAtTheDatabase (VS-2)
+    - name: OcrRevisionPointerTest.exactlyOneCurrentRevisionPerSourceAndCorrectionsSupersedeExplicitly (VS-3)
+    - name: OcrSpanStatusTest.acceptingARevisionDoesNotAcceptUngroundedOrOutOfScriptSpans (VS-3)
   green: ["Implement."]
   refactor: ["Shared cascade contract doc comment listing dependent tables per source."]
 
@@ -50,3 +58,9 @@ acceptance_criteria:
 docs_to_update: [docs/capabilities/C2.md]
 risks: []
 rollback: "Migration is additive; tables unused."
+notes: >
+  Plan 1.3.0 (2026-11-24): R6 (VS-2) and R7 (VS-3) added from
+  docs/reviews/2026-11-24-vault-audit.md. P3-01's specification must define
+  the edge kinds and STALE reasons before this step implements them. P1-18's
+  compare-and-set transitions and tolerant enum decoding (VS-1) are the
+  pattern for every new state column.

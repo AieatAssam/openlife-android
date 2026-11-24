@@ -37,6 +37,10 @@ requirements:
     text: "MUST keep deletion propagation: deleting a source removes its FTS rows (external-content triggers on delete); a test asserts no hits remain."
   - id: P2-08-R7
     text: "MUST NOT log queries; the search field is cleared on onStop (C0-R32 spirit)."
+  - id: P2-08-R8
+    text: "VS-2 (docs/reviews/2026-11-24-vault-audit.md): MUST maintain every FTS table only through triggers on its content tables (insert, update, delete), so rows removed by ON DELETE CASCADE from a source deletion, a reset, or a later supersession also leave the index; no repository code writes FTS rows directly, and DeletionRepository needs no FTS-specific statement. A test deletes a source through the cascade only and asserts zero FTS rows and zero hits remain."
+  - id: P2-08-R9
+    text: "A-02 (docs/reviews/2026-11-24-app-audit.md): MUST build the search field on P1-19's ContentTextField wrapper (no Copy/Cut, no autocorrect, no personalised learning) so the boundary test from P1-19-R6 passes without a new exemption."
 
 files_touched:
   - vault storage migration (FTS tables + triggers), SearchDao (raw @Query with MATCH), SearchRepository
@@ -50,6 +54,7 @@ tdd:
     - name: SearchRepositoryTest.findsSpanTextAndCorrectionsRankedAndLinked
     - name: SearchRepositoryTest.excludesRejectedStaleAndNonReadySources
     - name: SearchRepositoryTest.deletingASourceRemovesItsHits
+    - name: SearchRepositoryTest.cascadeOnlyDeletionLeavesNoFtsRows (VS-2)
     - name: SearchRepositoryTest.queryIsSanitisedAgainstFts5Syntax (input `"` `*` `NEAR(` `OR` cannot error or widen)
     - name: SearchScreenTest.resultOpensViewerWithSpanSelectedAndFieldClearsOnStop
   green:
@@ -71,3 +76,8 @@ docs_to_update:
 risks:
   - "Room schema export and virtual tables: verify `exportSchema` output remains stable; if Room complains, create FTS tables in a Callback.onOpen with IF NOT EXISTS instead of the migration (documented)."
 rollback: "Drop FTS tables in a later migration; route removed."
+
+notes: >
+  Plan 1.3.0 (2026-11-24): R8 (VS-2) and R9 (A-02) added from the
+  2026-11-24 audits. The search route itself should be added on the P1-20
+  navigation if P1-20 has landed; otherwise P1-20 migrates it.

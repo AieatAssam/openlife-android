@@ -1,0 +1,181 @@
+id: P1-19
+title: "App audit remediation (security, lifecycle, brand, accessibility)"
+phase: P1
+status: todo
+depends_on: [P0-09, P1-02, P1-13, P1-16, P1-17, P2-01]
+estimate: L
+owner: agent
+closes_findings: [F-56, F-57, F-58, F-59, F-61, F-62, F-63]
+
+summary: >
+  Fix the app-module defects found by the 2026-11-24 audit of commit 190be81
+  (docs/reviews/2026-11-24-app-audit.md) that do not need the navigation
+  rebuild: bound the app-lock exemption for external activities, keep
+  extracted text away from the clipboard and keyboard learning, make Save
+  survive leaving the intake screen, bring every Material colour role,
+  button and type role onto the visual identity brief, fix the accessibility
+  defects, and settle each "suspected" finding with a test that confirms or
+  refutes it before anything is changed. A-05 and A-09 (and AS-1..AS-6) are
+  P1-20.
+
+rationale: >
+  A-01 and A-02 are High: an unlocked library can be shown hours after a
+  Photo Picker trip, and OCR text can be copied to the system clipboard
+  from the correction field, contradicting design §3 and ADR-0004. A-03
+  leaves the outcome of Save unknown when the user leaves immediately. A-04
+  gives every dialog a Material You look the brief forbids. The suspected
+  findings depend on platform timing that nobody ran; the plan rule is that
+  "gap" and "refuted" are honest outcomes and "assumed" is not.
+
+ethos_check:
+  - "No clipboard egress of content (ethos non-negotiable): A-02 removes Copy/Cut from every content-bearing text field and makes the boundary test catch new ones."
+  - "The lock is an access gate (ADR-0004): A-01/A-07 make its exemption bounded and self-healing, and the threat model states the bound."
+  - "Visual identity is fixed (ADR-0006, VISUAL_IDENTITY.md): A-04 removes the baseline Material lavender greys, pill buttons, Roboto fallbacks and Fraunces-in-dialogs."
+
+constraints:
+  - "Suspected findings (A-06, A-07, A-10, A-11, A-12, A-13, A-16 and the StampBadge part of A-08): the first requirement for each is a test that confirms or refutes it on the current tree. A refuted finding is recorded as refuted (test name, device/API, observed behaviour) in notes and docs/verification/P1-19-app-audit-remediation.md; it is not 'fixed', and no production change is made for it beyond keeping the test as a guard."
+  - "P1-07 (app lock) is in review, not done, so it is not a dependency; but R1-R4 change its code and rewrite AppLockStateTest's 'unbounded exemption' case. The P1-07 reviewer must see this step's lock diff; record the overlap in P1-07's notes when this step starts."
+  - "Do not restructure navigation or ViewModel scoping here beyond what a finding needs; that is P1-20. A-10 and A-11 get the smallest local fix; P1-20 replaces the surrounding code."
+  - "A-03 interacts with P1-18-R5 (slot kept on a failed save): whichever lands second re-runs IntakeScreenFlowTest and ImportRepositoryTest."
+  - "Open PR #23 (P2-06) rewrites OcrPanel.kt, ViewerScreen.kt and adds ui/evidence/ZoomableEvidenceImage.kt. The viewer-file requirements here (R5 correction field, R9 span-text size, R11 row actions, R13 viewer bitmap holder) should land after P2-06 merges; if this step starts first, do the non-viewer requirements first and rebase the viewer ones onto the merged P2-06 code rather than editing the pre-PR files."
+
+requirements:
+  - id: P1-19-R1
+    text: "A-01: MUST record backgroundedAt during external-activity trips too; on return from an external trip the lock engages if time away >= max(configured timeout, EXTERNAL_GRACE = 60 s) (elapsedRealtime). AppLockStateTest's case that writes down the unbounded exemption (AppLockStateTest.kt:66) is replaced by the bounded rule. THREAT_MODEL.md and docs/decisions/0004-app-lock.md state the bound."
+  - id: P1-19-R2
+    text: "A-07 (suspected, confirm first): MUST add an instrumented test that begins an external trip (beginExternalActivity), recreates MainActivity without delivering the picker result, backgrounds past the timeout, and asserts whether the lock engages. If confirmed, MainActivity.onStart MUST clear a stale external flag when no picker request is pending (the PickerNonce already knows), in addition to R1's time bound."
+  - id: P1-19-R3
+    text: "A-18: MUST correct the AppLockState comment (AppLockState.kt:20-22) and the ADR/threat-model wording: with timeout 0 the lock engages when ProcessLifecycleOwner reports stop (about 700 ms after the last activity stops); activities scrub on their own onStop and FLAG_SECURE covers Recents. Comment/doc only."
+  - id: P1-19-R4
+    text: "A-12 (suspected, confirm first on API 29): MUST add an instrumented test, run on CI's API 29 leg, that sets a device PIN (adb shell locksettings set-pin, as in P1-07's manual run), starts IntakeActivity with a share while the lock is on, unlocks via the DEVICE_CREDENTIAL fallback driven with UiAutomator, and asserts the share reaches Preview. If the CI emulator cannot drive the credential activity, record a gap and add the check to the P1-11 physical-device runbook. Only if confirmed: drop noHistory from IntakeActivity and finish it explicitly on every terminal state (Saved, Cancelled, Failed, Busy, Open existing), keeping P1-01's abandoned-stage guarantees."
+  - id: P1-19-R5
+    text: "A-02: MUST provide one ContentTextField wrapper used by every text field that can hold user content (today the OCR correction field in ViewerScreen/OcrPanel; P2-08's search field later): LocalTextToolbar provides a toolbar without Copy/Cut (Paste/Select all may stay), KeyboardOptions(autoCorrectEnabled = false, keyboardType Text), and IME_FLAG_NO_PERSONALIZED_LEARNING set on the EditorInfo where Compose allows it (e.g. via InterceptPlatformTextInput / PlatformImeOptions); if the flag cannot be set on the pinned Compose version, record the gap in THREAT_MODEL.md. The reset-confirmation word field holds no content and is exempt by name."
+  - id: P1-19-R6
+    text: "A-02: MUST extend SourceEgressBoundaryTest (or a new boundary test) so any TextField/OutlinedTextField/BasicTextField call in app/src/main outside ContentTextField and the named exemption fails, proven RED by a recorded mutation (add a bare OutlinedTextField)."
+  - id: P1-19-R7
+    text: "A-03: MUST make Save survive the intake activity finishing: run ImportRepository.saveImport on ImportHousekeeping.appScope (or under NonCancellable for the commit section), treat Saving as decided in IntakeViewModel.onCleared (no cancelAbandonedImport while a save is in flight), and make the outcome observable on next open (the item is READY in the list, or the stage is gone and nothing claims success)."
+  - id: P1-19-R8
+    text: "A-04 colour roles: MUST set every Material 3 colour role in both light and dark OpenLifeColors from the palette, including surfaceContainerLowest/Low/(default)/High/Highest, surfaceBright, surfaceDim, inverseSurface, inverseOnSurface, inversePrimary, surfaceTint, scrim; a JVM test enumerates ColorScheme's properties by reflection and fails if any equals the Material baseline (lightColorScheme()/darkColorScheme()) value."
+  - id: P1-19-R9
+    text: "A-04 components and type: MUST give Button, OutlinedButton, TextButton and FilledTonalButton the brief's 8 dp shape (OpenLife wrappers or a ButtonDefaults shape applied at every call site, enforced by a test); set labelLarge, titleMedium, titleSmall to IBM Plex Sans; headlineLarge/headlineSmall to Plex Sans 600; Fraunces only for display roles (500, WONK where the font supports it) and never in dialogs; register the real weights used instead of synthesising SemiBold; Delete icons in the list and viewer use colorScheme.error; extracted OCR span text uses a body role at >= 16 sp."
+  - id: P1-19-R10
+    text: "A-04: MUST add a dialog golden (the delete confirmation AlertDialog, light and dark, profile-keyed like the existing brand goldens) to BrandScreenshotInstrumentedTest and its JVM per-profile golden check, regenerate local goldens, and dispatch generate-goldens for the CI profiles (or record the pending dispatch as P0-10 did)."
+  - id: P1-19-R11
+    text: "A-08: MUST make PerforationDivider decorative (no semantics: Modifier.clearAndSetSemantics {} or invisibleToUser), give every per-span action in the OCR panel ('Show region', 'Correct', and P2-06's 'Reject span' / 'Undo reject') a contentDescription that names the span (short preview, as P2-06-R3 does for regions), and raise the outline role to >= 3:1 against paper and carbon (new outline token; Rule stays for decorative dividers as outlineVariant) with VISUAL_IDENTITY.md amended to match its own AA rule."
+  - id: P1-19-R12
+    text: "A-08 (StampBadge part, suspected, confirm first): MUST add a semantics test that counts how many nodes announce a StampBadge label (merged tree, useUnmergedTree both ways); if the label is exposed twice, use clearAndSetSemantics with one contentDescription. The evidence-overlay focusability part of A-08 is covered by P2-06-R3 (regions as semantics nodes); verify it on the merged P2-06 code and record the result rather than duplicating the work; if P2-06 has not merged when this step reaches VERIFY, record the overlay check as deferred to P1-20/P1-10 (both depend on P2-06)."
+  - id: P1-19-R13
+    text: "A-06 (suspected, confirm first): MUST add an instrumented test that opens the viewer (and separately an intake preview), moves the activity to CREATED (stopped) with ActivityScenario, and while still stopped asserts whether the decoded Bitmap is recycled/unreferenced (test-only hook exposing the holder, or a WeakReference + GC check). If confirmed, decoded viewer and preview bitmaps MUST live in a holder cleared synchronously from onStop (as SensitiveContentCache is), not freed by recomposition; MultiWindowScrubTest gains the while-hidden assertion."
+  - id: P1-19-R14
+    text: "A-10 (suspected, confirm first): MUST add an instrumented test that deletes from the viewer while forcing the Room flow to emit before the delete callback (test dispatcher or a delayed callback seam) and asserts the List destination remains on the back stack. If confirmed, pop only when the current entry is still the Viewer (or popBackStack(Routes.List, inclusive = false))."
+  - id: P1-19-R15
+    text: "A-11 (suspected, confirm first): MUST add an instrumented test that rotates during Verify all items and during each reset confirmation stage and asserts whether the pass continues and the stage is kept. If confirmed, move ResetVaultFlow/AppLockSettings state and work into a SettingsViewModel (P1-20 later provides it from the app container)."
+  - id: P1-19-R16
+    text: "A-13 (suspected, confirm first): MUST add a test that resets the vault (or starts with Unavailable then Ready) and then deletes a source while OCR text is held, asserting whether OcrViewModel forgets it. If confirmed, forgetDeletedSources re-subscribes whenever VaultAccess changes."
+  - id: P1-19-R17
+    text: "A-14: MUST require a single-use per-process nonce (PickerNonce pattern) alongside EXTRA_OPEN_SOURCE_ID; MainActivity ignores the extra without a valid nonce; IntakeActivity's 'Open existing' supplies it. P1-20-R5 later moves this to a non-exported entry."
+  - id: P1-19-R18
+    text: "A-15: MUST correct the IntakeIntentValidator comment (IntakeIntentValidator.kt:32-39) and THREAT_MODEL.md so FLAG_GRANT_READ_URI_PERMISSION is described as caller-set and not a control; the stated defence is that OpenLife holds no media or storage permission. Doc/comment only; behaviour unchanged."
+  - id: P1-19-R19
+    text: "A-16 (suspected, confirm first): MUST add IntakeIntentValidatorTest cases for content://x@org.openlife.y/..., content://org.openlife.y:1/..., and mixed case, asserting how the own-authority check treats them today; if any bypasses it, compare the parsed host (and reject userinfo/port) instead of the authority prefix."
+  - id: P1-19-R20
+    text: "A-17: MUST localise the VaultFailureDiagnostics summary (string resources per cause, plurals for counts), replace joinToString(\", \") in ResetVaultFlow with a resource/ListFormatter-based join, compare IntakeKind by enum not by name, and move IntakeActivity.describeForTest and AppLockController.setForTest/resetForTest out of the shipping API (debug-only source set or internal + @VisibleForTesting behind a test-only module); extend NoHardcodedUiStringsTest to flag string templates passed to Text()."
+  - id: P1-19-R21
+    text: "MUST record every finding A-01..A-04, A-06..A-08, A-10..A-18 in docs/verification/P1-19-app-audit-remediation.md as fixed / refuted / gap, each with its test and run (device, API, commit)."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/lock/{AppLockState.kt,AppLockController.kt,BiometricPromptAuthenticator.kt}
+  - app/src/main/java/org/openlife/app/MainActivity.kt
+  - app/src/main/java/org/openlife/app/intake/{IntakeActivity.kt,IntakeIntentValidator.kt,PickerNonce.kt,OpenExistingIntent.kt}
+  - app/src/main/java/org/openlife/app/ui/{ViewerScreen.kt,OcrPanel.kt,ViewerImage.kt,IntakeScreen.kt,IntakeViewModel.kt,OcrViewModel.kt,ContentTextField.kt}
+  - app/src/main/java/org/openlife/app/ui/theme/{OpenLifeColors.kt,Type.kt,Shapes.kt}
+  - app/src/main/java/org/openlife/app/ui/brand/BrandComponents.kt
+  - app/src/main/java/org/openlife/app/settings/{ResetVaultFlow.kt,AppLockSettings.kt,SettingsViewModel.kt}
+  - app/src/main/java/org/openlife/app/navigation/OpenLifeNavHost.kt (A-10 only)
+  - app/src/main/java/org/openlife/app/OpenLifeApp.kt (VaultFailureDiagnostics)
+  - app/src/main/AndroidManifest.xml (only if A-12 is confirmed)
+  - app/src/main/res/values/strings.xml, app/src/main/res/font/
+  - app/src/test/java/org/openlife/app/{lock/AppLockStateTest.kt,boundary/SourceEgressBoundaryTest.kt,intake/IntakeIntentValidatorTest.kt,ui/NoHardcodedUiStringsTest.kt,ui/brand/*}
+  - app/src/androidTest/java/org/openlife/app/{lock/AppLockFlowTest.kt,ui/*,ui/brand/BrandScreenshotInstrumentedTest.kt}
+  - app/src/androidTest/assets or the golden directory used by P0-09/P0-10
+  - docs/verification/P1-19-app-audit-remediation.md
+
+tdd:
+  red:
+    - name: app test AppLockStateTest.externalTripLongerThanGraceLocksOnReturn
+    - name: app androidTest AppLockFlowTest.droppedPickerResultDoesNotLeaveTheLockDisabled
+      asserts: "A-07 confirm/refute: recreate without a result, background past timeout, foreground -> lock screen shown."
+    - name: app androidTest AppLockFlowTest.deviceCredentialUnlockOnApi29KeepsThePendingShare
+      asserts: "A-12 confirm/refute; runs on CI API 29 (assume-skip elsewhere with the reason in the output)."
+    - name: app androidTest ContentTextFieldTest.correctionFieldOffersNoCopyOrCut
+      asserts: "Long-press selection toolbar has no Copy/Cut item; clipboard unchanged (read via test-only ClipboardManager in the test process only)."
+    - name: app androidTest ContentTextFieldTest.correctionFieldDisablesAutocorrectAndPersonalisedLearning
+      asserts: "EditorInfo captured via the test IME hook has IME_FLAG_NO_PERSONALIZED_LEARNING (or the recorded gap)."
+    - name: app test SourceEgressBoundaryTest.everyContentTextFieldUsesTheSafeWrapper
+      asserts: "Mutation: a bare OutlinedTextField in ViewerScreen fails the test; revert."
+    - name: app androidTest IntakeScreenFlowTest.saveThenHomeEndsReadyOrCleanlyCancelledNeverUnknown
+      asserts: "Tap Save, immediately stop the activity (noHistory finishes it); after settling, the source is READY and listed, or no stage/row remains; never a READY-less claim of success."
+    - name: app test ColorSchemeCompletenessTest.noRoleFallsBackToMaterialBaseline
+    - name: app test TypographyBriefTest.buttonsTitlesAndHeadlinesUsePlexAndFrauncesOnlyForDisplay
+    - name: app androidTest ButtonShapeTest.buttonsUseTheEightDpShape
+    - name: app androidTest BrandScreenshotInstrumentedTest.deleteDialogMatchesGolden (light and dark)
+    - name: app androidTest AccessibilitySemanticsTest.perforationDividerIsNotAnnounced
+    - name: app androidTest AccessibilitySemanticsTest.ocrRowActionsNameTheirSpan
+    - name: app test PaletteContrastTest.outlineRoleMeetsThreeToOneOnPaperAndCarbon
+    - name: app androidTest AccessibilitySemanticsTest.stampBadgeLabelIsAnnouncedOnce
+      asserts: "A-08 StampBadge confirm/refute."
+    - name: app androidTest MultiWindowScrubTest.decodedBitmapsAreReleasedWhileHidden
+      asserts: "A-06 confirm/refute: checked while the activity is still stopped, before ON_START."
+    - name: app androidTest NavigationBackTest.deleteFromViewerKeepsListOnTheBackStack
+      asserts: "A-10 confirm/refute with the flow-emits-first ordering forced."
+    - name: app androidTest SettingsRotationTest.verifyAllAndResetStageSurviveRotation
+      asserts: "A-11 confirm/refute."
+    - name: app androidTest OcrPersistenceFlowTest.ocrTextIsForgottenForSourcesDeletedAfterVaultReset
+      asserts: "A-13 confirm/refute."
+    - name: app test OpenExistingIntentTest.openSourceExtraWithoutValidNonceIsIgnored
+    - name: app test IntakeIntentValidatorTest.ownAuthorityCheckCannotBeBypassedWithUserinfoOrPort
+      asserts: "A-16 confirm/refute."
+    - name: app test NoHardcodedUiStringsTest.stringTemplatesInTextCallsAreFlagged
+    - name: "A-15 and A-18 are comment/doc corrections: reviewer reads the diff against the review file; no test."
+  green:
+    - "Bounded lock exemption and stale-flag clearing; ContentTextField; Save on appScope; full colour scheme, button shape, type roles, outline token; semantics fixes; nonce on the open-source extra; localisation and test-seam moves. For each suspected finding, change production code only if its RED test confirmed it."
+  refactor:
+    - "Remove duplicated Button shape arguments in favour of the wrappers; drop the now-unused Rule-as-outline mapping; update stale comments (A-15, A-18)."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug"
+    - "./gradlew :app:connectedDebugAndroidTest"
+    - "bash scripts/ci/generate-goldens.sh (local profile) and the CI generate-goldens workflow dispatch"
+    - "bash scripts/release-smoke.sh app/build/outputs/apk/release/*.apk"
+    - "CI API 29 and API 36 legs (A-12 needs API 29)"
+  evidence_required:
+    - "Per finding: confirmed / refuted / gap with test name, device, API and commit; JVM and connected counts; golden PNG list; recorded mutations; CI run ids."
+
+acceptance_criteria:
+  - "After an external trip longer than max(timeout, 60 s) the app shows the lock; a dropped picker result cannot leave the lock disabled."
+  - "No content-bearing text field offers Copy or Cut, and the boundary test fails on a new unwrapped field."
+  - "Save followed by Home never leaves an unknown outcome."
+  - "No Material colour role equals the baseline scheme; buttons are 8 dp; no Roboto or synthesised weights in buttons, titles or headlines; dialog golden committed."
+  - "Every suspected finding has a recorded confirm/refute test result; refuted findings are labelled refuted, not fixed."
+
+docs_to_update:
+  - docs/verification/P1-19-app-audit-remediation.md (new)
+  - docs/THREAT_MODEL.md (lock exemption bound, zero-timeout wording, grant flag not a control, clipboard/IME controls)
+  - docs/decisions/0004-app-lock.md (external-trip bound)
+  - docs/design/VISUAL_IDENTITY.md (outline token at 3:1; dialogs use Plex)
+  - docs/capabilities/C0.md (C0-R32 clipboard/IME wording, C0-R33 accessibility evidence)
+  - docs/verification/C0.md (C0-04, C0-15 rows)
+  - docs/PRIVACY_POLICY.md if the lock wording changes
+
+risks:
+  - "Changing colour roles and type roles changes every golden; regenerate local and CI-profile goldens in this step, not later."
+  - "Compose may not expose IME_FLAG_NO_PERSONALIZED_LEARNING on the pinned BOM; R5 allows a recorded gap rather than a hack."
+  - "Overlaps P1-07 (in review) on lock code and P1-18 on the save path; see constraints."
+rollback: "Per-requirement revert. Brand token changes revert together with their goldens."
+
+notes: >
+  Added in plan 1.3.0 (2026-11-24). Source: docs/reviews/2026-11-24-app-audit.md
+  (commit 190be81). A-05, A-09 and AS-1..AS-6 belong to P1-20. The dialog
+  golden is added here (R10) because it is the RED proof for A-04; P1-20
+  keeps it green across the navigation rebuild.

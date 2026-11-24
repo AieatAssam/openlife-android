@@ -15,6 +15,8 @@ requirements:
     text: "MUST implement staleness propagation in FactRepository hooks: when a fact revision goes STALE or is superseded, dependent event revisions become STALE and their reminders SUSPENDED (persisted; the scheduler in P4-04 observes and cancels alarms)."
   - id: P4-02-R4
     text: "MUST extend DeletionRepository and VaultResetRepository to remove records/reminders explicitly in the same transaction and to invoke a `ReminderCanceller` seam (implemented in P4-04)."
+  - id: P4-02-R5
+    text: "VS-2 (docs/reviews/2026-11-24-vault-audit.md): MUST register every record, revision and reminder dependency in P3-02-R6's dependency-edge table: an event that depends on facts from more than one source uses RESTRICT edges, so deleting one source invalidates the event (STALE, reminder SUSPENDED) instead of cascading it away while another source is retained; record titles in FTS are maintained by triggers only."
 files_touched: [vault/src/main/java/org/openlife/vault/records/*, storage entities, migration, repositories, tests]
 tdd:
   red:
@@ -22,6 +24,7 @@ tdd:
     - name: RecordDatabaseTest.confirmedEventRequiresConfirmedOrUserDateFact
     - name: EventRepositoryTest.staleFactMarksEventStaleAndSuspendsReminder
     - name: DeletionRepositoryTest.deletingSourceRemovesRecordsRemindersAndCallsCanceller
+    - name: EventRepositoryTest.deletingOneOfTwoSourcesInvalidatesTheEventInsteadOfDeletingIt (VS-2)
   green: ["Implement."]
   refactor: []
 verification: {commands: ["./gradlew :vault:test && ./gradlew :vault:connectedDebugAndroidTest"], evidence_required: ["Tests"]}

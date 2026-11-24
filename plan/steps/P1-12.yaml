@@ -2,7 +2,7 @@ id: P1-12
 title: C0 acceptance refresh and v0.1.0
 phase: P1
 status: todo
-depends_on: [P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08, P1-09, P1-10, P1-11, P1-13, P1-14, P1-15, P1-16, P1-17, P0-06, P0-08, P0-10]
+depends_on: [P1-01, P1-02, P1-03, P1-04, P1-05, P1-06, P1-07, P1-08, P1-09, P1-10, P1-11, P1-13, P1-14, P1-15, P1-16, P1-17, P1-18, P1-19, P1-20, P0-06, P0-08, P0-10]
 estimate: M
 owner: agent+owner
 
@@ -16,7 +16,7 @@ requirements:
   - id: P1-12-R1
     text: "MUST re-run every C0-01..C0-17 row and record command, result, commit, and device/CI URL; no row may cite evidence older than this step's commit range except physical-device rows awaiting OA-3, which stay 'gap (owner action OA-3)'; evidence must be newer than baseline commit 6df9151 (the last handoff cites 0519e86)."
   - id: P1-12-R2
-    text: "MUST write docs/reviews/C0-security-self-review-v2.md re-deriving every threat-matrix row against the hardened code, listing every review finding F-01..F-49 whose closing step is in P0/P1 with its closure evidence, and the P2-owned findings as open known limitations."
+    text: "MUST write docs/reviews/C0-security-self-review-v2.md re-deriving every threat-matrix row against the hardened code, listing every review finding in plan.yaml review_findings_index (F-01 onward, including the plan 1.3.0 audit findings) whose closing step is in P0/P1 with its closure evidence, and the P2-owned findings as open known limitations."
   - id: P1-12-R3
     text: "MUST update docs/capabilities/C0.md with C0-R34 (orientation), C0-R35 (storage unavailable), C0-R36 (reset), C0-R37 (app lock), and re-map evidence."
   - id: P1-12-R4
@@ -25,6 +25,8 @@ requirements:
     text: "MUST NOT mark C0 accepted for public distribution if OA-1 (signing) is incomplete; v0.1.0 may still be tagged as an unsigned pre-release with that stated. v0.1.0 is a tester pre-release in any case (ML Kit still present); CHANGELOG states this."
   - id: P1-12-R6
     text: "MUST add ReleasedSchemaUpgradeTest (SQLCipher factory) that opens a database fixture created at the v0.1.0 schema and upgrades through all migrations to the current version, asserting row counts and that the READY-invariant triggers survive; every later acceptance step (P2-09, P3-08, P4-08, P6-06, P7-06, P8-05) adds its release's fixture to this test."
+  - id: P1-12-R7
+    text: "V-13 (docs/reviews/2026-11-24-vault-audit.md): MUST add real process-kill checkpoint tests for C0-09: a debug-only, test-armed hook that calls Process.killProcess(Process.myPid()) at named persistence checkpoints (after stage write, after STAGED insert, after rename before READY update, after READY commit, during deletion before/after the blob removal, during reset), driven by an instrumented orchestrator (UiAutomator/am instrument from a separate test APK process or adb from the CI script) that relaunches the app and asserts recovery outcome per checkpoint (no orphan, no lost READY item, no CORRUPT without tamper). The hook is absent from release builds (boundary test). docs/runbooks/kill-during-deletion.md is updated to point at the automated test and keeps the manual kill -9 procedure for physical devices. The C0-09 row cites this test instead of in-process fault injection."
 
 verification:
   commands:
@@ -45,5 +47,13 @@ rollback: "Untag."
 tdd:
   red:
     - name: ReleasedSchemaUpgradeTest.v0_1_0FixtureUpgradesToCurrentWithRowsAndTriggersIntact
+    - name: ProcessKillCheckpointTest.everyNamedCheckpointRecoversAfterRelaunch (V-13)
+    - name: ManifestBoundaryTest.killCheckpointHookIsAbsentFromRelease (V-13)
   green: ["Commit the fixture and the test."]
   refactor: []
+
+notes: >
+  Plan 1.3.0 (2026-11-24): depends on P1-18, P1-19 and P1-20 (audit
+  remediation); through P1-20 it now also waits for P2-06. R7 added from
+  V-13 because this step re-runs C0-09 and the kill hook runs on the CI
+  emulator without hardware; P1-11 keeps the physical-device runbooks.
