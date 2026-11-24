@@ -95,13 +95,6 @@ class ImportRepository(
             // stage, including the caller going away mid-import (P1-01).
             stagedId?.let { id -> withContext(NonCancellable) { mutationQueue.withReadLease { cancelStage(id) } } }
             throw cancelled
-        } catch (_: OutOfMemoryError) {
-            // CI run 45405099804: a large original can exhaust a small heap
-            // while it is read or encrypted. That is an import failure, not a
-            // crash, and leaves no stage behind.
-            stagedId?.let { id -> withContext(NonCancellable) { mutationQueue.withReadLease { cancelStage(id) } } }
-            result = PrepareResult.Failed
-            return result
         } finally {
             if (result !is PrepareResult.Prepared) importSlot.preparationEnded()
         }
@@ -127,6 +120,12 @@ class ImportRepository(
         val read = try {
             BoundedStreamReader.read(inputStream, deadline)
         } catch (_: IOException) {
+            return PrepareResult.Failed
+        } catch (_: OutOfMemoryError) {
+            // CI run 45405099804: a large original can exhaust a small heap
+            // while it is read; an import failure, not a crash. Nothing is
+            // staged yet (review R-07: the catch covers only this read and
+            // the stage encryption).
             return PrepareResult.Failed
         }
         try {
@@ -232,6 +231,11 @@ class ImportRepository(
     } catch (error: ErrnoException) {
         cancelStage(request.sourceId)
         prepareFailureFor(error)
+    } catch (_: OutOfMemoryError) {
+        // The envelope copy of a large original can exhaust a small heap
+        // (CI run 45405099804); the STAGED row is removed with any file.
+        cancelStage(request.sourceId)
+        PrepareResult.Failed
     }
 
     private suspend fun insertStagedSource(source: Source): PrepareResult? = try {
@@ -295,9 +299,11 @@ class ImportRepository(
      * cleanup again (design §11: failed cleanup is recoverable state).
      */
     private suspend fun cancelStage(sourceId: UUID): Boolean {
+        val row = sourceDao.findById(sourceId.toString())
+        // Never removes the files or row of anything but a STAGED import (review R-06).
+        if (row != null && row.state != SourceState.STAGED.name) return false
         if (!fileOps.deleteArtefacts(paths, sourceId)) return false
-        sourceDao.deleteById(sourceId.toString())
-        return true
+        return row == null || sourceDao.deleteStaged(sourceId.toString()) == 1
     }
 
     /**
@@ -336,8 +342,8 @@ class ImportRepository(
                 // no second import starts. Read under the same mutation.
                 keepSlot = keepsSlotAfterSave(
                     result,
-                    rowStillStaged = sourceDao.findById(sourceId.toString())?.state == SourceState.STAGED.name,
-                    stageExists = paths.stageFile(sourceId).exists(),
+                    rowStillStaged = { sourceDao.rowStillStaged(sourceId) },
+                    stageExists = { paths.stageFile(sourceId).exists() },
                 )
                 result
             }
@@ -392,8 +398,17 @@ private fun KeystoreWrapper.wrapSourceKeyOrNull(dek: ByteArray, sourceId: UUID) 
     null
 }
 
+/** Only read for a failed save (review R-06); if the row cannot be read, keep the slot. */
+private suspend fun SourceDao.rowStillStaged(sourceId: UUID): Boolean = try {
+    findById(sourceId.toString())?.state == SourceState.STAGED.name
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    true
+}
+
 /** The final STAGED -> READY commit of a save; the rename already happened. */
-private suspend fun SourceDao.commitReady(sourceId: UUID): SaveResult = try {
+internal suspend fun SourceDao.commitReady(sourceId: UUID): SaveResult = try {
     // Compare-and-set (P1-18-R13). Losing it cannot happen under the
     // mutation; if it did, the row was not saved by this call.
     when (compareAndSetState(sourceId.toString(), SourceState.STAGED, SourceState.READY)) {

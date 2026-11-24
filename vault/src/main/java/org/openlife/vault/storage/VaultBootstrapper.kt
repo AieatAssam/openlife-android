@@ -85,11 +85,12 @@ object VaultBootstrapper {
             // rename, so it was never the key (P1-18-R10).
             VaultKeyFile.removeLeftoverTemp(paths.databaseKeyFile)
             val plan = planBootstrap(
-                keyFileExists = paths.databaseKeyFile.exists(),
                 readKey = { readKey(paths) },
                 databaseExists = paths.databaseFile.exists(),
                 // Unlistable counts as "not provably empty".
                 hasArtefacts = paths.artefactsDir.list()?.isNotEmpty() ?: true,
+                // SQLCipher opens a 0-byte file as a new, empty database (review R-08).
+                databaseEmpty = paths.databaseFile.exists() && paths.databaseFile.length() == 0L,
             )
             when (plan) {
                 is BootstrapPlan.Stop -> VaultBootstrapResult.Unavailable(plan.cause)
@@ -128,13 +129,16 @@ object VaultBootstrapper {
         VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED)
     }
 
-    private fun unwrapFailure(exception: Exception): VaultBootstrapResult = VaultBootstrapResult.Unavailable(
+    private fun unwrapFailure(exception: Exception): VaultBootstrapResult =
+        VaultBootstrapResult.Unavailable(unwrapFailureCause(exception))
+
+    /** Why unwrapping `database.key` failed; JVM-testable (P1-18 review R-01). */
+    internal fun unwrapFailureCause(exception: Exception): VaultUnavailableCause =
         if (KeystoreFailures.isTemporary(exception)) {
             VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
         } else {
             VaultUnavailableCause.KEY_UNWRAP_FAILED
-        },
-    )
+        }
 
     private fun createFresh(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         val secret = ByteArray(DATABASE_SECRET_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
@@ -189,21 +193,24 @@ internal sealed interface BootstrapPlan {
  * Decides bootstrap from disk state alone. [readKey] is only called when
  * the key's contents matter.
  *
- * - A key file and saved originals with no database is DATABASE_MISSING,
- *   decided before the key is read: opening an empty database there would
- *   let recovery delete every blob as an orphan (P1-18-R4, design §11).
+ * - Saved originals with no database, or a 0-byte one, are DATABASE_MISSING
+ *   with or without a key file, decided before the key is read: opening an
+ *   empty database there would let recovery delete every blob as an orphan
+ *   (P1-18-R4, review R-05/R-08, design §11).
  * - A malformed key with no database and no artefacts has nothing at stake:
  *   it can only be a first-run write torn by an older build, so it is a
  *   fresh install (P1-18-R10, ADR-0005 addendum). With a database or any
  *   artefact it stays KEY_FILE_CORRUPT.
  */
 internal fun planBootstrap(
-    keyFileExists: Boolean,
     readKey: () -> KeyRead,
     databaseExists: Boolean,
     hasArtefacts: Boolean,
+    databaseEmpty: Boolean = false,
 ): BootstrapPlan {
-    if (keyFileExists && !databaseExists && hasArtefacts) {
+    // Saved originals with no usable database are never a fresh install,
+    // whatever the key file says (P1-18-R4; review R-05, R-08).
+    if ((!databaseExists || databaseEmpty) && hasArtefacts) {
         return BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_MISSING)
     }
     return when (val key = readKey()) {

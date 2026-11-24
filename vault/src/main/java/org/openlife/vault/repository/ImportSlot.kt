@@ -52,5 +52,13 @@ class ImportSlot {
  * retry. Only a failure that left the row STAGED with its stage file on disk
  * keeps it; every other outcome has decided the import.
  */
-internal fun keepsSlotAfterSave(result: SaveResult, rowStillStaged: Boolean, stageExists: Boolean): Boolean =
-    (result == SaveResult.Failed || result == SaveResult.StorageUnavailable) && rowStillStaged && stageExists
+internal suspend fun keepsSlotAfterSave(
+    result: SaveResult,
+    rowStillStaged: suspend () -> Boolean,
+    stageExists: suspend () -> Boolean,
+): Boolean {
+    // Evaluated only for a failure, in this order, so a decided save never
+    // reads the row or the stage (review R-06).
+    if (result != SaveResult.Failed && result != SaveResult.StorageUnavailable) return false
+    return rowStillStaged() && stageExists()
+}

@@ -62,8 +62,13 @@ database, with no separate key file or backup by design.
 - **Reset scope.** Reset removes every entry under the vault directory
   (including non-UUID strays and `-journal`), keeping only the marker until
   last, so a stray file can no longer leave the marker set permanently.
-- Open question: no key, no database, but artefacts present still
-  bootstraps fresh, and recovery then removes the artefacts as orphans.
+- **Saved originals without a usable database** (review R-05, R-08). No
+  database file, or a 0-byte one, next to a non-empty `artefacts/` is
+  `DATABASE_MISSING` whether or not the key file exists; nothing is
+  deleted. As a second layer, recovery never removes unreferenced `.blob`
+  files when the database has zero Source rows; it reports them
+  (`keptBlobsWithoutRows`) and the app shows `DATABASE_MISSING` instead of
+  an empty vault. This resolves the earlier open question.
 
 ## Verification
 

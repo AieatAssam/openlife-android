@@ -109,14 +109,7 @@ class RecoveryRepository(
                 }
             }
 
-            // Orphan deletion is safe only after every row was reconciled. If a
-            // cleanup failed above, retain all unreferenced files for the next
-            // pass rather than risking deletion during a partial recovery.
-            val removedOrphans = if (allRowsReconciled) {
-                removeUnreferencedArtefactFiles(referencedIds)
-            } else {
-                0
-            }
+            val (removedOrphans, keptBlobsWithoutRows) = cleanOrphans(rows.size, allRowsReconciled, referencedIds)
 
             RecoveryReport(
                 cleanedStaged = cleanedStaged,
@@ -126,6 +119,7 @@ class RecoveryRepository(
                 removedOrphanFiles = removedOrphans,
                 markedStaleOcrRevisions = staleOcrRevisions,
                 unrecognisedRows = unrecognisedRows,
+                keptBlobsWithoutRows = keptBlobsWithoutRows,
             )
         }
     }
@@ -254,6 +248,21 @@ class RecoveryRepository(
     }
 
     private fun removeArtefactFiles(sourceId: UUID): Boolean = fileOps.deleteArtefacts(paths, sourceId)
+
+    /**
+     * Returns (removed orphan files, blobs kept because there are no rows).
+     * Orphan deletion is safe only after every row was reconciled; if a
+     * cleanup failed, all unreferenced files wait for the next pass. With zero
+     * rows and saved originals present nothing is removed and the kept blobs
+     * are reported, so the app refuses to show an empty vault (review R-08).
+     */
+    private fun cleanOrphans(rowCount: Int, allRowsReconciled: Boolean, referencedIds: Set<UUID>): Pair<Int, Int> {
+        val artefactNames = paths.artefactsDir.list()?.toList().orEmpty()
+        if (!OrphanPolicy.mayRemoveOrphans(rowCount, artefactNames)) {
+            return 0 to OrphanPolicy.blobCount(artefactNames)
+        }
+        return (if (allRowsReconciled) removeUnreferencedArtefactFiles(referencedIds) else 0) to 0
+    }
 
     /**
      * Deletes only `.stage`/`.blob` files whose UUID has no corresponding

@@ -13,7 +13,9 @@ internal object VaultDirectoryWipe {
         var allRemoved = true
         for (entry in entries) {
             if (entry == keep) continue
-            if (entry.isDirectory && !deleteAllExcept(entry, keep, fileOps)) allRemoved = false
+            // A symlink is removed as a link and never followed (review R-09).
+            val isLink = java.nio.file.Files.isSymbolicLink(entry.toPath())
+            if (!isLink && entry.isDirectory && !deleteAllExcept(entry, keep, fileOps)) allRemoved = false
             if (!fileOps.deleteIfExists(entry)) allRemoved = false
         }
         return allRemoved

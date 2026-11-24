@@ -21,6 +21,7 @@ import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
+import org.openlife.vault.repository.RecoveryReport
 import org.openlife.vault.repository.RecoveryRepository
 import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.repository.VaultResetRepository
@@ -99,6 +100,45 @@ class OpenLifeApp : Application() {
         return { synchronized(this) { preResetCallbacks -= callback } }
     }
 
+    /**
+     * Saved originals next to a database with no rows are never shown as an
+     * empty vault (P1-18 review R-08): the database is closed and the vault
+     * reports DATABASE_MISSING.
+     */
+    private fun accessAfterRecovery(
+        database: OpenLifeDatabase,
+        recoveryRepository: RecoveryRepository,
+        report: RecoveryReport,
+    ): VaultAccess = if (report.keptBlobsWithoutRows > 0) {
+        OpenLifeDatabaseFactory.close(database)
+        cachedDatabase = null
+        VaultAccess.Unavailable(VaultUnavailableCause.DATABASE_MISSING)
+    } else {
+        VaultAccess.Ready(
+            importRepository = ImportRepository(
+                paths = paths,
+                database = database,
+                keystoreWrapper = keystoreWrapper,
+                bitmapSampler = AndroidBitmapSampler(),
+                mutationQueue = mutationQueue,
+            ),
+            deletionRepository = DeletionRepository(paths, database, mutationQueue),
+            viewRepository = SourceViewRepository(paths, database, keystoreWrapper, mutationQueue),
+            ocrRepository = OcrRepository(
+                paths = paths,
+                database = database,
+                keystoreWrapper = keystoreWrapper,
+                engineRegistry = OcrEngineRegistry(
+                    ocrEngines(this@OpenLifeApp),
+                    SELECTED_OCR_ENGINE,
+                ),
+                mutationQueue = mutationQueue,
+            ),
+            lastRecovery = report,
+            recoveryRepository = recoveryRepository,
+        )
+    }
+
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (!SensitiveContentTrimPolicy.shouldClear(level)) return
@@ -126,26 +166,7 @@ class OpenLifeApp : Application() {
                         if (BuildConfig.DEBUG) {
                             android.util.Log.i("OpenLifeRecovery", report.toString())
                         }
-                        VaultAccess.Ready(
-                            importRepository = ImportRepository(
-                                paths = paths,
-                                database = database,
-                                keystoreWrapper = keystoreWrapper,
-                                bitmapSampler = AndroidBitmapSampler(),
-                                mutationQueue = mutationQueue,
-                            ),
-                            deletionRepository = DeletionRepository(paths, database, mutationQueue),
-                            viewRepository = SourceViewRepository(paths, database, keystoreWrapper, mutationQueue),
-                            ocrRepository = OcrRepository(
-                                paths = paths,
-                                database = database,
-                                keystoreWrapper = keystoreWrapper,
-                                engineRegistry = OcrEngineRegistry(ocrEngines(this@OpenLifeApp), SELECTED_OCR_ENGINE),
-                                mutationQueue = mutationQueue,
-                            ),
-                            lastRecovery = report,
-                            recoveryRepository = recoveryRepository,
-                        )
+                        accessAfterRecovery(database, recoveryRepository, report)
                     } catch (exception: IOException) {
                         cachedDatabase?.let(OpenLifeDatabaseFactory::close)
                         cachedDatabase = null
@@ -241,13 +262,6 @@ class OpenLifeApp : Application() {
         bootstrapOverrideForTest = override
     }
 
-    private fun classifyBootstrapFailure(exception: Exception): VaultUnavailableCause =
-        if (exception is IOException || exception is android.database.sqlite.SQLiteFullException) {
-            VaultUnavailableCause.STORAGE_IO_ERROR
-        } else {
-            VaultUnavailableCause.DATABASE_OPEN_FAILED
-        }
-
     companion object {
         private const val APP_LOCK_PREFERENCES = "app_lock"
 
@@ -255,6 +269,13 @@ class OpenLifeApp : Application() {
         private const val SELECTED_OCR_ENGINE = TesseractOcrEngine.ID
     }
 }
+
+private fun classifyBootstrapFailure(exception: Exception): VaultUnavailableCause =
+    if (exception is IOException || exception is android.database.sqlite.SQLiteFullException) {
+        VaultUnavailableCause.STORAGE_IO_ERROR
+    } else {
+        VaultUnavailableCause.DATABASE_OPEN_FAILED
+    }
 
 /** Both engines are registered; P2-05 removes ML Kit once P2-04's evaluation gate passes. */
 private fun ocrEngines(context: android.content.Context) = listOf(

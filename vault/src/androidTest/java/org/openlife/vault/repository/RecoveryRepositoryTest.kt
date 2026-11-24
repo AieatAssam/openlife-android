@@ -313,6 +313,26 @@ class RecoveryRepositoryTest {
         assertEquals(null, db.sourceDao().findById(id.toString()))
     }
 
+    /**
+     * Review R-08: a database with no Source rows next to saved originals
+     * (for example a 0-byte file SQLCipher opened as a new, empty database)
+     * is never evidence that the originals are orphans. Nothing is deleted
+     * and the report says why.
+     */
+    @Test
+    fun emptyDatabaseNextToSavedOriginalsDeletesNothingAndReportsIt(): Unit = runBlocking {
+        paths.ensureDirectoriesExist()
+        val first = paths.blobFile(UUID.randomUUID()).apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val second = paths.blobFile(UUID.randomUUID()).apply { writeBytes(byteArrayOf(4, 5)) }
+        assertEquals(0, db.sourceDao().count())
+
+        val report = recoveryRepository.recover()
+
+        assertEquals(0, report.removedOrphanFiles)
+        assertEquals(2, report.keptBlobsWithoutRows)
+        assertTrue(first.exists() && second.exists())
+    }
+
     @Test
     fun unreferencedArtefactFileIsRemovedOnlyAfterFullReconciliation(): Unit = runBlocking {
         paths.ensureDirectoriesExist()

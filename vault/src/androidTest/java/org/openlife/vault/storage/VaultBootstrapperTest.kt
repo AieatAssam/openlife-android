@@ -237,24 +237,80 @@ class VaultBootstrapperTest {
             VaultBootstrapper.bootstrap(paths, hiccup),
         )
 
-        val platformCause = KeystoreFaults.platformKeyStoreException
-        if (platformCause != null) {
-            val wrapped = object : KeystoreWrapper(alias) {
-                override fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID?): ByteArray =
-                    throw EnvelopeAuthenticationException(
-                        javax.crypto.IllegalBlockSizeException("synthetic").apply { initCause(platformCause) },
-                    )
-            }
-            assertEquals(
-                VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE),
-                VaultBootstrapper.bootstrap(paths, wrapped),
-            )
-        } else {
-            android.util.Log.w("P118VaultBootstrapperTest", "cause-chain case skipped: platform exception not constructible")
-        }
-
         // Once Keystore recovers the same key file opens the same vault.
         assertTrue(VaultBootstrapper.bootstrap(paths, KeystoreWrapper(alias)) is VaultBootstrapResult.Ready)
+    }
+
+    /**
+     * The platform `android.security.KeyStoreException` anywhere in the cause
+     * chain is a retryable Keystore failure. Needs a real instance of the
+     * hidden class; if this platform cannot build one the test is reported
+     * as skipped (Assume), never silently passed (review R-01).
+     */
+    @Test
+    fun platformKeyStoreExceptionInTheCauseChainIsRetryable() {
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+        val platformCause = KeystoreFaults.platformKeyStoreException
+        org.junit.Assume.assumeTrue(KeystoreFaults.describe(), platformCause != null)
+        val wrapped = object : KeystoreWrapper(alias) {
+            override fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID?): ByteArray =
+                throw org.openlife.vault.crypto.KeystoreUnavailableException(
+                    javax.crypto.IllegalBlockSizeException("synthetic").apply { initCause(platformCause) },
+                )
+        }
+        assertEquals(
+            VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE),
+            VaultBootstrapper.bootstrap(paths, wrapped),
+        )
+    }
+
+    /**
+     * Review R-01: AOSP reports a failed tag as
+     * `AEADBadTagException().initCause(android.security.KeyStoreException)`.
+     * On `database.key` that is KEY_UNWRAP_FAILED, never a retry loop.
+     */
+    @Test
+    fun failedTagWithAKeystoreCauseAtUnwrapIsNotRetryable() {
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+        val platformCause = KeystoreFaults.platformKeyStoreException
+        org.junit.Assume.assumeTrue(KeystoreFaults.describe(), platformCause != null)
+        val tagFailure = DoFinalFaultWrapper(alias).apply {
+            failure = { javax.crypto.AEADBadTagException().apply { initCause(platformCause) } }
+        }
+        assertEquals(
+            VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED),
+            VaultBootstrapper.bootstrap(paths, tagFailure),
+        )
+    }
+
+    /** Review R-05: no key file and no database, but saved originals: never a fresh install. */
+    @Test
+    fun savedOriginalsWithoutKeyOrDatabaseAreDatabaseMissingAndKept() {
+        val blob = java.io.File(paths.artefactsDir, "${UUID.randomUUID()}.blob").apply { writeBytes(ByteArray(64) { 5 }) }
+        assertTrue(!paths.databaseKeyFile.exists() && !paths.databaseFile.exists())
+
+        assertEquals(
+            VaultOpenResult.Unavailable(VaultUnavailableCause.DATABASE_MISSING),
+            VaultOpener.open(context, paths, KeystoreWrapper(alias)),
+        )
+        assertTrue("no key is created", !paths.databaseKeyFile.exists())
+        assertTrue("no database is created", !paths.databaseFile.exists())
+        assertArrayEquals(ByteArray(64) { 5 }, blob.readBytes())
+    }
+
+    /** Review R-08: a 0-byte database next to saved originals is treated as missing, not as an empty vault. */
+    @Test
+    fun zeroByteDatabaseNextToSavedOriginalsIsDatabaseMissing() {
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+        paths.databaseFile.writeBytes(ByteArray(0))
+        val blob = java.io.File(paths.artefactsDir, "${UUID.randomUUID()}.blob").apply { writeBytes(ByteArray(32) { 6 }) }
+
+        assertEquals(
+            VaultOpenResult.Unavailable(VaultUnavailableCause.DATABASE_MISSING),
+            VaultOpener.open(context, paths, KeystoreWrapper(alias)),
+        )
+        assertEquals(0L, paths.databaseFile.length())
+        assertArrayEquals(ByteArray(32) { 6 }, blob.readBytes())
     }
 
     /**

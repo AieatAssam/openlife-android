@@ -11,6 +11,12 @@ data class RecoveryReport(
     val markedStaleOcrRevisions: Int = 0,
     /** Rows whose stored state this build does not recognise; kept, never shown or deleted (P1-18-R14). */
     val unrecognisedRows: Int = 0,
+    /**
+     * Saved originals kept because the database has no Source rows at all
+     * (review R-08): an empty database is never evidence that they are
+     * orphans. Non-zero means the vault must not be shown as empty.
+     */
+    val keptBlobsWithoutRows: Int = 0,
 )
 
 /** Outcome of an explicit "Verify all items" pass (P1-14-R3). */

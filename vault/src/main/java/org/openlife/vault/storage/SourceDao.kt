@@ -62,6 +62,10 @@ interface SourceDao {
     @Query("DELETE FROM sources WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    /** Removes a row only while it is STAGED; returns 0 for any other state (P1-18 review R-06). */
+    @Query("DELETE FROM sources WHERE id = :id AND state = 'STAGED'")
+    suspend fun deleteStaged(id: String): Int
+
     @Query("SELECT * FROM sources")
     suspend fun findAll(): List<SourceEntity>
 

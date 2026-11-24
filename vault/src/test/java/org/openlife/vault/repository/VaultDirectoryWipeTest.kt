@@ -10,6 +10,23 @@ import java.util.UUID
 /** P1-18-R11 (V-10) on the JVM: reset removes every entry, known or not, and keeps the marker. */
 class VaultDirectoryWipeTest {
 
+    /** Review R-09: a symlink inside the vault is removed, never followed. */
+    @Test
+    fun aSymlinkIsRemovedButItsTargetIsNeverFollowed() = withVaultDir { dir, marker ->
+        val outside = java.nio.file.Files.createTempDirectory("openlife-outside").toFile()
+        try {
+            val precious = File(outside, "precious").apply { writeBytes(byteArrayOf(1)) }
+            java.nio.file.Files.createSymbolicLink(File(dir, "link").toPath(), outside.toPath())
+
+            assertTrue(VaultDirectoryWipe.deleteAllExcept(dir, marker, ArtefactFileOps.Default))
+
+            assertTrue("a symlink target outside the vault is untouched", precious.exists())
+            assertEquals(listOf(marker.name), dir.list()!!.toList())
+        } finally {
+            outside.deleteRecursively()
+        }
+    }
+
     @Test
     fun strayFilesJournalAndNestedDirectoriesAreAllRemovedAndTheMarkerIsKept() = withVaultDir { dir, marker ->
         val artefacts = File(dir, "artefacts").apply { mkdirs() }
