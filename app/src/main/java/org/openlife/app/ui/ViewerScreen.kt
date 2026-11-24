@@ -44,6 +44,7 @@ import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.repository.ReadyReadResult
@@ -69,7 +70,7 @@ fun ViewerScreen(
     onReview: (OcrReviewState) -> Unit = {},
     onRejectSpan: (OcrSpan) -> Unit = {},
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
-    onSetUserContentKind: (org.openlife.vault.model.UserContentKind?) -> Unit = {},
+    onSetUserContentKind: (UserContentKind?) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
@@ -173,7 +174,7 @@ private fun ViewerContent(
     onReview: (OcrReviewState) -> Unit,
     onRejectSpan: (OcrSpan) -> Unit,
     onUndoRejectSpan: (OcrSpan) -> Unit,
-    onSetUserContentKind: (org.openlife.vault.model.UserContentKind?) -> Unit,
+    onSetUserContentKind: (UserContentKind?) -> Unit,
 ) {
     val ready = ocrState as? OcrUiState.Ready
     val spans = ready?.spans.orEmpty()
@@ -273,11 +274,7 @@ private fun ViewerCorrectionDialog(
 }
 
 @Composable
-private fun DetailsSection(
-    source: Source,
-    verified: Boolean,
-    onSetUserContentKind: (org.openlife.vault.model.UserContentKind?) -> Unit,
-) {
+private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKind: (UserContentKind?) -> Unit) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
