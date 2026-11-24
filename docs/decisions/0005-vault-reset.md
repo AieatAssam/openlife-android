@@ -45,7 +45,28 @@ captured by a compromised operating system. Database corruption can make all
 sources unrecoverable: per-source DEKs are stored only in that encrypted
 database, with no separate key file or backup by design.
 
+## Addendum (P1-18, 2026-11-24)
+
+- **DATABASE_MISSING.** If `database.key` exists, the database file is
+  absent and `artefacts/` has at least one entry, bootstrap returns
+  `Unavailable(DATABASE_MISSING)` before reading the key. Room is not opened,
+  recovery does not run, and no file is deleted. The screen explains that
+  saved originals were kept and offers Retry; Reset vault stays the
+  secondary, two-step-confirmed action defined above. Nothing is inferred
+  from an unreadable or missing database (design §11).
+- **Torn key file.** `database.key` is written as `database.key.tmp`,
+  fsynced, renamed over the key, and the directory is fsynced. A leftover
+  `.tmp` is removed at the next bootstrap. A key file that fails to decode
+  is treated as a fresh install **only** when there is no database and
+  `artefacts/` is empty; otherwise it stays `KEY_FILE_CORRUPT`.
+- **Reset scope.** Reset removes every entry under the vault directory
+  (including non-UUID strays and `-journal`), keeping only the marker until
+  last, so a stray file can no longer leave the marker set permanently.
+- Open question: no key, no database, but artefacts present still
+  bootstraps fresh, and recovery then removes the artefacts as orphans.
+
 ## Verification
 
 Implementation evidence is recorded in
 [`verification/P1-06-vault-reset.md`](../verification/P1-06-vault-reset.md).
+P1-18 changes: [`verification/P1-18-vault-remediation.md`](../verification/P1-18-vault-remediation.md).
