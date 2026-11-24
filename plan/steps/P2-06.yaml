@@ -5,7 +5,7 @@ status: todo
 depends_on: [P2-01, P1-03]
 estimate: L
 owner: agent
-closes_findings: [F-27]
+closes_findings: [F-27, F-65, F-66, F-67, F-68]
 
 summary: >
   Make evidence navigation correct and usable: draw region highlights on the
@@ -37,6 +37,35 @@ requirements:
     text: "MUST render a 'Extracted by <engine> · unreviewed' provenance line and distinct styles: extracted (normal), corrected (USER badge), rejected (strikethrough with 'rejected' label), stale (greyed with explanation)."
   - id: P2-06-R7
     text: "MUST keep memory bounded: the zoomable image uses the sampled bitmap (<=4M px); zooming does not re-decode at full size in v0.2.0 (record as a limitation with a later step if needed)."
+  # --- Plan 1.3.0 (2026-11-24): additional requirements from the review of
+  # PR #23 (branch cursor/p2-06-evidence-viewer-1e36, head 79926a6), recorded in
+  # docs/reviews/2026-11-24-P2-06-pr23-review.md (E-01..E-10). They are part of
+  # this step's acceptance: P2-06 cannot move to done until R8-R18 are met.
+  # The step's rollback ("keep geometry fix; drop zoom") remains an accepted
+  # alternative to R8/R9; if taken, R2's zoom clauses are withdrawn in notes
+  # and R10 removes the zoom claims instead of evidencing them.
+  - id: P2-06-R8
+    text: "E-01: MUST render the zoomed image at its zoomed size: ZoomableEvidenceImage measures the image and the region nodes with unbounded/fixed constraints (e.g. wrapContentSize(Alignment.TopStart, unbounded = true) between offset and size, or a layout {} measuring with Constraints.fixed), so at 3x with no pan the visible image, the drawn overlays and smallestSpanAt hit-testing all use the same transform. Proven by a test that zooms, not only at 1x."
+  - id: P2-06-R9
+    text: "E-02: MUST make the tap detector ignore drags, pinches and scrolls: use waitForUpOrCancellation(), abandon the tap when movement exceeds touch slop, when the pointer is consumed, or when a second pointer goes down; read zoom/pan through rememberUpdatedState instead of pointerInput keys so a pan does not restart the detector or reset double-tap timing; a double-tap at 3x whose first tap selects a partly off-screen region still zooms out."
+  - id: P2-06-R10
+    text: "E-03: MUST correct the claims to what is tested: docs/capabilities/C1.md C1-R4 must not say 'including pinch zoom and pan' unless R8/R9 tests pass; the P2-06 evidence in plan/plan.yaml must not list 'scale 1-8x, double-tap 1x/3x' without the R8/R9 test names; the acceptance claim 'highlights align ... arbitrary aspect ratios and orientations' is evidenced at 1x and at >1x zoom; the instrumented RED tests added by this revision are shown failing (assertion, not compile) before GREEN, per AGENTS.md, with the failing run recorded."
+  - id: P2-06-R11
+    text: "E-04: MUST add the SQLCipher upgrade path to v3: the SQLCipher migration test in OcrDatabaseTest (currently validating at v2, OcrDatabaseTest.kt:296) migrates to the current @Database version through the production SQLCipher factory and readyInvariantCallback, asserting v2 row counts survive and the READY-invariant triggers exist and fire after migration; migrationAddsSpanReviewsAndCascades runs on SQLCipher (not FrameworkSQLiteOpenHelperFactory) or gains a SQLCipher twin. Phrase assertions against the @Database version, not Vault.SCHEMA_VERSION (P1-18-R17 may delete that constant)."
+  - id: P2-06-R12
+    text: "E-05: MUST order span reviews by an explicit monotonic sequence instead of createdAt, rowid: add an INTEGER sequence column to ocr_span_reviews (assigned in the inserting transaction as max(sequence)+1 per span, or an INTEGER PRIMARY KEY AUTOINCREMENT id) and select the latest review by it. Schema v3 has never shipped in any release or tag, so MIGRATION_2_3 and the exported 3.json are amended in place rather than adding v4; both copies of 3.json (vault/schemas and vault/src/androidTest/assets) are regenerated and byte-identical, and the step notes state that v3 was unreleased when amended. If v3 has shipped by the time this lands, a v4 additive migration is required instead."
+  - id: P2-06-R13
+    text: "E-06: MUST give a rejected span a visible state change and an undo: 'Reject span' is replaced by 'Undo reject' on a rejected span (undo appends a review row restoring the previous state; rows are never updated or deleted); pressing Reject on an already-rejected span is impossible; a rejected span's region is drawn in the rejected style and cannot be selected as evidence (smallestSpanAt skips it), per ethos P3."
+  - id: P2-06-R14
+    text: "E-07: MUST add the missing tests: an independent oracle for all eight EXIF orientations with letterboxing on both axes (hand-computed expected rects, not a round trip through OcrCoordinateMapper); JVM tests for clampPan, panToReveal, smallestSpanAt and nextDoubleTapZoom; OcrRepository tests that rejectSpan leaves span text untouched, is refused unless the revision is READY, and is observed through the flow; a UI test that presses Reject span and Undo reject."
+  - id: P2-06-R15
+    text: "E-08: MUST require the BuildConfig.DEBUG guard for the EvidenceBounds log allowlist entry in SourceEgressBoundaryTest, as the recovery-log allowlist already does, proven by a recorded mutation (remove the guard -> test fails)."
+  - id: P2-06-R16
+    text: "E-09 (suspected, confirm first): MUST add a test of SpanRow at 360 dp and at 320x640 with fontScale 2.0 asserting the span text column keeps a usable width (>= 120 dp) and no action is clipped; if confirmed, move the per-span actions into an overflow menu or a second row."
+  - id: P2-06-R17
+    text: "E-10 (suspected, low): MUST validate OcrEvidenceRegion right/bottom against the source size at persistence (reject or clamp with the span marked ungrounded, never silently drawn outside the image) and add a test with an out-of-bounds region."
+  - id: P2-06-R18
+    text: "MUST record the outcome of E-01..E-10 (fixed / refuted / rollback taken) in docs/verification/C1.md (C1-05) and in this step's evidence."
 
 files_touched:
   - app/src/main/java/org/openlife/app/ui/evidence/{EvidenceGeometry.kt,ZoomableEvidenceImage.kt}
@@ -44,6 +73,7 @@ files_touched:
   - vault next schema version: OcrSpanReviewEntity, migration, DAO, exported schema JSON, androidTest asset
   - app/src/test/java/org/openlife/app/ui/evidence/EvidenceGeometryTest.kt
   - app/src/androidTest ViewerScreenC1Test (extended), EvidenceNavigationTest
+  - "plan 1.3.0 additions (R8-R18): ui/OcrPanel.kt SpanRow, vault OcrSpanReviewDao/entity (sequence column), MIGRATION_2_3 and both copies of 3.json, OcrRepository (region bounds), vault androidTest OcrDatabaseTest and OcrRepositoryTest, app test SourceEgressBoundaryTest, docs/capabilities/C1.md, docs/verification/C1.md"
 
 tdd:
   red:
@@ -55,6 +85,33 @@ tdd:
     - name: EvidenceNavigationTest.tappingASpanHighlightsItsRegionWithinTheImageBounds (assert overlay rect within image rect via semantics test tags)
     - name: OcrDatabaseTest.migrationAddsSpanReviewsAndCascades
     - name: ViewerScreenC1Test.rejectedSpanIsStruckThroughAndLabelled
+    # --- Plan 1.3.0: RED tests for docs/reviews/2026-11-24-P2-06-pr23-review.md ---
+    - name: EvidenceNavigationTest.doubleTapZoomsImageToThreeTimesItsFitWidth
+      asserts: "E-01: after double-click on the canvas, the image node's unclipped SemanticsNode.size is ~3x its 1x width and a region node stays within the image node's bounds."
+    - name: EvidenceNavigationTest.tapAtThreeTimesSelectsTheSpanUnderTheFinger
+      asserts: "E-01: hit-testing at >1x uses the drawn transform."
+    - name: EvidenceNavigationTest.verticalScrollStartingOnTheImageSelectsNothing
+      asserts: "E-02: swipeUp starting inside a region -> no selection, no live-region announcement, column scroll position not pulled back."
+    - name: EvidenceNavigationTest.pinchReleaseDoesNotSelect
+      asserts: "E-02: two-pointer gesture then lift -> no selection."
+    - name: EvidenceNavigationTest.doubleTapAtThreeTimesZoomsOutEvenWhenTheFirstTapPans
+      asserts: "E-02: pointerInput not restarted by pan."
+    - name: OcrDatabaseTest.sqlcipherMigrationToCurrentVersionKeepsRowsAndReadyTriggers
+      asserts: "E-04: SQLCipher factory + readyInvariantCallback; v2 row counts and trigger RAISE text after migration."
+    - name: OcrDatabaseTest.latestSpanReviewIsChosenBySequenceNotClock
+      asserts: "E-05: two reviews inserted with createdAt going backwards -> the later insert is current."
+    - name: ViewerScreenC1Test.rejectedSpanOffersUndoAndCannotBeRejectedTwice
+    - name: EvidenceNavigationTest.rejectedSpanRegionCannotBeSelectedAsEvidence
+    - name: EvidenceGeometryTest.allEightOrientationsMatchHandComputedLetterboxedRects
+      asserts: "E-07: independent oracle, both letterbox axes."
+    - name: EvidenceGeometryTest.clampPanPanToRevealSmallestSpanAtAndNextDoubleTapZoom
+    - name: OcrRepositoryTest.rejectSpanKeepsTextRequiresReadyAndIsObservedThroughTheFlow
+    - name: SourceEgressBoundaryTest.evidenceBoundsLogRequiresDebugGuard
+      asserts: "E-08: mutation - remove BuildConfig.DEBUG guard -> fails."
+    - name: ViewerScreenC1Test.spanRowKeepsUsableTextWidthAtNarrowWidthAndLargeFont
+      asserts: "E-09 confirm/refute."
+    - name: OcrRepositoryTest.regionBeyondSourceBoundsIsNotPersistedAsGrounded
+      asserts: "E-10."
   green:
     - "Implement geometry, zoomable image, panel, schema v3."
   refactor: []
@@ -68,6 +125,7 @@ verification:
 
 acceptance_criteria:
   - "Highlights align with text for arbitrary aspect ratios and orientations; span and region selection work both ways; per-span review persists across restart."
+  - "Plan 1.3.0: alignment and hit-testing are proven at >1x zoom (or zoom is removed under the rollback); taps never fire after a drag or pinch; the v2->v3 upgrade is proven on SQLCipher; every E-01..E-10 outcome is recorded (docs/reviews/2026-11-24-P2-06-pr23-review.md)."
 
 docs_to_update:
   - docs/capabilities/C1.md (C1-R4/R5 evidence, span reviews table)
@@ -76,3 +134,12 @@ docs_to_update:
 risks:
   - "Gesture handling conflicts with vertical scroll of the viewer column; put the image in a fixed-height area with nested scroll disabled while zoomed."
 rollback: "Keep geometry fix; drop zoom."
+
+notes: >
+  Plan 1.3.0 (2026-11-24): PR #23 (head 79926a6) implements R1-R7 and was
+  reviewed in docs/reviews/2026-11-24-P2-06-pr23-review.md with verdict
+  "merge after fixes". R8-R18 were added from that review; the step stays
+  (or returns to) in_progress until they are met, then goes to review for a
+  reviewer who did not implement it. P1-20 depends on this step and
+  restructures the final viewer, so keep the evidence composables
+  state-in/callbacks-out to ease that move.

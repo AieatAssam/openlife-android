@@ -28,6 +28,9 @@ One line is provided for every tracked documentation file under `docs/`.
 - [`generated/room-common-jvm-2.8.5.jar/META-INF/androidx/room/room-common/LICENSE.txt`](generated/room-common-jvm-2.8.5.jar/META-INF/androidx/room/room-common/LICENSE.txt) — bundled Room licence text.
 - [`reviews/C0-provenance-review.md`](reviews/C0-provenance-review.md) — provenance review record.
 - [`reviews/C0-security-self-review.md`](reviews/C0-security-self-review.md) — security self-review record.
+- [`reviews/2026-11-24-vault-audit.md`](reviews/2026-11-24-vault-audit.md) — `vault/` audit of commit 190be81 (V-01..V-16, VS-1..VS-3); remediated by plan steps P1-18 and others.
+- [`reviews/2026-11-24-app-audit.md`](reviews/2026-11-24-app-audit.md) — `app/` audit of commit 190be81 (A-01..A-18, AS-1..AS-6); remediated by P1-19 and P1-20.
+- [`reviews/2026-11-24-P2-06-pr23-review.md`](reviews/2026-11-24-P2-06-pr23-review.md) — review of PR #23 (P2-06 evidence viewer, E-01..E-10); requirements P2-06-R8..R18.
 - [`verification/C0.md`](verification/C0.md) — Capability 0 verification matrix and honest gaps.
 - [`verification/C0-handoff.md`](verification/C0-handoff.md) — Capability 0 handoff record.
 - [`verification/C1.md`](verification/C1.md) — Capability 1 verification record.

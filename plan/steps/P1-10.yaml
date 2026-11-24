@@ -2,7 +2,7 @@ id: P1-10
 title: Accessibility automation and TalkBack runbook
 phase: P1
 status: todo
-depends_on: [P0-07, P1-08]
+depends_on: [P0-07, P1-08, P1-20]
 estimate: M
 owner: agent
 
@@ -63,3 +63,10 @@ docs_to_update:
 risks:
   - "Material3 default contrast in dynamic colour can fail checks; adjust theme tokens rather than suppress."
 rollback: "Disable checks; keep tests."
+
+notes: >
+  Plan 1.3.0 (2026-11-24): depends on P1-20 so semantics tests target the
+  rebuilt destinations. P1-19 already fixes the A-08 defects found in
+  docs/reviews/2026-11-24-app-audit.md (decorative divider, span-named
+  actions, outline contrast, StampBadge double announcement); this step's
+  automated checks must keep them fixed rather than re-fixing them.

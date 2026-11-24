@@ -315,4 +315,50 @@ class OcrDatabaseTest {
             invalid.exceptionOrNull()?.message?.contains("READY source requires all validated fields") == true,
         )
     }
+
+    /**
+     * P1-18-R12 (V-11): the READY-invariant triggers come from the migration
+     * path itself, not only from onCreate. A version-1 database created
+     * without them (as a migration that rebuilds `sources` would leave it)
+     * has both triggers, by name, and they fire, after migrating to the
+     * current @Database version.
+     */
+    @Test
+    fun readyInvariantTriggersExistAfterMigratingToCurrentVersion() {
+        val helper = MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            OpenLifeDatabase::class.java,
+            emptyList(),
+            SupportOpenHelperFactory(ByteArray(32) { 6 }),
+        )
+        val name = "p118-triggers-${UUID.randomUUID()}"
+        helper.createDatabase(name, 1).close() // no callback: no triggers
+
+        val migrated = helper.runMigrationsAndValidate(name, 3, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
+        try {
+            val triggers = mutableListOf<String>()
+            migrated.query("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'sources' ORDER BY name")
+                .use { cursor -> while (cursor.moveToNext()) triggers += cursor.getString(0) }
+            assertEquals(
+                listOf("sources_ready_requires_fields_INSERT", "sources_ready_requires_fields_UPDATE"),
+                triggers,
+            )
+            val rejected = runCatching {
+                migrated.execSQL(
+                    """
+                    INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
+                        orientation, wrappedDek, artefactVersion)
+                    VALUES ('bad', 'READY', 1, 'SHARE', NULL, 10, X'01', 10, 10, 'NORMAL', X'02', 1)
+                    """.trimIndent(),
+                )
+            }
+            assertTrue(
+                "the migrated trigger fires: ${rejected.exceptionOrNull()}",
+                rejected.exceptionOrNull()?.message?.contains("READY source requires all validated fields") == true,
+            )
+        } finally {
+            migrated.close()
+            InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
+        }
+    }
 }

@@ -27,7 +27,11 @@ class BoundedStreamReaderTest {
     fun stopsAtLimitPlusOneForOversizedInput() {
         val oversized = ByteArray((ImportLimits.MAX_ORIGINAL_BYTES + 1000).toInt())
         val result = BoundedStreamReader.read(ByteArrayInputStream(oversized))
-        assertEquals(ImportLimits.MAX_ORIGINAL_BYTES + 1, result.bytes.size.toLong())
+        assertEquals(ImportLimits.MAX_ORIGINAL_BYTES + 1, result.byteCount)
+        assertTrue(result.exceededLimit)
+        // P1-18 CI addition: an oversized original is rejected on size alone,
+        // so none of its plaintext is kept or copied into a final array.
+        assertEquals(0, result.bytes.size)
     }
 
     @Test
@@ -35,6 +39,31 @@ class BoundedStreamReaderTest {
         val atLimit = ByteArray(ImportLimits.MAX_ORIGINAL_BYTES.toInt())
         val result = BoundedStreamReader.read(ByteArrayInputStream(atLimit))
         assertEquals(ImportLimits.MAX_ORIGINAL_BYTES, result.bytes.size.toLong())
+        assertEquals(false, result.exceededLimit)
+    }
+
+    /**
+     * P1-18 CI addition (run 45405099804, API 29): the doubling buffer held
+     * the old and the new array at once, so an oversized read needed about
+     * 24 MiB and then 32 MiB, and hit OutOfMemoryError on a 16 MiB-limit
+     * heap. Measured in a forked JVM whose heap is too small for that but
+     * large enough for limit + 1 bytes held once.
+     */
+    @Test
+    fun oversizedReadFitsInAHeapThatCannotHoldTwoCopies() {
+        val java = java.io.File(System.getProperty("java.home"), "bin/java").path
+        val process = ProcessBuilder(
+            java,
+            "-Xmx$PROBE_HEAP",
+            "-XX:+UseSerialGC",
+            "-cp",
+            System.getProperty("java.class.path"),
+            BoundedReadPeakProbe::class.java.name,
+        ).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().readText()
+        assertTrue("probe did not finish", process.waitFor(60, TimeUnit.SECONDS))
+        assertEquals("probe output: $output", 0, process.exitValue())
+        assertTrue(output, output.contains("exceeded=true count=${ImportLimits.MAX_ORIGINAL_BYTES + 1}"))
     }
 
     @Test
@@ -119,6 +148,34 @@ class BoundedStreamReaderTest {
         } finally {
             closer.join(5_000)
             assertTrue("closing thread did not finish", !closer.isAlive)
+        }
+    }
+}
+
+/** 16 MiB + 1 held once, plus JVM baseline, fits; the old ~24-32 MiB peak does not. */
+private const val PROBE_HEAP = "22m"
+
+/** Runs in a forked JVM with a small heap; exit code 3 means OutOfMemoryError. */
+object BoundedReadPeakProbe {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val zeros = object : InputStream() {
+            private var remaining = ImportLimits.MAX_ORIGINAL_BYTES + 4096
+            override fun read(): Int = if (remaining-- > 0) 0 else -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (remaining <= 0) return -1
+                val n = minOf(len.toLong(), remaining).toInt()
+                java.util.Arrays.fill(b, off, off + n, 0)
+                remaining -= n
+                return n
+            }
+        }
+        try {
+            val result = BoundedStreamReader.read(zeros)
+            println("exceeded=${result.exceededLimit} count=${result.byteCount}")
+        } catch (error: OutOfMemoryError) {
+            println("OOM: $error")
+            kotlin.system.exitProcess(3)
         }
     }
 }

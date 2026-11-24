@@ -1,0 +1,145 @@
+id: P1-20
+title: Navigation and state architecture rebuild
+phase: P1
+status: todo
+depends_on: [P1-19, P2-06]
+estimate: L
+owner: agent
+closes_findings: [F-60, F-64]
+
+summary: >
+  Rebuild navigation and UI state ownership before any further screen is
+  added (docs/reviews/2026-11-24-app-audit.md A-05, A-09, AS-1..AS-6):
+  per-destination ViewModels built from an app container, detail screens
+  that load their source by id, a real list-detail destination whose
+  selection lives in the route, a background scrub that clears content
+  without resetting navigation, one non-exported nonce-checked entry for
+  internal deep links, and tests that exercise behaviour instead of
+  grepping source text. Behaviour-preserving for users except where a
+  requirement states the change.
+
+rationale: >
+  The audit's verdict for navigation, MainActivity and ViewModel layout is
+  "rebuild before adding any screen". OpenLifeNavHost takes 17 parameters,
+  the viewer can only open a source present in the loaded list
+  (SourceScreens.find), expanded width uses a self-popping Viewer redirect,
+  every ViewModel is activity-scoped, and the C0-R32 scrub resets
+  navigation, which would wipe event-confirmation forms (P4-03) on every app
+  switch. Search hits (P2-08), evidence links (P3) and event detail (P4-07)
+  all need load-by-id. It depends on P2-06 so that it restructures the
+  final evidence viewer rather than one PR #23 is about to replace. Because
+  P1-12 depends on this step, v0.1.0 now also waits for P2-06 to be done;
+  this is accepted in plan 1.3.0 (the release train's 'contains [P0, P1]'
+  is unchanged, P2-06 is simply a prerequisite).
+
+ethos_check:
+  - "No plaintext user content in saved instance state: the back stack and SavedStateHandle hold only UUIDs and non-content UI state (selected span id, zoom); a test asserts the saved bundle contains no span text or bytes."
+  - "Background scrub still clears every decoded image, OCR text and preview on onStop (C0-R32); only the navigation position survives, and returning still passes the app lock."
+  - "Deep links never come from extras on the exported launcher."
+
+constraints:
+  - "Behaviour-preserving: the user-visible flows covered by CoreFlowUxTest, IntakeAndListFlowTest, AppLockFlowTest, AdaptiveLayoutTest, ViewerScreenC1Test, EvidenceNavigationTest (P2-06) and release-smoke.sh keep passing with unchanged assertions, except the one intended change in R4 (returning from background reopens the same destination instead of the list), which updates C0-R32's wording and the affected assertions in the same commit."
+  - "No schema change; no new runtime dependency beyond androidx.lifecycle/navigation artefacts already on the classpath (record any added artefact per the dependency policy)."
+  - "Starts only after P2-06 is done; rebases onto the merged evidence viewer."
+
+requirements:
+  - id: P1-20-R1
+    text: "AS-1: MUST add an AppContainer created by OpenLifeApp (repositories, MutationQueue, ImportHousekeeping, lock controller, vault access) and build every screen ViewModel with viewModel(factory = ...) inside its composable<> destination, scoped to the back-stack entry, with route arguments read from SavedStateHandle (typed routes, toRoute()). OpenLifeNavHost takes at most the NavController, the container and window size class; the 17-parameter signature and the activity-scoped OcrViewModel are removed."
+  - id: P1-20-R2
+    text: "AS-2 / A-05: MUST make the viewer (and the pattern for every future detail screen) load its source by id from the repository (SourceViewRepository observe-by-id flow), independent of the list's state: a viewer opened for a source that is not in the loaded list, or before the list has loaded, shows that source; a missing or deleted id shows the existing 'no longer available' state and returns to the list once. SourceScreens.find and the list-state lookup are deleted."
+  - id: P1-20-R3
+    text: "AS-3: MUST replace the expanded-width self-popping Viewer redirect (OpenLifeNavHost.kt:166-173) with one list-detail destination whose selected source id is part of the route; resizing between compact and expanded (multi-window, rotation, fold) keeps the selection and the back behaviour (compact: Back from detail returns to list; expanded: Back clears the selection, then leaves)."
+  - id: P1-20-R4
+    text: "AS-4: MUST scrub content without resetting navigation: onStop clears decoded images, OCR text, previews and any held plaintext synchronously (the holder from P1-19-R13, SensitiveContentCache, OcrPresenter.clearTransient) but keeps the back stack and route arguments (UUIDs only); on return, after the lock gate, the destination reloads its content by id. MultiWindowScrubTest and the C0-R32 evidence are updated to assert 'content cleared while hidden, destination preserved'."
+  - id: P1-20-R5
+    text: "AS-5 / A-14: MUST route 'Open existing' and every future internal deep link (P4-04 reminder taps) through a single non-exported entry (an exported=false activity or a PendingIntent-only target) that validates a single-use per-process nonce and a typed route before navigating; MainActivity, which stays exported as the launcher, ignores EXTRA_OPEN_SOURCE_ID and any other navigation extra. ManifestBoundaryTest keeps 'exactly MainActivity and IntakeActivity exported'."
+  - id: P1-20-R6
+    text: "AS-6 / A-09: MUST replace the source-grep unit tests SecureWindowTest (unit), LargeFontLayoutTest, RtlLayoutTest, NavigationBackTest (unit) and EdgeToEdgeInsetsTest with Compose UI/semantics instrumented tests that exercise the behaviour (FLAG_SECURE on every content window and dialog; no clipped control at fontScale 2.0 and 320x640; RTL layout mirrors; Back from each destination; insets applied at 48 dp bars). Each replacement is proven RED by a recorded mutation of the behaviour it guards before the grep test is deleted. Boundary greps that guard forbidden APIs (SourceEgressBoundaryTest, ManifestBoundaryTest, NoHardcodedUiStringsTest) stay."
+  - id: P1-20-R7
+    text: "AS-6: MUST keep the dialog golden from P1-19-R10 green and add goldens for the list-detail destination at expanded width (light/dark, profile-keyed), regenerated locally and via the CI generate-goldens dispatch."
+  - id: P1-20-R8
+    text: "A-09: MUST replace every Thread.sleep in app/src/androidTest and vault/src/androidTest (10 in app at commit 190be81, e.g. IntakeAndListFlowTest.kt:79, :326, :396, :557, :619, IntakeActivityTest.kt:213) with state-based awaits (composeRule.waitUntil on semantics, Flow.first { terminal }, MutationQueue idle await, UiDevice.wait(Until...)); a verification grep for Thread.sleep in androidTest returns nothing, or each remaining hit carries a comment explaining why no state exists to await."
+  - id: P1-20-R9
+    text: "MUST restructure the P2-06 evidence viewer onto R1/R2: ViewerViewModel (entry-scoped) owns the selected span id and zoom/pan as non-content saved state, loads OCR by source id, and the OcrPanel/ZoomableEvidenceImage composables receive state and callbacks only; P2-06's EvidenceNavigationTest and ViewerScreenC1Test pass unchanged."
+  - id: P1-20-R10
+    text: "MUST record the before/after architecture (container, destinations, entry, scrub semantics) in docs/design/screens.md and the C0-R32 change in docs/capabilities/C0.md, and the verification in docs/verification/P1-20-navigation-rebuild.md."
+
+files_touched:
+  - app/src/main/java/org/openlife/app/{OpenLifeApp.kt,AppContainer.kt,MainActivity.kt,ImportHousekeeping.kt}
+  - app/src/main/java/org/openlife/app/navigation/{OpenLifeNavHost.kt,Routes.kt,InternalLinkActivity.kt or equivalent}
+  - app/src/main/java/org/openlife/app/ui/{SourceListViewModel.kt,ViewerViewModel.kt,OcrViewModel.kt,OcrPresenter.kt,ViewerScreen.kt,SourceListScreen.kt}
+  - app/src/main/java/org/openlife/app/ui/evidence/* (from P2-06)
+  - app/src/main/java/org/openlife/app/settings/SettingsViewModel.kt (container-provided)
+  - app/src/main/java/org/openlife/app/intake/{IntakeActivity.kt,OpenExistingIntent.kt}
+  - app/src/main/AndroidManifest.xml (non-exported internal entry)
+  - vault/src/main/java/org/openlife/vault/repository/SourceViewRepository.kt (observe by id, if not already present)
+  - app/src/test/java/org/openlife/app/ui/{SecureWindowTest.kt,LargeFontLayoutTest.kt,RtlLayoutTest.kt,NavigationBackTest.kt,EdgeToEdgeInsetsTest.kt} (deleted after replacement)
+  - app/src/androidTest/java/org/openlife/app/ui/* (replacements; sleeps removed)
+  - vault/src/androidTest/** (sleeps removed)
+  - docs/design/screens.md, docs/capabilities/C0.md, docs/verification/P1-20-navigation-rebuild.md
+
+tdd:
+  red:
+    - name: app androidTest ViewerByIdTest.viewerOpensASourceThatIsNotInTheLoadedList
+    - name: app androidTest ViewerByIdTest.viewerOpenedBeforeTheListLoadsShowsTheSource
+    - name: app androidTest ViewerByIdTest.deletedIdShowsUnavailableAndReturnsToListOnce
+    - name: app androidTest AdaptiveLayoutTest.selectionSurvivesCompactToExpandedAndBack
+    - name: app androidTest AdaptiveLayoutTest.expandedBackClearsSelectionBeforeLeaving
+    - name: app androidTest MultiWindowScrubTest.backgroundingClearsContentButKeepsTheDestination
+      asserts: "While stopped: no decoded bitmap, no OCR text held; after return and unlock: same destination and source id, content reloaded."
+    - name: app androidTest SavedStateTest.savedBundleHoldsNoContent
+      asserts: "Process-death simulation: the saved state bundle contains UUIDs and numbers only; no span text, no bytes."
+    - name: app test ManifestBoundaryTest.internalLinkEntryIsNotExported
+    - name: app androidTest InternalLinkTest.openExistingGoesThroughTheInternalEntryWithNonce
+    - name: app androidTest InternalLinkTest.launcherIgnoresOpenSourceExtra
+      asserts: "An explicit MainActivity intent with EXTRA_OPEN_SOURCE_ID opens the list, not the viewer."
+    - name: app test ViewModelScopingTest.noScreenViewModelIsActivityScoped (Compose host test or reflection over the destinations, not a grep)
+    - name: app androidTest SecureWindowUiTest.everyContentWindowAndDialogIsSecure (replaces the unit grep; mutation - remove FLAG_SECURE from the delete dialog)
+    - name: app androidTest LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640 (replaces LargeFontLayoutTest)
+    - name: app androidTest RtlUiTest.listAndViewerMirrorInRtl (replaces RtlLayoutTest)
+    - name: app androidTest NavigationBackTest.backFromEveryDestination (replaces the unit NavigationBackTest)
+    - name: app androidTest EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets (replaces EdgeToEdgeInsetsTest)
+    - name: app androidTest BrandScreenshotInstrumentedTest.listDetailExpandedMatchesGolden
+    - name: "Thread.sleep removal is verified by the grep in verification.commands, not by a RED test."
+  green:
+    - "AppContainer, entry-scoped ViewModels, by-id loading, list-detail route, content-only scrub, internal entry, behaviour tests, state-based awaits."
+  refactor:
+    - "Delete the replaced grep tests, SourceScreens.find, the redirect, and the activity-scoped ViewModel wiring; shrink MainActivity to lock gate + NavHost."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug"
+    - "./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"
+    - "grep -rn 'Thread.sleep' app/src/androidTest vault/src/androidTest (expect no hits, or each hit justified in a comment)"
+    - "./gradlew assembleRelease && bash scripts/release-smoke.sh app/build/outputs/apk/release/*.apk"
+    - "CI API 29 and API 36 legs"
+  evidence_required:
+    - "Commits per TDD phase; JVM and connected counts before and after (the test count may drop by the deleted grep tests; list each deletion with its replacement); recorded mutations for every replacement; grep output; release smoke result; CI run ids; wall-clock duration of the app connected suite before and after the sleep removal."
+
+acceptance_criteria:
+  - "OpenLifeNavHost has no per-screen lambdas; every screen ViewModel is entry-scoped and built from the container."
+  - "Any detail screen opens by id regardless of list state; expanded width uses one list-detail destination with the selection in the route."
+  - "Backgrounding clears content but preserves the destination; no content in saved state."
+  - "No navigation extra is honoured on the exported launcher; internal links pass a nonce through a non-exported entry."
+  - "No source-grep test stands in for a behaviour test; no unexplained Thread.sleep remains in instrumented tests."
+  - "All pre-existing user-flow tests and release smoke pass unchanged except the documented R4 change."
+
+docs_to_update:
+  - docs/design/screens.md
+  - docs/capabilities/C0.md (C0-R32 scrub semantics)
+  - docs/verification/C0.md (C0-04, C0-15)
+  - docs/verification/P1-20-navigation-rebuild.md (new)
+  - docs/THREAT_MODEL.md (internal deep-link entry)
+  - AGENTS.md repository-layout paragraph if the navigation package changes
+
+risks:
+  - "Large diff across every screen; land it in reviewable commits (container, then by-id, then list-detail, then scrub, then entry, then tests) on the one step branch."
+  - "Golden and timing churn; regenerate goldens in this step and keep awaits state-based."
+  - "Holds v0.1.0 behind P2-06 (see rationale)."
+rollback: "Revert the step branch merge; the pre-rebuild navigation still works because no schema or persisted state changes."
+
+notes: >
+  Added in plan 1.3.0 (2026-11-24). Source: docs/reviews/2026-11-24-app-audit.md
+  A-05, A-09, AS-1..AS-6 (commit 190be81). P1-08 (Settings/About) and P1-10
+  (accessibility) now depend on this step so new screens and semantics work
+  land on the rebuilt navigation.

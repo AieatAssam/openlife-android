@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -236,6 +237,37 @@ class DeletionRepositoryTest {
 
         assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
         assertEquals(0, db.ocrDao().countRevisions())
+    }
+
+    /**
+     * P1-18-R9 (V-08): a cancellation arriving inside the row removal must
+     * reach the caller. The generic catch used to turn it into Failed. The
+     * transaction rolls back, so the row stays DELETING for a later retry.
+     */
+    @Test
+    fun cancellationIsNotSwallowedByGenericCatch(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val delegate = db.sourceDao()
+        val deleteJob = kotlinx.coroutines.CompletableDeferred<kotlinx.coroutines.Job>()
+        val cancellingDao = object : org.openlife.vault.storage.SourceDao by delegate {
+            override suspend fun deleteById(id: String) {
+                delegate.deleteById(id)
+                deleteJob.await().cancel()
+                kotlinx.coroutines.yield()
+            }
+        }
+        val repository = DeletionRepository(paths, db, mutationQueue, sourceDao = cancellingDao)
+
+        val deletion = async(kotlinx.coroutines.Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            repository.deleteSource(id)
+        }
+        deleteJob.complete(deletion)
+        deletion.start()
+        deletion.join()
+
+        assertTrue("the caller observes cancellation, not Failed", deletion.isCancelled)
+        assertEquals(SourceState.DELETING, db.sourceDao().findById(id.toString())!!.toDomain().state)
+        assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
     }
 
     private suspend fun insertOcrRevisionFor(id: UUID) {

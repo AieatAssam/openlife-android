@@ -20,7 +20,9 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SourceDao
+import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
 import org.openlife.vault.storage.toEntity
 import java.io.IOException
@@ -82,33 +84,37 @@ class ImportRepository(
         deadline: () -> Boolean = { false },
     ): PrepareResult {
         // Busy is decided by the import slot, not by lock state (P1-15-R1).
-        // Preparation only creates a row and a file for a fresh UUID, so it
-        // shares a read lease with viewers; deletion, recovery, save and
-        // reset stay excluded.
         if (!importSlot.tryBeginPreparing()) return PrepareResult.Busy
         var result: PrepareResult? = null
         var stagedId: UUID? = null
         try {
-            result = mutationQueue.withReadLease {
-                prepareImportLocked(inputStream, declaredMimeType, intakeKind, deadline) { stagedId = it }.also {
-                    // Inside the lease: a mutation that reads the slot (for
-                    // example abandoned-stage cleanup, P1-01) then never sees
-                    // this new stage without its owner.
-                    if (it is PrepareResult.Prepared) importSlot.preparedAs(it.sourceId)
-                }
-            }
+            result = prepareWithSlot(inputStream, declaredMimeType, intakeKind, deadline) { stagedId = it }
             return result
         } catch (cancelled: CancellationException) {
             // Design §11: any failure before a usable preview cancels the
             // stage, including the caller going away mid-import (P1-01).
             stagedId?.let { id -> withContext(NonCancellable) { mutationQueue.withReadLease { cancelStage(id) } } }
             throw cancelled
+        } catch (_: OutOfMemoryError) {
+            // CI run 45405099804: a large original can exhaust a small heap
+            // while it is read or encrypted. That is an import failure, not a
+            // crash, and leaves no stage behind.
+            stagedId?.let { id -> withContext(NonCancellable) { mutationQueue.withReadLease { cancelStage(id) } } }
+            result = PrepareResult.Failed
+            return result
         } finally {
             if (result !is PrepareResult.Prepared) importSlot.preparationEnded()
         }
     }
 
-    private suspend fun prepareImportLocked(
+    /**
+     * The provider read, validation and sampling happen before any lease
+     * (P1-18-R6): a stalled cloud provider holds nothing that viewers,
+     * deletion or reset wait on. Only the STAGED row insert, the stage write
+     * and the metadata update run under a read lease; they create a row and
+     * a file for a fresh UUID only, so they share the lease with viewers.
+     */
+    private suspend fun prepareWithSlot(
         inputStream: InputStream,
         declaredMimeType: String,
         intakeKind: IntakeKind,
@@ -118,10 +124,41 @@ class ImportRepository(
         if (!hasEnoughStorage()) {
             return PrepareResult.Rejected(ImageRejectionReason.STORAGE_UNAVAILABLE)
         }
+        val read = try {
+            BoundedStreamReader.read(inputStream, deadline)
+        } catch (_: IOException) {
+            return PrepareResult.Failed
+        }
+        try {
+            if (read.exceededLimit) return PrepareResult.Rejected(ImageRejectionReason.EXCEEDS_BYTE_LIMIT)
+            val validation = ImageHeaderValidator.validate(declaredMimeType, read.bytes)
+            if (validation is ImageValidationResult.Rejected) return PrepareResult.Rejected(validation.reason)
+            val valid = validation as ImageValidationResult.Valid
+            if (!bitmapSampler.canSample(read.bytes)) {
+                return PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
+            }
+            return mutationQueue.withReadLease {
+                stageLocked(read, valid, intakeKind, onStaged).also {
+                    // Inside the lease: a mutation that reads the slot (for
+                    // example abandoned-stage cleanup, P1-01) then never sees
+                    // this new stage without its owner.
+                    if (it is PrepareResult.Prepared) importSlot.preparedAs(it.sourceId)
+                }
+            }
+        } finally {
+            read.bytes.fill(0)
+            plaintextBufferObserver.onReleased(read.bytes)
+        }
+    }
 
+    private suspend fun stageLocked(
+        read: BoundedRead,
+        valid: ImageValidationResult.Valid,
+        intakeKind: IntakeKind,
+        onStaged: (UUID) -> Unit,
+    ): PrepareResult {
         val sourceId = UUID.randomUUID()
         val dek = ByteArray(DEK_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
-
         try {
             val wrappedDekEnvelope = keystoreWrapper.wrapSourceKeyOrNull(dek, sourceId) ?: return PrepareResult.Failed
             val stagedSource = Source(
@@ -144,61 +181,32 @@ class ImportRepository(
             insertStagedSource(stagedSource)?.let { return it }
             onStaged(sourceId)
 
-            val read = try {
-                BoundedStreamReader.read(inputStream, deadline)
-            } catch (_: IOException) {
-                cancelStage(sourceId)
-                return PrepareResult.Failed
-            }
+            val stageFailure = writeEncryptedStage(StageWriteRequest(sourceId, read.bytes, dek))
+            if (stageFailure != null) return stageFailure
 
-            try {
-                val validation = ImageHeaderValidator.validate(declaredMimeType, read.bytes)
-                if (validation is ImageValidationResult.Rejected) {
-                    cancelStage(sourceId)
-                    return PrepareResult.Rejected(validation.reason)
-                }
-                val valid = validation as ImageValidationResult.Valid
+            val updated = stagedSource.copy(
+                mimeType = valid.format,
+                byteCount = read.bytes.size.toLong(),
+                sha256 = read.sha256,
+                width = valid.width,
+                height = valid.height,
+                orientation = if (valid.format == ImageFormat.JPEG) {
+                    ExifOrientationParser.parse(read.bytes)
+                } else {
+                    Orientation.NORMAL
+                },
+                artefactVersion = SCHEMA_ARTEFACT_VERSION,
+            )
+            updatePreparedSource(updated)?.let { return it }
 
-                if (!bitmapSampler.canSample(read.bytes)) {
-                    cancelStage(sourceId)
-                    return PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
-                }
-
-                val stageFailure = writeEncryptedStage(StageWriteRequest(sourceId, read.bytes, dek))
-                if (stageFailure != null) {
-                    return stageFailure
-                }
-
-                val updated = stagedSource.copy(
-                    mimeType = valid.format,
-                    byteCount = read.bytes.size.toLong(),
-                    sha256 = read.sha256,
-                    width = valid.width,
-                    height = valid.height,
-                    orientation = if (valid.format == ImageFormat.JPEG) {
-                        ExifOrientationParser.parse(read.bytes)
-                    } else {
-                        Orientation.NORMAL
-                    },
-                    artefactVersion = SCHEMA_ARTEFACT_VERSION,
-                )
-                val updateFailure = updatePreparedSource(updated)
-                if (updateFailure != null) {
-                    return updateFailure
-                }
-
-                return PrepareResult.Prepared(
-                    sourceId,
-                    valid.format,
-                    valid.width,
-                    valid.height,
-                    read.bytes.size.toLong(),
-                    updated.orientation ?: Orientation.NORMAL,
-                )
-            } finally {
-                read.bytes.fill(0)
-                plaintextBufferObserver.onReleased(read.bytes)
-            }
+            return PrepareResult.Prepared(
+                sourceId,
+                valid.format,
+                valid.width,
+                valid.height,
+                read.bytes.size.toLong(),
+                updated.orientation ?: Orientation.NORMAL,
+            )
         } finally {
             dek.fill(0)
         }
@@ -226,13 +234,6 @@ class ImportRepository(
         prepareFailureFor(error)
     }
 
-    private fun prepareFailureFor(error: Throwable): PrepareResult =
-        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-            PrepareResult.StorageUnavailable
-        } else {
-            PrepareResult.Failed
-        }
-
     private suspend fun insertStagedSource(source: Source): PrepareResult? = try {
         sourceDao.insert(source.toEntity())
         null
@@ -258,8 +259,20 @@ class ImportRepository(
      */
     private suspend fun updatePreparedSource(source: Source): PrepareResult? {
         val failure = try {
-            sourceDao.update(source.toEntity())
-            return null
+            // Compare-and-set on STAGED (P1-18-R13): a row that is no longer
+            // STAGED is never overwritten with this snapshot.
+            val changed = sourceDao.updateStagedMetadata(
+                id = source.id.toString(),
+                mimeType = checkNotNull(source.mimeType).mimeType,
+                byteCount = checkNotNull(source.byteCount),
+                sha256 = checkNotNull(source.sha256),
+                width = checkNotNull(source.width),
+                height = checkNotNull(source.height),
+                orientation = checkNotNull(source.orientation).name,
+                artefactVersion = checkNotNull(source.artefactVersion),
+            )
+            if (changed == 1) return null
+            PrepareResult.Failed
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: IOException) {
@@ -314,72 +327,58 @@ class ImportRepository(
      * resolve; it is never reported as saved.
      */
     suspend fun saveImport(sourceId: UUID): SaveResult = withContext(ioDispatcher) {
+        var keepSlot = false
         try {
             mutationQueue.withMutation {
-                val entity = sourceDao.findById(sourceId.toString())
-                if (entity == null || entity.state != SourceState.STAGED.name) {
-                    return@withMutation SaveResult.StageNotFound
-                }
-                val source = entity.toDomain()
-
-                val stageFile = paths.stageFile(sourceId)
-                if (!stageFile.exists()) return@withMutation SaveResult.StageNotFound
-
-                if (!authenticator.authenticates(source, stageFile)) return@withMutation SaveResult.Failed
-
-                when (val duplicate = duplicateVerifier.check(source, stageFile)) {
-                    DuplicateCheck.None -> Unit
-
-                    is DuplicateCheck.Found -> {
-                        cancelStage(sourceId)
-                        return@withMutation SaveResult.DuplicateFound(duplicate.existingId)
-                    }
-
-                    DuplicateCheck.Unverifiable -> return@withMutation SaveResult.Failed
-                }
-
-                try {
-                    val blobFile = paths.blobFile(sourceId)
-                    if (!fileOps.rename(stageFile, blobFile)) return@withMutation SaveResult.Failed
-                    fileOps.syncDirectory(paths.artefactsDir)
-                } catch (error: IOException) {
-                    return@withMutation saveFailureFor(error)
-                } catch (error: ErrnoException) {
-                    return@withMutation saveFailureFor(error)
-                }
-
-                try {
-                    sourceDao.update(source.copy(state = SourceState.READY).toEntity())
-                } catch (error: IOException) {
-                    return@withMutation saveFailureFor(error)
-                } catch (error: ErrnoException) {
-                    return@withMutation saveFailureFor(error)
-                } catch (_: SQLiteFullException) {
-                    // The rename already happened, but the row remains STAGED when
-                    // the final commit is rejected; recovery owns both paths.
-                    return@withMutation SaveResult.StorageUnavailable
-                } catch (_: Exception) {
-                    // The rename already happened, but the row remains STAGED when
-                    // the final commit is rejected (for example by the READY
-                    // invariant trigger). Recovery owns both possible artefact paths
-                    // and will remove them on the next pass; never surface success.
-                    return@withMutation SaveResult.Failed
-                }
-                SaveResult.Saved(sourceId)
+                val result = saveLocked(sourceId)
+                // P1-18-R5: a failure that kept its stage keeps the slot, so
+                // foreground cleanup leaves the stage for the user's retry and
+                // no second import starts. Read under the same mutation.
+                keepSlot = keepsSlotAfterSave(
+                    result,
+                    rowStillStaged = sourceDao.findById(sourceId.toString())?.state == SourceState.STAGED.name,
+                    stageExists = paths.stageFile(sourceId).exists(),
+                )
+                result
             }
         } finally {
-            // Whatever the outcome, this import has been decided; a stage left
-            // by a failure is recovery's to remove.
-            importSlot.release(sourceId)
+            if (!keepSlot) importSlot.release(sourceId)
         }
     }
 
-    private fun saveFailureFor(error: Throwable): SaveResult =
-        if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
-            SaveResult.StorageUnavailable
-        } else {
-            SaveResult.Failed
+    private suspend fun saveLocked(sourceId: UUID): SaveResult {
+        val entity = sourceDao.findById(sourceId.toString())
+        if (entity == null || entity.state != SourceState.STAGED.name) return SaveResult.StageNotFound
+        val source = entity.toDomain()
+
+        val stageFile = paths.stageFile(sourceId)
+        if (!stageFile.exists()) return SaveResult.StageNotFound
+
+        if (!authenticator.authenticates(source, stageFile)) return SaveResult.Failed
+
+        when (val duplicate = duplicateVerifier.check(source, stageFile)) {
+            DuplicateCheck.None -> Unit
+
+            is DuplicateCheck.Found -> {
+                cancelStage(sourceId)
+                return SaveResult.DuplicateFound(duplicate.existingId)
+            }
+
+            DuplicateCheck.Unverifiable -> return SaveResult.Failed
         }
+
+        try {
+            val blobFile = paths.blobFile(sourceId)
+            if (!fileOps.rename(stageFile, blobFile)) return SaveResult.Failed
+            fileOps.syncDirectory(paths.artefactsDir)
+        } catch (error: IOException) {
+            return saveFailureFor(error)
+        } catch (error: ErrnoException) {
+            return saveFailureFor(error)
+        }
+
+        return sourceDao.commitReady(sourceId)
+    }
 }
 
 /** Null when Keystore cannot wrap, including a lost wrapping key, which is never recreated here (P1-14-R2). */
@@ -392,3 +391,45 @@ private fun KeystoreWrapper.wrapSourceKeyOrNull(dek: ByteArray, sourceId: UUID) 
 } catch (_: ProviderException) {
     null
 }
+
+/** The final STAGED -> READY commit of a save; the rename already happened. */
+private suspend fun SourceDao.commitReady(sourceId: UUID): SaveResult = try {
+    // Compare-and-set (P1-18-R13). Losing it cannot happen under the
+    // mutation; if it did, the row was not saved by this call.
+    when (compareAndSetState(sourceId.toString(), SourceState.STAGED, SourceState.READY)) {
+        StateTransition.APPLIED -> SaveResult.Saved(sourceId)
+        StateTransition.LOST_RACE -> SaveResult.Failed
+    }
+} catch (cancelled: CancellationException) {
+    // P1-18-R9: cancellation reaches the caller; never reported as a
+    // failure for an item that may already be saved.
+    throw cancelled
+} catch (error: IOException) {
+    saveFailureFor(error)
+} catch (error: ErrnoException) {
+    saveFailureFor(error)
+} catch (_: SQLiteFullException) {
+    // The rename already happened, but the row remains STAGED when
+    // the final commit is rejected; recovery owns both paths.
+    SaveResult.StorageUnavailable
+} catch (_: Exception) {
+    // The rename already happened, but the row remains STAGED when
+    // the final commit is rejected (for example by the READY
+    // invariant trigger). Recovery owns both possible artefact paths
+    // and will remove them on the next pass; never surface success.
+    SaveResult.Failed
+}
+
+private fun prepareFailureFor(error: Throwable): PrepareResult =
+    if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+        PrepareResult.StorageUnavailable
+    } else {
+        PrepareResult.Failed
+    }
+
+private fun saveFailureFor(error: Throwable): SaveResult =
+    if (IoFailureClassifier.classify(error) == IoFailureClassifier.Kind.STORAGE_UNAVAILABLE) {
+        SaveResult.StorageUnavailable
+    } else {
+        SaveResult.Failed
+    }

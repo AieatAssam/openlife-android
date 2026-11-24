@@ -3,15 +3,17 @@ package org.openlife.vault.repository
 import android.database.sqlite.SQLiteFullException
 import android.system.ErrnoException
 import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SourceDao
+import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
-import org.openlife.vault.storage.toEntity
 import java.util.UUID
 
 /**
@@ -54,8 +56,12 @@ class DeletionRepository(
                 // Committed before any file is touched, so a kill partway through
                 // leaves an unambiguous, resumable state (design §12; also handled
                 // by RecoveryRepository's DELETING branch on next startup).
-                if (source.state != SourceState.DELETING) {
-                    sourceDao.update(source.copy(state = SourceState.DELETING).toEntity())
+                if (source.state != SourceState.DELETING &&
+                    sourceDao.compareAndSetState(source.id.toString(), source.state, SourceState.DELETING) ==
+                    StateTransition.LOST_RACE
+                ) {
+                    // Another writer changed the row since it was read (P1-18-R13).
+                    return@withMutation DeleteResult.Failed
                 }
 
                 if (!fileOps.deleteArtefacts(paths, sourceId)) {
@@ -73,6 +79,10 @@ class DeletionRepository(
                     sourceDao.deleteById(sourceId.toString())
                 }
                 DeleteResult.Deleted
+            } catch (cancelled: CancellationException) {
+                // Never reported as a failure (P1-18-R9); the transaction rolled
+                // back, so the row stays DELETING for a later retry.
+                throw cancelled
             } catch (error: java.io.IOException) {
                 deleteFailureFor(error)
             } catch (error: ErrnoException) {

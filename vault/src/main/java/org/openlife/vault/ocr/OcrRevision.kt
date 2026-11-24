@@ -9,7 +9,8 @@ data class OcrRevision(
     val state: OcrRevisionState,
     val engineId: String,
     val modelVersion: String,
-    val orientation: Orientation,
+    /** Null when the stored value is not one this build recognises (P1-18-R14). */
+    val orientation: Orientation?,
     val sourceDigest: ByteArray,
     val startedAt: Long,
     val extractedAt: Long?,

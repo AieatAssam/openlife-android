@@ -116,6 +116,7 @@ private fun OcrReadyContent(
             OcrReviewState.UNREVIEWED -> R.string.viewer_provenance_unreviewed
             OcrReviewState.ACCEPTED -> R.string.viewer_review_accepted
             OcrReviewState.REJECTED -> R.string.viewer_review_rejected
+            OcrReviewState.UNRECOGNISED -> R.string.viewer_review_unrecognised
         },
     )
     val provenance = stringResource(
@@ -292,6 +293,7 @@ private fun reviewLabel(state: OcrReviewState): Int = when (state) {
     OcrReviewState.UNREVIEWED -> R.string.viewer_review_unreviewed
     OcrReviewState.ACCEPTED -> R.string.viewer_review_accepted
     OcrReviewState.REJECTED -> R.string.viewer_review_rejected
+    OcrReviewState.UNRECOGNISED -> R.string.viewer_review_unrecognised
 }
 
 private fun revisionStateLabel(state: org.openlife.vault.ocr.OcrRevisionState): Int = when (state) {
@@ -301,6 +303,7 @@ private fun revisionStateLabel(state: org.openlife.vault.ocr.OcrRevisionState): 
     org.openlife.vault.ocr.OcrRevisionState.FAILED -> R.string.viewer_revision_failed
     org.openlife.vault.ocr.OcrRevisionState.CANCELLED -> R.string.viewer_revision_cancelled
     org.openlife.vault.ocr.OcrRevisionState.STALE -> R.string.viewer_revision_stale
+    org.openlife.vault.ocr.OcrRevisionState.UNRECOGNISED -> R.string.viewer_revision_unrecognised
 }
 
 @Composable
@@ -315,4 +318,6 @@ private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) 
     OcrFailureReason.PROCESS_RESTART -> stringResource(R.string.ocr_failure_process_restart)
     OcrFailureReason.TIMEOUT -> stringResource(R.string.ocr_failure_timeout)
     OcrFailureReason.STORAGE_FAILURE -> stringResource(R.string.ocr_failure_storage)
+    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> stringResource(R.string.ocr_failure_source_unavailable)
+    OcrFailureReason.UNRECOGNISED -> stringResource(R.string.ocr_failure_unrecognised)
 }

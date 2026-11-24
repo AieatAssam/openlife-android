@@ -7,16 +7,25 @@ enum class OcrRevisionState {
     FAILED,
     CANCELLED,
     STALE,
+
+    /** Stored by a build this one does not understand; never written (P1-18-R14). */
+    UNRECOGNISED,
 }
 
 enum class OcrReviewState {
     UNREVIEWED,
     ACCEPTED,
     REJECTED,
+
+    /** Stored by a build this one does not understand; never written (P1-18-R14). */
+    UNRECOGNISED,
 }
 
 enum class OcrCoordinateSystem {
     SOURCE_PIXELS,
+
+    /** Stored by a build this one does not understand; never written (P1-18-R14). */
+    UNRECOGNISED,
 }
 
 enum class OcrFailureReason {
@@ -34,4 +43,10 @@ enum class OcrFailureReason {
 
     /** The final commit of text and revision failed on this device's storage (P2-02-R1). */
     STORAGE_FAILURE,
+
+    /** The saved image could not be read right now (Keystore or I/O); retry may succeed (P1-18-R8). */
+    SOURCE_TEMPORARILY_UNAVAILABLE,
+
+    /** Stored by a build this one does not understand; never written (P1-18-R14). */
+    UNRECOGNISED,
 }

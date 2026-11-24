@@ -63,7 +63,7 @@ else
 fi
 require "connected tests have a retry wrapper" 'attempt|retry'
 require "connected runner uses swiftshader" 'gpu swiftshader_indirect'
-require "test run reuses a snapshot without saving" 'no-snapshot-save'
+require "test run starts from a clean emulator without snapshots" 'no-snapshot -wipe-data'
 require "AVD snapshot cache is configured" 'id: avd-cache'
 require "AVD cache includes ~/.android/avd" '~/\.android/avd'
 require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
@@ -114,6 +114,7 @@ require "filtered OpenLife logcat is uploaded" 'OpenLifeRecovery|org\.openlife'
 require "release APK inspection is wired" 'scripts/inspect-release-apk\.sh'
 require "push trigger is present" '^  push:'
 require "pull request trigger is present" '^  pull_request:'
+require "emulator legs run on manual dispatch only (owner instruction 2026-11-24)" "^    if: github.event_name == 'workflow_dispatch'\$"
 require "emulator-runner pin is the ubuntu-24-safe v2.38.0 SHA" 'android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d'
 
 if grep -Eq '^[[:space:]]*enable-kvm:' "$WORKFLOW"; then

@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -454,6 +455,87 @@ class RecoveryRepositoryTest {
         assertEquals(SourceState.CORRUPT, db.sourceDao().findById(missing.toString())!!.toDomain().state)
         assertEquals(SourceState.CORRUPT, db.sourceDao().findById(malformed.toString())!!.toDomain().state)
         assertTrue("a malformed blob is kept for diagnosis", paths.blobFile(malformed).exists())
+    }
+
+    /**
+     * P1-18-R5 (V-03): a Save that failed transiently keeps its stage and its
+     * slot, so the foreground cleanup pass must leave that stage alone.
+     */
+    @Test
+    fun cleanAbandonedStagesSkipsAStageWhoseSaveFailedTransiently(): Unit = runBlocking {
+        val flaky = org.openlife.vault.testing.DoFinalFaultWrapper(alias)
+        val importer = ImportRepository(
+            paths = paths,
+            database = db,
+            keystoreWrapper = flaky,
+            bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
+            mutationQueue = queueForTest,
+        )
+        val prepared = importer.prepareImport(
+            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE,
+        ) as PrepareResult.Prepared
+        flaky.failure = { org.openlife.vault.testing.KeystoreFaults.doFinalFailure() }
+        assertEquals(SaveResult.Failed, importer.saveImport(prepared.sourceId))
+
+        assertEquals(0, recoveryRepository.cleanAbandonedStages(importer.importSlot))
+
+        assertEquals(SourceState.STAGED, db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state)
+        assertTrue("the stage a retry needs is kept", paths.stageFile(prepared.sourceId).exists())
+    }
+
+    /**
+     * P1-18-R14 (VS-1): a state written by another build is not READY. It is
+     * never shown, never deleted by recovery (nor its files as orphans), and
+     * its stored text is not rewritten.
+     */
+    @Test
+    fun unknownSourceStateIsNeitherShownNorDeleted(): Unit = runBlocking {
+        val id = UUID.randomUUID()
+        db.sourceDao().insert(
+            org.openlife.vault.storage.SourceEntity(
+                id = id.toString(),
+                state = "ARCHIVED_BY_A_NEWER_BUILD",
+                importedAt = 1,
+                intakeKind = "SHARE",
+                mimeType = "image/jpeg",
+                byteCount = 10,
+                sha256 = ByteArray(32) { 1 },
+                width = 10,
+                height = 10,
+                orientation = "NORMAL",
+                wrappedDek = ByteArray(16) { 2 },
+                artefactVersion = 1,
+            ),
+        )
+        val blob = paths.blobFile(id).apply { writeBytes(ByteArray(64) { 4 }) }
+
+        val report = recoveryRepository.recover()
+
+        assertEquals(1, report.unrecognisedRows)
+        assertEquals(0, report.removedOrphanFiles)
+        assertEquals("ARCHIVED_BY_A_NEWER_BUILD", db.sourceDao().findById(id.toString())!!.state)
+        assertTrue("its file is not an orphan", blob.exists())
+        val visible = SourceViewRepository(paths, db, wrapper, queueForTest).observeVisibleSources().first()
+        assertTrue("an unrecognised row is never shown", visible.none { it.id == id })
+        assertEquals(DeleteResult.NotFound, DeletionRepository(paths, db, queueForTest).deleteSource(id))
+        assertEquals("ARCHIVED_BY_A_NEWER_BUILD", db.sourceDao().findById(id.toString())!!.state)
+    }
+
+    /** P1-18-R15 (V-12): the ArtefactFileOps fault seam reaches recovery too. */
+    @Test
+    fun injectedFileOpsFaultReachesRecovery(): Unit = runBlocking {
+        val id = prepareOnly()
+        val stage = paths.stageFile(id)
+        val failing = object : ArtefactFileOps by ArtefactFileOps.Default {
+            override fun deleteIfExists(file: java.io.File): Boolean =
+                if (file == stage) false else ArtefactFileOps.Default.deleteIfExists(file)
+        }
+
+        val report = RecoveryRepository(paths, db, wrapper, MutationQueue(), fileOps = failing).recover()
+
+        assertEquals(0, report.cleanedStaged)
+        assertEquals(SourceState.STAGED, db.sourceDao().findById(id.toString())!!.toDomain().state)
+        assertTrue("the injected failure kept the stage", stage.exists())
     }
 
     /** A second, distinct saved source (the default fixture bytes would be a duplicate). */

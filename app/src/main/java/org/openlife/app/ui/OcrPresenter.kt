@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.openlife.vault.ocr.OcrCoordinateSystem
 import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevisionState
@@ -176,6 +177,8 @@ internal object OcrStateMapper {
 
     private fun fromRevision(sourceId: UUID, view: OcrView, history: List<OcrHistoryItem>): OcrUiState {
         val revision = view.revision
+        // P1-18-R14: written by another build; explained, never shown as text.
+        if (view.hasUnrecognisedValue()) return OcrUiState.Failed(sourceId, OcrFailureReason.UNRECOGNISED, history)
         return when (revision.state) {
             OcrRevisionState.READY -> OcrUiState.Ready(
                 sourceId = sourceId,
@@ -210,6 +213,14 @@ internal object OcrStateMapper {
             OcrRevisionState.RUNNING -> OcrUiState.Running(sourceId, history)
 
             OcrRevisionState.NOT_STARTED -> OcrUiState.Idle
+
+            OcrRevisionState.UNRECOGNISED -> OcrUiState.Failed(sourceId, OcrFailureReason.UNRECOGNISED, history)
         }
     }
+
+    private fun OcrView.hasUnrecognisedValue(): Boolean = revision.state == OcrRevisionState.UNRECOGNISED ||
+        revision.reviewState == OcrReviewState.UNRECOGNISED ||
+        revision.failureReason == OcrFailureReason.UNRECOGNISED ||
+        revision.orientation == null ||
+        spans.any { it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED }
 }

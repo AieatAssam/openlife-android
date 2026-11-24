@@ -65,7 +65,9 @@ jobs:
 
   instrumented-tests:
     name: Instrumented tests (API ${{ matrix.api-level }})
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    # Owner instruction 2026-11-24: no emulator legs on pull requests or pushes;
+    # device evidence comes from the physical tablet. Manual dispatch only.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     timeout-minutes: 55
     strategy:

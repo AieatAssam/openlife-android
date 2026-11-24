@@ -41,27 +41,7 @@ abstract class OpenLifeDatabase : RoomDatabase() {
         val readyInvariantCallback = object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                for (event in listOf("INSERT", "UPDATE")) {
-                    db.execSQL(
-                        """
-                        CREATE TRIGGER sources_ready_requires_fields_$event
-                        BEFORE $event ON sources
-                        WHEN NEW.state = 'READY' AND (
-                            NEW.mimeType IS NULL OR
-                            NEW.byteCount IS NULL OR
-                            NEW.sha256 IS NULL OR
-                            NEW.width IS NULL OR
-                            NEW.height IS NULL OR
-                            NEW.orientation IS NULL OR
-                            NEW.wrappedDek IS NULL OR
-                            NEW.artefactVersion IS NULL
-                        )
-                        BEGIN
-                            SELECT RAISE(ABORT, 'READY source requires all validated fields');
-                        END;
-                        """.trimIndent(),
-                    )
-                }
+                ReadyInvariantTriggers.create(db)
             }
         }
 
@@ -80,6 +60,9 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_ocr_span_reviews_spanId` " +
                         "ON `ocr_span_reviews` (`spanId`)",
                 )
+                // P1-18-R12: every migration ends by re-asserting the READY
+                // invariant triggers on `sources`.
+                ReadyInvariantTriggers.create(db)
             }
         }
 
@@ -154,6 +137,10 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_spanId` " +
                         "ON `ocr_user_revisions` (`spanId`)",
                 )
+                // P1-18-R12: last, once `sources` is in its final shape, so a
+                // database that lacks the triggers (or a future rebuild of
+                // `sources`) ends with them.
+                ReadyInvariantTriggers.create(db)
             }
         }
     }
