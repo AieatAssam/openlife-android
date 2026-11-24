@@ -43,18 +43,24 @@ class TypographyBriefTest {
         sansRoles.forEach { (name, style) ->
             assertEquals("$name is IBM Plex Sans", plex, resourceIds(name, style))
         }
-        listOf("headlineLarge" to type.headlineLarge, "headlineMedium" to type.headlineMedium, "headlineSmall" to type.headlineSmall)
-            .forEach { (name, style) -> assertEquals("$name is Plex 600", FontWeight.SemiBold, style.fontWeight) }
+        listOf(
+            "headlineLarge" to type.headlineLarge,
+            "headlineMedium" to type.headlineMedium,
+            "headlineSmall" to type.headlineSmall,
+        ).forEach { (name, style) -> assertEquals("$name is Plex 600", FontWeight.SemiBold, style.fontWeight) }
 
-        listOf("displayLarge" to type.displayLarge, "displayMedium" to type.displayMedium, "displaySmall" to type.displaySmall)
-            .forEach { (name, style) ->
-                assertEquals("$name is Fraunces", setOf(R.font.fraunces_variable), resourceIds(name, style))
-                assertEquals("$name is Fraunces 500", FontWeight.Medium, style.fontWeight)
-                val face = (style.fontFamily as FontListFontFamily).fonts.single() as ResourceFont
-                val settings = face.variationSettings.settings.associate { it.axisName to it.toVariationValue(null) }
-                assertEquals("$name carries the WONK axis", 1f, settings["WONK"])
-                assertEquals("$name sets the wght axis it claims", 500f, settings["wght"])
-            }
+        listOf(
+            "displayLarge" to type.displayLarge,
+            "displayMedium" to type.displayMedium,
+            "displaySmall" to type.displaySmall,
+        ).forEach { (name, style) ->
+            assertEquals("$name is Fraunces", setOf(R.font.fraunces_variable), resourceIds(name, style))
+            assertEquals("$name is Fraunces 500", FontWeight.Medium, style.fontWeight)
+            val face = (style.fontFamily as FontListFontFamily).fonts.single() as ResourceFont
+            val settings = face.variationSettings.settings.associate { it.axisName to it.toVariationValue(null) }
+            assertEquals("$name carries the WONK axis", 1f, settings["WONK"])
+            assertEquals("$name sets the wght axis it claims", 500f, settings["wght"])
+        }
     }
 
     @Test

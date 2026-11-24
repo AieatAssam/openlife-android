@@ -57,8 +57,7 @@ class NoHardcodedUiStringsTest {
         ).forEach { mutation -> assertTrue("the check catches: $mutation", templateViolation(mutation)) }
     }
 
-    private fun templateViolation(line: String): Boolean =
-        TEMPLATE_PATTERNS.any { it.containsMatchIn(line) }
+    private fun templateViolation(line: String): Boolean = TEMPLATE_PATTERNS.any { it.containsMatchIn(line) }
 
     private companion object {
         val TEMPLATE_EXEMPT_FILES = listOf(

@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.OpenLifeButton
+import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
 import java.util.UUID
@@ -104,7 +104,7 @@ private fun PreparingContent(onCancel: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(R.string.intake_preparing))
-            OutlinedButton(onClick = onCancel, modifier = Modifier.padding(top = 16.dp)) {
+            OpenLifeOutlinedButton(onClick = onCancel, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(R.string.cancel_action))
             }
         }
@@ -120,10 +120,10 @@ private fun DuplicateContent(existingSourceId: UUID, onOpenExisting: (UUID) -> U
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(stringResource(R.string.intake_duplicate))
             Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
-                Button(onClick = { onOpenExisting(existingSourceId) }) {
+                OpenLifeButton(onClick = { onOpenExisting(existingSourceId) }) {
                     Text(stringResource(R.string.intake_open_existing))
                 }
-                OutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
+                OpenLifeOutlinedButton(onClick = onCancel, modifier = Modifier.padding(start = 8.dp)) {
                     Text(stringResource(R.string.cancel_action))
                 }
             }
@@ -203,10 +203,10 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.End) {
-            OutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) {
+            OpenLifeOutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) {
                 Text(stringResource(R.string.cancel_action))
             }
-            Button(onClick = onSave, enabled = bitmap != null, modifier = Modifier.testTag("primary_action")) {
+            OpenLifeButton(onClick = onSave, enabled = bitmap != null, modifier = Modifier.testTag("primary_action")) {
                 Text(stringResource(R.string.save_action))
             }
         }
@@ -223,7 +223,7 @@ private fun CenteredMessage(text: String, stampState: StampState? = null, onDone
             stampState?.let { StampBadge(it, modifier = Modifier.padding(bottom = 16.dp)) }
             Text(text)
             onDone?.let {
-                Button(onClick = it, modifier = Modifier.padding(top = 16.dp)) {
+                OpenLifeButton(onClick = it, modifier = Modifier.padding(top = 16.dp)) {
                     Text(stringResource(R.string.intake_done))
                 }
             }
@@ -239,7 +239,7 @@ private fun TerminalMessage(text: String, onDone: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text)
-            Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {
+            OpenLifeButton(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(R.string.intake_done))
             }
         }

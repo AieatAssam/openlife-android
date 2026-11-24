@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +25,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.first
 import org.openlife.app.R
+import org.openlife.app.ui.brand.OpenLifeButton
+import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 
 /**
  * P1-07-R2: [content] is composed only while [status] is UNLOCKED, so no
@@ -126,7 +126,7 @@ private fun LockScreen(title: String, body: String, note: String?, action: Strin
             Text(title, style = MaterialTheme.typography.headlineSmall)
             Text(body, style = MaterialTheme.typography.bodyLarge)
             note?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Button(onClick = onAction) { Text(action) }
+            OpenLifeButton(onClick = onAction) { Text(action) }
         }
     }
 }
@@ -151,13 +151,13 @@ fun AppLockOfferScreen(onEnable: () -> LockAvailability, onSkip: () -> Unit) {
             Text(stringResource(R.string.app_lock_offer_title), style = MaterialTheme.typography.headlineSmall)
             Text(stringResource(R.string.app_lock_offer_body), style = MaterialTheme.typography.bodyLarge)
             refusal?.let { Text(stringResource(refusalText(it)), color = MaterialTheme.colorScheme.error) }
-            Button(
+            OpenLifeButton(
                 onClick = {
                     val availability = onEnable()
                     refusal = availability.takeIf { it != LockAvailability.AVAILABLE }
                 },
             ) { Text(stringResource(R.string.app_lock_offer_enable)) }
-            OutlinedButton(onClick = onSkip) { Text(stringResource(R.string.app_lock_offer_skip)) }
+            OpenLifeOutlinedButton(onClick = onSkip) { Text(stringResource(R.string.app_lock_offer_skip)) }
         }
     }
 }

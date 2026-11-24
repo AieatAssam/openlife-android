@@ -4,8 +4,8 @@ import android.content.Intent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import java.util.UUID
 import org.junit.Test
+import java.util.UUID
 
 /**
  * F-44: "Open existing" is started from IntakeActivity, which runs in the

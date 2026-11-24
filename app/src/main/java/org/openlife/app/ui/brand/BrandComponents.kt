@@ -26,8 +26,8 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -78,7 +78,9 @@ fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Fl
             .rotate(STAMP_ROTATION_DEGREES)
             .border(BorderStroke(1.5.dp, stampColor), MaterialTheme.shapes.small)
             .padding(horizontal = 8.dp, vertical = 4.dp)
-            .semantics { contentDescription = label },
+            // P1-19-R12 (A-08): one node carries the label. With plain
+            // semantics the Box and its uppercase Text child both exposed it.
+            .clearAndSetSemantics { contentDescription = label },
     ) {
         Text(
             text = label.uppercase(),
@@ -137,17 +139,15 @@ private const val STAMP_REST_SCALE = 1f
 private const val STAMP_ROTATION_DEGREES = -3f
 
 @Composable
-fun PerforationDivider(
-    modifier: Modifier = Modifier,
-    description: String = stringResource(R.string.perforation_content_description),
-) {
+fun PerforationDivider(modifier: Modifier = Modifier) {
     val brand = LocalOpenLifeBrandColors.current
     val density = LocalDensity.current
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(16.dp)
-            .semantics { contentDescription = description },
+            // P1-19-R11 (A-08): decorative, like any divider; nothing to announce.
+            .clearAndSetSemantics {},
     ) {
         drawLine(
             color = brand.rule,

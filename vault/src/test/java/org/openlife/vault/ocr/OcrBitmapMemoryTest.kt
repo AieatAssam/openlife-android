@@ -40,7 +40,12 @@ class OcrBitmapMemoryTest {
 
     @Test
     fun aGoodDecodeRecyclesOnlyTheReplacedBitmap() {
-        assertEquals("upright", OcrBitmapPreparer.prepareGuarded<String>({ "decoded" }, { "upright" }, { recycled += it }))
+        val upright = OcrBitmapPreparer.prepareGuarded<String>(
+            decode = { "decoded" },
+            orient = { "upright" },
+            recycle = { recycled += it },
+        )
+        assertEquals("upright", upright)
         assertEquals(listOf("decoded"), recycled)
     }
 

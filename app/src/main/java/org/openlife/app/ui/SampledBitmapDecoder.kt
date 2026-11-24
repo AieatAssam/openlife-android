@@ -26,19 +26,15 @@ object SampledBitmapDecoder {
         preferredConfig: Bitmap.Config = Bitmap.Config.ARGB_8888,
     ): Bitmap? {
         require(maxPixels > 0) { "Maximum decode pixels must be positive" }
-        val sampled = decodeSampled(bytes, maxPixels, preferredConfig) ?: return null
-        val matrix = OrientationTransform.matrixFor(orientation) ?: return sampled
-        val transformed = Bitmap.createBitmap(
-            sampled,
-            0,
-            0,
-            sampled.width,
-            sampled.height,
-            matrix,
-            true,
+        return decodeGuardingMemory(
+            decode = { decodeSampled(bytes, maxPixels, preferredConfig) },
+            orient = { sampled ->
+                OrientationTransform.matrixFor(orientation)
+                    ?.let { matrix -> Bitmap.createBitmap(sampled, 0, 0, sampled.width, sampled.height, matrix, true) }
+                    ?: sampled
+            },
+            recycle = Bitmap::recycle,
         )
-        if (transformed !== sampled) sampled.recycle()
-        return transformed
     }
 
     private fun decodeSampled(bytes: ByteArray, maxPixels: Long, preferredConfig: Bitmap.Config): Bitmap? {
@@ -93,6 +89,26 @@ object SampledBitmapDecoder {
     }
 }
 
-/** RED stub (P1-19, P1-18 review OOM addition). */
-internal fun <B : Any> decodeGuardingMemory(decode: () -> B?, orient: (B) -> B, recycle: (B) -> Unit): B? =
-    TODO("P1-19 OOM $decode $orient $recycle")
+/**
+ * P1-18 review addition (P1-19): every app-side decode (intake preview,
+ * viewer image, list thumbnail) runs here. An OutOfMemoryError while decoding
+ * or orienting becomes "no bitmap", which each caller already shows as
+ * unreadable or unavailable, and the sampled bitmap is recycled whenever it
+ * is not the one returned, so nothing half-built stays allocated.
+ */
+@Suppress("TooGenericExceptionCaught")
+internal fun <B : Any> decodeGuardingMemory(decode: () -> B?, orient: (B) -> B, recycle: (B) -> Unit): B? {
+    val sampled = try {
+        decode()
+    } catch (_: OutOfMemoryError) {
+        null
+    } ?: return null
+    val oriented = try {
+        orient(sampled)
+    } catch (_: OutOfMemoryError) {
+        recycle(sampled)
+        return null
+    }
+    if (oriented !== sampled) recycle(sampled)
+    return oriented
+}

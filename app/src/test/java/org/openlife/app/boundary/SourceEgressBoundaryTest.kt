@@ -199,7 +199,9 @@ class SourceEgressBoundaryTest {
         const val ALLOWED_EVIDENCE_BOUNDS_LOG = "android.util.Log.d(\"EvidenceBounds\", message)"
         const val DEBUG_GUARD = "if (BuildConfig.DEBUG) {"
         val OUTBOUND_ACTION = Regex("ACTION_(VIEW|SEND|SENDTO)")
-        val BARE_TEXT_FIELD = Regex("""(?<![A-Za-z])(TextField|OutlinedTextField|BasicTextField|SecureTextField|OutlinedSecureTextField)\s*\(""")
+        const val TEXT_FIELD_NAMES =
+            "TextField|OutlinedTextField|BasicTextField|SecureTextField|OutlinedSecureTextField"
+        val BARE_TEXT_FIELD = Regex("""(?<![A-Za-z])($TEXT_FIELD_NAMES)\s*\(""")
         val CONTENT_TEXT_FIELD_FILE: Path = Path.of("app/src/main/java/org/openlife/app/ui/ContentTextField.kt")
         val RESET_FLOW_FILE: Path = Path.of("app/src/main/java/org/openlife/app/settings/ResetVaultFlow.kt")
         const val RESET_WORD_EXEMPTION = "P1-19-R5 exemption: reset confirmation word"

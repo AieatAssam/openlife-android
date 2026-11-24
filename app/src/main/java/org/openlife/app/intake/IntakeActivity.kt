@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
-import org.openlife.app.R
 import org.openlife.app.lock.AppLockGate
 import org.openlife.app.lock.LockStatus
 import org.openlife.app.ui.FirstRunExplanationScreen
@@ -144,6 +143,10 @@ class IntakeActivity : FragmentActivity() {
                                     Intent(this, MainActivity::class.java).apply {
                                         addFlags(openExistingIntentFlags())
                                         putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
+                                        putExtra(
+                                            MainActivity.EXTRA_OPEN_SOURCE_NONCE,
+                                            (application as OpenLifeApp).openSourceNonce.issue(),
+                                        )
                                     },
                                 )
                                 finish()

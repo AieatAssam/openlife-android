@@ -56,7 +56,8 @@ class BrandScreenshotTest {
         profiles.forEach { profile ->
             val present = listOf("delete-dialog-light.png", "delete-dialog-dark.png")
                 .map { Files.isRegularFile(profile.resolve(it)) }
-            assertTrue("${profile.fileName} has only one delete-dialog theme", present.all { it } || present.none { it })
+            val paired = present.all { it } || present.none { it }
+            assertTrue("${profile.fileName} has only one delete-dialog theme", paired)
         }
         val screenshotTest = Files.readString(
             projectDir.resolve("app/src/androidTest/java/org/openlife/app/ui/brand/BrandScreenshotInstrumentedTest.kt"),

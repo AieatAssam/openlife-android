@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,10 +27,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.brand.OpenLifeButton
+import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
 import org.openlife.app.ui.evidence.EvidenceSelection
+import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
+import org.openlife.app.ui.theme.OpenLifeMono
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrFailureReason
@@ -57,7 +59,7 @@ internal fun OcrSection(
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.viewer_extracted_text_title), style = MaterialTheme.typography.titleMedium)
         val runAgain = @Composable {
-            TextButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
+            OpenLifeTextButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
                 Text(stringResource(R.string.viewer_run_again))
             }
         }
@@ -65,7 +67,7 @@ internal fun OcrSection(
             // Nothing to offer until the persisted state is known (P2-01).
             OcrUiState.Loading -> Unit
 
-            OcrUiState.Idle -> Button(onClick = onExtractText, enabled = source.state == SourceState.READY) {
+            OcrUiState.Idle -> OpenLifeButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
                 Text(stringResource(R.string.viewer_extract_text_action))
             }
 
@@ -73,7 +75,7 @@ internal fun OcrSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.viewer_extracting))
                     Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
+                    OpenLifeTextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
                 }
                 OcrHistory(state.history)
             }
@@ -162,10 +164,10 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
     }
     state.revisionCorrection?.let { CorrectionLine(it) }
     Row {
-        TextButton(onClick = { onReview(OcrReviewState.ACCEPTED) }) {
+        OpenLifeTextButton(onClick = { onReview(OcrReviewState.ACCEPTED) }) {
             Text(stringResource(R.string.viewer_accept_text))
         }
-        TextButton(onClick = { onReview(OcrReviewState.REJECTED) }) {
+        OpenLifeTextButton(onClick = { onReview(OcrReviewState.REJECTED) }) {
             Text(stringResource(R.string.viewer_reject_text))
         }
     }
@@ -195,25 +197,32 @@ private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions
             } else {
                 androidx.compose.ui.text.AnnotatedString(span.text)
             }
-            Text(value, style = MaterialTheme.typography.labelMedium)
+            Text(value, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = OpenLifeMono))
             if (rejected) {
                 Text(stringResource(R.string.viewer_span_rejected), style = MaterialTheme.typography.labelSmall)
             }
             state.corrections[span.id]?.let { CorrectionLine(it) }
         }
+        // P1-19-R11 (A-08): each action names its span, so a list of
+        // "Correct" buttons is distinguishable without seeing the row.
+        val preview = evidenceSpanPreview(span.text)
         FlowRow(modifier = Modifier.fillMaxWidth()) {
             if (selectable) {
-                TextButton(onClick = { actions.onSelect(span) }) {
+                SpanAction(stringResource(R.string.viewer_show_region_for, preview), { actions.onSelect(span) }) {
                     Text(stringResource(R.string.viewer_show_region))
                 }
             }
-            TextButton(onClick = { actions.onCorrect(span) }) { Text(stringResource(R.string.viewer_correct)) }
+            SpanAction(stringResource(R.string.viewer_correct_for, preview), { actions.onCorrect(span) }) {
+                Text(stringResource(R.string.viewer_correct))
+            }
             if (rejected) {
-                TextButton(onClick = { actions.onUndoReject(span) }) {
+                SpanAction(stringResource(R.string.viewer_undo_reject_for, preview), { actions.onUndoReject(span) }) {
                     Text(stringResource(R.string.viewer_undo_reject))
                 }
             } else {
-                TextButton(onClick = { actions.onReject(span) }) { Text(stringResource(R.string.viewer_reject_span)) }
+                SpanAction(stringResource(R.string.viewer_reject_span_for, preview), { actions.onReject(span) }) {
+                    Text(stringResource(R.string.viewer_reject_span))
+                }
             }
         }
     }
@@ -262,7 +271,7 @@ private fun OcrOutcome(explanation: String, history: List<OcrHistoryItem>, runAg
 private fun OcrHistory(history: List<OcrHistoryItem>) {
     if (history.isEmpty()) return
     var expanded by rememberSaveable { mutableStateOf(false) }
-    TextButton(onClick = { expanded = !expanded }) {
+    OpenLifeTextButton(onClick = { expanded = !expanded }) {
         Text(stringResource(R.string.viewer_ocr_history, history.size))
     }
     if (expanded) {

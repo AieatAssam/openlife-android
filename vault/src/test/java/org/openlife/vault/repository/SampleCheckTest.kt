@@ -15,7 +15,8 @@ class SampleCheckTest {
 
     @Test
     fun outOfMemoryInTheSampledDecodeIsAFailedPrepare() {
-        assertEquals(SampleCheck.OUT_OF_MEMORY, checkSample(BitmapSampler { throw OutOfMemoryError("synthetic") }, bytes))
+        val exhausted = BitmapSampler { throw OutOfMemoryError("synthetic") }
+        assertEquals(SampleCheck.OUT_OF_MEMORY, checkSample(exhausted, bytes))
         assertEquals(PrepareResult.Failed, SampleCheck.OUT_OF_MEMORY.refusal())
     }
 

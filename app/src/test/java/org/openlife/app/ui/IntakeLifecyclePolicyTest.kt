@@ -28,13 +28,12 @@ class IntakeLifecyclePolicyTest {
 
     @Test
     fun aSaveThatEndsWithoutAScreenNeverLeavesTheSlotHeld() {
-        assertFalse("saved: nothing to clean", IntakeLifecyclePolicy.abandonsAfterSave(IntakeUiState.Saved(id)))
-        assertFalse("duplicate: stage already dropped", IntakeLifecyclePolicy.abandonsAfterSave(IntakeUiState.Duplicate(id)))
-        assertFalse("stage gone", IntakeLifecyclePolicy.abandonsAfterSave(IntakeUiState.Cancelled))
-        assertTrue("failed save keeps its stage and slot", IntakeLifecyclePolicy.abandonsAfterSave(IntakeUiState.Failed))
-        assertTrue(IntakeLifecyclePolicy.abandonsAfterSave(IntakeUiState.StorageUnavailable))
-        assertTrue(
-            IntakeLifecyclePolicy.abandonsAfterSave(IntakeUiState.VaultUnavailable(VaultUnavailableCause.STORAGE_IO_ERROR)),
-        )
+        val abandons = IntakeLifecyclePolicy::abandonsAfterSave
+        assertFalse("saved: nothing to clean", abandons(IntakeUiState.Saved(id)))
+        assertFalse("duplicate: stage already dropped", abandons(IntakeUiState.Duplicate(id)))
+        assertFalse("stage gone", abandons(IntakeUiState.Cancelled))
+        assertTrue("failed save keeps its stage and slot", abandons(IntakeUiState.Failed))
+        assertTrue(abandons(IntakeUiState.StorageUnavailable))
+        assertTrue(abandons(IntakeUiState.VaultUnavailable(VaultUnavailableCause.STORAGE_IO_ERROR)))
     }
 }

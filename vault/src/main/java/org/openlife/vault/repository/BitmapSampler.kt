@@ -19,15 +19,27 @@ fun interface BitmapSampler {
     fun canSample(bytes: ByteArray): Boolean
 }
 
-/** RED stub (P1-19, P1-18 review OOM addition). */
+/**
+ * P1-18 review addition (P1-19): the outcome of the sampled decode that
+ * proves the platform can render an import. An OutOfMemoryError there is the
+ * existing [PrepareResult.Failed] (nothing is staged yet); a refused decode
+ * stays CORRUPT_CONTENT.
+ */
 internal enum class SampleCheck {
     SAMPLEABLE,
     UNDECODABLE,
     OUT_OF_MEMORY,
     ;
 
-    fun refusal(): PrepareResult? = TODO("P1-19 OOM $this")
+    fun refusal(): PrepareResult? = when (this) {
+        SAMPLEABLE -> null
+        UNDECODABLE -> PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
+        OUT_OF_MEMORY -> PrepareResult.Failed
+    }
 }
 
-/** RED stub (P1-19, P1-18 review OOM addition). */
-internal fun checkSample(sampler: BitmapSampler, bytes: ByteArray): SampleCheck = TODO("P1-19 OOM $sampler ${bytes.size}")
+internal fun checkSample(sampler: BitmapSampler, bytes: ByteArray): SampleCheck = try {
+    if (sampler.canSample(bytes)) SampleCheck.SAMPLEABLE else SampleCheck.UNDECODABLE
+} catch (_: OutOfMemoryError) {
+    SampleCheck.OUT_OF_MEMORY
+}

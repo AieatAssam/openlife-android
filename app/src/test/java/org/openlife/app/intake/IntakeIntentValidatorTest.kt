@@ -291,7 +291,8 @@ class IntakeIntentValidatorTest {
         // A neighbouring package name is not ours, and another provider with a
         // user prefix (cross-profile share) is still accepted.
         listOf("content://org.openlifex.y/a", "content://10@com.example.provider/a").forEach { uri ->
-            assertTrue(uri, IntakeIntentValidator.validate(shape(extraStreamUri = uri), ownPackage) is IntakeValidationResult.Valid)
+            val result = IntakeIntentValidator.validate(shape(extraStreamUri = uri), ownPackage)
+            assertTrue(uri, result is IntakeValidationResult.Valid)
         }
     }
 }

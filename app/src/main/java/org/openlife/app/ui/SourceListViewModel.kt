@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -145,7 +146,7 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     companion object {
         /** Test seam (P1-19-R14): holds back the delete callback so the list flow emits first. */
-        @androidx.annotation.VisibleForTesting
+        @VisibleForTesting
         @Volatile
         internal var deleteResultDelayMillisForTest = 0L
 

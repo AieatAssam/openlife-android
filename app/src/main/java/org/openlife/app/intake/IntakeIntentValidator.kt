@@ -29,11 +29,13 @@ object IntakeIntentValidator {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.WRONG_ACTION)
         }
 
-        // ACTION_SEND is exported, so a direct caller must prove it received
-        // a one-shot read grant for the supplied content URI. A caller cannot
-        // manufacture access merely by naming a public-looking content URI.
-        // Photo Picker forwarding adds this same flag in MainActivity before
-        // starting this activity, so it follows the identical boundary.
+        // P1-19-R18 (A-15): FLAG_GRANT_READ_URI_PERMISSION is set by the
+        // caller, so its presence proves nothing about what the caller may
+        // read; this check only rejects intents of the wrong shape. The
+        // defence is that OpenLife holds no media or storage permission:
+        // it can read a URI only if the caller really granted it (or it is
+        // world-readable), so naming a URI does not lend OpenLife's access.
+        // Photo Picker forwarding sets the same flag in MainActivity.
         if (!shape.hasReadUriPermission) {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.MISSING_READ_GRANT)
         }
@@ -69,11 +71,16 @@ object IntakeIntentValidator {
         // is defensive: sender-supplied paths and authorities are never
         // trusted (design §8), and this stops a future provider addition
         // from becoming a same-app confused-deputy vector by default.
-        val authority = parsed.authority
-        if (authority != null &&
+        // P1-19-R19 (A-16): compare the host only. The authority string also
+        // carries userinfo ("x@org.openlife.y") and a port, which the platform
+        // strips before resolving the provider, so a prefix test on the raw
+        // authority could be bypassed. Userinfo itself is not rejected: a
+        // cross-profile share legitimately arrives as "10@com.example.provider".
+        val host = parsed.authority?.substringAfterLast('@')?.substringBefore(':')
+        if (host != null &&
             (
-                authority.equals(ownPackageName, ignoreCase = true) ||
-                    authority.startsWith("$ownPackageName.", ignoreCase = true)
+                host.equals(ownPackageName, ignoreCase = true) ||
+                    host.startsWith("$ownPackageName.", ignoreCase = true)
             )
         ) {
             return IntakeValidationResult.Rejected(IntakeRejectionReason.OWN_AUTHORITY)

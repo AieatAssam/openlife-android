@@ -1,7 +1,7 @@
 package org.openlife.app.ui
 
-import android.view.inputmethod.EditorInfo
 import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.TextToolbar
@@ -24,7 +24,13 @@ class ContentTextFieldPolicyTest {
         val platform = RecordingToolbar()
         val toolbar = NoClipboardWriteTextToolbar(platform)
 
-        toolbar.showMenu(Rect.Zero, onCopyRequested = {}, onPasteRequested = {}, onCutRequested = {}, onSelectAllRequested = {})
+        toolbar.showMenu(
+            Rect.Zero,
+            onCopyRequested = {},
+            onPasteRequested = {},
+            onCutRequested = {},
+            onSelectAllRequested = {},
+        )
 
         assertNull("no Copy", platform.copy)
         assertNull("no Cut", platform.cut)

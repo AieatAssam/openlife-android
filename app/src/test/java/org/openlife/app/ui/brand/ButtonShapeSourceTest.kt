@@ -14,7 +14,9 @@ import java.util.stream.Collectors
 class ButtonShapeSourceTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
     private val wrapperFile = "ui/brand/Buttons.kt"
-    private val bareButton = Regex("""(?<![A-Za-z.])(Button|OutlinedButton|TextButton|FilledTonalButton|ElevatedButton)\s*\(""")
+    private val bareButton = Regex(
+        """(?<![A-Za-z.])(Button|OutlinedButton|TextButton|FilledTonalButton|ElevatedButton)\s*\(""",
+    )
 
     @Test
     fun everyButtonCallUsesTheEightDpWrapper() {
@@ -24,7 +26,7 @@ class ButtonShapeSourceTest {
                 .filter { !it.toString().endsWith(wrapperFile) }
                 .flatMap { file ->
                     Files.readAllLines(file).withIndex()
-                        .filter { (_, line) -> bareButton.containsMatchIn(line) && !line.trimStart().startsWith("import ") }
+                        .filter { (_, line) -> isBareButtonCall(line) }
                         .map { (index, line) -> "$file:${index + 1}: ${line.trim()}" }
                         .stream()
                 }
@@ -34,4 +36,7 @@ class ButtonShapeSourceTest {
         val wrappers = Files.readString(root.resolve(wrapperFile))
         assertTrue("the wrappers use the 8 dp shape", wrappers.contains("RoundedCornerShape(8.dp)"))
     }
+
+    private fun isBareButtonCall(line: String): Boolean =
+        bareButton.containsMatchIn(line) && !line.trimStart().startsWith("import ")
 }

@@ -1,5 +1,6 @@
 package org.openlife.app.settings
 
+import android.icu.text.ListFormatter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,28 +11,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
+import org.openlife.app.ui.brand.OpenLifeOutlinedButton
+import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 
@@ -43,6 +42,7 @@ fun SettingsScreen(
     onVerifyAll: (suspend () -> VerifyReport?)? = null,
     appLock: AppLockSettings? = null,
 ) {
+    val controller = viewModel<SettingsViewModel>().controller
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = { BackTopAppBar(title = stringResource(R.string.settings_title), onBack = onBack) },
@@ -53,8 +53,8 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 appLock?.let { AppLockSettingsSection(it) }
-                onVerifyAll?.let { VerifyAllSection(it) }
-                ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete)
+                onVerifyAll?.let { VerifyAllSection(controller, it) }
+                ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete, controller = controller)
             }
         }
     }
@@ -63,45 +63,29 @@ fun SettingsScreen(
 /**
  * P1-14-R3: deep verification is explicit. [onVerifyAll] returns null when
  * the vault is unavailable; the result stays on screen until run again.
+ * The pass and its result live in [SettingsController] (P1-19-R15).
  */
 @Composable
-@Suppress("TooGenericExceptionCaught", "SwallowedException")
-private fun VerifyAllSection(onVerifyAll: suspend () -> VerifyReport?) {
-    var running by remember { mutableStateOf(false) }
-    var outcome by remember { mutableStateOf<VerifyOutcome?>(null) }
-    val scope = rememberCoroutineScope()
+private fun VerifyAllSection(controller: SettingsController, onVerifyAll: suspend () -> VerifyReport?) {
+    val state by controller.verify.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.verify_all_explanation), style = MaterialTheme.typography.bodyMedium)
-        OutlinedButton(
-            enabled = !running,
-            onClick = {
-                scope.launch {
-                    running = true
-                    try {
-                        outcome = onVerifyAll()?.let(VerifyOutcome::Done) ?: VerifyOutcome.Unavailable
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        // A reset or storage failure mid-pass; items already checked keep their state.
-                        outcome = VerifyOutcome.Failed
-                    } finally {
-                        running = false
-                    }
-                }
-            },
-        ) {
-            Text(stringResource(if (running) R.string.verify_all_running else R.string.verify_all_action))
+        OpenLifeOutlinedButton(enabled = !state.running, onClick = { controller.verifyAll(onVerifyAll) }) {
+            Text(stringResource(if (state.running) R.string.verify_all_running else R.string.verify_all_action))
         }
-        when (val current = outcome) {
+        when (val current = state.outcome) {
             is VerifyOutcome.Done -> {
                 val report = current.report
+                val damaged = report.markedCorrupt
                 Text(
-                    listOf(
-                        pluralStringResource(R.plurals.verify_all_verified, report.verified, report.verified),
-                        pluralStringResource(R.plurals.verify_all_damaged, report.markedCorrupt, report.markedCorrupt),
-                        pluralStringResource(R.plurals.verify_all_unchecked, report.transient, report.transient),
-                    ).joinToString(", "),
+                    localizedList(
+                        listOf(
+                            pluralStringResource(R.plurals.verify_all_verified, report.verified, report.verified),
+                            pluralStringResource(R.plurals.verify_all_damaged, damaged, damaged),
+                            pluralStringResource(R.plurals.verify_all_unchecked, report.transient, report.transient),
+                        ),
+                    ),
                 )
                 if (report.transient > 0) Text(stringResource(R.string.verify_all_transient_hint))
             }
@@ -118,69 +102,60 @@ private fun VerifyAllSection(onVerifyAll: suspend () -> VerifyReport?) {
     }
 }
 
+/** Joins already-localised phrases the way the current locale lists things (P1-19-R20). */
+@Composable
+private fun localizedList(items: List<String>): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return ListFormatter.getInstance(locale).format(items)
+}
 
 @Composable
-@Suppress("TooGenericExceptionCaught", "SwallowedException")
-fun ResetVaultFlow(onResetVault: suspend () -> VaultResetResult, onResetComplete: () -> Unit = {}) {
-    var stage by remember { mutableStateOf(ResetStage.CLOSED) }
-    var word by remember { mutableStateOf("") }
-    var failure by remember { mutableStateOf<String?>(null) }
-    var running by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+fun ResetVaultFlow(
+    onResetVault: suspend () -> VaultResetResult,
+    onResetComplete: () -> Unit = {},
+    controller: SettingsController = viewModel<SettingsViewModel>().controller,
+) {
+    val state by controller.reset.collectAsState()
     val requiredWord = stringResource(R.string.reset_vault_required_word)
-    val busyText = stringResource(R.string.reset_vault_busy)
-    val failedText = stringResource(R.string.reset_vault_failed)
 
-    OutlinedButton(
-        onClick = {
-            stage = ResetStage.TYPE_WORD
-            word = ""
-            failure = null
-        },
+    LaunchedEffect(state.completed) {
+        if (state.completed) {
+            controller.consumeResetCompleted()
+            onResetComplete()
+        }
+    }
+
+    OpenLifeOutlinedButton(
+        onClick = controller::openReset,
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
     ) {
         Text(stringResource(R.string.reset_vault_action))
     }
 
-    if (stage == ResetStage.TYPE_WORD) {
+    if (state.stage == ResetStage.TYPE_WORD) {
         TypeWordDialog(
-            word = word,
+            word = state.word,
             requiredWord = requiredWord,
-            onWordChange = { word = it },
-            onContinue = { stage = ResetStage.FINAL_CONFIRMATION },
-            onDismiss = { stage = ResetStage.CLOSED },
+            onWordChange = controller::setWord,
+            onContinue = controller::continueReset,
+            onDismiss = controller::dismissReset,
         )
     }
 
-    if (stage == ResetStage.FINAL_CONFIRMATION) {
+    if (state.stage == ResetStage.FINAL_CONFIRMATION) {
         FinalConfirmationDialog(
-            running = running,
-            failure = failure,
-            onDismiss = { stage = ResetStage.CLOSED },
-            onConfirm = {
-                scope.launch {
-                    running = true
-                    try {
-                        when (onResetVault()) {
-                            VaultResetResult.COMPLETED -> {
-                                stage = ResetStage.CLOSED
-                                onResetComplete()
-                            }
-
-                            VaultResetResult.BUSY -> failure = busyText
-
-                            VaultResetResult.FAILED -> failure = failedText
-                        }
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (exception: Exception) {
-                        failure = failedText
-                    } finally {
-                        running = false
-                    }
-                }
+            running = state.running,
+            failure = state.failure?.let {
+                stringResource(
+                    when (it) {
+                        ResetFailure.BUSY -> R.string.reset_vault_busy
+                        ResetFailure.FAILED -> R.string.reset_vault_failed
+                    },
+                )
             },
+            onDismiss = controller::dismissReset,
+            onConfirm = { controller.confirmReset(onResetVault) },
         )
     }
 }
@@ -200,6 +175,8 @@ private fun TypeWordDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.reset_vault_explanation))
                 Text(stringResource(R.string.reset_vault_consequences))
+                // P1-19-R5 exemption: reset confirmation word. It holds only the
+                // fixed word the user types to confirm, never user content.
                 OutlinedTextField(
                     value = word,
                     onValueChange = onWordChange,
@@ -210,12 +187,12 @@ private fun TypeWordDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = word == requiredWord, onClick = onContinue) {
+            OpenLifeTextButton(enabled = word == requiredWord, onClick = onContinue) {
                 Text(stringResource(R.string.reset_vault_continue))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
+            OpenLifeTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
         },
     )
 }
@@ -232,15 +209,14 @@ private fun FinalConfirmationDialog(running: Boolean, failure: String?, onDismis
             }
         },
         confirmButton = {
-            TextButton(
+            OpenLifeTextButton(
                 enabled = !running,
                 onClick = onConfirm,
                 modifier = Modifier.testTag("final-reset-action"),
             ) { Text(stringResource(R.string.reset_vault_action)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
+            OpenLifeTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
         },
     )
 }
-

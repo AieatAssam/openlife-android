@@ -228,7 +228,7 @@ private fun ListDetail(
         Box(modifier = Modifier.width(LIST_PANE_WIDTH).fillMaxHeight()) {
             screens.List(onOpen = { onSelect(it) }, onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
         }
-        VerticalDivider(color = MaterialTheme.colorScheme.outline)
+        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             if (selected != null) {
                 // key: a new selection gets a fresh viewer, never the previous item's decoded state.
