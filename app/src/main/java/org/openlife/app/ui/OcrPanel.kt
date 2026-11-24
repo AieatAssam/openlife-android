@@ -103,11 +103,6 @@ internal fun OcrSection(
     }
 }
 
-/**
- * P2-01-R3/R5: the engine's text stays as extracted; a user's correction is
- * shown under it and attributed. Everything is plain, inert Text: no
- * selection, links or clipboard.
- */
 /** What a span row can do; selection is offered only for evidence (grounded, not rejected). */
 private class SpanActions(
     val onSelect: (OcrSpan) -> Unit,
@@ -116,6 +111,11 @@ private class SpanActions(
     val onUndoReject: (OcrSpan) -> Unit,
 )
 
+/**
+ * P2-01-R3/R5: the engine's text stays as extracted; a user's correction is
+ * shown under it and attributed. Everything is plain, inert Text: no
+ * selection, links or clipboard.
+ */
 @Composable
 private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onReview: (OcrReviewState) -> Unit) {
     val reviewWord = stringResource(
@@ -209,7 +209,9 @@ private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions
             }
             TextButton(onClick = { actions.onCorrect(span) }) { Text(stringResource(R.string.viewer_correct)) }
             if (rejected) {
-                TextButton(onClick = { actions.onUndoReject(span) }) { Text(stringResource(R.string.viewer_undo_reject)) }
+                TextButton(onClick = { actions.onUndoReject(span) }) {
+                    Text(stringResource(R.string.viewer_undo_reject))
+                }
             } else {
                 TextButton(onClick = { actions.onReject(span) }) { Text(stringResource(R.string.viewer_reject_span)) }
             }

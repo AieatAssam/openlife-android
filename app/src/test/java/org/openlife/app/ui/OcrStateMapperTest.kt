@@ -39,7 +39,13 @@ class OcrStateMapperTest {
     fun readyRevisionWithAnUnrecognisedSpanReviewIsUnreadable() {
         val base = view()
         val spanView = base.spans.single()
-        val review = org.openlife.vault.ocr.OcrSpanReview(UUID.randomUUID(), spanView.span.id, OcrReviewState.UNRECOGNISED, 1, 1)
+        val review = org.openlife.vault.ocr.OcrSpanReview(
+            UUID.randomUUID(),
+            spanView.span.id,
+            OcrReviewState.UNRECOGNISED,
+            createdAt = 1,
+            sequence = 1,
+        )
         assertUnreadable(base.copy(spans = listOf(spanView.copy(review = review))))
     }
 

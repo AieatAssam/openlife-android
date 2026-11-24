@@ -33,7 +33,8 @@ class SourceEgressBoundaryTest {
         val file = projectDir.resolve("app/src/main/java/org/openlife/app/ui/evidence/ZoomableEvidenceImage.kt")
         val lines = Files.readAllLines(file)
         assertTrue("the bounds log is still present", lines.any { it.trim() == ALLOWED_EVIDENCE_BOUNDS_LOG })
-        assertTrue("the shipped, guarded log passes: ${boundaryViolations(file, lines)}", boundaryViolations(file, lines).isEmpty())
+        val shipped = boundaryViolations(file, lines)
+        assertTrue("the shipped, guarded log passes: $shipped", shipped.isEmpty())
 
         val unguarded = lines.filterNot { it.trim() == DEBUG_GUARD }
         assertTrue("the mutation removes a guard", unguarded.size < lines.size)

@@ -354,7 +354,8 @@ private fun RegionNode(
             val stroke = STROKE_WIDTH.toPx()
             if (rejected) {
                 val dash = floatArrayOf(stroke * 2f, stroke * 2f)
-                drawRect(color = colors.rejected, style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(dash)))
+                val dashed = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(dash))
+                drawRect(color = colors.rejected, style = dashed)
             } else {
                 if (selected) drawRect(colors.highlighter.copy(alpha = HIGHLIGHT_ALPHA))
                 drawRect(color = colors.highlighter, style = Stroke(width = stroke))

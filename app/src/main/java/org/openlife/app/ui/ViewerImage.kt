@@ -30,11 +30,11 @@ import org.openlife.app.ui.evidence.EvidenceColors
 import org.openlife.app.ui.evidence.EvidenceContent
 import org.openlife.app.ui.evidence.EvidenceSelection
 import org.openlife.app.ui.evidence.ZoomableEvidenceImage
-import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.repository.ReadyReadResult
 import java.util.UUID

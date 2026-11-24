@@ -185,36 +185,46 @@ class EvidenceGeometryTest {
     @Test
     fun clampPanPanToRevealSmallestSpanAtAndNextDoubleTapZoom() {
         val square = Size(100f, 100f)
+
         // clampPan: at 3x a 100 px canvas shows a 300 px image, so pan is limited to ±100.
-        assertEquals(Offset(100f, -100f), EvidenceGeometry.clampPan(Offset(250f, -250f), 100, 100, Orientation.NORMAL, square, zoom = 3f))
-        assertEquals(Offset.Zero, EvidenceGeometry.clampPan(Offset(30f, 30f), 100, 100, Orientation.NORMAL, square, zoom = 1f))
+        fun clampSquare(pan: Offset, zoom: Float) =
+            EvidenceGeometry.clampPan(pan, 100, 100, Orientation.NORMAL, square, zoom = zoom)
+        assertEquals(Offset(100f, -100f), clampSquare(Offset(250f, -250f), zoom = 3f))
+        assertEquals(Offset.Zero, clampSquare(Offset(30f, 30f), zoom = 1f))
         // Pillarboxed 100×1000 in 1000×320: at 2x the image is 64×640, so only vertical pan (±160).
         assertEquals(
             Offset(0f, 160f),
             EvidenceGeometry.clampPan(Offset(50f, 500f), 100, 1000, Orientation.NORMAL, Size(1000f, 320f), zoom = 2f),
         )
 
+        fun revealAt3x(region: OcrEvidenceRegion) =
+            EvidenceGeometry.panToReveal(region, 100, 100, Orientation.NORMAL, square, zoom = 3f, pan = Offset.Zero)
         // panToReveal at 3x, pan 0: (45,45)-(55,55) draws at 35..65 and is already visible.
         assertEquals(
             Offset.Zero,
-            EvidenceGeometry.panToReveal(OcrEvidenceRegion(45, 45, 55, 55), 100, 100, Orientation.NORMAL, square, zoom = 3f, pan = Offset.Zero),
+            revealAt3x(OcrEvidenceRegion(45, 45, 55, 55)),
         )
         // (80,80)-(90,90) draws at 140..170; centring needs -105, clamped to -100.
         assertEquals(
             Offset(-100f, -100f),
-            EvidenceGeometry.panToReveal(OcrEvidenceRegion(80, 80, 90, 90), 100, 100, Orientation.NORMAL, square, zoom = 3f, pan = Offset.Zero),
+            revealAt3x(OcrEvidenceRegion(80, 80, 90, 90)),
         )
         // (0,0)-(100,50) is wider than the canvas at 3x (-100..200, -100..50): centred to x 0, y +75.
         assertEquals(
             Offset(0f, 75f),
-            EvidenceGeometry.panToReveal(OcrEvidenceRegion(0, 0, 100, 50), 100, 100, Orientation.NORMAL, square, zoom = 3f, pan = Offset.Zero),
+            revealAt3x(OcrEvidenceRegion(0, 0, 100, 50)),
         )
 
         // smallestSpanAt: the smallest containing region wins, ties keep the earlier ordinal.
         val revisionId = java.util.UUID.randomUUID()
         fun span(ordinal: Int, region: OcrEvidenceRegion?) = org.openlife.vault.ocr.OcrSpan(
-            java.util.UUID.randomUUID(), revisionId, ordinal, "s$ordinal", null,
-            org.openlife.vault.ocr.OcrCoordinateSystem.SOURCE_PIXELS, region,
+            id = java.util.UUID.randomUUID(),
+            revisionId = revisionId,
+            ordinal = ordinal,
+            text = "s$ordinal",
+            confidence = null,
+            coordinateSystem = org.openlife.vault.ocr.OcrCoordinateSystem.SOURCE_PIXELS,
+            evidenceRegion = region,
         )
         val wide = span(0, OcrEvidenceRegion(0, 0, 100, 100))
         val small = span(1, OcrEvidenceRegion(40, 40, 60, 60))
@@ -222,8 +232,16 @@ class EvidenceGeometryTest {
         val twinLater = span(4, OcrEvidenceRegion(5, 5, 15, 15))
         val twinEarlier = span(3, OcrEvidenceRegion(5, 5, 15, 15))
         val spans = listOf(wide, small, ungrounded, twinLater, twinEarlier)
-        fun at(x: Float, y: Float, zoom: Float = 1f) =
-            EvidenceGeometry.smallestSpanAt(Offset(x, y), spans, 100, 100, Orientation.NORMAL, square, zoom = zoom, pan = Offset.Zero)
+        fun at(x: Float, y: Float, zoom: Float = 1f) = EvidenceGeometry.smallestSpanAt(
+            point = Offset(x, y),
+            spans = spans,
+            sourceW = 100,
+            sourceH = 100,
+            orientation = Orientation.NORMAL,
+            canvasSize = square,
+            zoom = zoom,
+            pan = Offset.Zero,
+        )
         assertEquals(small, at(50f, 50f))
         assertEquals(wide, at(30f, 30f))
         assertEquals(twinEarlier, at(10f, 10f))
@@ -257,10 +275,19 @@ class EvidenceGeometryTest {
         assertEquals(IntRect(0, 0, 100, 100), oneX)
         assertEquals("3x is three times the fit and larger than the canvas", IntRect(-100, -100, 200, 200), threeX)
         val region = EvidenceGeometry.pixelBox(
-            EvidenceGeometry.regionToCanvas(OcrEvidenceRegion(40, 40, 60, 60), 100, 100, Orientation.NORMAL, canvas, zoom = 3f, pan = Offset.Zero),
+            EvidenceGeometry.regionToCanvas(
+                region = OcrEvidenceRegion(40, 40, 60, 60),
+                sourceW = 100,
+                sourceH = 100,
+                orientation = Orientation.NORMAL,
+                canvasSize = canvas,
+                zoom = 3f,
+                pan = Offset.Zero,
+            ),
         )
         assertEquals(IntRect(20, 20, 80, 80), region)
-        assertTrue("region box lies inside the image box", threeX.contains(region.topLeft) && region.right <= threeX.right)
+        val inside = threeX.contains(region.topLeft) && region.right <= threeX.right
+        assertTrue("region box lies inside the image box", inside)
         // Edges round independently, so adjacent boxes share an edge.
         assertEquals(IntRect(0, 1, 11, 20), EvidenceGeometry.pixelBox(Rect(0.4f, 0.6f, 10.5f, 20.4f)))
     }

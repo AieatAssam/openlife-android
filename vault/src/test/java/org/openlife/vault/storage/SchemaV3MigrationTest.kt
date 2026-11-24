@@ -30,7 +30,10 @@ class SchemaV3MigrationTest {
     fun migrationTwoToThreeCreatesWhatRoomExportedForSpanReviews() {
         val executed = record(OpenLifeDatabase.MIGRATION_2_3)
         val expected = exportedCreateSql("ocr_span_reviews")
-        assertTrue("the exported table must carry a sequence column: $expected", expected.first().contains("`sequence`"))
+        assertTrue(
+            "the exported table must carry a sequence column: $expected",
+            expected.first().contains("`sequence`"),
+        )
         assertEquals(expected, executed.filterNot { it.contains("TRIGGER") })
     }
 

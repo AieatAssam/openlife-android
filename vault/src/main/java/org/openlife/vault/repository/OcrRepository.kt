@@ -29,10 +29,10 @@ import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
 import org.openlife.vault.ocr.OcrSpanReviewAction
 import org.openlife.vault.ocr.OcrSpanReviewRules
-import org.openlife.vault.ocr.withinSource
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.ocr.OcrView
+import org.openlife.vault.ocr.withinSource
 import org.openlife.vault.storage.OcrDao
 import org.openlife.vault.storage.OcrRevisionEntity
 import org.openlife.vault.storage.OcrSpanEntity
@@ -125,9 +125,6 @@ class OcrRepository(
             throw cancelled
         }
     }
-
-    private fun org.openlife.vault.model.Source.isReadyForOcr(): Boolean = state == SourceState.READY &&
-        listOf(byteCount, sha256, width, height, orientation, mimeType).all { it != null }
 
     /**
      * Runs the engine under the one OCR deadline (P2-02-R2). A timeout from any
@@ -328,6 +325,9 @@ private suspend fun markTerminalLocked(
     // RUNNING-only compare-and-set (P1-18); a revision that already ended keeps how it ended.
     ocrDao.finishRunning(revisionId.toString(), state.name, reason.name)
 }
+
+private fun org.openlife.vault.model.Source.isReadyForOcr(): Boolean = state == SourceState.READY &&
+    listOf(byteCount, sha256, width, height, orientation, mimeType).all { it != null }
 
 internal fun ocrViewOf(
     latest: OcrRevisionEntity,
