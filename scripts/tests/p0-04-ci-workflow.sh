@@ -63,7 +63,7 @@ else
 fi
 require "connected tests have a retry wrapper" 'attempt|retry'
 require "connected runner uses swiftshader" 'gpu swiftshader_indirect'
-require "test run reuses a snapshot without saving" 'no-snapshot-save'
+require "test run starts from a clean emulator without snapshots" 'no-snapshot -wipe-data'
 require "AVD snapshot cache is configured" 'id: avd-cache'
 require "AVD cache includes ~/.android/avd" '~/\.android/avd'
 require "workflow uses the testable assertion classifier" 'scripts/ci/connected-test-failure-is-assertion\.sh'
