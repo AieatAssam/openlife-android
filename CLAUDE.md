@@ -69,6 +69,16 @@ scripts/plan-check.sh
 bash scripts/release-smoke.sh app/build/outputs/apk/release/*.apk   # from P0-06 on
 ```
 
+## Device testing (owner instruction, 2026-11-24)
+
+Do **not** run the Android emulator, locally or in pull-request CI: the
+hosts cannot carry it. The CI emulator legs run on manual dispatch only.
+Instrumented tests run on the attached physical tablet (adb serial
+`U8BBB20806201256`) and only when no other agent is using it. Until then,
+compile the androidTest sources, run the JVM suites, and record each unrun
+instrumented command as a device-verification gap in the step's `notes` and
+`docs/verification/`. The emulator notes below are kept for reference only.
+
 ## Emulator: known-good launch command
 
 ```bash
