@@ -47,6 +47,7 @@ object OpenLifeDatabaseFactory {
             .setJournalMode(journalMode)
             .addMigrations(*migrations.toTypedArray())
             .addCallback(OpenLifeDatabase.readyInvariantCallback)
+            .addCallback(DurableWrites.callback)
             .build()
     }
 

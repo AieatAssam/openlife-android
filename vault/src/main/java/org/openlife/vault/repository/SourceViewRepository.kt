@@ -9,6 +9,7 @@ import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
@@ -59,15 +60,15 @@ class SourceViewRepository(
             when (val check = authenticator.check(source, paths.blobFile(sourceId))) {
                 is ArtefactCheck.Verified -> ReadyReadResult.Loaded(check.plaintext)
 
-                ArtefactCheck.Corrupt -> {
-                    // Compare-and-set: a concurrent mark or deletion wins (P1-18-R13);
-                    // either way the original is not shown.
-                    database.sourceDao().compareAndSetState(
-                        source.id.toString(),
-                        SourceState.READY,
-                        SourceState.CORRUPT,
-                    )
-                    ReadyReadResult.Corrupt
+                // Compare-and-set (P1-18-R13); either way the original is not shown.
+                ArtefactCheck.Corrupt -> when (
+                    database.sourceDao().compareAndSetState(sourceId.toString(), SourceState.READY, SourceState.CORRUPT)
+                ) {
+                    StateTransition.APPLIED -> ReadyReadResult.Corrupt
+
+                    // The row left READY since it was read (deleted or already
+                    // marked): report it as no longer readable (review R-06).
+                    StateTransition.LOST_RACE -> ReadyReadResult.Unavailable
                 }
 
                 ArtefactCheck.Missing -> ReadyReadResult.Missing

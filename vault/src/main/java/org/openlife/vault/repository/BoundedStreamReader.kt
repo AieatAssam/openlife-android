@@ -51,8 +51,13 @@ object BoundedStreamReader {
         try {
             while (total < limit) {
                 if (deadline()) throw ReadDeadlineExceededException()
-                val chunk = chunks.lastOrNull()?.takeIf { (total % CHUNK_SIZE).toInt() != 0 }
-                    ?: newChunk(CHUNK_SIZE).also { chunks += it }
+                // A new chunk only once the last one is full; a zero-byte read
+                // at a boundary reuses the spare chunk (review R-07).
+                val chunk = if (total < chunks.size.toLong() * CHUNK_SIZE) {
+                    chunks.last()
+                } else {
+                    newChunk(CHUNK_SIZE).also { chunks += it }
+                }
                 val offset = (total % CHUNK_SIZE).toInt()
                 val toRead = minOf((CHUNK_SIZE - offset).toLong(), limit - total).toInt()
                 val n = stream.read(chunk, offset, toRead)

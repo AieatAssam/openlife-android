@@ -35,7 +35,9 @@ class ImportSlotTest {
     fun everyDecidedOutcomeFreesTheSlot(): Unit = runBlocking {
         val id = UUID.randomUUID()
         assertFalse(keepsSlotAfterSave(SaveResult.Saved(id), rowStillStaged = { false }, stageExists = { false }))
-        assertFalse(keepsSlotAfterSave(SaveResult.DuplicateFound(id), rowStillStaged = { false }, stageExists = { false }))
+        assertFalse(
+            keepsSlotAfterSave(SaveResult.DuplicateFound(id), rowStillStaged = { false }, stageExists = { false }),
+        )
         assertFalse(keepsSlotAfterSave(SaveResult.StageNotFound, rowStillStaged = { true }, stageExists = { false }))
         // A failure after the rename (stage gone) or one that lost the row is recovery's.
         assertFalse(keepsSlotAfterSave(SaveResult.Failed, rowStillStaged = { true }, stageExists = { false }))

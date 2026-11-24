@@ -83,7 +83,13 @@ class BoundedStreamReaderTest {
         }
         var allocations = 0
 
-        val read = BoundedStreamReader.read(stream, newChunk = { size -> allocations++; ByteArray(size) })
+        val read = BoundedStreamReader.read(
+            stream,
+            newChunk = { size ->
+                allocations++
+                ByteArray(size)
+            },
+        )
 
         assertEquals(chunk, read.bytes.size)
         assertEquals(1_000, zeroReads)

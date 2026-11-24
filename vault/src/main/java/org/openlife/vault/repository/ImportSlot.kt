@@ -57,7 +57,8 @@ internal suspend fun keepsSlotAfterSave(
     rowStillStaged: suspend () -> Boolean,
     stageExists: suspend () -> Boolean,
 ): Boolean {
-    val staged = rowStillStaged()
-    val stage = stageExists()
-    return (result == SaveResult.Failed || result == SaveResult.StorageUnavailable) && staged && stage
+    // Evaluated only for a failure, in this order, so a decided save never
+    // reads the row or the stage (review R-06).
+    if (result != SaveResult.Failed && result != SaveResult.StorageUnavailable) return false
+    return rowStillStaged() && stageExists()
 }
