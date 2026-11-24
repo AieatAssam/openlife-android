@@ -24,7 +24,7 @@ import java.util.UUID
  */
 class ContentKindLabelTest {
     private val strings by lazy {
-        val projectDir = File(System.getProperty("openlife.projectDir", ".."))
+        val projectDir = File(System.getProperty("openlife.projectDir") ?: "..")
         File(projectDir, "app/src/main/res/values/strings.xml").readText()
     }
 
