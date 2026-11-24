@@ -297,10 +297,11 @@ wait_for_ui_pattern 'content-desc="Saved image"|text="[^"]*Verified against the 
 
 # P2-03: run OCR in the release build. tesseract4android's native code looks up
 # Java members by name, so a missing R8 keep rule fails here, not in debug tests.
+# P2-06: the provenance line is "Extracted by <engine> <model> · <review>".
 scroll_until_visible 'text="Extract text on this device"'
 tap_text 'Extract text on this device'
 scroll_until_visible 'text="Run again"' 120
-scroll_until_visible 'text="Engine: tesseract-eng-fast[^"]*"'
+scroll_until_visible 'text="Extracted by tesseract-eng-fast[^"]*"'
 assert_no_fatal_exception
 
 tap_description 'Delete'

@@ -34,6 +34,21 @@ class OcrStateMapperTest {
         assertUnreadable(view(orientation = null))
     }
 
+    /** P2-06 under P1-18-R14: a span review written by another build is not shown as a known review. */
+    @Test
+    fun readyRevisionWithAnUnrecognisedSpanReviewIsUnreadable() {
+        val base = view()
+        val spanView = base.spans.single()
+        val review = org.openlife.vault.ocr.OcrSpanReview(
+            UUID.randomUUID(),
+            spanView.span.id,
+            OcrReviewState.UNRECOGNISED,
+            createdAt = 1,
+            sequence = 1,
+        )
+        assertUnreadable(base.copy(spans = listOf(spanView.copy(review = review))))
+    }
+
     @Test
     fun aFullyRecognisedReadyRevisionIsStillShown() {
         val state = OcrStateMapper.map(sourceId, Persisted.Loaded(view()), running = false, unrecordedFailure = null)

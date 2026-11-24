@@ -8,6 +8,7 @@ import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrRevision
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanReview
 import org.openlife.vault.ocr.OcrUserRevision
 import java.util.UUID
 
@@ -75,6 +76,14 @@ fun OcrSpan.toEntity() = OcrSpanEntity(
     top = evidenceRegion?.top,
     right = evidenceRegion?.right,
     bottom = evidenceRegion?.bottom,
+)
+
+fun OcrSpanReviewEntity.toDomain() = OcrSpanReview(
+    id = UUID.fromString(id),
+    spanId = UUID.fromString(spanId),
+    reviewState = decodeStored(reviewState, OcrReviewState.UNRECOGNISED),
+    createdAt = createdAt,
+    sequence = sequence,
 )
 
 fun OcrUserRevisionEntity.toDomain() = OcrUserRevision(

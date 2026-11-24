@@ -30,6 +30,10 @@ interface OcrBackend {
     suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String)
 
     suspend fun review(revisionId: UUID, reviewState: OcrReviewState)
+
+    suspend fun rejectSpan(spanId: UUID)
+
+    suspend fun undoRejectSpan(spanId: UUID)
 }
 
 /**
@@ -139,6 +143,14 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     fun review(revisionId: UUID, reviewState: OcrReviewState) {
         scope.launch { backend.review(revisionId, reviewState) }
     }
+
+    fun rejectSpan(spanId: UUID) {
+        scope.launch { backend.rejectSpan(spanId) }
+    }
+
+    fun undoRejectSpan(spanId: UUID) {
+        scope.launch { backend.undoRejectSpan(spanId) }
+    }
 }
 
 /** Whether the database has answered yet, and with what. */
@@ -183,6 +195,9 @@ internal object OcrStateMapper {
                 }.toMap(),
                 revisionCorrection = view.revisionCorrection?.correctedText,
                 reviewState = revision.reviewState,
+                spanReviews = view.spans.mapNotNull { spanView ->
+                    spanView.review?.let { spanView.span.id to it.reviewState }
+                }.toMap(),
                 engineId = revision.engineId,
                 modelVersion = revision.modelVersion,
                 extractedAt = revision.extractedAt,
@@ -213,5 +228,8 @@ internal object OcrStateMapper {
         revision.reviewState == OcrReviewState.UNRECOGNISED ||
         revision.failureReason == OcrFailureReason.UNRECOGNISED ||
         revision.orientation == null ||
-        spans.any { it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED }
+        spans.any {
+            it.span.coordinateSystem == OcrCoordinateSystem.UNRECOGNISED ||
+                it.review?.reviewState == OcrReviewState.UNRECOGNISED
+        }
 }

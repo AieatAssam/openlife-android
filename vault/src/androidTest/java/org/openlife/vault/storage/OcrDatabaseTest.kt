@@ -6,6 +6,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.After
@@ -112,12 +113,14 @@ class OcrDatabaseTest {
         db.ocrDao().insertUserRevision(
             OcrUserRevision(UUID.randomUUID(), revisionId, spanId, "changed", 2).toEntity(),
         )
+        db.ocrSpanReviewDao().append(UUID.randomUUID().toString(), spanId.toString(), OcrReviewState.REJECTED.name, 3)
 
         db.sourceDao().deleteById(sourceId.toString())
 
         assertEquals(0, db.ocrDao().countRevisions())
         assertEquals(0, db.ocrDao().countSpans())
         assertEquals(0, db.ocrDao().countUserRevisions())
+        assertEquals(0, db.ocrSpanReviewDao().count())
     }
 
     @Test
@@ -203,6 +206,76 @@ class OcrDatabaseTest {
         artefactVersion = 1,
     )
 
+    /**
+     * P2-06-R5 / R11 (E-04): schema v3 adds ocr_span_reviews on SQLCipher, the
+     * row survives a reopen through the production factory and callback, and
+     * deleting the span cascades the review.
+     */
+    @Test
+    fun migrationAddsSpanReviewsAndCascades() {
+        val passphrase = ByteArray(32) { 9 }
+        val cipherHelper = sqlCipherHelper(passphrase)
+        val databaseName = "p206-span-reviews-${UUID.randomUUID()}"
+        val sourceId = UUID.randomUUID().toString()
+        val revisionId = UUID.randomUUID().toString()
+        val spanId = UUID.randomUUID().toString()
+        val reviewId = UUID.randomUUID().toString()
+        val created = cipherHelper.createDatabase(databaseName, 2)
+        created.execSQL(
+            """
+            INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
+                orientation, wrappedDek, artefactVersion)
+            VALUES ('$sourceId', 'READY', 1, 'SHARE', 'image/jpeg', 10, X'01', 10, 10, 'NORMAL', X'02', 1)
+            """.trimIndent(),
+        )
+        created.execSQL(
+            """
+            INSERT INTO ocr_revisions(id, sourceId, state, engineId, modelVersion, orientation, sourceDigest,
+                startedAt, extractedAt, reviewState, failureReason, charCount, spanCount)
+            VALUES ('$revisionId', '$sourceId', 'READY', 'mlkit-latin', '16.0.1', 'NORMAL', X'03', 1, 2,
+                'UNREVIEWED', NULL, 4, 1)
+            """.trimIndent(),
+        )
+        created.execSQL(
+            """
+            INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, left, top, right, bottom)
+            VALUES ('$spanId', '$revisionId', 0, 'hello', NULL, 'SOURCE_PIXELS', 1, 2, 3, 4)
+            """.trimIndent(),
+        )
+        created.close()
+
+        val migrated = cipherHelper.runMigrationsAndValidate(
+            databaseName,
+            currentDatabaseVersion(),
+            true,
+            *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
+        )
+        val tableExists = migrated.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ocr_span_reviews'",
+        ).use { it.moveToFirst() }
+        assertTrue("ocr_span_reviews must exist after the v2 to v3 migration", tableExists)
+        migrated.execSQL("PRAGMA foreign_keys = ON")
+        migrated.execSQL(
+            """
+            INSERT INTO ocr_span_reviews(id, spanId, reviewState, createdAt, sequence)
+            VALUES ('$reviewId', '$spanId', 'REJECTED', 5, 1)
+            """.trimIndent(),
+        )
+        migrated.close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val reopened = openWithProductionFactory(databaseName, passphrase)
+        runBlocking {
+            val review = reopened.ocrSpanReviewDao().findForSpan(spanId).last()
+            assertEquals("REJECTED", review.reviewState)
+            assertEquals(1, reopened.ocrSpanReviewDao().count())
+            reopened.openHelper.writableDatabase.execSQL("DELETE FROM ocr_spans WHERE id = '$spanId'")
+            assertEquals(0, reopened.ocrSpanReviewDao().count())
+        }
+        reopened.close()
+        context.deleteDatabase(databaseName)
+    }
+
     /** P1-14-R5: the migration runs on SQLCipher and the READY invariant triggers survive it. */
     @Test
     fun migrationOnSqlCipherPreservesReadyInvariantTriggers() {
@@ -219,7 +292,12 @@ class OcrDatabaseTest {
         OpenLifeDatabase.readyInvariantCallback.onCreate(v1)
         v1.close()
 
-        val migrated = helper.runMigrationsAndValidate(name, 2, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
+        val migrated = helper.runMigrationsAndValidate(
+            name,
+            currentDatabaseVersion(),
+            true,
+            *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
+        )
         fun insertReady(id: String, mimeType: String?) = runCatching {
             migrated.execSQL(
                 """
@@ -260,7 +338,12 @@ class OcrDatabaseTest {
         val name = "p118-triggers-${UUID.randomUUID()}"
         helper.createDatabase(name, 1).close() // no callback: no triggers
 
-        val migrated = helper.runMigrationsAndValidate(name, 2, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
+        val migrated = helper.runMigrationsAndValidate(
+            name,
+            currentDatabaseVersion(),
+            true,
+            *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
+        )
         try {
             val triggers = mutableListOf<String>()
             migrated.query("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'sources' ORDER BY name")
@@ -287,4 +370,139 @@ class OcrDatabaseTest {
             InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
         }
     }
+
+    /**
+     * P2-06-R11 (E-04): a version-2 SQLCipher vault with rows upgrades to the
+     * current @Database version through the production factory (SQLCipher,
+     * every migration, readyInvariantCallback). Room validates the migrated
+     * schema on open; row counts survive and the READY triggers, absent at v2,
+     * exist and fire.
+     */
+    @Test
+    fun sqlcipherMigrationToCurrentVersionKeepsRowsAndReadyTriggers() {
+        val passphrase = ByteArray(32) { 11 }
+        val name = "p206-sqlcipher-upgrade-${UUID.randomUUID()}"
+        // No callback at v2: the triggers are absent, so finding them after the
+        // upgrade proves MIGRATION_2_3 re-creates them (opening a migrated
+        // database does not run onCreate).
+        val v2 = sqlCipherHelper(passphrase).createDatabase(name, 2)
+        v2.execSQL(
+            """
+            INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
+                orientation, wrappedDek, artefactVersion)
+            VALUES ('s1', 'READY', 1, 'SHARE', 'image/jpeg', 10, X'01', 10, 10, 'NORMAL', X'02', 1),
+                   ('s2', 'READY', 2, 'PHOTO_PICKER', 'image/png', 20, X'03', 20, 20, 'ROTATE_90', X'04', 1)
+            """.trimIndent(),
+        )
+        v2.execSQL(
+            """
+            INSERT INTO ocr_revisions(id, sourceId, state, engineId, modelVersion, orientation, sourceDigest,
+                startedAt, extractedAt, reviewState, failureReason, charCount, spanCount)
+            VALUES ('r1', 's1', 'READY', 'mlkit-latin', '16.0.1', 'NORMAL', X'05', 1, 2, 'ACCEPTED', NULL, 9, 2)
+            """.trimIndent(),
+        )
+        v2.execSQL(
+            """
+            INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, left, top, right, bottom)
+            VALUES ('sp1', 'r1', 0, 'hello', NULL, 'SOURCE_PIXELS', 1, 2, 3, 4),
+                   ('sp2', 'r1', 1, 'world', 0.5, 'SOURCE_PIXELS', NULL, NULL, NULL, NULL)
+            """.trimIndent(),
+        )
+        v2.execSQL(
+            """
+            INSERT INTO ocr_user_revisions(id, revisionId, spanId, correctedText, createdAt, actor)
+            VALUES ('u1', 'r1', 'sp1', 'hullo', 3, 'USER')
+            """.trimIndent(),
+        )
+        v2.close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val upgraded = openWithProductionFactory(name, passphrase)
+        try {
+            val sql = upgraded.openHelper.writableDatabase
+            assertEquals(currentDatabaseVersion(), sql.version)
+            fun count(table: String) = sql.query("SELECT COUNT(*) FROM $table").use { it.moveToFirst(); it.getInt(0) }
+            assertEquals(2, count("sources"))
+            assertEquals(1, count("ocr_revisions"))
+            assertEquals(2, count("ocr_spans"))
+            assertEquals(1, count("ocr_user_revisions"))
+            assertEquals(0, count("ocr_span_reviews"))
+            val triggers = mutableListOf<String>()
+            sql.query("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'sources' ORDER BY name")
+                .use { cursor -> while (cursor.moveToNext()) triggers += cursor.getString(0) }
+            assertEquals(ReadyInvariantTriggers.names.sorted(), triggers)
+            val rejected = runCatching {
+                sql.execSQL(
+                    """
+                    INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
+                        orientation, wrappedDek, artefactVersion)
+                    VALUES ('bad', 'READY', 1, 'SHARE', NULL, 10, X'01', 10, 10, 'NORMAL', X'02', 1)
+                    """.trimIndent(),
+                )
+            }
+            assertTrue(
+                "the READY trigger fires after the upgrade: ${rejected.exceptionOrNull()}",
+                rejected.exceptionOrNull()?.message?.contains("READY source requires all validated fields") == true,
+            )
+            runBlocking {
+                upgraded.ocrSpanReviewDao().append("rv1", "sp1", "REJECTED", 4)
+                assertEquals(1, upgraded.ocrSpanReviewDao().count())
+            }
+        } finally {
+            upgraded.close()
+            context.deleteDatabase(name)
+        }
+    }
+
+    /** P2-06-R12 (E-05): the later append is current even when its createdAt is earlier. */
+    @Test
+    fun latestSpanReviewIsChosenBySequenceNotClock(): Unit = runBlocking {
+        val sourceId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        val spanId = UUID.randomUUID()
+        db.sourceDao().insert(readySource(sourceId))
+        db.ocrDao().insertRevision(revision(revisionId, sourceId).copy(state = OcrRevisionState.READY, extractedAt = 2).toEntity())
+        db.ocrDao().insertSpans(listOf(span(revisionId, spanId).toEntity()))
+        val reviews = db.ocrSpanReviewDao()
+
+        reviews.append(UUID.randomUUID().toString(), spanId.toString(), OcrReviewState.REJECTED.name, 1_000)
+        reviews.append(UUID.randomUUID().toString(), spanId.toString(), OcrReviewState.UNREVIEWED.name, 10)
+
+        val stored = reviews.findForSpan(spanId.toString())
+        assertEquals(listOf(1L, 2L), stored.map { it.sequence })
+        val observed = reviews.observeForRevision(revisionId.toString()).first()
+        val view = org.openlife.vault.repository.ocrViewOf(
+            db.ocrDao().findRevision(revisionId.toString())!!,
+            emptyList(),
+            db.ocrDao().findSpans(revisionId.toString()),
+            emptyList(),
+            observed,
+        )
+        assertEquals(OcrReviewState.UNREVIEWED, view.spans.single().review?.reviewState)
+        assertEquals(
+            OcrReviewState.UNREVIEWED,
+            org.openlife.vault.ocr.OcrSpanReviewRules.latest(stored.map { it.toDomain() })?.reviewState,
+        )
+    }
+
+    private fun sqlCipherHelper(passphrase: ByteArray) = MigrationTestHelper(
+        InstrumentationRegistry.getInstrumentation(),
+        OpenLifeDatabase::class.java,
+        emptyList(),
+        SupportOpenHelperFactory(passphrase.copyOf()),
+    )
+
+    /** As the app opens the vault: SQLCipher, every migration, and the READY-invariant callback. */
+    private fun openWithProductionFactory(name: String, passphrase: ByteArray): OpenLifeDatabase {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        return OpenLifeDatabaseFactory.create(
+            context = context,
+            paths = VaultPaths(context),
+            databaseSecret = passphrase.copyOf(),
+            databasePath = context.getDatabasePath(name).absolutePath,
+        )
+    }
+
+    /** The @Database version, read from a database Room just created (not Vault.SCHEMA_VERSION). */
+    private fun currentDatabaseVersion(): Int = db.openHelper.readableDatabase.version
 }

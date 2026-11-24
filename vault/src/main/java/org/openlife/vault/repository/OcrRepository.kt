@@ -27,12 +27,16 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrRunStateMachine
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanDraft
+import org.openlife.vault.ocr.OcrSpanReviewAction
+import org.openlife.vault.ocr.OcrSpanReviewRules
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.ocr.OcrView
+import org.openlife.vault.ocr.withinSource
 import org.openlife.vault.storage.OcrDao
 import org.openlife.vault.storage.OcrRevisionEntity
 import org.openlife.vault.storage.OcrSpanEntity
+import org.openlife.vault.storage.OcrSpanReviewEntity
 import org.openlife.vault.storage.OcrUserRevisionEntity
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
@@ -67,7 +71,7 @@ class OcrRepository(
                 is OcrRunStateMachine.Decision.Persist -> persist(sourceId, prepared.revision, decision.spans)
 
                 is OcrRunStateMachine.Decision.Terminal -> {
-                    markTerminal(prepared.revision.id, decision.state, decision.reason)
+                    markTerminal(mutationQueue, ocrDao, prepared.revision.id, decision.state, decision.reason)
                     OcrRunStateMachine.resultFor(prepared.revision.id, decision)
                 }
             }
@@ -115,15 +119,12 @@ class OcrRepository(
             // leave it RUNNING. Marked inside this mutation, not through
             // markTerminal, which would wait for this same mutation.
             withContext(NonCancellable) {
-                markTerminalLocked(revision.id, OcrRevisionState.CANCELLED, OcrFailureReason.CANCELLED)
+                markTerminalLocked(ocrDao, revision.id, OcrRevisionState.CANCELLED, OcrFailureReason.CANCELLED)
             }
             input.close()
             throw cancelled
         }
     }
-
-    private fun org.openlife.vault.model.Source.isReadyForOcr(): Boolean = state == SourceState.READY &&
-        listOf(byteCount, sha256, width, height, orientation, mimeType).all { it != null }
 
     /**
      * Runs the engine under the one OCR deadline (P2-02-R2). A timeout from any
@@ -142,7 +143,13 @@ class OcrRepository(
         if (currentCoroutineContext().isActive) {
             OcrRunStateMachine.EngineOutcome.TimedOut
         } else {
-            markTerminal(prepared.revision.id, OcrRevisionState.CANCELLED, OcrFailureReason.CANCELLED)
+            markTerminal(
+                mutationQueue,
+                ocrDao,
+                prepared.revision.id,
+                OcrRevisionState.CANCELLED,
+                OcrFailureReason.CANCELLED,
+            )
             throw cancelled
         }
     } catch (error: Exception) {
@@ -161,7 +168,7 @@ class OcrRepository(
                 val source = database.sourceDao().findById(sourceId.toString())?.toDomain()
                 val stillWanted = current?.state == OcrRevisionState.RUNNING && source?.state == SourceState.READY
                 if (current == null || !stillWanted) {
-                    markTerminalLocked(revision.id, OcrRevisionState.STALE, OcrFailureReason.SOURCE_DELETED)
+                    markTerminalLocked(ocrDao, revision.id, OcrRevisionState.STALE, OcrFailureReason.SOURCE_DELETED)
                     return@withMutation OcrRunResult.Stale(revision.id)
                 }
                 val completed = current.copy(
@@ -170,6 +177,9 @@ class OcrRepository(
                     charCount = spans.sumOf { it.text.length },
                     spanCount = spans.size,
                 )
+                // A READY source has its size; without one no region can be checked, so none is kept.
+                val sourceWidth = source?.width ?: 0
+                val sourceHeight = source?.height ?: 0
                 val persistedSpans = spans.mapIndexed { ordinal, span ->
                     OcrSpan(
                         id = UUID.randomUUID(),
@@ -178,7 +188,8 @@ class OcrRepository(
                         text = span.text,
                         confidence = span.confidence,
                         coordinateSystem = OcrCoordinateSystem.SOURCE_PIXELS,
-                        evidenceRegion = span.region,
+                        // P2-06-R17: a box past the source edge is not evidence.
+                        evidenceRegion = span.region?.withinSource(sourceWidth, sourceHeight),
                     )
                 }
                 try {
@@ -200,7 +211,7 @@ class OcrRepository(
                         OcrRunResult.Stale(revision.id)
                     }
                 } catch (_: Exception) {
-                    markTerminalLocked(revision.id, OcrRevisionState.FAILED, OcrFailureReason.STORAGE_FAILURE)
+                    markTerminalLocked(ocrDao, revision.id, OcrRevisionState.FAILED, OcrFailureReason.STORAGE_FAILURE)
                     OcrRunResult.Failed(revision.id, OcrFailureReason.STORAGE_FAILURE)
                 }
             }
@@ -219,8 +230,12 @@ class OcrRepository(
         return views.observeRevisionsNewestFirst(sourceId.toString())
             .flatMapLatest { revisions ->
                 val latest = revisions.firstOrNull() ?: return@flatMapLatest flowOf(null)
-                combine(views.observeSpans(latest.id), views.observeUserRevisions(latest.id)) { spans, corrections ->
-                    ocrViewOf(latest, revisions.drop(1), spans, corrections)
+                combine(
+                    views.observeSpans(latest.id),
+                    views.observeUserRevisions(latest.id),
+                    database.ocrSpanReviewDao().observeForRevision(latest.id),
+                ) { spans, corrections, reviews ->
+                    ocrViewOf(latest, revisions.drop(1), spans, corrections, reviews)
                 }
             }
             .flowOn(ioDispatcher)
@@ -252,6 +267,27 @@ class OcrRepository(
             }
         }
 
+    /** Appends a REJECTED review for one span; refused if it is already rejected. The span text is unchanged. */
+    suspend fun rejectSpan(spanId: UUID): Boolean = appendSpanReview(spanId, OcrSpanReviewAction.REJECT)
+
+    /** Appends a review restoring the state before the span was rejected (P2-06-R13); rows are never updated. */
+    suspend fun undoRejectSpan(spanId: UUID): Boolean = appendSpanReview(spanId, OcrSpanReviewAction.UNDO_REJECT)
+
+    private suspend fun appendSpanReview(spanId: UUID, action: OcrSpanReviewAction): Boolean =
+        withContext(ioDispatcher) {
+            mutationQueue.withMutation {
+                database.withTransaction {
+                    val span = database.ocrDao().findSpan(spanId.toString()) ?: return@withTransaction false
+                    val revision = database.ocrDao().findRevision(span.revisionId)?.toDomain()
+                        ?: return@withTransaction false
+                    val reviews = database.ocrSpanReviewDao().findForSpan(span.id).map { it.toDomain() }
+                    val next = OcrSpanReviewRules.next(reviews, revision.state, action) ?: return@withTransaction false
+                    database.ocrSpanReviewDao().append(UUID.randomUUID().toString(), span.id, next.name, clock())
+                    true
+                }
+            }
+        }
+
     suspend fun setReviewState(revisionId: UUID, reviewState: OcrReviewState): Boolean = withContext(ioDispatcher) {
         check(reviewState != OcrReviewState.UNRECOGNISED) { "an unrecognised review state is never written" }
         mutationQueue.withMutation {
@@ -260,36 +296,59 @@ class OcrRepository(
         }
     }
 
-    /** Ends a RUNNING revision; NonCancellable so a cancelled run still records how it ended. */
-    private suspend fun markTerminal(revisionId: UUID, state: OcrRevisionState, reason: OcrFailureReason) {
-        withContext(NonCancellable) {
-            mutationQueue.withMutation { markTerminalLocked(revisionId, state, reason) }
-        }
-    }
-
-    /** Callers must already hold the mutation. */
-    private suspend fun markTerminalLocked(revisionId: UUID, state: OcrRevisionState, reason: OcrFailureReason) {
-        // RUNNING-only compare-and-set; a revision that already ended keeps how it ended.
-        ocrDao.finishRunning(revisionId.toString(), state.name, reason.name)
-    }
-
     private sealed interface Capture {
         data class Ready(val revision: OcrRevision, val input: OcrEngineInput) : Capture
         data class Failure(val reason: OcrFailureReason) : Capture
     }
 }
 
-private fun ocrViewOf(
+/** Ends a RUNNING revision; NonCancellable so a cancelled run still records how it ended. */
+private suspend fun markTerminal(
+    mutationQueue: MutationQueue,
+    ocrDao: OcrDao,
+    revisionId: UUID,
+    state: OcrRevisionState,
+    reason: OcrFailureReason,
+) {
+    withContext(NonCancellable) {
+        mutationQueue.withMutation { markTerminalLocked(ocrDao, revisionId, state, reason) }
+    }
+}
+
+/** Callers must already hold the mutation. */
+private suspend fun markTerminalLocked(
+    ocrDao: OcrDao,
+    revisionId: UUID,
+    state: OcrRevisionState,
+    reason: OcrFailureReason,
+) {
+    // RUNNING-only compare-and-set (P1-18); a revision that already ended keeps how it ended.
+    ocrDao.finishRunning(revisionId.toString(), state.name, reason.name)
+}
+
+private fun org.openlife.vault.model.Source.isReadyForOcr(): Boolean = state == SourceState.READY &&
+    listOf(byteCount, sha256, width, height, orientation, mimeType).all { it != null }
+
+internal fun ocrViewOf(
     latest: OcrRevisionEntity,
     earlier: List<OcrRevisionEntity>,
     spans: List<OcrSpanEntity>,
     corrections: List<OcrUserRevisionEntity>,
+    reviews: List<OcrSpanReviewEntity>,
 ): OcrView {
     // Corrections arrive oldest first, so the last one per span is the latest.
+    // A span's current review is its highest sequence, never the clock (P2-06-R12).
     val latestBySpan = corrections.associateBy { it.spanId }
+    val latestReviewBySpan = reviews.groupBy { it.spanId }.mapValues { (_, rows) -> rows.maxBy { it.sequence } }
     return OcrView(
         revision = latest.toDomain(),
-        spans = spans.map { span -> OcrSpanView(span.toDomain(), latestBySpan[span.id]?.toDomain()) },
+        spans = spans.map { span ->
+            OcrSpanView(
+                span.toDomain(),
+                latestBySpan[span.id]?.toDomain(),
+                latestReviewBySpan[span.id]?.toDomain(),
+            )
+        },
         revisionCorrection = latestBySpan[null]?.toDomain(),
         history = earlier.map { it.toDomain() },
     )

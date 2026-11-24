@@ -33,6 +33,7 @@ sealed interface OcrUiState {
         val modelVersion: String = "",
         val extractedAt: Long? = null,
         val history: List<OcrHistoryItem> = emptyList(),
+        val spanReviews: Map<UUID, OcrReviewState> = emptyMap(),
     ) : OcrUiState
 
     data class Failed(

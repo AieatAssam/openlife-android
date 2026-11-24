@@ -65,6 +65,16 @@ class EnumDecodingTest {
         assertEquals(OcrCoordinateSystem.SOURCE_PIXELS, spanEntity("SOURCE_PIXELS").toDomain().coordinateSystem)
     }
 
+    /** P2-06 under P1-18-R14: an unknown span review state decodes to UNRECOGNISED, never crashes. */
+    @Test
+    fun unknownSpanReviewStateDecodesToFallback() {
+        val spanId = UUID.randomUUID().toString()
+        val unknown = OcrSpanReviewEntity(UUID.randomUUID().toString(), spanId, "DISPUTED", 1, 1).toDomain()
+        assertEquals(OcrReviewState.UNRECOGNISED, unknown.reviewState)
+        val known = OcrSpanReviewEntity(UUID.randomUUID().toString(), spanId, "REJECTED", 1, 2).toDomain()
+        assertEquals(OcrReviewState.REJECTED, known.reviewState)
+    }
+
     @Test(expected = IllegalStateException::class)
     fun anUnrecognisedSourceIsNeverWrittenBack() {
         sourceEntity(state = "FUTURE", intakeKind = "SHARE", orientation = "NORMAL").toDomain().toEntity()

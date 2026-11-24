@@ -82,6 +82,24 @@ data class OcrSpan(
     }
 }
 
+/**
+ * Per-span review metadata. Rows are append-only; the one with the highest
+ * [sequence] for its span is current (P2-06-R12). [createdAt] is wall-clock
+ * time for display only and never decides which row is current.
+ */
+data class OcrSpanReview(
+    val id: UUID,
+    val spanId: UUID,
+    val reviewState: OcrReviewState,
+    val createdAt: Long,
+    val sequence: Long,
+) {
+    init {
+        require(createdAt >= 0)
+        require(sequence > 0) { "Span review sequence starts at 1" }
+    }
+}
+
 data class OcrUserRevision(
     val id: UUID,
     val revisionId: UUID,

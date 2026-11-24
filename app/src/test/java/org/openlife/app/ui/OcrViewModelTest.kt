@@ -22,6 +22,7 @@ import org.openlife.vault.ocr.OcrRevision
 import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanReview
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrUserRevision
 import org.openlife.vault.ocr.OcrView
@@ -75,6 +76,40 @@ class OcrViewModelTest {
         backend.view.value = null
         assertEquals(OcrUiState.Idle, state.value)
         collector.cancel()
+    }
+
+    @Test
+    fun spanReviewFromThePersistedViewIsRejected() = runBlocking {
+        val persisted = readyView("hello")
+        val spanView = persisted.spans.single()
+        backend.view.value = persisted.copy(
+            spans = listOf(
+                spanView.copy(
+                    review = OcrSpanReview(
+                        UUID.randomUUID(),
+                        spanView.span.id,
+                        OcrReviewState.REJECTED,
+                        3L,
+                        1L,
+                    ),
+                ),
+            ),
+        )
+        val state = presenter.state(sourceId)
+        val collector = scope.launch { state.collect {} }
+        val ready = state.value as OcrUiState.Ready
+        assertEquals(OcrReviewState.REJECTED, ready.spanReviews[spanView.span.id])
+        collector.cancel()
+    }
+
+    /** P2-06-R13: Reject span and Undo reject each reach the vault once. */
+    @Test
+    fun rejectAndUndoRejectReachTheBackend() {
+        val spanId = UUID.randomUUID()
+        presenter.rejectSpan(spanId)
+        presenter.undoRejectSpan(spanId)
+        assertEquals(listOf(spanId), backend.rejected)
+        assertEquals(listOf(spanId), backend.undone)
     }
 
     @Test
@@ -143,5 +178,16 @@ class OcrViewModelTest {
         override suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String) = Unit
 
         override suspend fun review(revisionId: UUID, reviewState: OcrReviewState) = Unit
+
+        val rejected = mutableListOf<UUID>()
+        val undone = mutableListOf<UUID>()
+
+        override suspend fun rejectSpan(spanId: UUID) {
+            rejected += spanId
+        }
+
+        override suspend fun undoRejectSpan(spanId: UUID) {
+            undone += spanId
+        }
     }
 }

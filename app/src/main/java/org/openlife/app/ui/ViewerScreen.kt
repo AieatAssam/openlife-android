@@ -40,6 +40,8 @@ import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
+import org.openlife.app.ui.evidence.EvidenceSelection
+import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
@@ -66,10 +68,12 @@ fun ViewerScreen(
     onCancelOcr: () -> Unit = {},
     onCorrect: (OcrSpan, String) -> Unit = { _, _ -> },
     onReview: (OcrReviewState) -> Unit = {},
+    onRejectSpan: (OcrSpan) -> Unit = {},
+    onUndoRejectSpan: (OcrSpan) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
-    var selectedRegion by remember(source.id) { mutableStateOf<org.openlife.vault.ocr.OcrEvidenceRegion?>(null) }
+    var selectedSpanId by remember(source.id) { mutableStateOf<java.util.UUID?>(null) }
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }
     var correctionText by remember(source.id) { mutableStateOf("") }
     var confirmingDelete by remember(source.id) { mutableStateOf(false) }
@@ -82,18 +86,25 @@ fun ViewerScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             source = source,
             content = content,
-            selectedRegion = selectedRegion,
+            selectedSpanId = selectedSpanId,
             onRetryLoad = { loadAttempt++ },
             onDeleteRequested = { confirmingDelete = true },
             ocrState = ocrState,
             onExtractText = onExtractText,
             onCancelOcr = onCancelOcr,
-            onSelectRegion = { selectedRegion = it },
+            onSelectSpan = { selectedSpanId = it.id },
             onCorrect = { span ->
                 correctingSpan = span
                 correctionText = span.text
             },
             onReview = onReview,
+            onRejectSpan = { span ->
+                // S-02: a rejected span stops being the selection here, so Undo
+                // does not re-reveal it (scroll jump) or re-announce it.
+                if (span.id == selectedSpanId) selectedSpanId = null
+                onRejectSpan(span)
+            },
+            onUndoRejectSpan = onUndoRejectSpan,
         )
     }
 
@@ -144,31 +155,49 @@ private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Uni
 }
 
 @Composable
+@Suppress("LongParameterList")
 private fun ViewerContent(
     modifier: Modifier,
     source: Source,
     content: ViewerContentState,
-    selectedRegion: org.openlife.vault.ocr.OcrEvidenceRegion?,
+    selectedSpanId: java.util.UUID?,
     onRetryLoad: () -> Unit,
     onDeleteRequested: () -> Unit,
     ocrState: OcrUiState,
     onExtractText: () -> Unit,
     onCancelOcr: () -> Unit,
-    onSelectRegion: (org.openlife.vault.ocr.OcrEvidenceRegion) -> Unit,
+    onSelectSpan: (OcrSpan) -> Unit,
     onCorrect: (OcrSpan) -> Unit,
     onReview: (OcrReviewState) -> Unit,
+    onRejectSpan: (OcrSpan) -> Unit,
+    onUndoRejectSpan: (OcrSpan) -> Unit,
 ) {
+    val ready = ocrState as? OcrUiState.Ready
+    val spans = ready?.spans.orEmpty()
+    val spanReviews = ready?.spanReviews.orEmpty()
+    // P2-06-R13: a span rejected after it was selected stops being the selection.
+    val selectedSpan = EvidenceSelection.selectableSpans(spans, spanReviews).find { it.id == selectedSpanId }
     Surface(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            ViewerImage(source, content, selectedRegion, onRetry = onRetryLoad, onDelete = onDeleteRequested)
-            if (selectedRegion != null) {
+            ViewerImage(
+                source,
+                content,
+                spans,
+                spanReviews,
+                selectedSpan?.id,
+                onSelectSpan = onSelectSpan,
+                onRetry = onRetryLoad,
+                onDelete = onDeleteRequested,
+            )
+            if (selectedSpan != null) {
                 // TalkBack does not receive visual Canvas changes by itself.
-                // Announce the evidence action as a polite live region while
-                // keeping the untrusted image content inert.
+                // Announce the selected span as a polite live region. The text
+                // stays inert: it is not a link and it is not executed.
                 Text(
-                    stringResource(R.string.viewer_evidence_region_highlighted),
+                    stringResource(R.string.viewer_span_selected, evidenceSpanPreview(selectedSpan.text)),
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
+                        .testTag("viewer_span_announcement")
                         .semantics { liveRegion = LiveRegionMode.Polite },
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -180,9 +209,11 @@ private fun ViewerContent(
                 state = ocrState,
                 onExtractText = onExtractText,
                 onCancel = onCancelOcr,
-                onSelectRegion = onSelectRegion,
+                onSelectSpan = onSelectSpan,
                 onCorrect = onCorrect,
                 onReview = onReview,
+                onRejectSpan = onRejectSpan,
+                onUndoRejectSpan = onUndoRejectSpan,
             )
             PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
             DetailsSection(source = source, verified = content is ViewerContentState.Shown)

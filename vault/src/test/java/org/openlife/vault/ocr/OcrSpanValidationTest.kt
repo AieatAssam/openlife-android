@@ -39,4 +39,15 @@ class OcrSpanValidationTest {
             OcrEvidenceRegion(left = -1, top = 0, right = 4, bottom = 2)
         }
     }
+
+    /** P2-06-R17 (E-10): a box past the source edge is not evidence; it is never clamped into one. */
+    @Test
+    fun `a region beyond the source bounds is ungrounded, one inside is kept`() {
+        val inside = OcrEvidenceRegion(0, 0, 64, 48)
+        assertEquals("right/bottom are exclusive, so the full image is inside", inside, inside.withinSource(64, 48))
+        assertEquals(OcrEvidenceRegion(3, 4, 10, 12), OcrEvidenceRegion(3, 4, 10, 12).withinSource(64, 48))
+        assertNull(OcrEvidenceRegion(0, 0, 65, 10).withinSource(64, 48))
+        assertNull(OcrEvidenceRegion(0, 0, 10, 49).withinSource(64, 48))
+        assertNull(OcrEvidenceRegion(70, 50, 80, 60).withinSource(64, 48))
+    }
 }
