@@ -92,6 +92,25 @@ class EvidenceGesturesTest {
         assertEquals(DoubleTapClock.Kind.SINGLE, clock.onTap(downMillis = 100, upMillis = 140))
     }
 
+    /** S-04: two quick taps far apart are two selections, not a zoom. */
+    @Test
+    fun twoQuickTapsFarApartAreTwoSingleTapsNotAZoom() {
+        val clock = DoubleTapClock(timeoutMillis = 300, slop = 50f)
+        fun tapAt(downMillis: Long, x: Float, y: Float) = clock.onTap(downMillis, downMillis + 40, Offset(x, y))
+        assertEquals(DoubleTapClock.Kind.SINGLE, tapAt(0, 10f, 10f))
+        assertEquals("150 px away, inside the timeout", DoubleTapClock.Kind.SINGLE, tapAt(100, 200f, 10f))
+        // The far tap starts a new sequence: a quick, near third tap completes it.
+        assertEquals(DoubleTapClock.Kind.DOUBLE, tapAt(200, 205f, 12f))
+    }
+
+    /** S-06: the adapter feeds the down's final pass to [TapGesture.onFinal]; a parent consuming it ends the tap. */
+    @Test
+    fun aDownConsumedByAParentIsNotATap() {
+        val tap = TapGesture(FIRST, start, slop)
+        assertEquals(TapGesture.Step.Abandoned, tap.onFinal(listOf(sample(FIRST, start, consumed = true))))
+        assertEquals(TapGesture.Step.Abandoned, tap.onMain(listOf(sample(FIRST, start, pressed = false))))
+    }
+
     private fun sample(id: Long, position: Offset, pressed: Boolean = true, consumed: Boolean = false) =
         PointerSample(id, position, pressed, consumed)
 

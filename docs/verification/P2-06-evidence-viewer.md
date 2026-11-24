@@ -50,7 +50,8 @@ RED, from the real Gradle output at b375703:
   (expected UNRECOGNISED, was null),
   `SourceEgressBoundaryTest.evidenceBoundsLogRequiresDebugGuard`
   ("an EvidenceBounds log outside BuildConfig.DEBUG must be a violation").
-- Instrumented RED: **not shown failing**, because no device was allowed.
+- Instrumented RED: **never observed.** No instrumented test added by this
+  revision has been run, failing or passing, because no device was allowed.
   This is a deviation from R10 and AGENTS.md (see below).
 
 GREEN and after: app JVM 86/86, vault JVM 115/115 (debug unit tests; counts
@@ -79,20 +80,24 @@ attributable: the clamp test uses NORMAL only, and the oracle does not call
 
 | Finding | Requirement | Outcome |
 |---|---|---|
-| E-01 zoomed image measured at canvas size | R8 | **Fixed.** The image and each region use a `placeAt(IntRect)` layout modifier. It measures the node with `Constraints.fixed` at its zoomed pixel box from `EvidenceGeometry`, places it at the box origin, and reports the canvas size, so Compose does not re-centre it. `EvidenceGeometry.pixelBox` and `zoomedImageIsMeasuredAtItsZoomedSizeNotTheCanvas` prove the 3x box (-100,-100,200,200) on a 100 px canvas and a region inside it (JVM). The drawn result on a device: gap. |
-| E-02 tap after drag/pinch; detector restarts | R9 | **Fixed.** `TapGesture` abandons the tap past touch slop, on a second pointer, or when any change is consumed in the main or the final pass. `DoubleTapClock` keeps double-tap timing across pans. `pointerInput(Unit)` with `rememberUpdatedState` reads zoom, pan and spans when the tap ends. JVM: `EvidenceGesturesTest` 8/8. **Deviation:** R9 names `waitForUpOrCancellation()`. The adapter `awaitTapRelease` mirrors its main- and final-pass consumption checks but delegates to `TapGesture`, because `waitForUpOrCancellation()` has no slop or second-pointer rule and cannot be tested on the JVM. |
+| E-01 zoomed image measured at canvas size | R8 | **Implemented, unverified (gap — pending physical-device run).** Only the geometry arithmetic is proven on the JVM; that arithmetic was already right before the fix, so the JVM test does not prove E-01 is fixed. The image and each region use a `placeAt(IntRect)` layout modifier. It measures the node with `Constraints.fixed` at its zoomed pixel box from `EvidenceGeometry`, places it at the box origin, and reports the canvas size, so Compose does not re-centre it. `EvidenceGeometry.pixelBox` and `zoomedImageIsMeasuredAtItsZoomedSizeNotTheCanvas` check the 3x box (-100,-100,200,200) on a 100 px canvas and a region inside it (JVM). Nothing on the JVM runs `placeAt` or Compose measurement. |
+| E-02 tap after drag/pinch; detector restarts | R9 | **Tap-classification logic proven on the JVM; the pointer-input adapter and pinch are implemented, unverified (gap — pending physical-device run).** `TapGesture` abandons the tap past touch slop, on a second pointer, or when any change is consumed in the main or the final pass. `DoubleTapClock` keeps double-tap timing across pans. `pointerInput(Unit)` with `rememberUpdatedState` reads zoom, pan and spans when the tap ends. JVM: `EvidenceGesturesTest` (8 at the first review, plus S-04 and S-06). The JVM tests do not run `awaitTapRelease`, `pointerInput` or `transformable`; pinch has no test that has run. **Deviation:** R9 names `waitForUpOrCancellation()`. The adapter `awaitTapRelease` mirrors its main- and final-pass consumption checks but delegates to `TapGesture`, because `waitForUpOrCancellation()` has no slop or second-pointer rule and cannot be tested on the JVM. |
 | E-03 overclaiming docs | R10 | **Fixed in docs.** C1-R4 no longer claims pinch zoom and pan as proven. The plan evidence no longer lists "scale 1-8x, double-tap 1x/3x" without test names. The old hosted runs are kept only as history of their commits. **Deviation:** the instrumented RED was not shown failing (no device). Alignment at >1x is proven on the JVM only; on a device it is a gap. |
 | E-04 no SQLCipher upgrade to v3 | R11 | **Test written, not run.** `OcrDatabaseTest.sqlcipherMigrationToCurrentVersionKeepsRowsAndReadyTriggers` and `migrationAddsSpanReviewsAndCascades` now use the SQLCipher helper and the production factory with `readyInvariantCallback`. They validate at the `@Database` version read from the opened database. On the JVM, `SchemaV3MigrationTest` proves the migration DDL equals the export and ends with the triggers. |
 | E-05 latest review by clock | R12 | **Fixed.** `ocr_span_reviews.sequence INTEGER NOT NULL` with a unique `(spanId, sequence)` index. The DAO assigns `MAX(sequence)+1` per span in the INSERT. `ocrViewOf` and `OcrSpanReviewRules.latest` choose by sequence. v3 was unreleased (no release or tag carries it), so `MIGRATION_2_3` and both 3.json copies were amended in place. The copies are byte-identical (`cmp`, `bothCopiesOfTheV3SchemaAreByteIdentical`). An unknown stored state decodes to UNRECOGNISED and makes the revision unreadable instead of crashing. |
-| E-06 no undo, double reject | R13 | **Fixed.** A rejected span shows "Undo reject" instead of "Reject span". Undo appends the previous state, and rows are never updated. Reject is refused on a rejected span or a non-READY revision. A rejected region is drawn dashed in muted ink, has no click action, is skipped by hit-testing, and drops the current selection. JVM: `OcrSpanReviewRulesTest`, `EvidenceSelectionTest`, `OcrViewModelTest`. UI: gap. |
-| E-07 test gaps | R14 | **Fixed.** Independent eight-orientation oracle with letterboxing on both axes, and helper tests (JVM, mutation-proven). Repository and UI tests are written but not run (gap). |
-| E-08 bounds log guard | R15 | **Fixed.** The allowlist now requires the log line to sit inside an `if (BuildConfig.DEBUG) {` block, found by brace depth. Proven by the built-in mutation. |
+| E-06 no undo, double reject | R13 | **Rules proven on the JVM; UI implemented, unverified (gap).** A rejected span shows "Undo reject" instead of "Reject span". Undo appends the previous state, and rows are never updated. Reject is refused on a rejected span or a non-READY revision. A rejected region is drawn dashed in muted ink, has no click action, is skipped by hit-testing, and drops the current selection. JVM: `OcrSpanReviewRulesTest`, `EvidenceSelectionTest`, `OcrViewModelTest`. UI: gap. |
+| E-07 test gaps | R14 | **Partly closed.** The independent eight-orientation oracle with letterboxing on both axes and the helper tests are JVM tests, mutation-proven. The repository, UI and pinch tests are written but have never run (gap — pending physical-device run). |
+| E-08 bounds log guard | R15 | **Fixed.** The allowlist now requires the log line to sit inside an `if (BuildConfig.DEBUG) {` block, found by a character-accurate backwards scan (S-03). The guard's `else` branch is rejected. Proven by two built-in mutations: the guard removed, and the log moved into the `else` branch. |
 | E-09 narrow screens (suspected) | R16 | **Not confirmed on a device; fixed by layout.** By arithmetic, three TextButtons need about 282 dp of a 328 dp row at 360 dp, so the text would get about 46 dp. The span text now takes the full width and the actions wrap in a `FlowRow` below it. `spanRowKeepsUsableTextWidthAtNarrowWidthAndLargeFont` is written but not run. **Deviation:** R16 says confirm first; the fix was applied without confirmation. |
-| E-10 region past the image edge (suspected) | R17 | **Fixed.** At persistence a region whose right or bottom exceeds the source size is stored ungrounded (null region), never clamped. Both engines map regions to raw source pixels (`OcrCoordinateMapper.toSourcePixels`) before persist, so the check compares like with like on rotated sources. JVM: `OcrSpanValidationTest`. On a device: gap (`regionBeyondSourceBoundsIsNotPersistedAsGrounded`). |
+| E-10 region past the image edge (suspected) | R17 | **Rule proven on the JVM; persistence path unverified (gap).** At persistence a region whose right or bottom exceeds the source size is stored ungrounded (null region), never clamped. Both engines map regions to raw source pixels (`OcrCoordinateMapper.toSourcePixels`) before persist, so the check compares like with like on rotated sources. JVM: `OcrSpanValidationTest`. On a device: gap (`regionBeyondSourceBoundsIsNotPersistedAsGrounded`). |
 
 No finding was refuted by a test.
 
 ## Instrumented tests awaiting a device run
+
+**First, uninstall any earlier build of this branch.** The unreleased v3
+schema identity changed, so a vault left by an earlier build fails Room's
+identity check. Do not reset the vault to work around it.
 
 All are **gap — pending physical-device run**. Run one class with:
 
@@ -111,6 +116,50 @@ All are **gap — pending physical-device run**. Run one class with:
 | `org.openlife.vault.repository.OcrRepositoryTest` | `rejectSpanKeepsTextRequiresReadyAndIsObservedThroughTheFlow`, `regionBeyondSourceBoundsIsNotPersistedAsGrounded` |
 
 The manual tall/wide transcript (step verification) is also pending a device.
+
+### Device checklist (second review, in priority order)
+
+1. Uninstall, then do a fresh install.
+2. At 3x with no pan, and at each pan extreme: the image covers the canvas,
+   the overlays line up, and a tap selects the span under the finger.
+3. At 1x, a vertical swipe that starts on the image scrolls the column and
+   selects nothing.
+4. Pinch, then lift one finger: nothing is selected.
+5. A tap that stops a fling selects nothing (S-06). The adapter abandons the
+   tap if the down's final pass is consumed. This is implemented, and it is
+   unverified that the column's scroll consumes that down.
+6. With the image half visible, double-tap on a region.
+7. Reject, Undo, Reject: one row per press, sequences 1, 2, 3. Nothing is
+   selectable while rejected. No scroll jump: rejecting the selected span
+   clears the selection, so Undo does not re-reveal it (S-02, not testable
+   on the JVM because the selection lives in `ViewerScreen`'s `remember`).
+8. Run `OcrDatabaseTest` and `EvidenceNavigationTest`.
+
+## Second review round (S-01..S-06)
+
+- S-01: the claims above are corrected. The instrumented RED was never
+  observed.
+- S-02: `ViewerScreen` clears `selectedSpanId` when the selected span is
+  rejected (device checklist item 7).
+- S-03: the DEBUG-guard scan walks backwards one character at a time and
+  accepts only a block whose own header is `if (BuildConfig.DEBUG)`. The
+  guard's `else` block (header `} else`) is rejected. A second built-in
+  mutation (`} else {` inserted after the guard) must be reported.
+- S-04: `DoubleTapClock` also needs the second tap within 100 dp of the
+  first (Android's double-tap slop). JVM:
+  `EvidenceGesturesTest.twoQuickTapsFarApartAreTwoSingleTapsNotAZoom`.
+- S-05: uninstall instruction added above.
+- S-06: the adapter checks the down's final pass through
+  `TapGesture.onFinal`. The JVM test
+  (`aDownConsumedByAParentIsNotATap`) covers the rule, not the adapter.
+- Minor fixes:
+  - `sqlcipherMigrationToCurrentVersionKeepsRowsAndReadyTriggers` no longer
+    creates the triggers at v2, so finding them proves MIGRATION_2_3
+    re-creates them.
+  - `migrationAddsSpanReviewsAndCascades` passes the full `MIGRATIONS` list.
+  - The OcrPanel comment now cites R16.
+- None of this round was compiled or run locally: no Gradle run was allowed
+  on the shared host. Hosted CI (build, lint, JVM tests) is the check.
 
 ## Existing tests changed
 

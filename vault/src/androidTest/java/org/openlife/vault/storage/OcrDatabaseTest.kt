@@ -248,7 +248,7 @@ class OcrDatabaseTest {
             databaseName,
             currentDatabaseVersion(),
             true,
-            OpenLifeDatabase.MIGRATION_2_3,
+            *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
         val tableExists = migrated.query(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ocr_span_reviews'",
@@ -375,15 +375,17 @@ class OcrDatabaseTest {
      * P2-06-R11 (E-04): a version-2 SQLCipher vault with rows upgrades to the
      * current @Database version through the production factory (SQLCipher,
      * every migration, readyInvariantCallback). Room validates the migrated
-     * schema on open; row counts survive and the READY triggers exist and fire.
+     * schema on open; row counts survive and the READY triggers, absent at v2,
+     * exist and fire.
      */
     @Test
     fun sqlcipherMigrationToCurrentVersionKeepsRowsAndReadyTriggers() {
         val passphrase = ByteArray(32) { 11 }
         val name = "p206-sqlcipher-upgrade-${UUID.randomUUID()}"
+        // No callback at v2: the triggers are absent, so finding them after the
+        // upgrade proves MIGRATION_2_3 re-creates them (opening a migrated
+        // database does not run onCreate).
         val v2 = sqlCipherHelper(passphrase).createDatabase(name, 2)
-        // A version-2 install created the triggers through the Room callback.
-        OpenLifeDatabase.readyInvariantCallback.onCreate(v2)
         v2.execSQL(
             """
             INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,

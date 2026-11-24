@@ -175,7 +175,7 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
 
 /**
  * One span: its text uses the full width, the actions wrap on the line below
- * (P2-06-R15), so a narrow screen or a large font never squeezes the text. A
+ * (P2-06-R16), so a narrow screen or a large font never squeezes the text. A
  * rejected span offers Undo instead of Reject and is not evidence, so it
  * cannot be selected (P2-06-R13).
  */

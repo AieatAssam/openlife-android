@@ -25,8 +25,9 @@ class SourceEgressBoundaryTest {
 
     /**
      * P2-06-R15 (E-08): the EvidenceBounds log is allowed only inside its
-     * BuildConfig.DEBUG guard, as the recovery log is. The mutation (the same
-     * file with the guard line removed) must be reported.
+     * BuildConfig.DEBUG guard, as the recovery log is. Two built-in mutations
+     * must be reported: the guard line removed, and the log moved into the
+     * guard's `else` branch (release-only code, S-03).
      */
     @Test
     fun evidenceBoundsLogRequiresDebugGuard() {
@@ -42,6 +43,12 @@ class SourceEgressBoundaryTest {
             "an EvidenceBounds log outside BuildConfig.DEBUG must be a violation",
             boundaryViolations(file, unguarded).isEmpty(),
         )
+
+        val inElseBranch = lines.flatMap { if (it.trim() == DEBUG_GUARD) listOf(it, "} else {") else listOf(it) }
+        assertFalse(
+            "an EvidenceBounds log in the else branch of the DEBUG guard must be a violation",
+            boundaryViolations(file, inElseBranch).isEmpty(),
+        )
     }
 
     private fun boundaryViolations(file: Path, lines: List<String> = Files.readAllLines(file)): List<String> {
@@ -56,24 +63,40 @@ class SourceEgressBoundaryTest {
     private fun lineViolation(file: Path, lines: List<String>, index: Int, recoveryLogIsDebugOnly: Boolean): String? {
         val line = lines[index]
         val location = "$file:${index + 1}"
-        val debugOnly = enclosedByDebugGuard(lines, index)
+        val debugOnly = line.trim() == ALLOWED_EVIDENCE_BOUNDS_LOG && enclosedByDebugGuard(lines, index)
         return clipboardViolation(line, location)
             ?: logViolation(file, line, location, recoveryLogIsDebugOnly, debugOnly)
             ?: activityViolation(file, line, location)
     }
 
-    /** True when a block opened by [DEBUG_GUARD] encloses line [index] (brace depth, read backwards). */
-    private fun enclosedByDebugGuard(lines: List<String>, index: Int): Boolean {
+    /**
+     * True when a block opened by [DEBUG_GUARD] encloses line [index]. The
+     * guard's `else` block has the header `} else`, so code there is not
+     * accepted (S-03).
+     */
+    private fun enclosedByDebugGuard(lines: List<String>, index: Int): Boolean =
+        enclosingBlockHeaders(lines, index).any { it == DEBUG_GUARD_HEADER }
+
+    /**
+     * The text before each `{` that opens a block enclosing line [index],
+     * innermost first. The scan walks backwards one character at a time; a
+     * `{` met while the depth is zero opens an enclosing block.
+     */
+    private fun enclosingBlockHeaders(lines: List<String>, index: Int): List<String> {
+        val headers = mutableListOf<String>()
         var depth = 0
         for (i in index - 1 downTo 0) {
             val line = lines[i]
-            depth += line.count { it == '}' } - line.count { it == '{' }
-            if (depth < 0) {
-                if (line.trim() == DEBUG_GUARD) return true
-                depth = 0
+            for (column in line.lastIndex downTo 0) {
+                val char = line[column]
+                when {
+                    char == '}' -> depth++
+                    char == '{' && depth > 0 -> depth--
+                    char == '{' -> headers += line.substring(0, column).trim()
+                }
             }
         }
-        return false
+        return headers
     }
 
     private fun clipboardViolation(line: String, location: String): String? =
@@ -198,6 +221,7 @@ class SourceEgressBoundaryTest {
         const val ALLOWED_RECOVERY_LOG = "android.util.Log.i(\"OpenLifeRecovery\", report.toString())"
         const val ALLOWED_EVIDENCE_BOUNDS_LOG = "android.util.Log.d(\"EvidenceBounds\", message)"
         const val DEBUG_GUARD = "if (BuildConfig.DEBUG) {"
+        const val DEBUG_GUARD_HEADER = "if (BuildConfig.DEBUG)"
         val OUTBOUND_ACTION = Regex("ACTION_(VIEW|SEND|SENDTO)")
         const val TEXT_FIELD_NAMES =
             "TextField|OutlinedTextField|BasicTextField|SecureTextField|OutlinedSecureTextField"
