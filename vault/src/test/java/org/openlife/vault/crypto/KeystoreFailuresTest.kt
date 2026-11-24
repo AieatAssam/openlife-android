@@ -1,9 +1,9 @@
 package org.openlife.vault.crypto
 
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.GeneralSecurityException
 import java.security.InvalidKeyException
 import java.security.ProviderException
 import javax.crypto.AEADBadTagException
@@ -28,7 +28,7 @@ class KeystoreFailuresTest {
             IllegalBlockSizeException("keymaster").apply { initCause(platformKeyStoreException()) },
             BadPaddingException("KM_ERROR_INVALID_ARGUMENT"),
             java.security.InvalidAlgorithmParameterException("init"),
-            InvalidKeyException("KeyPermanentlyInvalidated-shaped"),
+            InvalidKeyException("key not usable right now"),
         )
         notTag.forEach { failure ->
             val mapped = KeystoreFailures.forCipherFailure(failure)
@@ -54,16 +54,32 @@ class KeystoreFailuresTest {
     }
 
     /**
-     * The android.jar stub on the unit-test classpath has the real class name;
-     * allocating it without running its stub constructor gives an instance
-     * whose type is exactly what the platform throws.
+     * P1-18 review R-01: AOSP throws
+     * `new AEADBadTagException().initCause(android.security.KeyStoreException)`
+     * for KM_ERROR_VERIFICATION_FAILED (AndroidKeyStoreCipherSpiBase.engineDoFinal,
+     * android-10.0.0_r1 keystore/, android-14.0.0_r1 keystore2/). The
+     * Keystore cause must not make a genuine tag failure look transient.
      */
-    private fun platformKeyStoreException(): Throwable {
-        val type = Class.forName(KeystoreFailures.PLATFORM_KEYSTORE_EXCEPTION)
-        val unsafeType = Class.forName("sun.misc.Unsafe")
-        val field = unsafeType.getDeclaredField("theUnsafe").apply { isAccessible = true }
-        val instance = unsafeType.getMethod("allocateInstance", Class::class.java).invoke(field.get(null), type)
-        assertNotNull(instance)
-        return instance as Throwable
+    @Test
+    fun aFailedTagWithAKeystoreCauseIsNeverTemporary() {
+        val tag = AEADBadTagException().apply { initCause(platformKeyStoreException()) }
+        val mapped = KeystoreFailures.forCipherFailure(tag)
+        assertTrue("$mapped", mapped is EnvelopeAuthenticationException)
+        assertFalse(KeystoreFailures.isTemporary(tag))
+        assertFalse(KeystoreFailures.isTemporary(mapped))
     }
+
+    /** A permanently invalidated key never comes back; retrying forever is wrong (R-01). */
+    @Test
+    fun aPermanentlyInvalidatedKeyIsNotTransient() {
+        val invalidated = PlatformExceptions.keyPermanentlyInvalidated() as GeneralSecurityException
+        val mapped = KeystoreFailures.forCipherFailure(invalidated)
+        assertTrue("$mapped", mapped is MissingWrappingKeyException)
+        assertFalse(KeystoreFailures.isTemporary(invalidated))
+        assertFalse(KeystoreFailures.isTemporary(mapped))
+        assertFalse(KeystoreFailures.isTemporary(ProviderException(invalidated)))
+        assertFalse(KeystoreFailures.isTemporary(InvalidKeyException(invalidated)))
+    }
+
+    private fun platformKeyStoreException(): Throwable = PlatformExceptions.keyStoreException()
 }

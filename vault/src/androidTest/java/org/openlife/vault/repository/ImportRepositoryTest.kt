@@ -916,14 +916,13 @@ class ImportRepositoryTest {
     @Test
     fun cancellationAfterReadyCommitPropagatesAndRowIsReady(): Unit = runBlocking {
         val delegate = db.sourceDao()
-        val saveJob = CompletableDeferred<kotlinx.coroutines.Job>()
+        // Review R-02: the DAO seam throws once the READY commit is durable, so
+        // the old generic catch would report SaveResult.Failed and fail this test.
         val cancellingAfterCommit = object : SourceDao by delegate {
             override suspend fun transitionState(id: String, from: String, to: String): Int {
                 val changed = delegate.transitionState(id, from, to)
                 if (to == SourceState.READY.name) {
-                    // The commit is durable; the caller goes away as the call resumes.
-                    saveJob.await().cancel()
-                    kotlinx.coroutines.yield()
+                    throw kotlinx.coroutines.CancellationException("synthetic: the caller went away after commit")
                 }
                 return changed
             }
@@ -932,12 +931,13 @@ class ImportRepositoryTest {
         val prepared = importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
             as PrepareResult.Prepared
 
-        val save = async(Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) { importer.saveImport(prepared.sourceId) }
-        saveJob.complete(save)
-        save.start()
-        save.join()
+        val outcome = runCatching { importer.saveImport(prepared.sourceId) }
 
-        assertTrue("the caller observes cancellation, not a result", save.isCancelled)
+        assertTrue(
+            "expected CancellationException, never a result for a saved item; got " +
+                "${outcome.getOrNull() ?: outcome.exceptionOrNull()}",
+            outcome.exceptionOrNull() is kotlinx.coroutines.CancellationException,
+        )
         assertEquals(SourceState.READY, db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state)
         assertEquals("a saved item frees the slot", null, importer.importSlot.activeSourceId)
     }

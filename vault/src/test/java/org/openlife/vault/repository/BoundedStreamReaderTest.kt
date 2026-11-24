@@ -66,6 +66,30 @@ class BoundedStreamReaderTest {
         assertTrue(output, output.contains("exceeded=true count=${ImportLimits.MAX_ORIGINAL_BYTES + 1}"))
     }
 
+    /** Review R-07: a provider returning 0 at a chunk boundary must not allocate a chunk per call. */
+    @Test
+    fun zeroByteReadsAtAChunkBoundaryDoNotAllocateNewChunks() {
+        val chunk = 64 * 1024
+        var served = 0
+        var zeroReads = 0
+        val stream = object : InputStream() {
+            override fun read(): Int = -1
+
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = when {
+                served < chunk -> minOf(length, chunk - served).also { served += it }
+                zeroReads < 1_000 -> 0.also { zeroReads++ }
+                else -> -1
+            }
+        }
+        var allocations = 0
+
+        val read = BoundedStreamReader.read(stream, newChunk = { size -> allocations++; ByteArray(size) })
+
+        assertEquals(chunk, read.bytes.size)
+        assertEquals(1_000, zeroReads)
+        assertTrue("allocated $allocations chunks for 1 chunk of data", allocations <= 2)
+    }
+
     @Test
     fun ignoresAnyClaimedLengthAndReadsWhatIsActuallyThere() {
         // A stream with fewer bytes than any declared/expected size must not
@@ -94,10 +118,10 @@ class BoundedStreamReaderTest {
         var deadlineChecks = 0
 
         val failure = assertThrows(ReadDeadlineExceededException::class.java) {
-            BoundedStreamReader.read(stream) {
+            BoundedStreamReader.read(stream, deadline = {
                 deadlineChecks++
                 deadlineChecks > 1
-            }
+            })
         }
 
         assertTrue(failure.message?.contains("deadline") == true)

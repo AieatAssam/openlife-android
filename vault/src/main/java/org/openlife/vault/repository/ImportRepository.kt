@@ -336,8 +336,8 @@ class ImportRepository(
                 // no second import starts. Read under the same mutation.
                 keepSlot = keepsSlotAfterSave(
                     result,
-                    rowStillStaged = sourceDao.findById(sourceId.toString())?.state == SourceState.STAGED.name,
-                    stageExists = paths.stageFile(sourceId).exists(),
+                    rowStillStaged = { sourceDao.findById(sourceId.toString())?.state == SourceState.STAGED.name },
+                    stageExists = { paths.stageFile(sourceId).exists() },
                 )
                 result
             }
@@ -393,7 +393,7 @@ private fun KeystoreWrapper.wrapSourceKeyOrNull(dek: ByteArray, sourceId: UUID) 
 }
 
 /** The final STAGED -> READY commit of a save; the rename already happened. */
-private suspend fun SourceDao.commitReady(sourceId: UUID): SaveResult = try {
+internal suspend fun SourceDao.commitReady(sourceId: UUID): SaveResult = try {
     // Compare-and-set (P1-18-R13). Losing it cannot happen under the
     // mutation; if it did, the row was not saved by this call.
     when (compareAndSetState(sourceId.toString(), SourceState.STAGED, SourceState.READY)) {

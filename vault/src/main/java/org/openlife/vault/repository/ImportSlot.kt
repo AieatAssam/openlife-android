@@ -52,5 +52,12 @@ class ImportSlot {
  * retry. Only a failure that left the row STAGED with its stage file on disk
  * keeps it; every other outcome has decided the import.
  */
-internal fun keepsSlotAfterSave(result: SaveResult, rowStillStaged: Boolean, stageExists: Boolean): Boolean =
-    (result == SaveResult.Failed || result == SaveResult.StorageUnavailable) && rowStillStaged && stageExists
+internal suspend fun keepsSlotAfterSave(
+    result: SaveResult,
+    rowStillStaged: suspend () -> Boolean,
+    stageExists: suspend () -> Boolean,
+): Boolean {
+    val staged = rowStillStaged()
+    val stage = stageExists()
+    return (result == SaveResult.Failed || result == SaveResult.StorageUnavailable) && staged && stage
+}

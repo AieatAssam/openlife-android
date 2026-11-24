@@ -38,7 +38,11 @@ object BoundedStreamReader {
      * so its chunks are wiped and no copy is made (N + 1 chunk). Every chunk
      * is wiped after use.
      */
-    fun read(stream: InputStream, deadline: () -> Boolean = { false }): BoundedRead {
+    fun read(
+        stream: InputStream,
+        deadline: () -> Boolean = { false },
+        newChunk: (Int) -> ByteArray = ::ByteArray,
+    ): BoundedRead {
         val digest = MessageDigest.getInstance("SHA-256")
         val limit = ImportLimits.MAX_ORIGINAL_BYTES + 1
         val chunks = ArrayList<ByteArray>()
@@ -48,7 +52,7 @@ object BoundedStreamReader {
             while (total < limit) {
                 if (deadline()) throw ReadDeadlineExceededException()
                 val chunk = chunks.lastOrNull()?.takeIf { (total % CHUNK_SIZE).toInt() != 0 }
-                    ?: ByteArray(CHUNK_SIZE).also { chunks += it }
+                    ?: newChunk(CHUNK_SIZE).also { chunks += it }
                 val offset = (total % CHUNK_SIZE).toInt()
                 val toRead = minOf((CHUNK_SIZE - offset).toLong(), limit - total).toInt()
                 val n = stream.read(chunk, offset, toRead)

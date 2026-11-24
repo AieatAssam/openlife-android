@@ -128,13 +128,16 @@ object VaultBootstrapper {
         VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED)
     }
 
-    private fun unwrapFailure(exception: Exception): VaultBootstrapResult = VaultBootstrapResult.Unavailable(
+    private fun unwrapFailure(exception: Exception): VaultBootstrapResult =
+        VaultBootstrapResult.Unavailable(unwrapFailureCause(exception))
+
+    /** Why unwrapping `database.key` failed; JVM-testable (P1-18 review R-01). */
+    internal fun unwrapFailureCause(exception: Exception): VaultUnavailableCause =
         if (KeystoreFailures.isTemporary(exception)) {
             VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
         } else {
             VaultUnavailableCause.KEY_UNWRAP_FAILED
-        },
-    )
+        }
 
     private fun createFresh(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         val secret = ByteArray(DATABASE_SECRET_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
@@ -202,6 +205,7 @@ internal fun planBootstrap(
     readKey: () -> KeyRead,
     databaseExists: Boolean,
     hasArtefacts: Boolean,
+    databaseEmpty: Boolean = false,
 ): BootstrapPlan {
     if (keyFileExists && !databaseExists && hasArtefacts) {
         return BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_MISSING)

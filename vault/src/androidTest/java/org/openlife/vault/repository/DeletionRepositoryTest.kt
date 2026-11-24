@@ -248,24 +248,23 @@ class DeletionRepositoryTest {
     fun cancellationIsNotSwallowedByGenericCatch(): Unit = runBlocking {
         val id = prepareAndSave()
         val delegate = db.sourceDao()
-        val deleteJob = kotlinx.coroutines.CompletableDeferred<kotlinx.coroutines.Job>()
+        // Review R-02: the seam itself throws, so the old `catch (_: Exception)`
+        // would turn this into DeleteResult.Failed and the test would fail.
         val cancellingDao = object : org.openlife.vault.storage.SourceDao by delegate {
             override suspend fun deleteById(id: String) {
                 delegate.deleteById(id)
-                deleteJob.await().cancel()
-                kotlinx.coroutines.yield()
+                throw kotlinx.coroutines.CancellationException("synthetic: the caller went away")
             }
         }
         val repository = DeletionRepository(paths, db, mutationQueue, sourceDao = cancellingDao)
 
-        val deletion = async(kotlinx.coroutines.Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
-            repository.deleteSource(id)
-        }
-        deleteJob.complete(deletion)
-        deletion.start()
-        deletion.join()
+        val outcome = runCatching { repository.deleteSource(id) }
 
-        assertTrue("the caller observes cancellation, not Failed", deletion.isCancelled)
+        assertTrue(
+            "expected CancellationException, got ${outcome.getOrNull() ?: outcome.exceptionOrNull()}",
+            outcome.exceptionOrNull() is kotlinx.coroutines.CancellationException,
+        )
+        // The transaction rolled back: the row is still DELETING and a retry finishes it.
         assertEquals(SourceState.DELETING, db.sourceDao().findById(id.toString())!!.toDomain().state)
         assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
     }

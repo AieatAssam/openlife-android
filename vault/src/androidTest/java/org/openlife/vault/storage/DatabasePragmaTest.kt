@@ -1,6 +1,7 @@
 package org.openlife.vault.storage
 
 import android.util.Log
+import androidx.room.RoomDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
@@ -35,12 +36,23 @@ class DatabasePragmaTest {
 
     @Test
     fun effectiveSynchronousAndJournalModeAreRecorded() {
-        val db = OpenLifeDatabaseFactory.create(context, paths, ByteArray(32) { 4 })
+        assertFullSynchronous(RoomDatabase.JournalMode.AUTOMATIC)
+    }
+
+    /** Low-RAM devices get TRUNCATE from AUTOMATIC; FULL must hold there too (review R-03). */
+    @Test
+    fun synchronousIsFullInTruncateJournalModeToo() {
+        assertFullSynchronous(RoomDatabase.JournalMode.TRUNCATE)
+    }
+
+    private fun assertFullSynchronous(mode: RoomDatabase.JournalMode) {
+        val db = OpenLifeDatabaseFactory.create(context, paths, ByteArray(32) { 4 }, journalMode = mode)
         try {
             val sqlite = db.openHelper.writableDatabase
             var journalMode = ""
             var synchronous = -1
             var cipherVersion = ""
+            // Inside a transaction, so the pragmas are read on the writer connection.
             sqlite.beginTransaction()
             try {
                 sqlite.query("PRAGMA journal_mode").use { it.moveToFirst(); journalMode = it.getString(0) }
@@ -50,8 +62,8 @@ class DatabasePragmaTest {
             } finally {
                 sqlite.endTransaction()
             }
-            val record = "P1-18-R16 journal_mode=$journalMode synchronous=$synchronous cipher_version=$cipherVersion " +
-                "sqlcipher-android=4.19.0 lowRam=${isLowRam()}"
+            val record = "P1-18-R16 requested=$mode journal_mode=$journalMode synchronous=$synchronous " +
+                "cipher_version=$cipherVersion sqlcipher-android=4.19.0 lowRam=${isLowRam()}"
             Log.i("P118DatabasePragmaTest", record)
             println(record)
             assertEquals("synchronous must be FULL (2): $record", 2, synchronous)
