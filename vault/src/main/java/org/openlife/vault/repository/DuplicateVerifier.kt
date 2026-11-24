@@ -4,8 +4,8 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
-import org.openlife.vault.storage.toEntity
 import java.io.File
 import java.util.UUID
 
@@ -45,7 +45,7 @@ internal class DuplicateVerifier(
             }
 
             ArtefactCheck.Corrupt -> {
-                sourceDao.update(candidate.copy(state = SourceState.CORRUPT).toEntity())
+                sourceDao.compareAndSetState(candidate.id.toString(), SourceState.READY, SourceState.CORRUPT)
                 DuplicateCheck.None
             }
 

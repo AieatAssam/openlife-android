@@ -14,15 +14,15 @@ import java.util.UUID
 fun OcrRevisionEntity.toDomain() = OcrRevision(
     id = UUID.fromString(id),
     sourceId = UUID.fromString(sourceId),
-    state = OcrRevisionState.valueOf(state),
+    state = decodeStored(state, OcrRevisionState.UNRECOGNISED),
     engineId = engineId,
     modelVersion = modelVersion,
-    orientation = Orientation.valueOf(orientation),
+    orientation = decodeStoredOrNull<Orientation>(orientation),
     sourceDigest = sourceDigest,
     startedAt = startedAt,
     extractedAt = extractedAt,
-    reviewState = OcrReviewState.valueOf(reviewState),
-    failureReason = failureReason?.let(OcrFailureReason::valueOf),
+    reviewState = decodeStored(reviewState, OcrReviewState.UNRECOGNISED),
+    failureReason = failureReason?.let { decodeStored(it, OcrFailureReason.UNRECOGNISED) },
     charCount = charCount,
     spanCount = spanCount,
 )
@@ -30,15 +30,15 @@ fun OcrRevisionEntity.toDomain() = OcrRevision(
 fun OcrRevision.toEntity() = OcrRevisionEntity(
     id = id.toString(),
     sourceId = sourceId.toString(),
-    state = state.name,
+    state = state.also { check(it != OcrRevisionState.UNRECOGNISED) { "never written back" } }.name,
     engineId = engineId,
     modelVersion = modelVersion,
     orientation = checkNotNull(orientation) { "an unrecognised orientation is never written back" }.name,
     sourceDigest = sourceDigest,
     startedAt = startedAt,
     extractedAt = extractedAt,
-    reviewState = reviewState.name,
-    failureReason = failureReason?.name,
+    reviewState = reviewState.also { check(it != OcrReviewState.UNRECOGNISED) { "never written back" } }.name,
+    failureReason = failureReason?.also { check(it != OcrFailureReason.UNRECOGNISED) { "never written back" } }?.name,
     charCount = charCount,
     spanCount = spanCount,
 )
@@ -49,7 +49,7 @@ fun OcrSpanEntity.toDomain() = OcrSpan(
     ordinal = ordinal,
     text = text,
     confidence = confidence,
-    coordinateSystem = OcrCoordinateSystem.valueOf(coordinateSystem),
+    coordinateSystem = decodeStored(coordinateSystem, OcrCoordinateSystem.UNRECOGNISED),
     evidenceRegion = toEvidenceRegion(left, top, right, bottom),
 )
 
@@ -68,7 +68,9 @@ fun OcrSpan.toEntity() = OcrSpanEntity(
     ordinal = ordinal,
     text = text,
     confidence = confidence,
-    coordinateSystem = coordinateSystem.name,
+    coordinateSystem = coordinateSystem.also {
+        check(it != OcrCoordinateSystem.UNRECOGNISED) { "never written back" }
+    }.name,
     left = evidenceRegion?.left,
     top = evidenceRegion?.top,
     right = evidenceRegion?.right,

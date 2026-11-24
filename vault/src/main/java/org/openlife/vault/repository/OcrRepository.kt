@@ -82,8 +82,9 @@ class OcrRepository(
         if (source == null || !source.isReadyForOcr()) {
             return@withMutation Capture.Failure(OcrFailureReason.SOURCE_NOT_READY)
         }
-        val bytes = authenticator.decryptAndVerify(source, paths.blobFile(sourceId))
-            ?: return@withMutation Capture.Failure(OcrFailureReason.SOURCE_CORRUPT)
+        val check = authenticator.check(source, paths.blobFile(sourceId))
+        ocrCaptureFailureFor(check)?.let { return@withMutation Capture.Failure(it) }
+        val bytes = (check as ArtefactCheck.Verified).plaintext
         val input = try {
             OcrEngineInput(bytes, source.width!!, source.height!!, source.orientation!!, source.mimeType!!)
         } catch (_: IllegalArgumentException) {
@@ -181,11 +182,23 @@ class OcrRepository(
                     )
                 }
                 try {
-                    database.withTransaction {
-                        ocrDao.updateRevision(completed.toEntity())
-                        ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
+                    // Compare-and-set (P1-18-R13): spans are written only if this
+                    // run still owns a RUNNING revision; a lost race writes nothing.
+                    val committed = database.withTransaction {
+                        val moved = ocrDao.completeRunning(
+                            completed.id.toString(),
+                            checkNotNull(completed.extractedAt),
+                            completed.charCount,
+                            completed.spanCount,
+                        )
+                        if (moved == 1) ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
+                        moved == 1
                     }
-                    OcrRunResult.Completed(completed.id, persistedSpans)
+                    if (committed) {
+                        OcrRunResult.Completed(completed.id, persistedSpans)
+                    } else {
+                        OcrRunResult.Stale(revision.id)
+                    }
                 } catch (_: Exception) {
                     markTerminalLocked(revision.id, OcrRevisionState.FAILED, OcrFailureReason.STORAGE_FAILURE)
                     OcrRunResult.Failed(revision.id, OcrFailureReason.STORAGE_FAILURE)
@@ -240,12 +253,10 @@ class OcrRepository(
         }
 
     suspend fun setReviewState(revisionId: UUID, reviewState: OcrReviewState): Boolean = withContext(ioDispatcher) {
+        check(reviewState != OcrReviewState.UNRECOGNISED) { "an unrecognised review state is never written" }
         mutationQueue.withMutation {
-            val revision = database.ocrDao().findRevision(revisionId.toString())?.toDomain()
-                ?: return@withMutation false
-            if (revision.state != OcrRevisionState.READY) return@withMutation false
-            database.ocrDao().updateRevision(revision.copy(reviewState = reviewState).toEntity())
-            true
+            // READY-only compare-and-set; a missing or non-READY revision changes nothing.
+            database.ocrDao().setReviewState(revisionId.toString(), reviewState.name) == 1
         }
     }
 
@@ -258,10 +269,8 @@ class OcrRepository(
 
     /** Callers must already hold the mutation. */
     private suspend fun markTerminalLocked(revisionId: UUID, state: OcrRevisionState, reason: OcrFailureReason) {
-        val revision = ocrDao.findRevision(revisionId.toString())?.toDomain() ?: return
-        if (revision.state == OcrRevisionState.RUNNING) {
-            ocrDao.updateRevision(revision.copy(state = state, failureReason = reason).toEntity())
-        }
+        // RUNNING-only compare-and-set; a revision that already ended keeps how it ended.
+        ocrDao.finishRunning(revisionId.toString(), state.name, reason.name)
     }
 
     private sealed interface Capture {
@@ -291,4 +300,8 @@ private fun ocrViewOf(
  * V-05). Only evidence about the stored bytes is SOURCE_CORRUPT; a Keystore or
  * I/O hiccup is retryable.
  */
-internal fun ocrCaptureFailureFor(check: ArtefactCheck): OcrFailureReason? = TODO("P1-18-R8")
+internal fun ocrCaptureFailureFor(check: ArtefactCheck): OcrFailureReason? = when (check) {
+    is ArtefactCheck.Verified -> null
+    ArtefactCheck.Corrupt, ArtefactCheck.Missing -> OcrFailureReason.SOURCE_CORRUPT
+    ArtefactCheck.Transient -> OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE
+}

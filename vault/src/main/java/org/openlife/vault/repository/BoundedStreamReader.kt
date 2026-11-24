@@ -20,8 +20,8 @@ class ReadDeadlineExceededException : IOException("provider read deadline exceed
  * Reads at most [ImportLimits.MAX_ORIGINAL_BYTES] + 1 bytes from [stream]
  * into bounded memory, computing SHA-256 as bytes arrive (design §11 step
  * 2). Reading exactly limit+1 bytes is the deliberate signal that the
- * original exceeded the limit — [ImageHeaderValidator] rejects on size for
- * exactly that reason, so the caller does not need to special-case it here.
+ * original exceeded the limit; the result then has [BoundedRead.exceededLimit]
+ * set and carries no bytes.
  * The provider's claimed size (e.g. `Content-Length`-equivalent metadata)
  * is never consulted; only what is actually read counts.
  */
@@ -29,56 +29,50 @@ object BoundedStreamReader {
 
     private const val CHUNK_SIZE = 64 * 1024
 
+    /**
+     * Accumulates fixed-size chunks rather than a doubling buffer, which held
+     * the old and the new array at once (about 24 MiB, then 32 MiB, for an
+     * oversized read: OutOfMemoryError on a 16 MiB-limit heap, CI run
+     * 45405099804). Peak: the chunks, plus one exact-size copy for an
+     * accepted original (2N); an oversized read is rejected on size alone,
+     * so its chunks are wiped and no copy is made (N + 1 chunk). Every chunk
+     * is wiped after use.
+     */
     fun read(stream: InputStream, deadline: () -> Boolean = { false }): BoundedRead {
         val digest = MessageDigest.getInstance("SHA-256")
         val limit = ImportLimits.MAX_ORIGINAL_BYTES + 1
-        val buffer = ByteArray(CHUNK_SIZE)
-        val out = WipeableByteArrayOutputStream()
+        val chunks = ArrayList<ByteArray>()
         var total = 0L
 
         try {
             while (total < limit) {
                 if (deadline()) throw ReadDeadlineExceededException()
-                val toRead = minOf(buffer.size.toLong(), limit - total).toInt()
-                val n = stream.read(buffer, 0, toRead)
+                val chunk = chunks.lastOrNull()?.takeIf { (total % CHUNK_SIZE).toInt() != 0 }
+                    ?: ByteArray(CHUNK_SIZE).also { chunks += it }
+                val offset = (total % CHUNK_SIZE).toInt()
+                val toRead = minOf((CHUNK_SIZE - offset).toLong(), limit - total).toInt()
+                val n = stream.read(chunk, offset, toRead)
                 if (n < 0) break
-                digest.update(buffer, 0, n)
-                out.write(buffer, 0, n)
+                digest.update(chunk, offset, n)
                 total += n
             }
-            return BoundedRead(out.toByteArray(), digest.digest())
-        } finally {
-            buffer.fill(0)
-            out.clear()
-        }
-    }
-
-    private class WipeableByteArrayOutputStream(initialCapacity: Int = CHUNK_SIZE) {
-        private var buffer = ByteArray(initialCapacity)
-        private var size = 0
-
-        fun write(source: ByteArray, offset: Int, length: Int) {
-            ensureCapacity(size + length)
-            source.copyInto(buffer, size, offset, offset + length)
-            size += length
-        }
-
-        fun toByteArray(): ByteArray = buffer.copyOf(size)
-
-        fun clear() {
-            buffer.fill(0)
-            size = 0
-        }
-
-        private fun ensureCapacity(required: Int) {
-            if (required <= buffer.size) return
-            var nextSize = buffer.size
-            while (nextSize < required) {
-                nextSize = (nextSize * 2).coerceAtMost(ImportLimits.MAX_ORIGINAL_BYTES.toInt() + 1)
+            if (total >= limit) {
+                // Exceeded: the bytes are never needed, only the count.
+                return BoundedRead(ByteArray(0), digest.digest(), byteCount = total)
             }
-            val replacement = buffer.copyOf(nextSize)
-            buffer.fill(0)
-            buffer = replacement
+            val bytes = ByteArray(total.toInt())
+            var copied = 0
+            for (chunk in chunks) {
+                val length = minOf(CHUNK_SIZE, bytes.size - copied)
+                if (length <= 0) break
+                chunk.copyInto(bytes, copied, 0, length)
+                copied += length
+                chunk.fill(0)
+            }
+            return BoundedRead(bytes, digest.digest())
+        } finally {
+            chunks.forEach { it.fill(0) }
+            chunks.clear()
         }
     }
 }

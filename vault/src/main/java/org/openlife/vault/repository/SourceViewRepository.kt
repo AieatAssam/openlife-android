@@ -10,8 +10,8 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
-import org.openlife.vault.storage.toEntity
 import java.util.UUID
 
 /**
@@ -60,7 +60,9 @@ class SourceViewRepository(
                 is ArtefactCheck.Verified -> ReadyReadResult.Loaded(check.plaintext)
 
                 ArtefactCheck.Corrupt -> {
-                    database.sourceDao().update(source.copy(state = SourceState.CORRUPT).toEntity())
+                    // Compare-and-set: a concurrent mark or deletion wins (P1-18-R13);
+                    // either way the original is not shown.
+                    database.sourceDao().compareAndSetState(source.id.toString(), SourceState.READY, SourceState.CORRUPT)
                     ReadyReadResult.Corrupt
                 }
 

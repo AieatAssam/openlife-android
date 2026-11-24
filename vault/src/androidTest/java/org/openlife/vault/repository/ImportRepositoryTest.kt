@@ -139,7 +139,7 @@ class ImportRepositoryTest {
 
     private fun sourceDaoFailingReadyUpdate(): SourceDao {
         val delegate = db.sourceDao()
-        return object : SourceDao {
+        return object : SourceDao by delegate {
             override suspend fun insert(source: SourceEntity) = delegate.insert(source)
 
             override suspend fun update(source: SourceEntity) {

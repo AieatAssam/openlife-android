@@ -9,14 +9,45 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Room access for source rows and the READY invariant. The repositories own
  * import, save, recovery, and deletion mutations (design §11-§12).
+ *
+ * State changes are compare-and-set statements ([transitionState],
+ * [updateStagedMetadata]) so a stale snapshot can never be written back over
+ * a row another writer changed (P1-18-R13). The one remaining @Update:
+ * - [update]: not called by production code. Test fixtures use it to write
+ *   arbitrary rows, including deliberately invalid ones that the READY
+ *   trigger must reject.
  */
 @Dao
 interface SourceDao {
     @Insert
     suspend fun insert(source: SourceEntity)
 
+    /** Test fixtures only; see the class KDoc. Production state changes use [transitionState]. */
     @Update
     suspend fun update(source: SourceEntity)
+
+    /**
+     * Records the validated metadata of a STAGED row (design §11 "Prepare");
+     * returns 0 when the row is no longer STAGED, and then nothing is written.
+     */
+    @Query(
+        """
+        UPDATE sources SET mimeType = :mimeType, byteCount = :byteCount, sha256 = :sha256, width = :width,
+            height = :height, orientation = :orientation, artefactVersion = :artefactVersion
+        WHERE id = :id AND state = 'STAGED'
+        """,
+    )
+    @Suppress("LongParameterList") // one column per validated field
+    suspend fun updateStagedMetadata(
+        id: String,
+        mimeType: String,
+        byteCount: Long,
+        sha256: ByteArray,
+        width: Int,
+        height: Int,
+        orientation: String,
+        artefactVersion: Int,
+    ): Int
 
     /** Compare-and-set state change; returns the number of rows changed (0 or 1). */
     @Query("UPDATE sources SET state = :to WHERE id = :id AND state = :from")
@@ -56,4 +87,9 @@ suspend fun SourceDao.compareAndSetState(
     id: String,
     from: org.openlife.vault.model.SourceState,
     to: org.openlife.vault.model.SourceState,
-): StateTransition = TODO("P1-18-R13")
+): StateTransition {
+    check(from != org.openlife.vault.model.SourceState.UNRECOGNISED && to != org.openlife.vault.model.SourceState.UNRECOGNISED) {
+        "an unrecognised state is never written"
+    }
+    return if (transitionState(id, from.name, to.name) == 1) StateTransition.APPLIED else StateTransition.LOST_RACE
+}

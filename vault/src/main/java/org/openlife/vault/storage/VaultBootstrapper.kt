@@ -3,12 +3,12 @@ package org.openlife.vault.storage
 import org.openlife.vault.crypto.EnvelopeAuthenticationException
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
+import org.openlife.vault.crypto.KeystoreFailures
 import org.openlife.vault.crypto.KeystoreUnavailableException
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.crypto.MissingWrappingKeyException
 import java.io.IOException
 import java.security.GeneralSecurityException
-import java.security.KeyStoreException
 import java.security.ProviderException
 import java.security.SecureRandom
 
@@ -81,17 +81,20 @@ object VaultBootstrapper {
                 return VaultBootstrapResult.Unavailable(VaultUnavailableCause.RESET_INCOMPLETE)
             }
             paths.ensureDirectoriesExist()
-            when (val keyRead = readKey(paths)) {
-                KeyRead.Corrupt -> VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_FILE_CORRUPT)
-
-                is KeyRead.Present -> unwrapExisting(keyRead.envelope, wrapper)
-
-                KeyRead.Absent -> if (paths.databaseFile.exists()) {
-                    // A database with no usable key file is never safe to recreate.
-                    VaultBootstrapResult.Unavailable(VaultUnavailableCause.DATABASE_WITHOUT_KEY)
-                } else {
-                    createFresh(paths, wrapper)
-                }
+            // A temporary key left by an interrupted write never reached its
+            // rename, so it was never the key (P1-18-R10).
+            VaultKeyFile.removeLeftoverTemp(paths.databaseKeyFile)
+            val plan = planBootstrap(
+                keyFileExists = paths.databaseKeyFile.exists(),
+                readKey = { readKey(paths) },
+                databaseExists = paths.databaseFile.exists(),
+                // Unlistable counts as "not provably empty".
+                hasArtefacts = paths.artefactsDir.list()?.isNotEmpty() ?: true,
+            )
+            when (plan) {
+                is BootstrapPlan.Stop -> VaultBootstrapResult.Unavailable(plan.cause)
+                is BootstrapPlan.UnwrapExisting -> unwrapExisting(plan.envelope, wrapper)
+                BootstrapPlan.CreateFresh -> createFresh(paths, wrapper)
             }
         } catch (exception: IOException) {
             VaultBootstrapResult.Unavailable(classify(exception))
@@ -166,18 +169,8 @@ object VaultBootstrapper {
         else -> VaultUnavailableCause.STORAGE_IO_ERROR
     }
 
-    private fun isTemporaryKeystoreFailure(exception: Throwable): Boolean {
-        var current: Throwable? = exception
-        while (current != null) {
-            if (current is KeyStoreException || current is ProviderException ||
-                current.javaClass.name.endsWith("UserNotAuthenticatedException")
-            ) {
-                return true
-            }
-            current = current.cause
-        }
-        return false
-    }
+    /** One classifier shared with KeystoreWrapper (P1-18-R2). */
+    private fun isTemporaryKeystoreFailure(exception: Throwable): Boolean = KeystoreFailures.isTemporary(exception)
 
 }
 
@@ -198,10 +191,38 @@ internal sealed interface BootstrapPlan {
 /**
  * Decides bootstrap from disk state alone. [readKey] is only called when
  * the key's contents matter.
+ *
+ * - A key file and saved originals with no database is DATABASE_MISSING,
+ *   decided before the key is read: opening an empty database there would
+ *   let recovery delete every blob as an orphan (P1-18-R4, design §11).
+ * - A malformed key with no database and no artefacts has nothing at stake:
+ *   it can only be a first-run write torn by an older build, so it is a
+ *   fresh install (P1-18-R10, ADR-0005 addendum). With a database or any
+ *   artefact it stays KEY_FILE_CORRUPT.
  */
 internal fun planBootstrap(
     keyFileExists: Boolean,
     readKey: () -> KeyRead,
     databaseExists: Boolean,
     hasArtefacts: Boolean,
-): BootstrapPlan = TODO("P1-18-R4/R10")
+): BootstrapPlan {
+    if (keyFileExists && !databaseExists && hasArtefacts) {
+        return BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_MISSING)
+    }
+    return when (val key = readKey()) {
+        KeyRead.Corrupt -> if (!databaseExists && !hasArtefacts) {
+            BootstrapPlan.CreateFresh
+        } else {
+            BootstrapPlan.Stop(VaultUnavailableCause.KEY_FILE_CORRUPT)
+        }
+
+        is KeyRead.Present -> BootstrapPlan.UnwrapExisting(key.envelope)
+
+        // A database with no usable key file is never safe to recreate.
+        KeyRead.Absent -> if (databaseExists) {
+            BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_WITHOUT_KEY)
+        } else {
+            BootstrapPlan.CreateFresh
+        }
+    }
+}

@@ -7,11 +7,15 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import java.util.UUID
 
+/**
+ * Never writes an unrecognised value back over the stored text (P1-18-R14):
+ * a row this build cannot fully read is left exactly as another build wrote it.
+ */
 fun Source.toEntity(): SourceEntity = SourceEntity(
     id = id.toString(),
-    state = state.name,
+    state = state.also { check(it != SourceState.UNRECOGNISED) { "an unrecognised state is never written back" } }.name,
     importedAt = importedAt,
-    intakeKind = intakeKind.name,
+    intakeKind = intakeKind.also { check(it != IntakeKind.UNRECOGNISED) { "an unrecognised intake is never written back" } }.name,
     mimeType = mimeType?.mimeType,
     byteCount = byteCount,
     sha256 = sha256,
@@ -24,15 +28,15 @@ fun Source.toEntity(): SourceEntity = SourceEntity(
 
 fun SourceEntity.toDomain(): Source = Source(
     id = UUID.fromString(id),
-    state = SourceState.valueOf(state),
+    state = decodeStored(state, SourceState.UNRECOGNISED),
     importedAt = importedAt,
-    intakeKind = IntakeKind.valueOf(intakeKind),
-    mimeType = mimeType?.let { declared -> ImageFormat.entries.first { it.mimeType == declared } },
+    intakeKind = decodeStored(intakeKind, IntakeKind.UNRECOGNISED),
+    mimeType = mimeType?.let { declared -> ImageFormat.entries.firstOrNull { it.mimeType == declared } },
     byteCount = byteCount,
     sha256 = sha256,
     width = width,
     height = height,
-    orientation = orientation?.let { Orientation.valueOf(it) },
+    orientation = orientation?.let { decodeStoredOrNull<Orientation>(it) },
     wrappedDek = wrappedDek,
     artefactVersion = artefactVersion,
 )

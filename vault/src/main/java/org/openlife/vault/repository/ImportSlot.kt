@@ -53,4 +53,4 @@ class ImportSlot {
  * keeps it; every other outcome has decided the import.
  */
 internal fun keepsSlotAfterSave(result: SaveResult, rowStillStaged: Boolean, stageExists: Boolean): Boolean =
-    TODO("P1-18-R5")
+    (result == SaveResult.Failed || result == SaveResult.StorageUnavailable) && rowStillStaged && stageExists
