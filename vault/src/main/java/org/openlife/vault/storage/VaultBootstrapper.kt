@@ -3,12 +3,12 @@ package org.openlife.vault.storage
 import org.openlife.vault.crypto.EnvelopeAuthenticationException
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.EnvelopeDomain
+import org.openlife.vault.crypto.KeystoreFailures
 import org.openlife.vault.crypto.KeystoreUnavailableException
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.crypto.MissingWrappingKeyException
 import java.io.IOException
 import java.security.GeneralSecurityException
-import java.security.KeyStoreException
 import java.security.ProviderException
 import java.security.SecureRandom
 
@@ -34,6 +34,9 @@ enum class VaultUnavailableCause {
     DATABASE_OPEN_FAILED,
     STORAGE_IO_ERROR,
     RESET_INCOMPLETE,
+
+    /** Key file and saved originals exist but the database file is gone (P1-18-R4). */
+    DATABASE_MISSING,
 }
 
 val VaultUnavailableCause.retryable: Boolean
@@ -41,6 +44,7 @@ val VaultUnavailableCause.retryable: Boolean
         VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE,
         VaultUnavailableCause.DATABASE_OPEN_FAILED,
         VaultUnavailableCause.STORAGE_IO_ERROR,
+        VaultUnavailableCause.DATABASE_MISSING,
         -> true
 
         VaultUnavailableCause.KEY_FILE_CORRUPT,
@@ -77,17 +81,21 @@ object VaultBootstrapper {
                 return VaultBootstrapResult.Unavailable(VaultUnavailableCause.RESET_INCOMPLETE)
             }
             paths.ensureDirectoriesExist()
-            when (val keyRead = readKey(paths)) {
-                KeyRead.Corrupt -> VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_FILE_CORRUPT)
-
-                is KeyRead.Present -> unwrapExisting(keyRead.envelope, wrapper)
-
-                KeyRead.Absent -> if (paths.databaseFile.exists()) {
-                    // A database with no usable key file is never safe to recreate.
-                    VaultBootstrapResult.Unavailable(VaultUnavailableCause.DATABASE_WITHOUT_KEY)
-                } else {
-                    createFresh(paths, wrapper)
-                }
+            // A temporary key left by an interrupted write never reached its
+            // rename, so it was never the key (P1-18-R10).
+            VaultKeyFile.removeLeftoverTemp(paths.databaseKeyFile)
+            val plan = planBootstrap(
+                readKey = { readKey(paths) },
+                databaseExists = paths.databaseFile.exists(),
+                // Unlistable counts as "not provably empty".
+                hasArtefacts = paths.artefactsDir.list()?.isNotEmpty() ?: true,
+                // SQLCipher opens a 0-byte file as a new, empty database (review R-08).
+                databaseEmpty = paths.databaseFile.exists() && paths.databaseFile.length() == 0L,
+            )
+            when (plan) {
+                is BootstrapPlan.Stop -> VaultBootstrapResult.Unavailable(plan.cause)
+                is BootstrapPlan.UnwrapExisting -> unwrapExisting(plan.envelope, wrapper)
+                BootstrapPlan.CreateFresh -> createFresh(paths, wrapper)
             }
         } catch (exception: IOException) {
             VaultBootstrapResult.Unavailable(classify(exception))
@@ -121,13 +129,16 @@ object VaultBootstrapper {
         VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED)
     }
 
-    private fun unwrapFailure(exception: Exception): VaultBootstrapResult = VaultBootstrapResult.Unavailable(
-        if (isTemporaryKeystoreFailure(exception)) {
+    private fun unwrapFailure(exception: Exception): VaultBootstrapResult =
+        VaultBootstrapResult.Unavailable(unwrapFailureCause(exception))
+
+    /** Why unwrapping `database.key` failed; JVM-testable (P1-18 review R-01). */
+    internal fun unwrapFailureCause(exception: Exception): VaultUnavailableCause =
+        if (KeystoreFailures.isTemporary(exception)) {
             VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
         } else {
             VaultUnavailableCause.KEY_UNWRAP_FAILED
-        },
-    )
+        }
 
     private fun createFresh(paths: VaultPaths, wrapper: KeystoreWrapper): VaultBootstrapResult {
         val secret = ByteArray(DATABASE_SECRET_LENGTH_BYTES).also { SecureRandom().nextBytes(it) }
@@ -157,27 +168,65 @@ object VaultBootstrapper {
     }
 
     private fun classify(exception: Exception): VaultUnavailableCause = when {
-        isTemporaryKeystoreFailure(exception) -> VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
-        exception is IOException -> VaultUnavailableCause.STORAGE_IO_ERROR
+        // One classifier shared with KeystoreWrapper (P1-18-R2).
+        KeystoreFailures.isTemporary(exception) -> VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
+
         else -> VaultUnavailableCause.STORAGE_IO_ERROR
     }
+}
 
-    private fun isTemporaryKeystoreFailure(exception: Throwable): Boolean {
-        var current: Throwable? = exception
-        while (current != null) {
-            if (current is KeyStoreException || current is ProviderException ||
-                current.javaClass.name.endsWith("UserNotAuthenticatedException")
-            ) {
-                return true
-            }
-            current = current.cause
-        }
-        return false
+/** What reading `database.key` found. */
+internal sealed interface KeyRead {
+    data object Absent : KeyRead
+    data object Corrupt : KeyRead
+    data class Present(val envelope: org.openlife.vault.crypto.Envelope) : KeyRead
+}
+
+/** What bootstrap does for the files on disk, decided before any Keystore call (P1-18-R4, R10). */
+internal sealed interface BootstrapPlan {
+    data object CreateFresh : BootstrapPlan
+    data class UnwrapExisting(val envelope: org.openlife.vault.crypto.Envelope) : BootstrapPlan
+    data class Stop(val cause: VaultUnavailableCause) : BootstrapPlan
+}
+
+/**
+ * Decides bootstrap from disk state alone. [readKey] is only called when
+ * the key's contents matter.
+ *
+ * - Saved originals with no database, or a 0-byte one, are DATABASE_MISSING
+ *   with or without a key file, decided before the key is read: opening an
+ *   empty database there would let recovery delete every blob as an orphan
+ *   (P1-18-R4, review R-05/R-08, design §11).
+ * - A malformed key with no database and no artefacts has nothing at stake:
+ *   it can only be a first-run write torn by an older build, so it is a
+ *   fresh install (P1-18-R10, ADR-0005 addendum). With a database or any
+ *   artefact it stays KEY_FILE_CORRUPT.
+ */
+internal fun planBootstrap(
+    readKey: () -> KeyRead,
+    databaseExists: Boolean,
+    hasArtefacts: Boolean,
+    databaseEmpty: Boolean = false,
+): BootstrapPlan {
+    // Saved originals with no usable database are never a fresh install,
+    // whatever the key file says (P1-18-R4; review R-05, R-08).
+    if ((!databaseExists || databaseEmpty) && hasArtefacts) {
+        return BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_MISSING)
     }
+    return when (val key = readKey()) {
+        KeyRead.Corrupt -> if (!databaseExists && !hasArtefacts) {
+            BootstrapPlan.CreateFresh
+        } else {
+            BootstrapPlan.Stop(VaultUnavailableCause.KEY_FILE_CORRUPT)
+        }
 
-    private sealed interface KeyRead {
-        data object Absent : KeyRead
-        data object Corrupt : KeyRead
-        data class Present(val envelope: org.openlife.vault.crypto.Envelope) : KeyRead
+        is KeyRead.Present -> BootstrapPlan.UnwrapExisting(key.envelope)
+
+        // A database with no usable key file is never safe to recreate.
+        KeyRead.Absent -> if (databaseExists) {
+            BootstrapPlan.Stop(VaultUnavailableCause.DATABASE_WITHOUT_KEY)
+        } else {
+            BootstrapPlan.CreateFresh
+        }
     }
 }

@@ -7,9 +7,10 @@ import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
-import org.openlife.vault.storage.toEntity
 import java.io.FileInputStream
 import java.io.IOException
 import java.util.UUID
@@ -34,6 +35,7 @@ class RecoveryRepository(
     keystoreWrapper: KeystoreWrapper,
     private val mutationQueue: MutationQueue,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -47,6 +49,7 @@ class RecoveryRepository(
             var confirmedReady = 0
             var markedCorrupt = 0
             var resumedDeletions = 0
+            var unrecognisedRows = 0
 
             val rows = database.sourceDao().findAll()
             val referencedIds = mutableSetOf<UUID>()
@@ -74,8 +77,9 @@ class RecoveryRepository(
                         Framing.PLAUSIBLE -> confirmedReady++
 
                         Framing.BROKEN -> {
-                            database.sourceDao().update(source.copy(state = SourceState.CORRUPT).toEntity())
-                            markedCorrupt++
+                            val marked = database.sourceDao()
+                                .compareAndSetState(source.id.toString(), SourceState.READY, SourceState.CORRUPT)
+                            if (marked == StateTransition.APPLIED) markedCorrupt++
                         }
 
                         // An I/O error says nothing about the stored bytes.
@@ -98,17 +102,14 @@ class RecoveryRepository(
                         // Retained until a user confirms deletion; no
                         // automatic action.
                     }
+
+                    // Written by another build: never shown, never deleted, and
+                    // its files are referenced, so not orphans (P1-18-R14).
+                    SourceState.UNRECOGNISED -> unrecognisedRows++
                 }
             }
 
-            // Orphan deletion is safe only after every row was reconciled. If a
-            // cleanup failed above, retain all unreferenced files for the next
-            // pass rather than risking deletion during a partial recovery.
-            val removedOrphans = if (allRowsReconciled) {
-                removeUnreferencedArtefactFiles(referencedIds)
-            } else {
-                0
-            }
+            val (removedOrphans, keptBlobsWithoutRows) = cleanOrphans(rows.size, allRowsReconciled, referencedIds)
 
             RecoveryReport(
                 cleanedStaged = cleanedStaged,
@@ -117,44 +118,58 @@ class RecoveryRepository(
                 resumedDeletions = resumedDeletions,
                 removedOrphanFiles = removedOrphans,
                 markedStaleOcrRevisions = staleOcrRevisions,
+                unrecognisedRows = unrecognisedRows,
+                keptBlobsWithoutRows = keptBlobsWithoutRows,
             )
         }
     }
 
     /**
      * Settings > Verify all items (P1-14-R3): deep-authenticates every READY
-     * item. Only a genuine authentication failure or a missing blob marks it
-     * CORRUPT; a Keystore or I/O failure changes nothing and is counted as
-     * [VerifyReport.transient]. Each item is checked in its own mutation, so
-     * imports and deletions are not held off for the whole pass.
+     * and CORRUPT item. Only a genuine authentication failure or a missing
+     * blob marks a READY item CORRUPT; a CORRUPT item whose blob now fully
+     * authenticates is restored to READY (P1-18-R3), since an earlier verdict
+     * may have come from a transient Keystore error. A Keystore or I/O failure
+     * changes nothing and is counted as [VerifyReport.transient]. Every state
+     * change is a compare-and-set. Each item is checked in its own mutation,
+     * so imports and deletions are not held off for the whole pass.
      */
     suspend fun verifyAll(): VerifyReport = withContext(ioDispatcher) {
         var verified = 0
         var markedCorrupt = 0
         var transient = 0
+        var restored = 0
+        val checked = setOf(SourceState.READY.name, SourceState.CORRUPT.name)
         val ids = mutationQueue.withReadLease {
-            database.sourceDao().findAll().filter { it.state == SourceState.READY.name }.map { it.id }
+            database.sourceDao().findAll().filter { it.state in checked }.map { it.id }
         }
         for (id in ids) {
             mutationQueue.withMutation {
                 val source = database.sourceDao().findById(id)?.toDomain()
-                if (source?.state != SourceState.READY) return@withMutation
-                when (val check = authenticator.check(source, paths.blobFile(source.id))) {
-                    is ArtefactCheck.Verified -> {
-                        check.plaintext.fill(0)
-                        verified++
+                if (source == null || source.state.name !in checked) return@withMutation
+                val check = authenticator.check(source, paths.blobFile(source.id))
+                if (check is ArtefactCheck.Verified) check.plaintext.fill(0)
+                when {
+                    check == ArtefactCheck.Transient -> transient++
+
+                    source.state == SourceState.READY && check is ArtefactCheck.Verified -> verified++
+
+                    source.state == SourceState.READY -> {
+                        val marked = database.sourceDao().compareAndSetState(id, SourceState.READY, SourceState.CORRUPT)
+                        if (marked == StateTransition.APPLIED) markedCorrupt++
                     }
 
-                    ArtefactCheck.Corrupt, ArtefactCheck.Missing -> {
-                        database.sourceDao().update(source.copy(state = SourceState.CORRUPT).toEntity())
-                        markedCorrupt++
+                    check is ArtefactCheck.Verified -> {
+                        val back = database.sourceDao().compareAndSetState(id, SourceState.CORRUPT, SourceState.READY)
+                        if (back == StateTransition.APPLIED) restored++
                     }
 
-                    ArtefactCheck.Transient -> transient++
+                    // CORRUPT and still corrupt or missing: unchanged.
+                    else -> Unit
                 }
             }
         }
-        VerifyReport(verified = verified, markedCorrupt = markedCorrupt, transient = transient)
+        VerifyReport(verified = verified, markedCorrupt = markedCorrupt, transient = transient, restored = restored)
     }
 
     /**
@@ -204,8 +219,10 @@ class RecoveryRepository(
      * that completes just before cannot have its fresh stage mistaken for an
      * abandoned one. Skips (null) while an import is still preparing.
      */
-    suspend fun cleanAbandonedStages(importSlot: ImportSlot): Int? = cleanAbandonedStages {
-        if (importSlot.isPreparing) SKIP else importSlot.activeSourceId
+    suspend fun cleanAbandonedStages(importSlot: ImportSlot): Int? {
+        // Checked before trying the queue as well as inside it (P1-18-R6, C0-R12 "skips").
+        if (importSlot.isPreparing) return null
+        return cleanAbandonedStages { if (importSlot.isPreparing) SKIP else importSlot.activeSourceId }
     }
 
     private suspend fun cleanAbandonedStages(active: () -> Any?): Int? = withContext(ioDispatcher) {
@@ -230,7 +247,22 @@ class RecoveryRepository(
         val SKIP = Any()
     }
 
-    private fun removeArtefactFiles(sourceId: UUID): Boolean = ArtefactFileOps.Default.deleteArtefacts(paths, sourceId)
+    private fun removeArtefactFiles(sourceId: UUID): Boolean = fileOps.deleteArtefacts(paths, sourceId)
+
+    /**
+     * Returns (removed orphan files, blobs kept because there are no rows).
+     * Orphan deletion is safe only after every row was reconciled; if a
+     * cleanup failed, all unreferenced files wait for the next pass. With zero
+     * rows and saved originals present nothing is removed and the kept blobs
+     * are reported, so the app refuses to show an empty vault (review R-08).
+     */
+    private fun cleanOrphans(rowCount: Int, allRowsReconciled: Boolean, referencedIds: Set<UUID>): Pair<Int, Int> {
+        val artefactNames = paths.artefactsDir.list()?.toList().orEmpty()
+        if (!OrphanPolicy.mayRemoveOrphans(rowCount, artefactNames)) {
+            return 0 to OrphanPolicy.blobCount(artefactNames)
+        }
+        return (if (allRowsReconciled) removeUnreferencedArtefactFiles(referencedIds) else 0) to 0
+    }
 
     /**
      * Deletes only `.stage`/`.blob` files whose UUID has no corresponding
@@ -247,7 +279,8 @@ class RecoveryRepository(
             val extension = name.substringAfterLast('.', missingDelimiterValue = "")
             if (extension == "stage" || extension == "blob") {
                 val id = runCatching { UUID.fromString(uuidPart) }.getOrNull()
-                if (id != null && id !in referencedIds && file.delete()) removed++
+                val orphan = id != null && id !in referencedIds && file.exists()
+                if (orphan && fileOps.deleteIfExists(file)) removed++
             }
         }
         return removed

@@ -2,6 +2,7 @@ package org.openlife.vault.storage
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
@@ -37,12 +38,16 @@ object OpenLifeDatabaseFactory {
         databaseSecret: ByteArray,
         migrations: List<Migration> = OpenLifeDatabase.MIGRATIONS,
         databasePath: String = paths.databaseFile.absolutePath,
+        // AUTOMATIC is WAL, or TRUNCATE on low-RAM devices; tests pin TRUNCATE.
+        journalMode: RoomDatabase.JournalMode = RoomDatabase.JournalMode.AUTOMATIC,
     ): OpenLifeDatabase {
         System.loadLibrary("sqlcipher")
         return Room.databaseBuilder(context, OpenLifeDatabase::class.java, databasePath)
             .openHelperFactory(SupportOpenHelperFactory(databaseSecret))
+            .setJournalMode(journalMode)
             .addMigrations(*migrations.toTypedArray())
             .addCallback(OpenLifeDatabase.readyInvariantCallback)
+            .addCallback(DurableWrites.callback)
             .build()
     }
 

@@ -46,3 +46,19 @@ class ImportSlot {
         if (current is State.Staged && current.sourceId == sourceId) state.compareAndSet(current, State.Free)
     }
 }
+
+/**
+ * P1-18-R5 (V-03): after Save, the slot stays with a stage the user can still
+ * retry. Only a failure that left the row STAGED with its stage file on disk
+ * keeps it; every other outcome has decided the import.
+ */
+internal suspend fun keepsSlotAfterSave(
+    result: SaveResult,
+    rowStillStaged: suspend () -> Boolean,
+    stageExists: suspend () -> Boolean,
+): Boolean {
+    // Evaluated only for a failure, in this order, so a decided save never
+    // reads the row or the stage (review R-06).
+    if (result != SaveResult.Failed && result != SaveResult.StorageUnavailable) return false
+    return rowStillStaged() && stageExists()
+}

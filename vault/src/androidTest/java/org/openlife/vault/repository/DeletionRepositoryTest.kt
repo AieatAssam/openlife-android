@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -236,6 +237,36 @@ class DeletionRepositoryTest {
 
         assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
         assertEquals(0, db.ocrDao().countRevisions())
+    }
+
+    /**
+     * P1-18-R9 (V-08): a cancellation arriving inside the row removal must
+     * reach the caller. The generic catch used to turn it into Failed. The
+     * transaction rolls back, so the row stays DELETING for a later retry.
+     */
+    @Test
+    fun cancellationIsNotSwallowedByGenericCatch(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val delegate = db.sourceDao()
+        // Review R-02: the seam itself throws, so the old `catch (_: Exception)`
+        // would turn this into DeleteResult.Failed and the test would fail.
+        val cancellingDao = object : org.openlife.vault.storage.SourceDao by delegate {
+            override suspend fun deleteById(id: String) {
+                delegate.deleteById(id)
+                throw kotlinx.coroutines.CancellationException("synthetic: the caller went away")
+            }
+        }
+        val repository = DeletionRepository(paths, db, mutationQueue, sourceDao = cancellingDao)
+
+        val outcome = runCatching { repository.deleteSource(id) }
+
+        assertTrue(
+            "expected CancellationException, got ${outcome.getOrNull() ?: outcome.exceptionOrNull()}",
+            outcome.exceptionOrNull() is kotlinx.coroutines.CancellationException,
+        )
+        // The transaction rolled back: the row is still DELETING and a retry finishes it.
+        assertEquals(SourceState.DELETING, db.sourceDao().findById(id.toString())!!.toDomain().state)
+        assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
     }
 
     private suspend fun insertOcrRevisionFor(id: UUID) {

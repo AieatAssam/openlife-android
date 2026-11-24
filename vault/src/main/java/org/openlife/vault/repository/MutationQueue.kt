@@ -12,8 +12,9 @@ import kotlinx.coroutines.sync.withLock
  *   import preparation, which only creates rows and files for a fresh UUID.
  *   A plaintext read therefore never makes an import "busy" (P1-15, F-29).
  * - [withMutation] / [tryMutation]: exclusive. Save, cancel, deletion,
- *   recovery, OCR bookkeeping and reset. A mutation waits for active read
- *   leases to finish, so deletion can never race plaintext delivery.
+ *   recovery, OCR bookkeeping and reset. [withMutation] waits for active
+ *   read leases to finish, so deletion can never race plaintext delivery;
+ *   [tryMutation] reports busy instead of waiting.
  *
  * A mutation holds [gate] for its whole run; a reader only passes through
  * [gate] to register. A waiting mutation therefore blocks new readers, and
@@ -56,14 +57,16 @@ class MutationQueue {
     }
 
     /**
-     * Runs [block] exclusively, or returns null at once if another mutation
-     * holds the queue. Active read leases are waited for, not reported busy.
+     * Runs [block] exclusively, or returns null at once, without waiting, if
+     * another mutation holds the queue or a read lease is active (P1-18-R6,
+     * C0-R12 "skips"). Readers register only while holding [gate], so once
+     * this holds [gate] the reader count it reads cannot grow.
      */
     suspend fun <T> tryMutation(block: suspend () -> T): T? {
+        if (!readersIdle.value) return null
         if (!gate.tryLock()) return null
         return try {
-            readersIdle.first { it }
-            block()
+            if (synchronized(readerLock) { activeReaders > 0 }) null else block()
         } finally {
             gate.unlock()
         }

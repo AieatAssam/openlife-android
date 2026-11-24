@@ -14,6 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.vault.testing.DoFinalFaultWrapper
+import org.openlife.vault.testing.KeystoreFaults
 
 /**
  * Instrumented because Android Keystore is unavailable off-device (design
@@ -122,6 +124,36 @@ class KeystoreWrapperTest {
 
         assertTrue("expected MissingWrappingKeyException, was $failure", failure is MissingWrappingKeyException)
         assertFalse("wrap must not generate a replacement key", wrapper.hasWrappingKey())
+    }
+
+    /**
+     * P1-18-R1 (V-01): only a failed GCM tag (AEADBadTagException) is
+     * evidence about the envelope. AOSP's AndroidKeyStoreCipherSpiBase.engineDoFinal
+     * reports every other keymaster error as IllegalBlockSizeException (and
+     * KM_ERROR_INVALID_ARGUMENT as BadPaddingException) with a KeyStoreException
+     * cause; those are transient and must never become a CORRUPT verdict.
+     */
+    @Test
+    fun nonAeadCipherFailureIsTransientNotAuthentication() {
+        val faulty = DoFinalFaultWrapper(alias)
+        faulty.ensureWrappingKey()
+        val envelope = faulty.wrap("database secret material".toByteArray(), EnvelopeDomain.DATABASE_SECRET)
+        android.util.Log.i("P118KeystoreWrapperTest", KeystoreFaults.describe())
+
+        faulty.failure = { KeystoreFaults.doFinalFailure() }
+        val blockSize = runCatching { faulty.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+        assertTrue("IllegalBlockSizeException must be transient, was $blockSize", blockSize is KeystoreUnavailableException)
+
+        faulty.failure = { javax.crypto.BadPaddingException("synthetic").apply { initCause(KeystoreFaults.keystoreCause()) } }
+        val padding = runCatching { faulty.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+        assertTrue("BadPaddingException must be transient, was $padding", padding is KeystoreUnavailableException)
+
+        faulty.failure = { javax.crypto.AEADBadTagException("synthetic tag failure") }
+        val tag = runCatching { faulty.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET) }.exceptionOrNull()
+        assertTrue("AEADBadTagException is authentication, was $tag", tag is EnvelopeAuthenticationException)
+
+        faulty.failure = null
+        assertArrayEquals("database secret material".toByteArray(), faulty.unwrap(envelope, EnvelopeDomain.DATABASE_SECRET))
     }
 
     private fun deleteAlias() {

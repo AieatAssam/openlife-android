@@ -3,9 +3,10 @@ package org.openlife.vault.repository
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.SourceDao
+import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.storage.compareAndSetState
 import org.openlife.vault.storage.toDomain
-import org.openlife.vault.storage.toEntity
 import java.io.File
 import java.util.UUID
 
@@ -44,10 +45,15 @@ internal class DuplicateVerifier(
                 }
             }
 
-            ArtefactCheck.Corrupt -> {
-                sourceDao.update(candidate.copy(state = SourceState.CORRUPT).toEntity())
-                DuplicateCheck.None
-            }
+            ArtefactCheck.Corrupt ->
+                when (sourceDao.compareAndSetState(candidate.id.toString(), SourceState.READY, SourceState.CORRUPT)) {
+                    // The tampered original is marked; the new import is saved (C0-R16).
+                    StateTransition.APPLIED -> DuplicateCheck.None
+
+                    // The candidate changed since it was read (review R-06):
+                    // decide nothing, keep the stage for a retry.
+                    StateTransition.LOST_RACE -> DuplicateCheck.Unverifiable
+                }
 
             ArtefactCheck.Missing -> DuplicateCheck.None
 

@@ -135,6 +135,28 @@ authenticates.
   OpenLife stays locked and explains how to restore a screen lock. It never
   unlocks silently.
 
+## Authentication versus transient failure (P1-18)
+
+Only a failed GCM tag (`AEADBadTagException`) or a framing or digest
+mismatch is evidence that stored bytes were altered, and only that marks an
+item `CORRUPT`. Every other Keystore error (for example
+`IllegalBlockSizeException` caused by `android.security.KeyStoreException`)
+is transient: the item stays READY and the user can retry. A `CORRUPT` item
+whose bytes fully authenticate in Settings > Verify all items is restored to
+READY. A false transient costs a retry; a false `CORRUPT` would cost the
+user's original.
+
+Power-loss durability (V-16, review R-03): sqlcipher-android 4.19.0 sets
+`synchronous=NORMAL` on every connection it opens. Under NORMAL in WAL mode
+a commit that has already returned can be rolled back by power loss. That
+is not only lost metadata: a READY commit the user saw as saved could come
+back STAGED, and recovery would then delete the item as an abandoned
+import. The vault therefore sets `PRAGMA synchronous=FULL` on the writer
+connection in Room `onOpen` (after SQLCipher's own settings), on every
+open and in both WAL and TRUNCATE journal modes. The value observed on a
+device (`DatabasePragmaTest`) and the write-latency cost of FULL are
+pending a physical-device run.
+
 ## Environment-specific gaps in this build (recorded, not hidden)
 
 - Instrumented and adversarial testing in this repository's development

@@ -84,6 +84,7 @@
     <string name="viewer_review_unreviewed">Unreviewed</string>
     <string name="viewer_review_accepted">Accepted</string>
     <string name="viewer_review_rejected">Rejected</string>
+    <string name="viewer_review_unrecognised">Unknown review state</string>
     <string name="viewer_ocr_history">History (%1$d)</string>
     <string name="viewer_ocr_history_item">%1$s · %2$s · %3$s %4$s</string>
     <string name="viewer_revision_not_started">Not started</string>
@@ -92,6 +93,7 @@
     <string name="viewer_revision_failed">Failed</string>
     <string name="viewer_revision_cancelled">Cancelled</string>
     <string name="viewer_revision_stale">Stale</string>
+    <string name="viewer_revision_unrecognised">Unreadable</string>
     <string name="viewer_accept_text">Accept text</string>
     <string name="viewer_reject_text">Reject</string>
     <string name="viewer_extraction_failed">Text extraction was not accepted: %1$s</string>
@@ -131,6 +133,8 @@
     <string name="ocr_failure_process_restart">the operation was interrupted by a process restart</string>
     <string name="ocr_failure_timeout">it took too long, so OpenLife stopped it</string>
     <string name="ocr_failure_storage">the result could not be saved on this device</string>
+    <string name="ocr_failure_source_unavailable">the device key store was temporarily unavailable. Your saved image is unchanged; try again</string>
+    <string name="ocr_failure_unrecognised">this result was saved by a different version of OpenLife and cannot be shown. Your saved image is unchanged</string>
 
     <string name="settings_title">Settings</string>
     <string name="lock_title">OpenLife is locked</string>
@@ -164,6 +168,7 @@
     <string name="vault_unavailable_missing_key">The vault database exists, but its key file is missing. OpenLife will not replace the key automatically.</string>
     <string name="vault_unavailable_database">The encrypted database could not be opened. Your vault files have been left in place.</string>
     <string name="vault_unavailable_storage">OpenLife could not access required vault storage. Check free space and try again.</string>
+    <string name="vault_unavailable_database_missing">Your saved items are still on this device, but the vault database is missing. OpenLife has not changed or deleted anything. Try again; if this keeps happening, do not reset unless you accept losing those items.</string>
     <string name="vault_unavailable_reset_incomplete">A vault reset was interrupted. Finish the reset to continue.</string>
     <string name="vault_unavailable_details">OpenLife keeps data only on this device. There is no cloud backup or recovery copy. A damaged database can make saved items unrecoverable because the keys needed for each item are stored in that database. Reset removes the app-owned encrypted files and wrapping key; it does not guarantee forensic erasure from device storage.</string>
     <string name="vault_unavailable_what_means">What this means</string>
