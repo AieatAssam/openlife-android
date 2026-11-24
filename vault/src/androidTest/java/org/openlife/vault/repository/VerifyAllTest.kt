@@ -108,6 +108,51 @@ class VerifyAllTest {
         assertEquals(SourceState.READY, stateOf(id))
     }
 
+    /**
+     * P1-18-R3 (V-01): a row marked CORRUPT by an earlier false verdict (for
+     * example a transient Keystore error under the old mapping) is restored
+     * to READY by Verify all items once its blob fully authenticates.
+     */
+    @Test
+    fun corruptRowThatNowAuthenticatesIsRestoredToReady(): Unit = runBlocking {
+        val intact = save(4)
+        markCorrupt(intact)
+
+        val report = RecoveryRepository(paths, db, wrapper, queue).verifyAll()
+
+        assertEquals(VerifyReport(verified = 0, markedCorrupt = 0, transient = 0, restored = 1), report)
+        assertEquals(SourceState.READY, stateOf(intact))
+    }
+
+    /** P1-18-R3: a transient check proves nothing either way; the CORRUPT row is left exactly as it was. */
+    @Test
+    fun corruptRowWithTransientCheckStaysCorruptAndUnchanged(): Unit = runBlocking {
+        val id = save(5)
+        markCorrupt(id)
+        val before = db.sourceDao().findById(id.toString())!!
+        wrapper.failKeyAccess = true
+
+        val report = RecoveryRepository(paths, db, wrapper, queue).verifyAll()
+
+        assertEquals(VerifyReport(verified = 0, markedCorrupt = 0, transient = 1, restored = 0), report)
+        assertEquals(before, db.sourceDao().findById(id.toString()))
+
+        // A genuinely damaged CORRUPT row also stays CORRUPT.
+        wrapper.failKeyAccess = false
+        val blob = paths.blobFile(id)
+        blob.writeBytes(blob.readBytes().also { it[it.size - 5] = (it[it.size - 5].toInt() xor 0xFF).toByte() })
+        val second = RecoveryRepository(paths, db, wrapper, queue).verifyAll()
+        assertEquals(0, second.restored)
+        assertEquals(SourceState.CORRUPT, stateOf(id))
+    }
+
+    private fun markCorrupt(id: UUID) {
+        db.openHelper.writableDatabase.execSQL(
+            "UPDATE sources SET state = 'CORRUPT' WHERE id = ?",
+            arrayOf<Any>(id.toString()),
+        )
+    }
+
     private suspend fun stateOf(id: UUID): SourceState = db.sourceDao().findById(id.toString())!!.toDomain().state
 
     private suspend fun save(variant: Int): UUID {

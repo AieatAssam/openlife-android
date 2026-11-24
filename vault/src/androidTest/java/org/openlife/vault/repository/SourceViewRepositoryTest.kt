@@ -17,7 +17,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.testing.DoFinalFaultWrapper
+import org.openlife.vault.testing.KeystoreFaults
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
@@ -46,7 +47,7 @@ class SourceViewRepositoryTest {
     private lateinit var viewRepository: SourceViewRepository
 
     /** Real Keystore, with a switch that makes key access fail like a keystore daemon error. */
-    private class FlakyKeystoreWrapper(alias: String) : KeystoreWrapper(alias) {
+    private class FlakyKeystoreWrapper(alias: String) : DoFinalFaultWrapper(alias) {
         @Volatile var failKeyAccess = false
 
         override fun existingWrappingKey(): SecretKey? {
@@ -96,6 +97,27 @@ class SourceViewRepositoryTest {
         wrapper.failKeyAccess = false
         val retried = viewRepository.readReadyBytes(sourceId)
         assertTrue("a retry after the keystore recovers must succeed", retried is ReadyReadResult.Loaded)
+        assertArrayEquals(original, (retried as ReadyReadResult.Loaded).bytes)
+    }
+
+    /**
+     * P1-18-R1 (V-01): the hiccup the audit described. AndroidKeyStore reports
+     * an unknown keymaster error at doFinal as IllegalBlockSizeException with
+     * a KeyStoreException cause. Unwrapping the DEK hits it; the intact
+     * original must stay READY and open on retry.
+     */
+    @Test
+    fun keystoreHiccupAtDoFinalLeavesRowReady(): Unit = runBlocking {
+        val (sourceId, original) = saveASource()
+        android.util.Log.i("P118SourceViewRepositoryTest", KeystoreFaults.describe())
+
+        wrapper.failure = { KeystoreFaults.doFinalFailure() }
+        assertEquals(ReadyReadResult.Transient, viewRepository.readReadyBytes(sourceId))
+        assertEquals(SourceState.READY, stateOf(sourceId))
+
+        wrapper.failure = null
+        val retried = viewRepository.readReadyBytes(sourceId)
+        assertTrue("the intact original opens once Keystore recovers", retried is ReadyReadResult.Loaded)
         assertArrayEquals(original, (retried as ReadyReadResult.Loaded).bytes)
     }
 

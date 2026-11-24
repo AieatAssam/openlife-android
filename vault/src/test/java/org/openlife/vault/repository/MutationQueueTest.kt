@@ -126,8 +126,15 @@ class MutationQueueTest {
         assertEquals(listOf("mutation", "late read"), order)
     }
 
+    /**
+     * P1-18-R6 (V-04): the opportunistic callers of [MutationQueue.tryMutation]
+     * (foreground stage cleanup, reset) skip at once while readers are active.
+     * Taking the writer gate and then waiting would block every new reader
+     * behind a mutation that was only ever optional (C0-R12 "skips").
+     * Replaces readLeaseDoesNotMakeTryMutationBusy, which pinned the old wait.
+     */
     @Test
-    fun readLeaseDoesNotMakeTryMutationBusy() = runTest {
+    fun tryMutationReturnsBusyImmediatelyWhenReadersAreActive() = runTest {
         val queue = MutationQueue()
         val readerIn = CompletableDeferred<Unit>()
         val releaseReader = CompletableDeferred<Unit>()
@@ -139,13 +146,19 @@ class MutationQueueTest {
         }
         readerIn.await()
 
-        val attempt = async { queue.tryMutation { "ran" } }
+        val attempt = async { queue.tryMutation { "should not run" } }
         runCurrent()
-        assertFalse("tryMutation must wait for readers, not report busy", attempt.isCompleted)
+        assertTrue("tryMutation must not wait for readers", attempt.isCompleted)
+        assertNull("an active read lease makes tryMutation busy", attempt.await())
+
+        // The writer gate was never taken: a new reader still gets in at once.
+        val lateReader = async { queue.withReadLease { "late read" } }
+        runCurrent()
+        assertTrue("a skipped tryMutation must not block new readers", lateReader.isCompleted)
 
         releaseReader.complete(Unit)
         reader.await()
-        assertEquals("ran", attempt.await())
+        assertEquals("ran", queue.tryMutation { "ran" })
     }
 
     @Test

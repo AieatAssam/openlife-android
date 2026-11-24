@@ -36,6 +36,8 @@ import org.openlife.vault.storage.VaultBootstrapper
 import org.openlife.vault.storage.VaultBootstrapResult
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.toDomain
+import org.openlife.vault.testing.DoFinalFaultWrapper
+import org.openlife.vault.testing.KeystoreFaults
 
 /**
  * Instrumented because this exercises the real Keystore, the real
@@ -145,6 +147,11 @@ class ImportRepositoryTest {
                     throw SQLiteFullException("synthetic database full")
                 }
                 delegate.update(source)
+            }
+
+            override suspend fun transitionState(id: String, from: String, to: String): Int {
+                if (to == SourceState.READY.name) throw SQLiteFullException("synthetic database full")
+                return delegate.transitionState(id, from, to)
             }
 
             override suspend fun findById(id: String): SourceEntity? = delegate.findById(id)
@@ -816,5 +823,169 @@ class ImportRepositoryTest {
         assertEquals("design §9: an unverifiable original is not a duplicate", SaveResult.Saved(again.sourceId), saved)
         assertEquals(SourceState.CORRUPT.name, db.sourceDao().findById(existing.sourceId.toString())!!.state)
         assertTrue("the damaged original is retained for diagnosis", blob.exists())
+    }
+
+    // --- P1-18 (vault audit remediation) ---
+
+    /**
+     * P1-18-R5 (V-03): a Save that fails transiently keeps its stage (C0-R16),
+     * so it must keep the import slot too. Otherwise foreground cleanup
+     * removes the stage the user may retry, and a second import starts.
+     */
+    @Test
+    fun failedSaveThatKeepsTheStageKeepsTheSlot(): Unit = runBlocking {
+        val flaky = DoFinalFaultWrapper(alias)
+        val importer = ImportRepository(
+            paths = paths,
+            database = db,
+            keystoreWrapper = flaky,
+            bitmapSampler = { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null },
+            mutationQueue = MutationQueue(),
+        )
+        val prepared = importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes(64, 48)), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+
+        flaky.failure = { KeystoreFaults.doFinalFailure() }
+        assertEquals(SaveResult.Failed, importer.saveImport(prepared.sourceId))
+
+        assertEquals(SourceState.STAGED, db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state)
+        assertTrue("the stage is kept for retry", paths.stageFile(prepared.sourceId).exists())
+        assertEquals("the slot stays with the kept stage", prepared.sourceId, importer.importSlot.activeSourceId)
+        assertEquals(
+            PrepareResult.Busy,
+            importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes(32, 24)), "image/jpeg", IntakeKind.SHARE),
+        )
+
+        flaky.failure = null
+        assertEquals(SaveResult.Saved(prepared.sourceId), importer.saveImport(prepared.sourceId))
+        assertEquals("a completed Save frees the slot", null, importer.importSlot.activeSourceId)
+    }
+
+    /**
+     * P1-18-R6 (V-04): the provider read happens before any lease is taken, so
+     * a stalled cloud provider holds nothing that viewers or deletion wait on.
+     */
+    @Test
+    fun slowProviderReadDoesNotBlockViewerReadsOrDeletion(): Unit = runBlocking {
+        val queue = MutationQueue()
+        val importer = repositoryWithQueue(queue)
+        val viewer = SourceViewRepository(paths, db, wrapper, queue)
+        val deletion = DeletionRepository(paths, db, queue)
+        val toView = saveWith(importer, syntheticJpegBytes(64, 48))
+        val toDelete = saveWith(importer, syntheticJpegBytes(40, 30))
+
+        val readStarted = java.util.concurrent.CountDownLatch(1)
+        val releaseProvider = java.util.concurrent.CountDownLatch(1)
+        val stalled = object : java.io.InputStream() {
+            private val bytes = ByteArrayInputStream(syntheticJpegBytes(56, 42))
+            override fun read(): Int {
+                readStarted.countDown()
+                releaseProvider.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                return bytes.read()
+            }
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                readStarted.countDown()
+                releaseProvider.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                return bytes.read(b, off, len)
+            }
+        }
+        val preparing = async(Dispatchers.IO) { importer.prepareImport(stalled, "image/jpeg", IntakeKind.SHARE) }
+        try {
+            assertTrue("the provider read started", readStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+
+            val deleted = async(Dispatchers.IO) { deletion.deleteSource(toDelete) }
+            val viewed = async(Dispatchers.IO) { viewer.loadReadyBytes(toView) }
+            val finished = kotlinx.coroutines.withTimeoutOrNull(1_000) { deleted.await() to viewed.await() }
+
+            assertTrue("deletion and a viewer read must finish within 1 s while the provider stalls", finished != null)
+            assertEquals(DeleteResult.Deleted, finished!!.first)
+            assertTrue("the viewer read the saved original", finished.second != null)
+        } finally {
+            releaseProvider.countDown()
+        }
+        val result = preparing.await()
+        assertTrue("the stalled import still prepares once the provider answers: $result", result is PrepareResult.Prepared)
+        importer.cancelStagedImport((result as PrepareResult.Prepared).sourceId)
+    }
+
+    /**
+     * P1-18-R9 (V-08): cancellation that arrives as the READY commit resumes
+     * must reach the caller, not be reported as Failed for a saved item.
+     */
+    @Test
+    fun cancellationAfterReadyCommitPropagatesAndRowIsReady(): Unit = runBlocking {
+        val delegate = db.sourceDao()
+        val saveJob = CompletableDeferred<kotlinx.coroutines.Job>()
+        val cancellingAfterCommit = object : SourceDao by delegate {
+            override suspend fun transitionState(id: String, from: String, to: String): Int {
+                val changed = delegate.transitionState(id, from, to)
+                if (to == SourceState.READY.name) {
+                    // The commit is durable; the caller goes away as the call resumes.
+                    saveJob.await().cancel()
+                    kotlinx.coroutines.yield()
+                }
+                return changed
+            }
+        }
+        val importer = repositoryWithFileOps(ArtefactFileOps.Default, sourceDao = cancellingAfterCommit)
+        val prepared = importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+
+        val save = async(Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) { importer.saveImport(prepared.sourceId) }
+        saveJob.complete(save)
+        save.start()
+        save.join()
+
+        assertTrue("the caller observes cancellation, not a result", save.isCancelled)
+        assertEquals(SourceState.READY, db.sourceDao().findById(prepared.sourceId.toString())!!.toDomain().state)
+        assertEquals("a saved item frees the slot", null, importer.importSlot.activeSourceId)
+    }
+
+    /**
+     * P1-18 CI addition (run 45405099804, API 29): an OutOfMemoryError while
+     * reading the provider or while encrypting the stage is a typed Failed,
+     * not a crash, and leaves no STAGED row and no stage file behind.
+     */
+    @Test
+    fun outOfMemoryDuringReadOrStageEncryptionIsATypedFailureWithNoStage(): Unit = runBlocking {
+        val exhausted = object : java.io.InputStream() {
+            override fun read(): Int = throw OutOfMemoryError("synthetic: provider read buffer")
+            override fun read(b: ByteArray, off: Int, len: Int): Int = throw OutOfMemoryError("synthetic: provider read buffer")
+        }
+        assertEquals(PrepareResult.Failed, repository.prepareImport(exhausted, "image/jpeg", IntakeKind.SHARE))
+        assertNoStagedState()
+
+        val failingStage = object : ArtefactFileOps by ArtefactFileOps.Default {
+            override fun writeAndSync(file: java.io.File, bytes: ByteArray) =
+                throw OutOfMemoryError("synthetic: stage envelope encoding")
+        }
+        val importer = repositoryWithFileOps(failingStage)
+        assertEquals(
+            PrepareResult.Failed,
+            importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE),
+        )
+        assertNoStagedState()
+
+        val next = importer.prepareImport(ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE)
+        assertTrue("the slot is free after the typed failure: $next", next !is PrepareResult.Busy)
+    }
+
+    private fun assertNoStagedState() {
+        db.openHelper.readableDatabase.query("SELECT COUNT(*) FROM sources WHERE state = 'STAGED'").use {
+            it.moveToFirst()
+            assertEquals("no STAGED row", 0, it.getInt(0))
+        }
+        assertTrue(
+            "no stage file",
+            paths.artefactsDir.listFiles().orEmpty().none { it.name.endsWith(".stage") },
+        )
+    }
+
+    private suspend fun saveWith(importer: ImportRepository, bytes: ByteArray): UUID {
+        val prepared = importer.prepareImport(ByteArrayInputStream(bytes), "image/jpeg", IntakeKind.SHARE)
+            as PrepareResult.Prepared
+        assertEquals(SaveResult.Saved(prepared.sourceId), importer.saveImport(prepared.sourceId))
+        return prepared.sourceId
     }
 }

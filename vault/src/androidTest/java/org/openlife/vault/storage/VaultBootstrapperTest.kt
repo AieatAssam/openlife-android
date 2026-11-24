@@ -19,6 +19,8 @@ import org.openlife.vault.crypto.EnvelopeAuthenticationException
 import org.openlife.vault.crypto.EnvelopeDomain
 import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.storage.VaultUnavailableCause
+import org.openlife.vault.testing.DoFinalFaultWrapper
+import org.openlife.vault.testing.KeystoreFaults
 
 /**
  * Instrumented because Android Keystore and SQLCipher's native library both
@@ -139,6 +141,8 @@ class VaultBootstrapperTest {
     @Test
     fun corruptKeyFileIsUnavailableNotReplaced() {
         paths.ensureDirectoriesExist()
+        // A database exists, so this is not a torn first-run key (P1-18-R10).
+        paths.databaseFile.writeBytes(byteArrayOf(7))
         paths.databaseKeyFile.writeBytes(byteArrayOf(1, 2, 3, 4))
 
         val result = VaultBootstrapper.bootstrap(paths, wrapper)
@@ -153,12 +157,13 @@ class VaultBootstrapperTest {
     @Test
     fun eachFailureModeReportsItsTypedCause() {
         paths.ensureDirectoriesExist()
+        // With a database present a malformed key file is corrupt, not a torn first run (P1-18-R10).
+        paths.databaseFile.writeBytes(byteArrayOf(7))
         paths.databaseKeyFile.writeBytes(byteArrayOf(1, 2, 3, 4))
         val corrupt = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
         assertEquals(VaultUnavailableCause.KEY_FILE_CORRUPT, corrupt.cause)
 
         paths.databaseKeyFile.delete()
-        paths.databaseFile.writeBytes(byteArrayOf(7))
         val missingKey = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
         assertEquals(VaultUnavailableCause.DATABASE_WITHOUT_KEY, missingKey.cause)
 
@@ -212,5 +217,99 @@ class VaultBootstrapperTest {
         assertEquals(VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEY_UNWRAP_FAILED), result)
         assertFalse("bootstrap must not generate a replacement key", KeystoreWrapper(alias).hasWrappingKey())
         assertTrue("the key file is kept", paths.databaseKeyFile.exists())
+    }
+
+    /**
+     * P1-18-R2 (V-01): a keymaster hiccup while unwrapping the database secret
+     * is retryable. Through the real wrapper it surfaces as
+     * KeystoreUnavailableException; an android.security.KeyStoreException
+     * anywhere in a cause chain is also recognised, not only
+     * java.security.KeyStoreException.
+     */
+    @Test
+    fun androidKeyStoreExceptionAtUnwrapIsRetryable() {
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+        android.util.Log.i("P118VaultBootstrapperTest", KeystoreFaults.describe())
+
+        val hiccup = DoFinalFaultWrapper(alias).apply { failure = { KeystoreFaults.doFinalFailure() } }
+        assertEquals(
+            VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE),
+            VaultBootstrapper.bootstrap(paths, hiccup),
+        )
+
+        val platformCause = KeystoreFaults.platformKeyStoreException
+        if (platformCause != null) {
+            val wrapped = object : KeystoreWrapper(alias) {
+                override fun unwrap(envelope: Envelope, domain: EnvelopeDomain, sourceId: UUID?): ByteArray =
+                    throw EnvelopeAuthenticationException(
+                        javax.crypto.IllegalBlockSizeException("synthetic").apply { initCause(platformCause) },
+                    )
+            }
+            assertEquals(
+                VaultBootstrapResult.Unavailable(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE),
+                VaultBootstrapper.bootstrap(paths, wrapped),
+            )
+        } else {
+            android.util.Log.w("P118VaultBootstrapperTest", "cause-chain case skipped: platform exception not constructible")
+        }
+
+        // Once Keystore recovers the same key file opens the same vault.
+        assertTrue(VaultBootstrapper.bootstrap(paths, KeystoreWrapper(alias)) is VaultBootstrapResult.Ready)
+    }
+
+    /**
+     * P1-18-R4 (V-02): a surviving key file and saved originals with no
+     * database must never be opened as an empty vault, because recovery
+     * would then delete every blob as an orphan (design §11).
+     */
+    @Test
+    fun missingDatabaseWithKeyAndArtefactsIsDatabaseMissingAndDeletesNothing() {
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+        val first = java.io.File(paths.artefactsDir, "${UUID.randomUUID()}.blob").apply { writeBytes(ByteArray(64) { 1 }) }
+        val second = java.io.File(paths.artefactsDir, "${UUID.randomUUID()}.blob").apply { writeBytes(ByteArray(80) { 2 }) }
+        val before = listOf(first, second, paths.databaseKeyFile).associateWith { it.readBytes() }
+        assertTrue(!paths.databaseFile.exists())
+
+        val result = VaultOpener.open(context, paths, KeystoreWrapper(alias))
+
+        assertEquals(VaultOpenResult.Unavailable(VaultUnavailableCause.DATABASE_MISSING), result)
+        assertTrue("no empty database is created over saved originals", !paths.databaseFile.exists())
+        before.forEach { (file, bytes) ->
+            assertTrue("${file.name} must survive", file.exists())
+            assertArrayEquals("${file.name} must be byte-identical", bytes, file.readBytes())
+        }
+        assertEquals(2, paths.artefactsDir.listFiles().orEmpty().size)
+    }
+
+    /**
+     * P1-18-R10 (V-09): the key file is now written via a temporary file and
+     * rename, so a torn key can only come from an older build. With no
+     * database and no artefacts nothing is at stake and it is a fresh
+     * install; a leftover temporary file is removed. With any artefact
+     * present it is never treated as fresh.
+     */
+    @Test
+    fun tornKeyFileWithNoDatabaseAndNoArtefactsIsFreshInstall() {
+        wrapper.ensureWrappingKey()
+        val full = EnvelopeCodec.encode(wrapper.wrap(ByteArray(32) { 9 }, EnvelopeDomain.DATABASE_SECRET))
+        paths.ensureDirectoriesExist()
+        paths.databaseKeyFile.writeBytes(full.copyOf(full.size / 2))
+        val leftoverTemp = java.io.File(paths.vaultDir, "database.key.tmp").apply { writeBytes(byteArrayOf(1, 2)) }
+
+        val result = VaultBootstrapper.bootstrap(paths, wrapper)
+
+        assertTrue("a torn key with nothing at stake is a fresh install: $result", result is VaultBootstrapResult.Ready)
+        val secret = (result as VaultBootstrapResult.Ready).databaseSecret
+        val rewritten = VaultKeyFile.read(paths.databaseKeyFile)!!
+        assertArrayEquals(secret, wrapper.unwrap(rewritten, EnvelopeDomain.DATABASE_SECRET))
+        assertFalse("the leftover temporary key file is removed", leftoverTemp.exists())
+
+        // The same torn key next to a saved original is never "fresh".
+        val torn = full.copyOf(full.size / 2)
+        paths.databaseKeyFile.writeBytes(torn)
+        java.io.File(paths.artefactsDir, "${UUID.randomUUID()}.blob").writeBytes(ByteArray(16) { 3 })
+        val guarded = VaultBootstrapper.bootstrap(paths, wrapper)
+        assertTrue("with an artefact present the vault stays unavailable: $guarded", guarded is VaultBootstrapResult.Unavailable)
+        assertArrayEquals("the torn key is left for diagnosis", torn, paths.databaseKeyFile.readBytes())
     }
 }

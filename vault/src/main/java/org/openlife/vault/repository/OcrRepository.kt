@@ -285,3 +285,10 @@ private fun ocrViewOf(
         history = earlier.map { it.toDomain() },
     )
 }
+
+/**
+ * Why OCR cannot capture a source, or null when it authenticated (P1-18-R8,
+ * V-05). Only evidence about the stored bytes is SOURCE_CORRUPT; a Keystore or
+ * I/O hiccup is retryable.
+ */
+internal fun ocrCaptureFailureFor(check: ArtefactCheck): OcrFailureReason? = TODO("P1-18-R8")

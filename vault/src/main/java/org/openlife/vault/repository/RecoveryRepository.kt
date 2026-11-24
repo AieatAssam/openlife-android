@@ -34,6 +34,7 @@ class RecoveryRepository(
     keystoreWrapper: KeystoreWrapper,
     private val mutationQueue: MutationQueue,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    @Suppress("unused") private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -98,6 +99,8 @@ class RecoveryRepository(
                         // Retained until a user confirms deletion; no
                         // automatic action.
                     }
+
+                    SourceState.UNRECOGNISED -> Unit
                 }
             }
 

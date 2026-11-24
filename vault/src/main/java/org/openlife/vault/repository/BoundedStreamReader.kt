@@ -4,7 +4,15 @@ import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
 
-data class BoundedRead(val bytes: ByteArray, val sha256: ByteArray)
+data class BoundedRead(
+    val bytes: ByteArray,
+    val sha256: ByteArray,
+    /** How many bytes the provider actually delivered (at most limit + 1). */
+    val byteCount: Long = bytes.size.toLong(),
+) {
+    /** True when limit + 1 bytes arrived: the original exceeds [ImportLimits.MAX_ORIGINAL_BYTES]. */
+    val exceededLimit: Boolean get() = byteCount > ImportLimits.MAX_ORIGINAL_BYTES
+}
 
 class ReadDeadlineExceededException : IOException("provider read deadline exceeded")
 

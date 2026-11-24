@@ -201,6 +201,8 @@ internal object OcrStateMapper {
             OcrRevisionState.RUNNING -> OcrUiState.Running(sourceId, history)
 
             OcrRevisionState.NOT_STARTED -> OcrUiState.Idle
+
+            OcrRevisionState.UNRECOGNISED -> OcrUiState.Idle // P1-18-R14 RED stub
         }
     }
 }

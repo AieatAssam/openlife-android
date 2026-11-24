@@ -9,7 +9,15 @@ data class RecoveryReport(
     val resumedDeletions: Int = 0,
     val removedOrphanFiles: Int = 0,
     val markedStaleOcrRevisions: Int = 0,
+    /** Rows whose stored state this build does not recognise; kept, never shown or deleted (P1-18-R14). */
+    val unrecognisedRows: Int = 0,
 )
 
 /** Outcome of an explicit "Verify all items" pass (P1-14-R3). */
-data class VerifyReport(val verified: Int = 0, val markedCorrupt: Int = 0, val transient: Int = 0)
+data class VerifyReport(
+    val verified: Int = 0,
+    val markedCorrupt: Int = 0,
+    val transient: Int = 0,
+    /** CORRUPT rows whose blob now authenticates and are READY again (P1-18-R3). */
+    val restored: Int = 0,
+)

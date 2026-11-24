@@ -34,6 +34,9 @@ enum class VaultUnavailableCause {
     DATABASE_OPEN_FAILED,
     STORAGE_IO_ERROR,
     RESET_INCOMPLETE,
+
+    /** Key file and saved originals exist but the database file is gone (P1-18-R4). */
+    DATABASE_MISSING,
 }
 
 val VaultUnavailableCause.retryable: Boolean
@@ -41,6 +44,7 @@ val VaultUnavailableCause.retryable: Boolean
         VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE,
         VaultUnavailableCause.DATABASE_OPEN_FAILED,
         VaultUnavailableCause.STORAGE_IO_ERROR,
+        VaultUnavailableCause.DATABASE_MISSING,
         -> true
 
         VaultUnavailableCause.KEY_FILE_CORRUPT,
@@ -175,9 +179,29 @@ object VaultBootstrapper {
         return false
     }
 
-    private sealed interface KeyRead {
-        data object Absent : KeyRead
-        data object Corrupt : KeyRead
-        data class Present(val envelope: org.openlife.vault.crypto.Envelope) : KeyRead
-    }
 }
+
+/** What reading `database.key` found. */
+internal sealed interface KeyRead {
+    data object Absent : KeyRead
+    data object Corrupt : KeyRead
+    data class Present(val envelope: org.openlife.vault.crypto.Envelope) : KeyRead
+}
+
+/** What bootstrap does for the files on disk, decided before any Keystore call (P1-18-R4, R10). */
+internal sealed interface BootstrapPlan {
+    data object CreateFresh : BootstrapPlan
+    data class UnwrapExisting(val envelope: org.openlife.vault.crypto.Envelope) : BootstrapPlan
+    data class Stop(val cause: VaultUnavailableCause) : BootstrapPlan
+}
+
+/**
+ * Decides bootstrap from disk state alone. [readKey] is only called when
+ * the key's contents matter.
+ */
+internal fun planBootstrap(
+    keyFileExists: Boolean,
+    readKey: () -> KeyRead,
+    databaseExists: Boolean,
+    hasArtefacts: Boolean,
+): BootstrapPlan = TODO("P1-18-R4/R10")

@@ -82,7 +82,7 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         val iv = cipher.iv
         val aad = aadFor(domain, sourceId)
         cipher.updateAAD(aad)
-        val ciphertext = cipher.doFinal(plaintext)
+        val ciphertext = doFinal(cipher, plaintext)
         return Envelope(iv, ciphertext)
     }
 
@@ -106,7 +106,7 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
                 GCMParameterSpec(EnvelopeFormat.TAG_LENGTH_BITS, envelope.nonce),
             )
             cipher.updateAAD(aadFor(domain, sourceId))
-            return cipher.doFinal(envelope.ciphertext)
+            return doFinal(cipher, envelope.ciphertext)
         } catch (e: GeneralSecurityException) {
             throw unwrapFailure(e)
         } catch (e: ProviderException) {
@@ -122,6 +122,13 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
 
         else -> KeystoreUnavailableException(e)
     }
+
+    /**
+     * The one place a Keystore cipher operation completes. A seam so tests can
+     * inject the exceptions AndroidKeyStore raises from `engineDoFinal`
+     * (P1-18-R1); production code never overrides it.
+     */
+    protected open fun doFinal(cipher: Cipher, input: ByteArray): ByteArray = cipher.doFinal(input)
 
     private fun aadFor(domain: EnvelopeDomain, sourceId: UUID?): ByteArray =
         if (sourceId != null) EnvelopeAad.forSource(domain, sourceId) else EnvelopeAad.forDomain(domain)

@@ -28,8 +28,31 @@ object VaultKeyFile {
      * with it (design §10: "Write and synchronise the wrapped-secret file
      * before initialising the database").
      */
-    fun writeAndSync(file: File, envelope: Envelope) {
+    /** Removes a `database.key.tmp` left by a write that never reached its rename (P1-18-R10). */
+    fun removeLeftoverTemp(file: File): Boolean = TODO("P1-18-R10")
+
+    fun writeAndSync(file: File, envelope: Envelope, @Suppress("UNUSED_PARAMETER") ops: KeyFileOps = KeyFileOps.Default) {
         Fsync.writeAndSync(file, EnvelopeCodec.encode(envelope))
         Fsync.syncDirectory(requireNotNull(file.parentFile) { "key file must have a parent directory" })
+    }
+}
+
+/** Durable-write seam for the key file, so the write protocol is testable on the JVM (P1-18-R10). */
+interface KeyFileOps {
+    /** Removes a `database.key.tmp` left by a write that never reached its rename (P1-18-R10). */
+    fun removeLeftoverTemp(file: File): Boolean = TODO("P1-18-R10")
+
+    fun writeAndSync(file: File, bytes: ByteArray)
+
+    fun rename(from: File, to: File): Boolean
+
+    fun syncDirectory(directory: File)
+
+    object Default : KeyFileOps {
+        override fun writeAndSync(file: File, bytes: ByteArray) = Fsync.writeAndSync(file, bytes)
+
+        override fun rename(from: File, to: File): Boolean = from.renameTo(to)
+
+        override fun syncDirectory(directory: File) = Fsync.syncDirectory(directory)
     }
 }

@@ -85,4 +85,5 @@ private fun VaultUnavailableCause.explanationString(): Int = when (this) {
     VaultUnavailableCause.DATABASE_OPEN_FAILED -> R.string.vault_unavailable_database
     VaultUnavailableCause.STORAGE_IO_ERROR -> R.string.vault_unavailable_storage
     VaultUnavailableCause.RESET_INCOMPLETE -> R.string.vault_unavailable_reset_incomplete
+    VaultUnavailableCause.DATABASE_MISSING -> R.string.vault_unavailable_database_missing
 }

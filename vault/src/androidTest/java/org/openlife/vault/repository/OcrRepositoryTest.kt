@@ -38,6 +38,7 @@ import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.VaultBootstrapResult
 import org.openlife.vault.storage.VaultBootstrapper
 import org.openlife.vault.storage.VaultPaths
+import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.toDomain
 
 @RunWith(AndroidJUnit4::class)
@@ -111,6 +112,28 @@ class OcrRepositoryTest {
 
         assertEquals(OcrRunResult.Failed(null, OcrFailureReason.SOURCE_CORRUPT), result)
         assertEquals(0, db.ocrDao().countRevisions())
+    }
+
+    /**
+     * P1-18-R8 (V-05): a transient Keystore failure while OCR captures the
+     * source is retryable, not SOURCE_CORRUPT. Nothing about the source is
+     * changed and a retry once Keystore recovers succeeds.
+     */
+    @Test
+    fun transientAuthenticationFailureIsRetryableNotSourceCorrupt(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val flaky = org.openlife.vault.testing.DoFinalFaultWrapper(alias)
+        flaky.failure = { org.openlife.vault.testing.KeystoreFaults.doFinalFailure() }
+        val ocr = repository(TestEngine { OcrEngineOutput(emptyList()) }, keystore = flaky)
+
+        val failed = ocr.runOcr(sourceId)
+
+        assertEquals(OcrRunResult.Failed(null, OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE), failed)
+        assertEquals(0, db.ocrDao().countRevisions())
+        assertEquals(SourceState.READY, db.sourceDao().findById(sourceId.toString())!!.toDomain().state)
+
+        flaky.failure = null
+        assertTrue("a retry runs once Keystore recovers", ocr.runOcr(sourceId) is OcrRunResult.Completed)
     }
 
     @Test
@@ -374,10 +397,11 @@ class OcrRepositoryTest {
         engine: OcrEngine,
         ocrDao: org.openlife.vault.storage.OcrDao = db.ocrDao(),
         deadlineMillis: Long = org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS,
+        keystore: KeystoreWrapper = wrapper,
     ) = OcrRepository(
         paths = paths,
         database = db,
-        keystoreWrapper = wrapper,
+        keystoreWrapper = keystore,
         engineRegistry = OcrEngineRegistry(listOf(engine), engine.id),
         mutationQueue = mutationQueue,
         ocrDao = ocrDao,

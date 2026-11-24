@@ -88,6 +88,27 @@ class VaultResetRepositoryTest {
         assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
     }
 
+    /**
+     * P1-18-R11 (V-10): a file reset does not recognise (a non-UUID name in
+     * artefacts/, a TRUNCATE-mode -journal, anything else) must not leave the
+     * reset marker set forever.
+     */
+    @Test
+    fun strayNonUuidFileAndJournalDoNotBlockReset(): Unit = runBlocking {
+        paths.ensureDirectoriesExist()
+        paths.databaseFile.writeBytes(byteArrayOf(1))
+        File(paths.databaseFile.path + "-journal").writeBytes(byteArrayOf(2))
+        File(paths.artefactsDir, "thumbnail-cache.bin").writeBytes(byteArrayOf(3))
+        File(paths.artefactsDir, "${UUID.randomUUID()}.blob").writeBytes(byteArrayOf(4))
+        File(paths.vaultDir, "database.key.tmp").writeBytes(byteArrayOf(5))
+        File(paths.vaultDir, "unknown-dir").apply { mkdirs() }.resolve("x").writeBytes(byteArrayOf(6))
+
+        assertEquals(VaultResetResult.COMPLETED, VaultResetRepository(paths, wrapper, MutationQueue()).resetVault())
+
+        assertEquals("nothing under the vault directory survives", emptyList<String>(), paths.vaultDir.list().orEmpty().toList())
+        assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
+    }
+
     @Test
     fun resetIsRefusedWhileAnImportIsInProgress(): Unit = runBlocking {
         val queue = MutationQueue()
