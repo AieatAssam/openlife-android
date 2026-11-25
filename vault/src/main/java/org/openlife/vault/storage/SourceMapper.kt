@@ -1,10 +1,12 @@
 package org.openlife.vault.storage
 
+import org.openlife.vault.model.AssessmentState
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.UserContentKind
 import java.util.UUID
 
 /**
@@ -26,6 +28,14 @@ fun Source.toEntity(): SourceEntity = SourceEntity(
     orientation = orientation?.name,
     wrappedDek = wrappedDek,
     artefactVersion = artefactVersion,
+    assessmentState = assessmentState.also {
+        check(it != AssessmentState.UNRECOGNISED) { "an unrecognised assessment state is never written back" }
+    }.name,
+    userContentKind = userContentKind?.also {
+        check(it != UserContentKind.UNRECOGNISED) { "an unrecognised content kind is never written back" }
+    }?.name,
+    userContentKindAt = userContentKindAt,
+    assessmentMethodVersion = assessmentMethodVersion,
 )
 
 fun SourceEntity.toDomain(): Source = Source(
@@ -41,4 +51,8 @@ fun SourceEntity.toDomain(): Source = Source(
     orientation = orientation?.let { decodeStoredOrNull<Orientation>(it) },
     wrappedDek = wrappedDek,
     artefactVersion = artefactVersion,
+    assessmentState = decodeStored(assessmentState, AssessmentState.UNRECOGNISED),
+    userContentKind = userContentKind?.let { decodeStored(it, UserContentKind.UNRECOGNISED) },
+    userContentKindAt = userContentKindAt,
+    assessmentMethodVersion = assessmentMethodVersion,
 )

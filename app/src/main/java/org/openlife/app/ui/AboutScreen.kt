@@ -54,7 +54,7 @@ private fun AboutContent(
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
             Text(
                 stringResource(R.string.about_subtitle),
                 style = MaterialTheme.typography.bodyLarge,

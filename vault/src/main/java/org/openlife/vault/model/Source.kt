@@ -23,7 +23,16 @@ data class Source(
     /** Encoded [org.openlife.vault.crypto.Envelope] bytes for this Source's per-file DEK. */
     val wrappedDek: ByteArray?,
     val artefactVersion: Int?,
+    /** Design §6 / P2-07-R1: every Source carries one; nothing in C1 assesses. */
+    val assessmentState: AssessmentState = AssessmentState.NOT_ASSESSED,
+    /** The user's optional label (P2-07-R3); null is "not labelled" or "Not sure", see [userContentKindAt]. */
+    val userContentKind: UserContentKind? = null,
+    /** When the user last answered the label question (actor USER); null if never. */
+    val userContentKindAt: Long? = null,
+    /** The assessment method that produced [assessmentState]; null while NOT_ASSESSED. */
+    val assessmentMethodVersion: String? = null,
 ) {
+    @Suppress("CyclomaticComplexMethod") // one comparison per column
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Source) return false
@@ -38,7 +47,11 @@ data class Source(
             height == other.height &&
             orientation == other.orientation &&
             wrappedDek.contentEqualsOrNull(other.wrappedDek) &&
-            artefactVersion == other.artefactVersion
+            artefactVersion == other.artefactVersion &&
+            assessmentState == other.assessmentState &&
+            userContentKind == other.userContentKind &&
+            userContentKindAt == other.userContentKindAt &&
+            assessmentMethodVersion == other.assessmentMethodVersion
     }
 
     override fun hashCode(): Int {
@@ -54,6 +67,10 @@ data class Source(
         result = 31 * result + (orientation?.hashCode() ?: 0)
         result = 31 * result + (wrappedDek?.contentHashCode() ?: 0)
         result = 31 * result + (artefactVersion ?: 0)
+        result = 31 * result + assessmentState.hashCode()
+        result = 31 * result + (userContentKind?.hashCode() ?: 0)
+        result = 31 * result + (userContentKindAt?.hashCode() ?: 0)
+        result = 31 * result + (assessmentMethodVersion?.hashCode() ?: 0)
         return result
     }
 }

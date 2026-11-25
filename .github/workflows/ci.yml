@@ -33,6 +33,11 @@ jobs:
       - name: Static analysis, lint, JVM tests, and debug build
         run: ./gradlew detekt lint :app:test :vault:test assembleDebug
 
+      # No emulator leg runs on pull requests (owner instruction 2026-11-24),
+      # so at least prove the instrumented sources still compile.
+      - name: Compile instrumented test sources
+        run: ./gradlew :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+
       # Sideloadable debug APK for physical-device testing when emulator
       # legs fail. Uploaded only after assembleDebug succeeds so a missing
       # APK is not published; this job's success is independent of later

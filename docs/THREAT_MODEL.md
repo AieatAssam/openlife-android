@@ -27,6 +27,62 @@ adversary.
   No user data is sent to browser, calendar, messaging, email or share
   intents. No content in logs, clipboard, crash attachments, public caches,
   notifications or recents previews.
+  - **Clipboard and keyboard (P1-19-R5, review Q-01).** Every text field
+    that can hold user content is `ContentTextField`. Closed, as established
+    from the compiled Compose foundation 1.12 classes
+    (docs/verification/P1-19-app-audit-remediation.md):
+    - The field's `LocalClipboard` drops every write, so no route the field
+      offers can put its text on the clipboard. That covers menu Copy/Cut,
+      shortcuts, the keyboard's copy/cut requests and the accessibility
+      Copy/Cut actions. Paste still reads the clipboard.
+    - The context menu is an allow-list of Paste and Select all. Copy, Cut,
+      Autofill, ACTION_PROCESS_TEXT apps (Translate and the like) and
+      text-classification actions are not offered.
+    - Smart selection is off app-wide, so selected text is not sent to the
+      system TextClassifier.
+    - Copy/Cut shortcuts and the keyboard's copy/cut requests are refused
+      before they reach the field.
+    - Autocorrect is off, and the keyboard is asked not to learn
+      (`IME_FLAG_NO_PERSONALIZED_LEARNING`).
+    - **Autofill (review U-01).** Compose reports every text field to the
+      autofill framework by default: on focus it calls `notifyViewEntered`,
+      on each edit `notifyValueChanged` with the text, and it writes the
+      text into the structure an autofill service receives. FLAG_SECURE does
+      not stop this. The content field now declares no autofill data type
+      (`ContentDataType.None`), so Compose sends neither call for it, and
+      marks its data sensitive, so its value is stripped from fill requests.
+      Every activity window, and the dialog window the correction field
+      opens in, is marked not important for autofill with its descendants.
+      Implemented; unverified (gap — pending physical-device run).
+    A boundary test fails on any other text field in the app, and on any
+    clipboard reference outside `ContentTextField`. The vault-reset word
+    field is the one named exemption, because it holds only a fixed
+    confirmation word.
+  - **Residual (not closed):**
+    - The keyboard can read the whole field, not only what is typed: an
+      IME reads the prefilled OCR text through the InputConnection
+      (`getExtractedText`, `getTextBeforeCursor`). The no-learning flag is
+      a request, and a keyboard that ignores it can keep that text.
+    - A screen reader reads the field aloud, by design.
+    - An accessibility Cut action removes the selected text from the field,
+      though nothing reaches the clipboard, so the cut text is lost from the
+      field (review U-04: kept and documented; see the verification record).
+    - An autofill service that asks the platform to include views not
+      important for autofill, or a platform that ignores the flag, is not
+      covered by the window exclusion; the field-level settings still apply.
+    - None of this is device-verified yet; the instrumented
+      `ContentTextFieldTest` is pending.
+- **Incoming share grants (P1-19-R18).** The sender sets
+  `FLAG_GRANT_READ_URI_PERMISSION`, so its presence is not a control.
+  OpenLife's defence is that it holds no media or storage permission: it
+  can read a shared URI only if the sender really granted it. A share whose
+  authority names OpenLife itself is refused. The check compares the host
+  only, after removing userinfo and port, so `x@org.openlife...` cannot
+  bypass it.
+- **Open-source requests (P1-19-R17).** The launcher activity is exported.
+  It opens a specific item only when the request carries a single-use,
+  in-process nonce that OpenLife's own "Open existing" button issued. Any
+  other caller just opens the list.
 - The Photo Picker can expose items supplied by a cloud media provider.
   OpenLife reads only the explicitly selected URI and cannot control that
   provider's download or logging behaviour (R3). This is explained at intake:
@@ -120,6 +176,10 @@ BiometricPrompt, using a biometric or the device credential, until the user
 authenticates.
 - **When it locks:** on process start, and after a configurable time in the
   background, measured on a monotonic clock that keeps counting through sleep.
+  - With timeout 0, it locks when `ProcessLifecycleOwner` reports the process
+    stopped, about 700 ms after the last activity stops. Content is not
+    exposed in that window: each activity scrubs its content in its own
+    `onStop`, and `FLAG_SECURE` keeps it out of Recents and screenshots.
 - **While locked:** no content is composed, and no item bytes are decrypted or
   shared streams opened.
 - **What it protects against:** someone using an already-unlocked phone.
@@ -129,8 +189,17 @@ authenticates.
 - **Limits:**
   - It does not protect against anyone who knows the device credential.
   - It does not protect against a compromised OS.
-  - While OpenLife's own Photo Picker trip is open, returning to OpenLife is
-    not re-gated.
+  - A trip to an activity OpenLife started itself (the Photo Picker, the
+    system credential screen) is not re-gated on return if it took less than
+    the longer of the timeout and 60 seconds (P1-19-R1). Within that window,
+    someone else who picks up the phone can return to OpenLife unprompted.
+    A longer trip locks on return, even if the picker's result never
+    arrives. Returning to the foreground ends the trip (review Q-02), so a
+    dropped picker result no longer extends the grace to later background
+    periods. Residual: a return within ProcessLifecycleOwner's ~700 ms stop
+    delay sends no foreground event; if the result is also dropped, the
+    next background period still gets the trip grace. JVM-tested; the
+    device test is pending (audit A-07).
 - **If the device can no longer verify the user** (screen lock removed):
   OpenLife stays locked and explains how to restore a screen lock. It never
   unlocks silently.
@@ -156,6 +225,29 @@ connection in Room `onOpen` (after SQLCipher's own settings), on every
 open and in both WAL and TRUNCATE journal modes. The value observed on a
 device (`DatabasePragmaTest`) and the write-latency cost of FULL are
 pending a physical-device run.
+
+## Communication safety (design §6, P2-07)
+
+A shared screenshot of a message can ask the user to pay, sign in or reply.
+OpenLife stores such an item as inert content and does not judge it. From
+C1 on, every Source carries an explicit assessment state; in this build it
+is always `NOT_ASSESSED`, because no assessment method exists yet, and the
+viewer says "Safety check: not assessed in this version". No state, label
+or copy in the app may present an item as safe; `NO_INDICATORS_FOUND`, when
+a later capability can produce it, will mean only that a completed check
+found no indicators. The user may answer "Is this a message or request from
+someone?". That answer is stored with its time as routing context for later
+capabilities (C3 must refuse or defer actionable proposals from
+communication-like content that is not assessed). It is not proof of
+safety and never changes the assessment state. A user can mislabel a
+message as "No"; later capabilities must therefore not treat "No" as an
+assessment, and an unanswered or "Not sure" item must not silently take the
+non-communication path. Links and requests in the content stay inert.
+
+| Threat | Required defence | Residual limit |
+| --- | --- | --- |
+| A scam message is read as vetted because the app stored or labelled it | Explicit `NOT_ASSESSED` state and copy; no "safe" wording; the user label is attributed and never sets the assessment | The app gives no protection beyond inert display until an assessment exists (C3 gate, C10) |
+| A newer build's assessment result is misread by an older build | Unknown stored values decode to `UNRECOGNISED`, are shown as recorded by another version, and are never written back | The older build cannot show the newer result or its evidence |
 
 ## Environment-specific gaps in this build (recorded, not hidden)
 

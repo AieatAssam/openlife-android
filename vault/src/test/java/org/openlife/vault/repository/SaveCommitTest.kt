@@ -65,6 +65,8 @@ class SaveCommitTest {
             artefactVersion: Int,
         ): Int = unused()
 
+        override suspend fun setUserContentKind(id: String, kind: String?, at: Long): Int = unused()
+
         override suspend fun findById(id: String): SourceEntity? = unused()
 
         override suspend fun count(): Int = unused()

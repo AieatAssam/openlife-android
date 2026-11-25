@@ -53,21 +53,55 @@ are WCAG AA at minimum; text on paper is AAA.
 | Ink (on surface) | `#1B1A17` | `#EFE9DC` | body text, icons |
 | Ink muted | `#5B5750` | `#A8A297` | secondary text, timestamps |
 | Rule | `#D9D1C0` | `#2E2B23` | dividers, perforation dashes |
-| Vermilion (primary) | `#C8412B` | `#E0654F` | primary buttons, the icon background, "Delete" is NOT vermilion |
+| Vermilion (brand) | `#C8412B` | `#E0654F` | the icon background and surface tint; "Delete" is NOT vermilion |
+| Vermilion ink (primary role) | `#A83420` | `#EE7F6A` | primary buttons, text actions, focused labels, the Saved stamp (P1-19 review Q-03) |
 | Vermilion container | `#F9DDD6` | `#4A1F17` | primary container, selected chips |
 | Stamp green (confirmed) | `#2F6B4F` | `#7FC39B` | Confirmed / Verified badges only |
 | Highlighter (evidence) | `#FFE45C` | `#D9B93A` | evidence region outline and span highlight |
 | Amber (attention) | `#B7791F` | `#E3B04B` | stale, needs clarification, not assessed |
 | Error | `#8F1D1D` | `#F2B8B5` | destructive confirmations, unreadable content |
+| Outline | `#7D776B` | `#857F75` | meaningful boundaries: text-field and outlined-button borders (≥ 3:1 on every paper/carbon surface) |
 
 Rules: vermilion is the only brand colour on a screen; green appears only on
 confirmed or verified states so it keeps meaning; amber marks uncertainty;
 never use colour alone (every state has a label). Delete actions use the
 error colour and an outlined button, never the primary filled button.
 
-Material 3 mapping (P0-07 theme): primary=Vermilion, onPrimary=Surface,
+Material 3 mapping (P0-07 theme; primary amended below): primary=Vermilion, onPrimary=Surface,
 primaryContainer=Vermilion container, secondary=Ink muted, tertiary=Stamp
-green, surface/onSurface=Surface/Ink, outline=Rule, error=Error.
+green, surface/onSurface=Surface/Ink, outline=Outline, outlineVariant=Rule,
+error=Error.
+
+P1-19 amendments (audit A-04, A-08):
+- **Outline.** Rule is 1.35:1 on paper, which fails this brief's own AA rule
+  (3:1 for UI component boundaries). Outline therefore has its own token.
+  Rule stays for decorative dividers and perforation as `outlineVariant`.
+- **Every Material role is set.** This covers the surface-container steps,
+  inverse roles, scrim, surface tint and the fixed roles. Each is taken from
+  this palette (paper steps between Surface raised and Rule; carbon steps
+  between `#0F0E0B` and Rule), so no Material baseline tone appears in menus,
+  sheets, snackbars or dialogs. The carbon Error `#F2B8B5` happens to equal
+  Material's baseline; it is kept as this brief's value.
+- **Buttons.** Every button uses the 8 dp corner (`OpenLifeButton` and its
+  variants).
+- **Primary ink (review Q-03).** Material draws the primary role as text as
+  well as fill: text and outlined buttons, focused field labels, the Saved
+  stamp, the snackbar action (inversePrimary). Brand Vermilion `#C8412B` is
+  only 4.39:1 on Surface, 4.06:1 on the dialog container and 3.57:1 on the
+  dimmest paper step, which fails this brief's AA rule. The primary role
+  therefore uses **Vermilion ink** `#A83420` in light (≥ 4.77:1 on every
+  paper surface role and on primaryContainer) and **`#EE7F6A`** in dark
+  (≥ 4.87:1 on every carbon surface role and on primaryContainer; `#E0654F`
+  was 3.80:1 on the brightest carbon step). Not claimed for the other
+  containers, where primary falls below 4.5:1: light secondaryContainer
+  4.35:1, dark tertiaryContainer 3.48:1, dark errorContainer 4.00:1, dark
+  attentionContainer 4.49:1. Those carry their own on-colours, and app code
+  must not draw on them directly (review U-03, `PaletteContrastTest`).
+  inversePrimary swaps the two. This also deepens filled primary buttons and
+  the Saved stamp; onPrimary on them stays ≥ 6.4:1. Brand Vermilion
+  `#C8412B` is unchanged as the mark colour: the launcher icon background and
+  the surface tint. `PaletteContrastTest` enforces ≥ 4.5:1 for primary on
+  every surface role and primaryContainer, light and dark.
 
 ## 5. Typography (all OFL, bundled, licences in About)
 
@@ -77,7 +111,11 @@ green, surface/onSurface=Surface/Ink, outline=Rule, error=Error.
   digests, timestamps, amounts, dates, file sizes. Data looks like data; it
   is visibly distinct from the app's own words.
 - **Fraunces** — display only: wordmark, first-run headline, empty-state
-  headings. Never in lists or dialogs.
+  headings. Never in lists or dialogs. It is set at weight 500 with WONK on
+  (optical size 72) through the variable font's axes, and is used only for
+  Material's display roles. Headlines, titles and dialog titles are Plex
+  Sans 600 (P1-19-R9).
+- Extracted OCR span text is Plex Mono at the 16 sp body size.
 - Minimum body size 16 sp; supports font scale to 2.0×; no text in images.
 
 ## 6. Shape, texture, motion

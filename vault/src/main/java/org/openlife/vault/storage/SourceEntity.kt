@@ -1,5 +1,6 @@
 package org.openlife.vault.storage
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,6 +15,10 @@ import androidx.room.PrimaryKey
  * perform the STAGED -> READY transition.
  *
  * No Fact, Record, or Action tables exist in this schema (design §5, §9).
+ *
+ * Schema v4 (P2-07) adds the communication assessment state, defaulting to
+ * NOT_ASSESSED, and the user's optional content-kind label with the time
+ * the user gave it.
  */
 @Entity(tableName = "sources")
 data class SourceEntity(
@@ -29,7 +34,13 @@ data class SourceEntity(
     val orientation: String?,
     val wrappedDek: ByteArray?,
     val artefactVersion: Int?,
+    @ColumnInfo(defaultValue = "NOT_ASSESSED")
+    val assessmentState: String = "NOT_ASSESSED",
+    val userContentKind: String? = null,
+    val userContentKindAt: Long? = null,
+    val assessmentMethodVersion: String? = null,
 ) {
+    @Suppress("CyclomaticComplexMethod") // one comparison per column
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is SourceEntity) return false
@@ -44,7 +55,11 @@ data class SourceEntity(
             height == other.height &&
             orientation == other.orientation &&
             wrappedDek.contentEqualsOrNull(other.wrappedDek) &&
-            artefactVersion == other.artefactVersion
+            artefactVersion == other.artefactVersion &&
+            assessmentState == other.assessmentState &&
+            userContentKind == other.userContentKind &&
+            userContentKindAt == other.userContentKindAt &&
+            assessmentMethodVersion == other.assessmentMethodVersion
     }
 
     override fun hashCode(): Int {
@@ -60,6 +75,10 @@ data class SourceEntity(
         result = 31 * result + (orientation?.hashCode() ?: 0)
         result = 31 * result + (wrappedDek?.contentHashCode() ?: 0)
         result = 31 * result + (artefactVersion ?: 0)
+        result = 31 * result + assessmentState.hashCode()
+        result = 31 * result + (userContentKind?.hashCode() ?: 0)
+        result = 31 * result + (userContentKindAt?.hashCode() ?: 0)
+        result = 31 * result + (assessmentMethodVersion?.hashCode() ?: 0)
         return result
     }
 }

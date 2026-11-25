@@ -1,5 +1,6 @@
 package org.openlife.app
 
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,7 +47,8 @@ class ImportHousekeeping(private val vault: suspend () -> VaultAccess, private v
     }
 
     /** Test hook: waits until application-scoped cleanup started so far has finished. */
-    suspend fun awaitIdleForTest() {
+    @VisibleForTesting
+    internal suspend fun awaitIdleForTest() {
         appScope.coroutineContext[Job]?.children?.toList()?.forEach { it.join() }
     }
 }

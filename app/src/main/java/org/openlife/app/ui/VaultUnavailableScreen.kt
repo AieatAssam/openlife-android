@@ -7,12 +7,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.brand.OpenLifeButton
+import org.openlife.app.ui.brand.OpenLifeOutlinedButton
+import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.vault.storage.VaultUnavailableCause
 import org.openlife.vault.storage.retryable
 
@@ -54,7 +54,7 @@ fun VaultUnavailableScreen(
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
-            TextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(top = 8.dp)) {
+            OpenLifeTextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(top = 8.dp)) {
                 val detailsLabel = when (expanded) {
                     true -> R.string.vault_unavailable_hide_details
                     false -> R.string.vault_unavailable_what_means
@@ -62,15 +62,15 @@ fun VaultUnavailableScreen(
                 Text(stringResource(detailsLabel))
             }
             if (cause == VaultUnavailableCause.RESET_INCOMPLETE) {
-                Button(onClick = onFinishReset, modifier = Modifier.padding(top = 8.dp)) {
+                OpenLifeButton(onClick = onFinishReset, modifier = Modifier.padding(top = 8.dp)) {
                     Text(stringResource(R.string.vault_unavailable_finish_reset))
                 }
             } else if (cause.retryable) {
-                Button(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
+                OpenLifeButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
                     Text(stringResource(R.string.vault_unavailable_try_again))
                 }
             }
-            OutlinedButton(onClick = onOpenResetSettings, modifier = Modifier.padding(top = 8.dp)) {
+            OpenLifeOutlinedButton(onClick = onOpenResetSettings, modifier = Modifier.padding(top = 8.dp)) {
                 Text(stringResource(R.string.vault_unavailable_open_settings))
             }
         }

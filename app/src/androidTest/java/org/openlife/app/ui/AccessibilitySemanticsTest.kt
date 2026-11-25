@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertHasClickAction
@@ -27,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.app.test.StrictModeRule
+import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -304,6 +307,119 @@ class AccessibilitySemanticsTest {
         sha256 = ByteArray(32),
         width = 32,
         height = 24,
+        orientation = Orientation.NORMAL,
+        wrappedDek = ByteArray(16),
+        artefactVersion = 1,
+    )
+
+    /** A-08 (P1-19-R11): the perforation is decoration; TalkBack must not stop on it. */
+    @Test
+    fun perforationDividerIsNotAnnounced() {
+        composeRule.setContent {
+            org.openlife.app.ui.theme.OpenLifeTheme {
+                Box(Modifier.testTag("perforation-host")) { org.openlife.app.ui.brand.PerforationDivider() }
+            }
+        }
+        listOf(true, false).forEach { unmerged ->
+            val described = composeRule.onAllNodes(
+                androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("perforation-host"))
+                    .and(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)),
+                useUnmergedTree = unmerged,
+            ).fetchSemanticsNodes()
+            assertTrue("the divider is announced (unmerged=$unmerged): ${described.size}", described.isEmpty())
+        }
+    }
+
+    /**
+     * A-08 (P1-19-R11): every per-span action names the span it acts on, so a
+     * TalkBack user hearing "Correct" knows which line it corrects.
+     */
+    @Test
+    fun ocrRowActionsNameTheirSpan() {
+        val sourceId = UUID.randomUUID()
+        val revisionId = UUID.randomUUID()
+        val grounded = syntheticSpan(revisionId, 0, "Synthetic appointment 14 October", grounded = true)
+        val rejected = syntheticSpan(revisionId, 1, "Synthetic clinic room 3", grounded = true)
+        composeRule.setContent {
+            org.openlife.app.ui.theme.OpenLifeTheme {
+                Box {
+                    OcrSection(
+                        source = readyAccessibilitySource(sourceId),
+                        state = OcrUiState.Ready(
+                            sourceId,
+                            revisionId,
+                            listOf(grounded, rejected),
+                            spanReviews = mapOf(rejected.id to org.openlife.vault.ocr.OcrReviewState.REJECTED),
+                        ),
+                        onExtractText = {},
+                        onCancel = {},
+                        onSelectSpan = {},
+                        onCorrect = {},
+                        onReview = {},
+                        onRejectSpan = {},
+                        onUndoRejectSpan = {},
+                    )
+                }
+            }
+        }
+        fun actionsNaming(span: org.openlife.vault.ocr.OcrSpan) = composeRule.onAllNodes(
+            androidx.compose.ui.test.hasContentDescription(evidenceSpanPreview(span.text), substring = true)
+                .and(androidx.compose.ui.test.hasClickAction()),
+        ).fetchSemanticsNodes()
+        assertTrue("Show region, Correct and Reject span name the span", actionsNaming(grounded).size >= 3)
+        assertTrue("Correct and Undo reject name the rejected span", actionsNaming(rejected).size >= 2)
+    }
+
+    /**
+     * A-08 (P1-19-R12, suspected): StampBadge set a contentDescription on its
+     * Box and also drew the label as Text, which may expose the label twice.
+     */
+    @Test
+    fun stampBadgeLabelIsAnnouncedOnce() {
+        composeRule.setContent {
+            org.openlife.app.ui.theme.OpenLifeTheme {
+                Box(Modifier.testTag("stamp-host")) {
+                    org.openlife.app.ui.brand.StampBadge(org.openlife.app.ui.brand.StampState.Confirmed)
+                }
+            }
+        }
+        listOf(false, true).forEach { unmerged ->
+            val nodes = composeRule.onAllNodes(
+                androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("stamp-host")),
+                useUnmergedTree = unmerged,
+            ).fetchSemanticsNodes()
+            val announcing = nodes.count { node ->
+                val config = node.config
+                config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
+                    .orEmpty().any { it.isNotBlank() } ||
+                    config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)
+                        .orEmpty().any { it.text.isNotBlank() }
+            }
+            assertTrue("stamp label announced by $announcing nodes (unmerged=$unmerged)", announcing == 1)
+        }
+    }
+
+    private fun syntheticSpan(revisionId: UUID, ordinal: Int, text: String, grounded: Boolean) =
+        org.openlife.vault.ocr.OcrSpan(
+            id = UUID.randomUUID(),
+            revisionId = revisionId,
+            ordinal = ordinal,
+            text = text,
+            confidence = null,
+            coordinateSystem = org.openlife.vault.ocr.OcrCoordinateSystem.SOURCE_PIXELS,
+            evidenceRegion = if (grounded) org.openlife.vault.ocr.OcrEvidenceRegion(10, 10 + ordinal * 40, 80, 40 + ordinal * 40) else null,
+        )
+
+    private fun readyAccessibilitySource(id: UUID) = org.openlife.vault.model.Source(
+        id = id,
+        state = org.openlife.vault.model.SourceState.READY,
+        importedAt = 1L,
+        intakeKind = IntakeKind.SHARE,
+        mimeType = ImageFormat.JPEG,
+        byteCount = 10,
+        sha256 = ByteArray(32),
+        width = 48,
+        height = 200,
         orientation = Orientation.NORMAL,
         wrappedDek = ByteArray(16),
         artefactVersion = 1,

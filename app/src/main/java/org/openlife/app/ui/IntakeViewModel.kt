@@ -92,6 +92,8 @@ class IntakeViewModel(
     private var attached = false
     private val lookupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var backgrounded = false
+    private val screenGone = AtomicBoolean(false)
+    private val settled = AtomicBoolean(false)
 
     private var sourceId: UUID?
         get() = savedStateHandle.get<String>(KEY_SOURCE_ID)?.let(UUID::fromString)
@@ -403,21 +405,43 @@ class IntakeViewModel(
         // backed by the same invariant at the ViewModel boundary.
         if (preview.previewBytes == null) return
         val id = preview.sourceId
-        viewModelScope.launch {
-            _state.value = IntakeUiState.Saving(id)
-            when (val access = application.vault()) {
-                is VaultAccess.Unavailable -> _state.value = IntakeUiState.VaultUnavailable(access.cause)
+        _state.value = IntakeUiState.Saving(id)
+        // P1-19-R7 (A-03): the save runs on the application scope. Leaving the
+        // screen mid-save (Home, a config change the activity does not keep)
+        // must neither cancel the commit halfway nor cancel its stage; the
+        // outcome is settled here when no screen is left to show it.
+        application.importHousekeeping.appScope.launch {
+            val outcome = when (val access = application.vault()) {
+                is VaultAccess.Unavailable -> IntakeUiState.VaultUnavailable(access.cause)
 
-                is VaultAccess.Ready -> {
-                    _state.value = when (val result = access.importRepository.saveImport(id)) {
-                        is SaveResult.Saved -> IntakeUiState.Saved(id)
-                        is SaveResult.DuplicateFound -> IntakeUiState.Duplicate(result.existingSourceId)
-                        SaveResult.StageNotFound -> IntakeUiState.Cancelled
-                        SaveResult.StorageUnavailable -> IntakeUiState.StorageUnavailable
-                        SaveResult.Failed -> IntakeUiState.Failed
-                    }
+                is VaultAccess.Ready -> when (val result = access.importRepository.saveImport(id)) {
+                    is SaveResult.Saved -> IntakeUiState.Saved(id)
+                    is SaveResult.DuplicateFound -> IntakeUiState.Duplicate(result.existingSourceId)
+                    SaveResult.StageNotFound -> IntakeUiState.Cancelled
+                    SaveResult.StorageUnavailable -> IntakeUiState.StorageUnavailable
+                    SaveResult.Failed -> IntakeUiState.Failed
                 }
             }
+            _state.value = outcome
+            if (screenGone.get()) settleWithoutScreen(id, outcome)
+        }
+    }
+
+    /** Runs once: either onCleared or the finished save settles the slot. */
+    private fun settleWithoutScreen(id: UUID, state: IntakeUiState) {
+        if (!settled.compareAndSet(false, true)) return
+        val abandons = when (IntakeLifecyclePolicy.onCleared(state)) {
+            ClearedAction.RELEASE_SLOT -> false
+            ClearedAction.CANCEL_ABANDONED -> true
+            ClearedAction.LEAVE_TO_SAVE -> IntakeLifecyclePolicy.abandonsAfterSave(state)
+        }
+        if (abandons) {
+            // P1-01-R1: the user walked away from an unsaved preview, or a save
+            // failed with no screen left. Cancel the stage now rather than at
+            // the next process start; this runs on the application scope.
+            application.importHousekeeping.cancelAbandonedImport(id)
+        } else {
+            application.importHousekeeping.releaseImportSlot(id)
         }
     }
 
@@ -477,18 +501,12 @@ class IntakeViewModel(
         activeImportJob?.cancel()
         lookupScope.cancel()
         val id = sourceId ?: return
-        val decided = when (_state.value) {
-            is IntakeUiState.Saved, is IntakeUiState.Duplicate, IntakeUiState.Cancelled -> true
-            else -> false
-        }
-        if (decided) {
-            application.importHousekeeping.releaseImportSlot(id)
-        } else {
-            // P1-01-R1: the user walked away from an unsaved preview. Cancel
-            // the stage now rather than at the next process start. viewModelScope
-            // is already cancelled, so this runs on the application scope.
-            application.importHousekeeping.cancelAbandonedImport(id)
-        }
+        // Set before reading the state; the save sets the state before reading
+        // this flag, so a save in flight always sees one or the other.
+        screenGone.set(true)
+        val state = _state.value
+        if (IntakeLifecyclePolicy.onCleared(state) == ClearedAction.LEAVE_TO_SAVE) return
+        settleWithoutScreen(id, state)
     }
 
     companion object {

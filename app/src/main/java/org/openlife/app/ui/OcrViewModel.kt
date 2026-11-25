@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
@@ -43,14 +44,18 @@ class OcrViewModel(private val application: OpenLifeApp) : ViewModel() {
      */
     private fun forgetDeletedSources() {
         viewModelScope.launch {
-            val access = application.vault() as? VaultAccess.Ready ?: return@launch
-            var previous = emptySet<UUID>()
-            access.viewRepository.observeVisibleSources().collect { sources ->
-                val visible = sources.mapTo(HashSet()) { it.id }
-                val gone = previous - visible
-                if (gone.isNotEmpty()) presenter.forget(gone)
-                previous = visible
-            }
+            // Opens the vault if nothing has yet; the tracker then follows
+            // whichever vault is Ready, including one that opens later or
+            // replaces a reset vault (P1-19-R16).
+            application.vault()
+            forgetSourcesLeavingTheList(
+                application.readyVault.map { access ->
+                    access?.viewRepository?.observeVisibleSources()?.map { sources ->
+                        sources.mapTo(HashSet()) { it.id }
+                    }
+                },
+                presenter::forget,
+            )
         }
     }
 

@@ -29,6 +29,7 @@ import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
 import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.intake.currentStatusForTest
 import org.openlife.app.intake.TestHostileContentProvider
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.model.IntakeKind
@@ -585,6 +586,7 @@ class IntakeAndListFlowTest {
 
         val open = Intent(context, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, preview.sourceId.toString())
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
         }
         ActivityScenario.launch<MainActivity>(open).use { scenario ->
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.OpenLifeButton
 
 /**
  * Design §8: "First-run explanation must state that the vault has no sync
@@ -67,15 +67,15 @@ fun FirstRunExplanationScreen(onContinue: () -> Unit) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
             FoldedCornerCard(modifier = Modifier.padding(top = 16.dp)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.first_run_title), style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.first_run_title), style = MaterialTheme.typography.displaySmall)
                     Text(stringResource(R.string.first_run_body))
                     Text(stringResource(R.string.first_run_device_lock))
                 }
             }
-            Button(
+            OpenLifeButton(
                 modifier = Modifier.padding(top = 24.dp),
                 onClick = onContinue,
             ) {

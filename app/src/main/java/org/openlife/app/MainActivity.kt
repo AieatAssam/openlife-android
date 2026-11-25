@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.intake.openSourceRequest
 import org.openlife.app.lock.AppLockGate
 import org.openlife.app.lock.AppLockOfferScreen
 import org.openlife.app.lock.AppLockPolicy
@@ -200,6 +202,7 @@ class MainActivity : FragmentActivity() {
             review = ocrViewModel::review,
             rejectSpan = ocrViewModel::rejectSpan,
             undoRejectSpan = ocrViewModel::undoRejectSpan,
+            setUserContentKind = viewModel::setUserContentKind,
             onImportFromPhotoPicker = rememberPhotoPickerLauncher(),
             navController = navController,
             onRetryVault = viewModel::retryVault,
@@ -215,9 +218,11 @@ class MainActivity : FragmentActivity() {
     }
 
     /** Test seam (P1-16-R2): how many times hiding the activity has scrubbed content. */
+    @VisibleForTesting
     internal fun scrubCountForTest(): Long = backgroundEpoch.value
 
     /** Test seam: the Photo Picker result path (P1-02). */
+    @VisibleForTesting
     internal fun forwardPickedUriForTest(uri: Uri) = forwardPickedUri(uri)
 
     private fun forwardPickedUri(uri: Uri) {
@@ -243,10 +248,14 @@ class MainActivity : FragmentActivity() {
 
     companion object {
         const val EXTRA_OPEN_SOURCE_ID = "org.openlife.app.MainActivity.openSourceId"
+
+        /** Carries [OpenLifeApp.openSourceNonce]; the id is ignored without it (P1-19-R17). */
+        const val EXTRA_OPEN_SOURCE_NONCE = "org.openlife.app.MainActivity.openSourceNonce"
     }
 }
 
-private fun openSourceIdFrom(intent: Intent): UUID? =
-    intent.getStringExtra(MainActivity.EXTRA_OPEN_SOURCE_ID)?.let { raw ->
-        runCatching { UUID.fromString(raw) }.getOrNull()
-    }
+private fun MainActivity.openSourceIdFrom(intent: Intent): UUID? = openSourceRequest(
+    intent.getStringExtra(MainActivity.EXTRA_OPEN_SOURCE_ID),
+    intent.getStringExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE),
+    (application as OpenLifeApp).openSourceNonce,
+)

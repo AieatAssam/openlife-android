@@ -32,7 +32,10 @@ your unlocked phone. It is not extra encryption: your items are encrypted the
 same way whether it is on or off. OpenLife never sees or stores your
 fingerprint, face data or screen-lock credential. It only receives
 "verified" or "not verified" from Android. The lock setting itself is stored
-on the device, and resetting the vault turns it off.
+on the device, and resetting the vault turns it off. If you leave OpenLife
+to pick a photo or confirm your screen lock, it does not ask again when you
+come back within a minute (or within your chosen lock time, if that is
+longer). After a longer trip it asks again.
 
 ## What leaves the device
 

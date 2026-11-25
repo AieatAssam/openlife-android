@@ -2,6 +2,7 @@ package org.openlife.app.lock
 
 import android.content.Context
 import android.os.SystemClock
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -18,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class AppLockController(private val context: Context, private val scope: CoroutineScope) {
     /** elapsedRealtime keeps counting through device sleep; see [AppLockState]. */
-    val state = AppLockState(clock = SystemClock::elapsedRealtime)
+    val state = AppLockState(clock = { SystemClock.elapsedRealtime() })
     val status: StateFlow<LockStatus> get() = state.status
     val policy: StateFlow<AppLockPolicy> get() = state.policy
 
@@ -28,8 +29,9 @@ class AppLockController(private val context: Context, private val scope: Corouti
     private var authenticatorOverride: BiometricAuthenticator? = null
     val authenticator: BiometricAuthenticator get() = authenticatorOverride ?: realAuthenticator
 
-    /** Test seam: the number of item-content reads let through [awaitContentAccess]. */
-    val contentReads = AtomicInteger()
+    /** Test seam: the number of item-content reads let through [awaitContentAccess] (review U-02: not public). */
+    @VisibleForTesting
+    internal val contentReadsForTest = AtomicInteger()
 
     /** Called once from Application.onCreate: read the policy off the main thread and watch the process. */
     fun start() {
@@ -50,7 +52,7 @@ class AppLockController(private val context: Context, private val scope: Corouti
      */
     suspend fun awaitContentAccess() {
         status.first { it == LockStatus.UNLOCKED }
-        contentReads.incrementAndGet()
+        contentReadsForTest.incrementAndGet()
     }
 
     /** Settings and onboarding change the policy here; it is persisted off the main thread. */
@@ -60,13 +62,15 @@ class AppLockController(private val context: Context, private val scope: Corouti
     }
 
     /** Test seam: a scripted authenticator and a policy applied as if at process start. */
-    fun setForTest(authenticator: BiometricAuthenticator, policy: AppLockPolicy) {
+    @VisibleForTesting
+    internal fun setForTest(authenticator: BiometricAuthenticator, policy: AppLockPolicy) {
         authenticatorOverride = authenticator
         AppLockPolicyStore.write(context, policy)
         state.start(policy)
     }
 
-    fun resetForTest() {
+    @VisibleForTesting
+    internal fun resetForTest() {
         authenticatorOverride = null
         AppLockPolicyStore.write(context, AppLockPolicy())
         state.start(AppLockPolicy())

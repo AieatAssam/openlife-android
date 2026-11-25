@@ -133,9 +133,7 @@ class ImportRepository(
             val validation = ImageHeaderValidator.validate(declaredMimeType, read.bytes)
             if (validation is ImageValidationResult.Rejected) return PrepareResult.Rejected(validation.reason)
             val valid = validation as ImageValidationResult.Valid
-            if (!bitmapSampler.canSample(read.bytes)) {
-                return PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
-            }
+            checkSample(bitmapSampler, read.bytes).refusal()?.let { return it }
             return mutationQueue.withReadLease {
                 stageLocked(read, valid, intakeKind, onStaged).also {
                     // Inside the lease: a mutation that reads the slot (for

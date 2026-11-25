@@ -14,12 +14,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
@@ -45,6 +44,7 @@ import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.repository.ReadyReadResult
@@ -70,6 +70,7 @@ fun ViewerScreen(
     onReview: (OcrReviewState) -> Unit = {},
     onRejectSpan: (OcrSpan) -> Unit = {},
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
+    onSetUserContentKind: (UserContentKind?) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
@@ -105,6 +106,7 @@ fun ViewerScreen(
                 onRejectSpan(span)
             },
             onUndoRejectSpan = onUndoRejectSpan,
+            onSetUserContentKind = onSetUserContentKind,
         )
     }
 
@@ -148,6 +150,7 @@ private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Uni
                 Icon(
                     Icons.Filled.Delete,
                     contentDescription = stringResource(R.string.viewer_delete_content_description),
+                    tint = MaterialTheme.colorScheme.error,
                 )
             }
         },
@@ -171,6 +174,7 @@ private fun ViewerContent(
     onReview: (OcrReviewState) -> Unit,
     onRejectSpan: (OcrSpan) -> Unit,
     onUndoRejectSpan: (OcrSpan) -> Unit,
+    onSetUserContentKind: (UserContentKind?) -> Unit,
 ) {
     val ready = ocrState as? OcrUiState.Ready
     val spans = ready?.spans.orEmpty()
@@ -216,7 +220,11 @@ private fun ViewerContent(
                 onUndoRejectSpan = onUndoRejectSpan,
             )
             PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            DetailsSection(source = source, verified = content is ViewerContentState.Shown)
+            DetailsSection(
+                source = source,
+                verified = content is ViewerContentState.Shown,
+                onSetUserContentKind = onSetUserContentKind,
+            )
         }
     }
 }
@@ -237,7 +245,7 @@ private fun ViewerCorrectionDialog(
             text = {
                 val correctionLabel = stringResource(R.string.viewer_correction_label)
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    OutlinedTextField(
+                    ContentTextField(
                         value = correctionText,
                         onValueChange = onCorrectionTextChange,
                         modifier = Modifier
@@ -251,7 +259,7 @@ private fun ViewerCorrectionDialog(
                 }
             },
             confirmButton = {
-                TextButton(
+                OpenLifeTextButton(
                     onClick = {
                         if (correctionText.isNotEmpty()) onSave(currentSpan, correctionText)
                         onDismiss()
@@ -259,14 +267,14 @@ private fun ViewerCorrectionDialog(
                 ) { Text(stringResource(R.string.viewer_save_correction)) }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
+                OpenLifeTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) }
             },
         )
     }
 }
 
 @Composable
-private fun DetailsSection(source: Source, verified: Boolean) {
+private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKind: (UserContentKind?) -> Unit) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
@@ -274,7 +282,7 @@ private fun DetailsSection(source: Source, verified: Boolean) {
             DetailRow(
                 stringResource(R.string.viewer_route_label),
                 stringResource(
-                    if (source.intakeKind.name == "SHARE") {
+                    if (source.intakeKind == org.openlife.vault.model.IntakeKind.SHARE) {
                         R.string.viewer_route_share
                     } else {
                         R.string.viewer_route_photos
@@ -296,6 +304,10 @@ private fun DetailsSection(source: Source, verified: Boolean) {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            // P2-07: communication safety context; no assessment runs in this version.
+            PerforationDivider(modifier = Modifier.padding(top = 12.dp))
+            AssessmentNotice(source)
+            if (ContentKindLabel.showQuestion(source)) ContentKindQuestion(source, onSetUserContentKind)
         }
     }
 }
