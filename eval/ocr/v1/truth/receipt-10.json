@@ -1,0 +1,105 @@
+{
+  "id": "receipt-10",
+  "category": "receipt",
+  "image": "fixtures/receipt-10.png",
+  "width": 576,
+  "height": 758,
+  "seed": 20261125024,
+  "style": "thermal-receipt",
+  "skew_degrees": 1.5,
+  "noise_density": 0.0048,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "EXAMPLE HARDWARE",
+      "box": [183, 50, 410, 74],
+      "script": "latin"
+    },
+    {
+      "text": "42 EXAMPLE STREET",
+      "box": [52, 83, 296, 106],
+      "script": "latin"
+    },
+    {
+      "text": "TEL 0100 555 0277",
+      "box": [51, 118, 294, 142],
+      "script": "latin"
+    },
+    {
+      "text": "DATE 2/04/2027 15:45",
+      "box": [51, 154, 336, 180],
+      "script": "latin"
+    },
+    {
+      "text": "CHEESE 200G                   3.05",
+      "box": [50, 190, 537, 221],
+      "script": "latin"
+    },
+    {
+      "text": "PLASTERS                     10.65",
+      "box": [49, 226, 536, 257],
+      "script": "latin"
+    },
+    {
+      "text": "ORANGE JUICE                  2.82",
+      "box": [48, 262, 535, 293],
+      "script": "latin"
+    },
+    {
+      "text": "FLAT WHITE                    4.08",
+      "box": [47, 298, 534, 329],
+      "script": "latin"
+    },
+    {
+      "text": "COFFEE BEANS 250G             9.96",
+      "box": [46, 334, 533, 365],
+      "script": "latin"
+    },
+    {
+      "text": "BREAD WHOLEMEAL               3.50",
+      "box": [45, 370, 533, 401],
+      "script": "latin"
+    },
+    {
+      "text": "RICE 1KG                      2.85",
+      "box": [44, 406, 531, 437],
+      "script": "latin"
+    },
+    {
+      "text": "SCREWS 40MM                   5.78",
+      "box": [42, 442, 531, 473],
+      "script": "latin"
+    },
+    {
+      "text": "TOMATOES TIN                  3.45",
+      "box": [41, 478, 529, 509],
+      "script": "latin"
+    },
+    {
+      "text": "SUBTOTAL                     38.45",
+      "box": [41, 514, 528, 545],
+      "script": "latin"
+    },
+    {
+      "text": "VAT 20%                       7.69",
+      "box": [40, 550, 528, 581],
+      "script": "latin"
+    },
+    {
+      "text": "TOTAL                       ¥46.14",
+      "box": [39, 586, 527, 617],
+      "script": "latin"
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [38, 622, 210, 644],
+      "script": "latin"
+    },
+    {
+      "text": "THANK YOU",
+      "box": [216, 663, 344, 684],
+      "script": "latin"
+    }
+  ]
+}

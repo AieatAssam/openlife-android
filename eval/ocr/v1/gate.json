@@ -1,0 +1,18 @@
+{
+  "schema": "openlife-ocr-gate/1",
+  "set": "ocr/v1",
+  "requirement": "P2-04-R3; changing a threshold is a reviewed diff here and in eval GateFileTest (R4)",
+  "line_match_iou": 0.5,
+  "thresholds": {
+    "cer_mean_max": {
+      "screenshot": 0.08,
+      "receipt": 0.15,
+      "letter": 0.10
+    },
+    "line_match_rate_min": 0.90,
+    "abstention_correct_rate_min": 1.0,
+    "duration_p95_ms_max": 6000,
+    "peak_pss_delta_kib_max": 122880
+  },
+  "engines": ["tesseract-eng-fast", "mlkit-latin"]
+}

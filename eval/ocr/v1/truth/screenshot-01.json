@@ -1,0 +1,80 @@
+{
+  "id": "screenshot-01",
+  "category": "screenshot",
+  "image": "fixtures/screenshot-01.png",
+  "width": 1080,
+  "height": 2400,
+  "seed": 20261125000,
+  "style": "phone-screenshot",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "08:35",
+      "box": [50, 41, 138, 67],
+      "script": "latin"
+    },
+    {
+      "text": "Jo Placeholder",
+      "box": [61, 150, 377, 186],
+      "script": "latin"
+    },
+    {
+      "text": "Today",
+      "box": [496, 286, 584, 317],
+      "script": "latin"
+    },
+    {
+      "text": "The parcel arrived today",
+      "box": [80, 392, 536, 433],
+      "script": "latin"
+    },
+    {
+      "text": "I will pick up the keys",
+      "box": [595, 552, 998, 593],
+      "script": "latin"
+    },
+    {
+      "text": "Dentist is on Tuesday",
+      "box": [83, 702, 483, 743],
+      "script": "latin"
+    },
+    {
+      "text": "Can you bring the receipts?",
+      "box": [491, 859, 999, 900],
+      "script": "latin"
+    },
+    {
+      "text": "Train leaves at 08:15",
+      "box": [80, 1020, 475, 1053],
+      "script": "latin"
+    },
+    {
+      "text": "Did you pay the gas bill?",
+      "box": [550, 1157, 999, 1198],
+      "script": "latin"
+    },
+    {
+      "text": "Table booked for four",
+      "box": [80, 1290, 485, 1323],
+      "script": "latin"
+    },
+    {
+      "text": "Room 4B on the left",
+      "box": [629, 1452, 999, 1485],
+      "script": "latin"
+    },
+    {
+      "text": "Running ten minutes late",
+      "box": [83, 1618, 550, 1659],
+      "script": "latin"
+    },
+    {
+      "text": "Paid it this morning",
+      "box": [640, 1771, 1000, 1812],
+      "script": "latin"
+    }
+  ]
+}

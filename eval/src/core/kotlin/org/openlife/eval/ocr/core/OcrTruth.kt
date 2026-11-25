@@ -17,16 +17,21 @@ data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
 
     companion object {
         private const val COORDINATES = 4
+        private const val LEFT = 0
+        private const val TOP = 1
+        private const val RIGHT = 2
+        private const val BOTTOM = 3
 
         fun fromJson(value: JsonValue): Box {
-            val items = (value as? JsonArray)?.items ?: throw JsonFormatException("box is not an array")
-            if (items.size != COORDINATES) throw JsonFormatException("box needs four coordinates")
-            val numbers = items.map { (it as? JsonNumber)?.toLong() ?: throw JsonFormatException("box coordinate") }
-            if (numbers.any { it !in 0..Int.MAX_VALUE }) throw JsonFormatException("box coordinate out of range")
+            val items = (value as? JsonArray)?.items ?: jsonFail("box is not an array")
+            if (items.size != COORDINATES) jsonFail("box needs four coordinates")
+            val numbers = items.map { (it as? JsonNumber)?.toLong() ?: jsonFail("box coordinate") }
+            if (numbers.any { it !in 0..Int.MAX_VALUE }) jsonFail("box coordinate out of range")
+            val coordinates = numbers.map { it.toInt() }.toIntArray()
             return try {
-                Box(numbers[0].toInt(), numbers[1].toInt(), numbers[2].toInt(), numbers[3].toInt())
+                Box(coordinates[LEFT], coordinates[TOP], coordinates[RIGHT], coordinates[BOTTOM])
             } catch (invalid: IllegalArgumentException) {
-                throw JsonFormatException("invalid box: ${invalid.message}")
+                throw JsonFormatException("invalid box: ${invalid.message}", invalid)
             }
         }
     }
@@ -40,7 +45,7 @@ enum class FixtureCategory(val key: String) {
 
     companion object {
         fun of(key: String): FixtureCategory =
-            entries.firstOrNull { it.key == key } ?: throw JsonFormatException("unknown category $key")
+            entries.firstOrNull { it.key == key } ?: jsonFail("unknown category $key")
     }
 }
 
@@ -53,7 +58,7 @@ enum class ScriptClass(val key: String) {
 
     companion object {
         fun of(key: String): ScriptClass =
-            entries.firstOrNull { it.key == key } ?: throw JsonFormatException("unknown script class $key")
+            entries.firstOrNull { it.key == key } ?: jsonFail("unknown script class $key")
     }
 }
 
@@ -112,8 +117,12 @@ object TruthCodec {
             scriptClass = ScriptClass.of(root.string("script_class")),
             expectedAbstain = root.bool("expected_abstain"),
             lines = root.array("lines").map { line ->
-                val fields = line as? JsonObject ?: throw JsonFormatException("line is not an object")
-                TruthLine(fields.string("text"), Box.fromJson(fields.value("box")), ScriptClass.of(fields.string("script")))
+                val fields = line as? JsonObject ?: jsonFail("line is not an object")
+                TruthLine(
+                    fields.string("text"),
+                    Box.fromJson(fields.value("box")),
+                    ScriptClass.of(fields.string("script")),
+                )
             },
         )
     }
@@ -173,11 +182,11 @@ object ManifestCodec {
             javaVersion = renderedWith.string("java_version"),
             javaVendor = renderedWith.string("java_vendor"),
             fonts = root.array("fonts").map {
-                val font = it as? JsonObject ?: throw JsonFormatException("font is not an object")
+                val font = it as? JsonObject ?: jsonFail("font is not an object")
                 FontEntry(font.string("file"), font.string("sha256"))
             },
             fixtures = root.array("fixtures").map {
-                val entry = it as? JsonObject ?: throw JsonFormatException("fixture is not an object")
+                val entry = it as? JsonObject ?: jsonFail("fixture is not an object")
                 ManifestEntry(
                     id = entry.string("id"),
                     category = FixtureCategory.of(entry.string("category")),

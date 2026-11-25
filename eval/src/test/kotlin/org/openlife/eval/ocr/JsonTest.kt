@@ -31,7 +31,7 @@ class JsonTest {
     fun rejectsMalformedInput() {
         val malformed = listOf(
             "", "{", "{\"a\":1,}", "{\"a\":1}{}", "{\"a\":1,\"a\":2}", "[01]", "NaN", "[1e999]",
-            "\"\u0001\"", "{a:1}", "[1 2]", "\"\\x\"", "tru", "[" .repeat(100) + "]".repeat(100),
+            "\"\u0001\"", "{a:1}", "[1 2]", "\"\\x\"", "tru", "[".repeat(100) + "]".repeat(100),
         )
         malformed.forEach { text ->
             try {

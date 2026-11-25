@@ -37,5 +37,26 @@ object ScriptPolicyCost {
         wholeRevisionAbstained: Boolean,
         minIou: Double,
         spanIsUnsupported: (String) -> Boolean,
-    ): ScriptPolicyComparison = TODO("P2-04 GREEN")
+    ): ScriptPolicyComparison {
+        val pairs = OcrMetrics.matchLines(truth.map { it.box }, rawSpans, minIou)
+        val matched = pairs.associate { it }
+        val keptPerSpan = rawSpans.map { !spanIsUnsupported(it.text) }
+        fun cost(kept: (Int) -> Boolean): PolicyCost {
+            var lost = 0
+            var accepted = 0
+            truth.forEachIndexed { index, line ->
+                val span = matched[index] ?: return@forEachIndexed
+                if (line.script == ScriptClass.LATIN && !kept(span)) lost++
+                if (line.script != ScriptClass.LATIN && kept(span)) accepted++
+            }
+            return PolicyCost(lost, accepted)
+        }
+        return ScriptPolicyComparison(
+            latinLines = truth.count { it.script == ScriptClass.LATIN },
+            nonLatinLines = truth.count { it.script != ScriptClass.LATIN },
+            unmatchedLines = truth.size - pairs.size,
+            wholeRevision = cost { !wholeRevisionAbstained },
+            perSpan = cost { keptPerSpan[it] },
+        )
+    }
 }

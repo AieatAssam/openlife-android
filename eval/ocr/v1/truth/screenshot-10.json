@@ -1,0 +1,70 @@
+{
+  "id": "screenshot-10",
+  "category": "screenshot",
+  "image": "fixtures/screenshot-10.png",
+  "width": 1080,
+  "height": 2400,
+  "seed": 20261125009,
+  "style": "phone-screenshot",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "16:20",
+      "box": [49, 41, 138, 67],
+      "script": "latin"
+    },
+    {
+      "text": "Jo Placeholder",
+      "box": [61, 150, 377, 186],
+      "script": "latin"
+    },
+    {
+      "text": "Today",
+      "box": [496, 286, 584, 317],
+      "script": "latin"
+    },
+    {
+      "text": "Paid it this morning",
+      "box": [83, 392, 443, 433],
+      "script": "latin"
+    },
+    {
+      "text": "Dentist is on Tuesday",
+      "box": [601, 520, 1000, 561],
+      "script": "latin"
+    },
+    {
+      "text": "I will pick up the keys",
+      "box": [82, 673, 485, 714],
+      "script": "latin"
+    },
+    {
+      "text": "Thanks, got it",
+      "box": [747, 812, 999, 853],
+      "script": "latin"
+    },
+    {
+      "text": "Table booked for four",
+      "box": [80, 952, 485, 985],
+      "script": "latin"
+    },
+    {
+      "text": "Bring an umbrella",
+      "box": [669, 1105, 999, 1146],
+      "script": "latin"
+    },
+    {
+      "text": "Are we still on for Friday?",
+      "box": [80, 1270, 555, 1311],
+      "script": "latin"
+    },
+    {
+      "text": "Call me after lunch",
+      "box": [648, 1434, 997, 1467],
+      "script": "latin"
+    }
+  ]
+}

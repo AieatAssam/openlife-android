@@ -44,7 +44,10 @@ class OcrEvaluationTest {
         assertEquals(
             "a b\nc",
             OcrMetrics.referenceText(
-                listOf(TruthLine(" a  b ", Box(0, 0, 1, 1), ScriptClass.LATIN), TruthLine("c", Box(0, 2, 1, 3), ScriptClass.LATIN)),
+                listOf(
+                    TruthLine(" a  b ", Box(0, 0, 1, 1), ScriptClass.LATIN),
+                    TruthLine("c", Box(0, 2, 1, 3), ScriptClass.LATIN),
+                ),
             ),
         )
         // Same row (centres 115 and 116.5) ordered left to right; next row; then a span with no region.
@@ -80,7 +83,11 @@ class OcrEvaluationTest {
         // One-to-one: two truth lines cannot share the one span that overlaps both.
         assertEquals(
             listOf(0 to 0),
-            OcrMetrics.matchLines(listOf(Box(0, 0, 10, 10), Box(0, 0, 10, 10)), listOf(SpanObservation("s", Box(0, 0, 10, 10))), 0.5),
+            OcrMetrics.matchLines(
+                listOf(Box(0, 0, 10, 10), Box(0, 0, 10, 10)),
+                listOf(SpanObservation("s", Box(0, 0, 10, 10))),
+                0.5,
+            ),
         )
 
         // p95 nearest rank: rank ceil(0.95 n).
@@ -158,9 +165,20 @@ class OcrEvaluationTest {
             fixtures = GateFixtures.binding.fixtures.map { if (it.id == "l1") it.copy(expectedAbstain = true) else it },
         )
         val results = GateFixtures.passingResults().withImage("l1") {
-            it.copy(expectedAbstain = true, outcome = RunOutcome.ABSTAINED, cer = 1.0, linesMatched = 0, spans = emptyList())
+            it.copy(
+                expectedAbstain = true,
+                outcome = RunOutcome.ABSTAINED,
+                cer = 1.0,
+                linesMatched = 0,
+                spans = emptyList(),
+            )
         }
-        val verdict = OcrGate.evaluate(GateFixtures.ENGINE, GateFixtures.thresholds, onlyAbstainLetters, ResultsCodec.encode(results))
+        val verdict = OcrGate.evaluate(
+            GateFixtures.ENGINE,
+            GateFixtures.thresholds,
+            onlyAbstainLetters,
+            ResultsCodec.encode(results),
+        )
         assertEquals(verdict.problems.toString(), GateOutcome.NO_MEASUREMENT, verdict.outcome)
         assertEquals(CheckStatus.NOT_MEASURED, verdict.checks.single { it.name == "cer_mean_letter" }.status)
 
@@ -198,7 +216,9 @@ class OcrEvaluationTest {
             "abstained but scored" to ResultsCodec.encode(
                 passing.withImage("r1") { it.copy(outcome = RunOutcome.ABSTAINED, cer = 0.0) },
             ),
-            "line total disagrees with truth" to ResultsCodec.encode(passing.withImage("s1") { it.copy(linesTotal = 3) }),
+            "line total disagrees with truth" to ResultsCodec.encode(
+                passing.withImage("s1") { it.copy(linesTotal = 3) },
+            ),
         )
         for ((case, text) in invalid) {
             val verdict = OcrGate.evaluate(GateFixtures.ENGINE, GateFixtures.thresholds, GateFixtures.binding, text)
@@ -247,14 +267,23 @@ class OcrEvaluationTest {
         assertEquals(PolicyCost(0, 2), accepting.perSpan)
 
         // A Latin line misread with a Cyrillic look-alike is lost by both policies.
-        val misread = readsCyrillic.toMutableList().apply { set(2, SpanObservation("TОTAL 9.99", Box(11, 90, 200, 120))) }
+        val misread = readsCyrillic.toMutableList().apply {
+            set(
+                2,
+                SpanObservation("TОTAL 9.99", Box(11, 90, 200, 120)),
+            )
+        }
         val perSpanLoss = ScriptPolicyCost.compare(truth, misread, true, 0.5, cyrillic)
         assertEquals(PolicyCost(2, 0), perSpanLoss.wholeRevision)
         assertEquals(PolicyCost(1, 0), perSpanLoss.perSpan)
     }
 
-    private fun evaluate(results: EngineResults) =
-        OcrGate.evaluate(GateFixtures.ENGINE, GateFixtures.thresholds, GateFixtures.binding, ResultsCodec.encode(results))
+    private fun evaluate(results: EngineResults) = OcrGate.evaluate(
+        GateFixtures.ENGINE,
+        GateFixtures.thresholds,
+        GateFixtures.binding,
+        ResultsCodec.encode(results),
+    )
 
     private fun EngineResults.withImage(id: String, change: (ImageResult) -> ImageResult): EngineResults =
         copy(images = images.map { if (it.id == id) change(it) else it })
@@ -272,7 +301,11 @@ internal object GateFixtures {
 
     val thresholds = GateThresholds(
         lineMatchIou = 0.5,
-        cerMeanMax = mapOf(FixtureCategory.SCREENSHOT to 0.08, FixtureCategory.RECEIPT to 0.15, FixtureCategory.LETTER to 0.10),
+        cerMeanMax = mapOf(
+            FixtureCategory.SCREENSHOT to 0.08,
+            FixtureCategory.RECEIPT to 0.15,
+            FixtureCategory.LETTER to 0.10,
+        ),
         lineMatchRateMin = 0.90,
         abstentionCorrectRateMin = 1.0,
         durationP95MsMax = 6_000,
@@ -295,7 +328,16 @@ internal object GateFixtures {
         manifestSha256 = MANIFEST,
         gateSha256 = GATE,
         fixtures = fixtures.map { (fixture, _) ->
-            ManifestEntry(fixture.first, fixture.second, fixture.third, "fixtures/${fixture.first}.png", "truth/${fixture.first}.json", "", "", "")
+            ManifestEntry(
+                fixture.first,
+                fixture.second,
+                fixture.third,
+                "fixtures/${fixture.first}.png",
+                "truth/${fixture.first}.json",
+                "",
+                "",
+                "",
+            )
         },
         lineCounts = lineCounts,
     )

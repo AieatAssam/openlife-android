@@ -61,7 +61,10 @@ class FixtureGeneratorTest {
         assertTrue("fully non-Latin samples", abstain.count { it.scriptClass == ScriptClass.NON_LATIN } >= 2)
 
         // V-15: an otherwise Latin receipt with a stray Cyrillic word, and one with a single stray glyph.
-        val mixedReceipts = abstain.filter { it.category == FixtureCategory.RECEIPT && it.scriptClass == ScriptClass.MIXED }
+        val mixedReceipts = abstain.filter {
+            it.category == FixtureCategory.RECEIPT &&
+                it.scriptClass == ScriptClass.MIXED
+        }
         assertEquals(2, mixedReceipts.size)
         mixedReceipts.forEach { receipt ->
             val latin = receipt.lines.count { it.script == ScriptClass.LATIN }
@@ -80,7 +83,10 @@ class FixtureGeneratorTest {
             assertTrue(truth.id, truth.lines.isNotEmpty())
             truth.lines.forEach { line ->
                 assertTrue("${truth.id}: '${line.text}' box ${line.box}", line.box.width > 0 && line.box.height > 0)
-                assertTrue("${truth.id}: box inside image", line.box.right <= truth.width && line.box.bottom <= truth.height)
+                assertTrue(
+                    "${truth.id}: box inside image",
+                    line.box.right <= truth.width && line.box.bottom <= truth.height,
+                )
                 assertEquals(line.text.trim(), line.text)
             }
             when (truth.category) {
@@ -88,6 +94,7 @@ class FixtureGeneratorTest {
                     assertTrue("${truth.id}: skew 0-3 degrees", abs(truth.skewDegrees) <= 3.0)
                     assertTrue("${truth.id}: noisy", truth.noiseDensity > 0.0)
                 }
+
                 else -> assertEquals(0.0, truth.skewDegrees, 0.0)
             }
         }

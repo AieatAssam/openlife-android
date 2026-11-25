@@ -1,0 +1,85 @@
+{
+  "id": "letter-06",
+  "category": "letter",
+  "image": "fixtures/letter-06.png",
+  "width": 1240,
+  "height": 1754,
+  "seed": 20261125035,
+  "style": "letter",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "Example Water Ltd",
+      "box": [103, 117, 486, 159],
+      "script": "latin"
+    },
+    {
+      "text": "80 Example Road",
+      "box": [889, 236, 1138, 267],
+      "script": "latin"
+    },
+    {
+      "text": "Testford TE1 6XX",
+      "box": [889, 284, 1140, 309],
+      "script": "latin"
+    },
+    {
+      "text": "3 March 2027",
+      "box": [941, 356, 1138, 381],
+      "script": "latin"
+    },
+    {
+      "text": "Sam Sample",
+      "box": [101, 436, 279, 467],
+      "script": "latin"
+    },
+    {
+      "text": "31 Sample Street",
+      "box": [101, 484, 349, 515],
+      "script": "latin"
+    },
+    {
+      "text": "Ref: L-263363",
+      "box": [102, 532, 307, 557],
+      "script": "latin"
+    },
+    {
+      "text": "Dear Sam Sample,",
+      "box": [102, 626, 362, 657],
+      "script": "latin"
+    },
+    {
+      "text": "Our opening hours are 9.00 to 17.00, Monday to Friday. Your reference",
+      "box": [101, 706, 1114, 737],
+      "script": "latin"
+    },
+    {
+      "text": "number is shown at the top of this page.",
+      "box": [102, 756, 672, 787],
+      "script": "latin"
+    },
+    {
+      "text": "There is nothing more you need to do at this stage. We have received",
+      "box": [100, 836, 1082, 867],
+      "script": "latin"
+    },
+    {
+      "text": "your form and it is complete.",
+      "box": [100, 886, 509, 917],
+      "script": "latin"
+    },
+    {
+      "text": "Yours sincerely,",
+      "box": [100, 986, 326, 1017],
+      "script": "latin"
+    },
+    {
+      "text": "Alex Example",
+      "box": [100, 1086, 294, 1117],
+      "script": "latin"
+    }
+  ]
+}

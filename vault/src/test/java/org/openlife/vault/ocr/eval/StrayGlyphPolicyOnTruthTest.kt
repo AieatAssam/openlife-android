@@ -41,7 +41,11 @@ class StrayGlyphPolicyOnTruthTest {
             assertEquals("${truth.id}: production abstains exactly on non-Latin text", truth.expectedAbstain, abstained)
             assertEquals(truth.id, 0, comparison.unmatchedLines)
             if (truth.expectedAbstain) {
-                assertEquals("${truth.id}: whole revision loses every Latin line", PolicyCost(latin, 0), comparison.wholeRevision)
+                assertEquals(
+                    "${truth.id}: whole revision loses every Latin line",
+                    PolicyCost(latin, 0),
+                    comparison.wholeRevision,
+                )
             } else {
                 assertEquals(truth.id, PolicyCost(0, 0), comparison.wholeRevision)
             }

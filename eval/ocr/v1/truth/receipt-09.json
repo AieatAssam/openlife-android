@@ -1,0 +1,95 @@
+{
+  "id": "receipt-09",
+  "category": "receipt",
+  "image": "fixtures/receipt-09.png",
+  "width": 576,
+  "height": 686,
+  "seed": 20261125023,
+  "style": "thermal-receipt",
+  "skew_degrees": -1.7,
+  "noise_density": 0.0031,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "TESTFORD MARKET",
+      "box": [172, 50, 387, 74],
+      "script": "latin"
+    },
+    {
+      "text": "55 EXAMPLE STREET",
+      "box": [38, 89, 281, 114],
+      "script": "latin"
+    },
+    {
+      "text": "TEL 0100 555 0476",
+      "box": [38, 125, 282, 150],
+      "script": "latin"
+    },
+    {
+      "text": "DATE 27/03/2027 14:30",
+      "box": [40, 159, 340, 186],
+      "script": "latin"
+    },
+    {
+      "text": "COFFEE BEANS 250G             4.81",
+      "box": [41, 190, 529, 222],
+      "script": "latin"
+    },
+    {
+      "text": "MILK 1L                       5.18",
+      "box": [42, 225, 530, 258],
+      "script": "latin"
+    },
+    {
+      "text": "PLASTERS                      1.97",
+      "box": [44, 262, 530, 294],
+      "script": "latin"
+    },
+    {
+      "text": "LIGHT BULB                    5.18",
+      "box": [45, 297, 532, 330],
+      "script": "latin"
+    },
+    {
+      "text": "SCREWS 40MM                   7.10",
+      "box": [45, 333, 533, 366],
+      "script": "latin"
+    },
+    {
+      "text": "BREAD WHOLEMEAL              12.32",
+      "box": [47, 369, 534, 402],
+      "script": "latin"
+    },
+    {
+      "text": "TOMATOES TIN                  6.17",
+      "box": [46, 405, 534, 438],
+      "script": "latin"
+    },
+    {
+      "text": "SUBTOTAL                     35.61",
+      "box": [48, 442, 537, 474],
+      "script": "latin"
+    },
+    {
+      "text": "VAT 20%                       7.12",
+      "box": [49, 477, 537, 509],
+      "script": "latin"
+    },
+    {
+      "text": "TOTAL                        42.73",
+      "box": [49, 513, 538, 545],
+      "script": "latin"
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [52, 559, 223, 582],
+      "script": "latin"
+    },
+    {
+      "text": "THANK YOU",
+      "box": [231, 591, 359, 612],
+      "script": "latin"
+    }
+  ]
+}

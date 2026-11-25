@@ -10,6 +10,7 @@ package org.openlife.eval.ocr.core
  */
 sealed interface JsonValue
 
+@Suppress("TooManyFunctions") // one typed accessor per JSON type, required and nullable
 data class JsonObject(val fields: Map<String, JsonValue>) : JsonValue {
     fun has(key: String): Boolean = key in fields
 
@@ -74,7 +75,10 @@ data class JsonBool(val value: Boolean) : JsonValue
 
 data object JsonNull : JsonValue
 
-class JsonFormatException(message: String) : IllegalArgumentException(message)
+class JsonFormatException(message: String, cause: Throwable? = null) : IllegalArgumentException(message, cause)
+
+/** Rejects malformed input; decoders call this instead of throwing so each reads as a list of rules. */
+fun jsonFail(message: String): Nothing = throw JsonFormatException(message)
 
 fun jsonObject(vararg fields: Pair<String, JsonValue>): JsonObject {
     val map = LinkedHashMap<String, JsonValue>()
@@ -101,8 +105,6 @@ fun Double?.jsonOrNull(): JsonValue = this?.json() ?: JsonNull
 fun Long?.jsonOrNull(): JsonValue = this?.json() ?: JsonNull
 
 fun Int?.jsonOrNull(): JsonValue = this?.json() ?: JsonNull
-
-fun Boolean?.jsonOrNull(): JsonValue = this?.json() ?: JsonNull
 
 object Json {
     private const val MAX_DEPTH = 64
@@ -204,6 +206,7 @@ object Json {
     private const val HEX = 16
     private const val UNICODE_DIGITS = 4
 
+    @Suppress("TooManyFunctions") // recursive descent: one function per grammar rule
     private class Parser(private val text: String) {
         var position = 0
             private set
@@ -288,17 +291,24 @@ object Json {
 
         private fun escape(): Char = when (val char = next()) {
             '"', '\\', '/' -> char
+
             'b' -> '\b'
+
             'f' -> '\u000C'
+
             'n' -> '\n'
+
             'r' -> '\r'
+
             't' -> '\t'
+
             'u' -> {
                 if (position + UNICODE_DIGITS > text.length) fail("truncated unicode escape")
                 val hex = text.substring(position, position + UNICODE_DIGITS)
                 position += UNICODE_DIGITS
                 hex.toIntOrNull(HEX)?.toChar() ?: fail("bad unicode escape")
             }
+
             else -> fail("bad escape '\\$char'")
         }
 

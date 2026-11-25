@@ -1,0 +1,95 @@
+{
+  "id": "receipt-01",
+  "category": "receipt",
+  "image": "fixtures/receipt-01.png",
+  "width": 576,
+  "height": 686,
+  "seed": 20261125015,
+  "style": "thermal-receipt",
+  "skew_degrees": 0.3,
+  "noise_density": 0.0039,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "EXAMPLE HARDWARE",
+      "box": [176, 52, 403, 71],
+      "script": "latin"
+    },
+    {
+      "text": "69 EXAMPLE STREET",
+      "box": [46, 87, 290, 106],
+      "script": "latin"
+    },
+    {
+      "text": "TEL 0100 555 0823",
+      "box": [45, 123, 288, 143],
+      "script": "latin"
+    },
+    {
+      "text": "DATE 12/03/2027 17:15",
+      "box": [47, 159, 346, 181],
+      "script": "latin"
+    },
+    {
+      "text": "TOMATOES TIN                  7.69",
+      "box": [45, 195, 533, 216],
+      "script": "latin"
+    },
+    {
+      "text": "CROISSANT                     0.51",
+      "box": [46, 231, 533, 252],
+      "script": "latin"
+    },
+    {
+      "text": "APPLES 1KG                    6.43",
+      "box": [45, 268, 532, 288],
+      "script": "latin"
+    },
+    {
+      "text": "TEA BAGS X80                  0.76",
+      "box": [44, 303, 533, 324],
+      "script": "latin"
+    },
+    {
+      "text": "ORANGE JUICE                  6.56",
+      "box": [45, 339, 533, 360],
+      "script": "latin"
+    },
+    {
+      "text": "MILK 1L                      10.17",
+      "box": [45, 375, 532, 396],
+      "script": "latin"
+    },
+    {
+      "text": "COFFEE BEANS 250G             9.03",
+      "box": [45, 411, 532, 432],
+      "script": "latin"
+    },
+    {
+      "text": "SUBTOTAL                     34.30",
+      "box": [44, 447, 532, 468],
+      "script": "latin"
+    },
+    {
+      "text": "VAT 20%                       6.85",
+      "box": [44, 483, 532, 504],
+      "script": "latin"
+    },
+    {
+      "text": "TOTAL                        41.15",
+      "box": [43, 519, 531, 540],
+      "script": "latin"
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [44, 555, 216, 574],
+      "script": "latin"
+    },
+    {
+      "text": "THANK YOU",
+      "box": [222, 592, 350, 611],
+      "script": "latin"
+    }
+  ]
+}

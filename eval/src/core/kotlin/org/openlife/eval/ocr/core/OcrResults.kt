@@ -8,8 +8,7 @@ enum class RunOutcome(val key: String) {
     ;
 
     companion object {
-        fun of(key: String): RunOutcome =
-            entries.firstOrNull { it.key == key } ?: throw JsonFormatException("unknown outcome $key")
+        fun of(key: String): RunOutcome = entries.firstOrNull { it.key == key } ?: jsonFail("unknown outcome $key")
     }
 }
 
@@ -66,7 +65,7 @@ object ResultsCodec {
 
     fun decode(text: String): EngineResults {
         val root = Json.parseObject(text)
-        if (root.string("schema") != SCHEMA) throw JsonFormatException("unknown results schema")
+        if (root.string("schema") != SCHEMA) jsonFail("unknown results schema")
         val engine = root.obj("engine")
         return EngineResults(
             engineId = engine.string("id"),
@@ -75,10 +74,10 @@ object ResultsCodec {
             gateSha256 = root.string("gate_sha256"),
             runDate = root.string("run_date"),
             device = root.obj("device").fields.mapValues {
-                (it.value as? JsonString)?.value ?: throw JsonFormatException("device field ${it.key}")
+                (it.value as? JsonString)?.value ?: jsonFail("device field ${it.key}")
             },
             images = root.array("images").map {
-                decodeImage(it as? JsonObject ?: throw JsonFormatException("image is not an object"))
+                decodeImage(it as? JsonObject ?: jsonFail("image is not an object"))
             },
         )
     }
@@ -144,7 +143,7 @@ object ResultsCodec {
     )
 
     private fun decodeSpans(items: List<JsonValue>): List<SpanObservation> = items.map {
-        val span = it as? JsonObject ?: throw JsonFormatException("span is not an object")
+        val span = it as? JsonObject ?: jsonFail("span is not an object")
         val box = span.value("box").let { value -> if (value == JsonNull) null else Box.fromJson(value) }
         SpanObservation(span.string("text"), box)
     }

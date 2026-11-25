@@ -1,0 +1,105 @@
+{
+  "id": "receipt-14",
+  "category": "receipt",
+  "image": "fixtures/receipt-14.png",
+  "width": 576,
+  "height": 758,
+  "seed": 20261125028,
+  "style": "thermal-receipt",
+  "skew_degrees": -1.2,
+  "noise_density": 0.0025,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "PLACEHOLDER CAFE",
+      "box": [168, 50, 395, 73],
+      "script": "latin"
+    },
+    {
+      "text": "84 EXAMPLE STREET",
+      "box": [39, 89, 283, 112],
+      "script": "latin"
+    },
+    {
+      "text": "TEL 0100 555 0103",
+      "box": [39, 125, 282, 148],
+      "script": "latin"
+    },
+    {
+      "text": "DATE 9/08/2027 08:25",
+      "box": [41, 160, 327, 185],
+      "script": "latin"
+    },
+    {
+      "text": "TEA BAGS X80                  8.58",
+      "box": [40, 191, 529, 220],
+      "script": "latin"
+    },
+    {
+      "text": "SCREWS 40MM                   0.87",
+      "box": [42, 228, 529, 256],
+      "script": "latin"
+    },
+    {
+      "text": "COFFEE BEANS 250G             9.10",
+      "box": [43, 263, 531, 292],
+      "script": "latin"
+    },
+    {
+      "text": "BREAD WHOLEMEAL               9.39",
+      "box": [44, 299, 531, 328],
+      "script": "latin"
+    },
+    {
+      "text": "TOMATOES TIN                  6.77",
+      "box": [43, 336, 532, 363],
+      "script": "latin"
+    },
+    {
+      "text": "TOOTHPASTE                   10.48",
+      "box": [44, 371, 533, 399],
+      "script": "latin"
+    },
+    {
+      "text": "PLASTERS                      9.42",
+      "box": [46, 407, 534, 436],
+      "script": "latin"
+    },
+    {
+      "text": "CROISSANT                     6.18",
+      "box": [47, 443, 534, 472],
+      "script": "latin"
+    },
+    {
+      "text": "FLAT WHITE                    7.88",
+      "box": [48, 479, 535, 508],
+      "script": "latin"
+    },
+    {
+      "text": "SUBTOTAL                     57.23",
+      "box": [48, 515, 535, 544],
+      "script": "latin"
+    },
+    {
+      "text": "VAT 20%                      11.44",
+      "box": [48, 552, 537, 579],
+      "script": "latin"
+    },
+    {
+      "text": "TOTAL                       €68.67",
+      "box": [49, 588, 537, 615],
+      "script": "latin"
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [51, 630, 222, 652],
+      "script": "latin"
+    },
+    {
+      "text": "THANK YOU",
+      "box": [229, 663, 358, 684],
+      "script": "latin"
+    }
+  ]
+}

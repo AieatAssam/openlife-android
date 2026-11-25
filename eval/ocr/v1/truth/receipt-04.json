@@ -1,0 +1,110 @@
+{
+  "id": "receipt-04",
+  "category": "receipt",
+  "image": "fixtures/receipt-04.png",
+  "width": 576,
+  "height": 794,
+  "seed": 20261125018,
+  "style": "thermal-receipt",
+  "skew_degrees": -2.1,
+  "noise_density": 0.0021,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "PLACEHOLDER CAFE",
+      "box": [162, 49, 390, 75],
+      "script": "latin"
+    },
+    {
+      "text": "65 EXAMPLE STREET",
+      "box": [34, 89, 277, 116],
+      "script": "latin"
+    },
+    {
+      "text": "TEL 0100 555 0931",
+      "box": [34, 125, 279, 151],
+      "script": "latin"
+    },
+    {
+      "text": "DATE 22/08/2027 10:40",
+      "box": [37, 159, 337, 188],
+      "script": "latin"
+    },
+    {
+      "text": "SCREWS 40MM                   5.42",
+      "box": [38, 188, 526, 224],
+      "script": "latin"
+    },
+    {
+      "text": "TEA BAGS X80                 12.14",
+      "box": [38, 224, 528, 259],
+      "script": "latin"
+    },
+    {
+      "text": "APPLES 1KG                    5.16",
+      "box": [40, 260, 528, 295],
+      "script": "latin"
+    },
+    {
+      "text": "CHEESE 200G                  11.40",
+      "box": [42, 296, 530, 331],
+      "script": "latin"
+    },
+    {
+      "text": "FLAT WHITE                    1.49",
+      "box": [44, 332, 531, 367],
+      "script": "latin"
+    },
+    {
+      "text": "RICE 1KG                      6.62",
+      "box": [45, 368, 532, 403],
+      "script": "latin"
+    },
+    {
+      "text": "CROISSANT                    11.48",
+      "box": [46, 404, 534, 439],
+      "script": "latin"
+    },
+    {
+      "text": "COFFEE BEANS 250G            11.20",
+      "box": [48, 440, 535, 475],
+      "script": "latin"
+    },
+    {
+      "text": "PLASTERS                     12.12",
+      "box": [49, 476, 536, 511],
+      "script": "latin"
+    },
+    {
+      "text": "TOOTHPASTE                    3.08",
+      "box": [49, 512, 538, 547],
+      "script": "latin"
+    },
+    {
+      "text": "SUBTOTAL                     66.76",
+      "box": [51, 548, 539, 583],
+      "script": "latin"
+    },
+    {
+      "text": "VAT 20%                      13.35",
+      "box": [52, 584, 540, 619],
+      "script": "latin"
+    },
+    {
+      "text": "TOTAL                        80.11",
+      "box": [53, 620, 542, 655],
+      "script": "latin"
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [55, 667, 227, 691],
+      "script": "latin"
+    },
+    {
+      "text": "THANK YOU",
+      "box": [234, 698, 363, 720],
+      "script": "latin"
+    }
+  ]
+}
