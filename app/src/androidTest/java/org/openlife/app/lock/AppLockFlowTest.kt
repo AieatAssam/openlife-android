@@ -73,7 +73,7 @@ class AppLockFlowTest {
         val id = saveSyntheticSource()
         val authenticator = ScriptedAuthenticator()
         app.appLock.setForTest(authenticator, AppLockPolicy(enabled = true))
-        val readsBefore = app.appLock.contentReads.get()
+        val readsBefore = app.appLock.contentReadsForTest.get()
         val intent = Intent(context, MainActivity::class.java)
             .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
             .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
@@ -83,12 +83,12 @@ class AppLockFlowTest {
             authenticator.awaitRequest()
             device.waitForIdle()
             assertFalse("list composed while locked", device.hasObject(By.desc("More options")))
-            assertEquals("bytes read while locked", readsBefore, app.appLock.contentReads.get())
+            assertEquals("bytes read while locked", readsBefore, app.appLock.contentReadsForTest.get())
 
             authenticator.complete(AuthOutcome.Succeeded)
 
             // The requested item opens after unlock, and only now are its bytes read.
-            awaitTrue("no content read after unlock") { app.appLock.contentReads.get() > readsBefore }
+            awaitTrue("no content read after unlock") { app.appLock.contentReadsForTest.get() > readsBefore }
             assertTrue(device.wait(Until.gone(By.text(LOCKED_TITLE)), WAIT_MS))
         }
     }

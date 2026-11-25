@@ -45,7 +45,10 @@ import org.openlife.app.ui.theme.OpenLifeTheme
  * content. It must offer Paste but not Copy or Cut, must not write the
  * clipboard through keyboard shortcuts or the accessibility Copy action, and
  * must ask the keyboard not to learn from what is typed. The test writes a
- * sentinel to the device clipboard and restores the previous clip afterwards.
+ * sentinel to the device clipboard and restores the previous clip afterwards
+ * when it could read one. If the read returns null (an empty clipboard, or
+ * one the test could not read) the sentinel is left in place: the test never
+ * clears a clipboard it could not read.
  */
 @RunWith(AndroidJUnit4::class)
 class ContentTextFieldTest {
@@ -59,17 +62,13 @@ class ContentTextFieldTest {
     private val device = UiDevice.getInstance(instrumentation)
     private val clipboard = instrumentation.targetContext.getSystemService(ClipboardManager::class.java)
 
-    /** The device clipboard as it was before this test; put back in [restoreClipboard]. */
+    /** The device clipboard as it was before this test, if it could be read; put back in [restoreClipboard]. */
     private var savedClip: ClipData? = null
-    private var clipSaved = false
 
     @After
     fun restoreClipboard() {
-        if (!clipSaved) return
-        instrumentation.runOnMainSync {
-            val saved = savedClip
-            if (saved != null) clipboard.setPrimaryClip(saved) else clipboard.clearPrimaryClip()
-        }
+        val saved = savedClip ?: return
+        instrumentation.runOnMainSync { clipboard.setPrimaryClip(saved) }
     }
 
     @Test
@@ -86,7 +85,6 @@ class ContentTextFieldTest {
         // Saved after the window has focus: from API 29 an unfocused app reads null.
         instrumentation.runOnMainSync {
             savedClip = clipboard.primaryClip
-            clipSaved = true
             clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", SENTINEL))
         }
 

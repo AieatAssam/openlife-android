@@ -53,7 +53,8 @@ are WCAG AA at minimum; text on paper is AAA.
 | Ink (on surface) | `#1B1A17` | `#EFE9DC` | body text, icons |
 | Ink muted | `#5B5750` | `#A8A297` | secondary text, timestamps |
 | Rule | `#D9D1C0` | `#2E2B23` | dividers, perforation dashes |
-| Vermilion (primary) | `#C8412B` | `#E0654F` | primary buttons, the icon background, "Delete" is NOT vermilion |
+| Vermilion (brand) | `#C8412B` | `#E0654F` | the icon background and surface tint; "Delete" is NOT vermilion |
+| Vermilion ink (primary role) | `#A83420` | `#EE7F6A` | primary buttons, text actions, focused labels, the Saved stamp (P1-19 review Q-03) |
 | Vermilion container | `#F9DDD6` | `#4A1F17` | primary container, selected chips |
 | Stamp green (confirmed) | `#2F6B4F` | `#7FC39B` | Confirmed / Verified badges only |
 | Highlighter (evidence) | `#FFE45C` | `#D9B93A` | evidence region outline and span highlight |
@@ -89,13 +90,18 @@ P1-19 amendments (audit A-04, A-08):
   only 4.39:1 on Surface, 4.06:1 on the dialog container and 3.57:1 on the
   dimmest paper step, which fails this brief's AA rule. The primary role
   therefore uses **Vermilion ink** `#A83420` in light (≥ 4.77:1 on every
-  paper surface and container) and **`#EE7F6A`** in dark (≥ 4.87:1 on every
-  carbon surface; `#E0654F` was 3.80:1 on the brightest carbon step).
+  paper surface role and on primaryContainer) and **`#EE7F6A`** in dark
+  (≥ 4.87:1 on every carbon surface role and on primaryContainer; `#E0654F`
+  was 3.80:1 on the brightest carbon step). Not claimed for the other
+  containers, where primary falls below 4.5:1: light secondaryContainer
+  4.35:1, dark tertiaryContainer 3.48:1, dark errorContainer 4.00:1, dark
+  attentionContainer 4.49:1. Those carry their own on-colours, and app code
+  must not draw on them directly (review U-03, `PaletteContrastTest`).
   inversePrimary swaps the two. This also deepens filled primary buttons and
   the Saved stamp; onPrimary on them stays ≥ 6.4:1. Brand Vermilion
   `#C8412B` is unchanged as the mark colour: the launcher icon background and
   the surface tint. `PaletteContrastTest` enforces ≥ 4.5:1 for primary on
-  every surface and container role, light and dark.
+  every surface role and primaryContainer, light and dark.
 
 ## 5. Typography (all OFL, bundled, licences in About)
 

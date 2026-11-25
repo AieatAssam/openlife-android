@@ -29,8 +29,9 @@ class AppLockController(private val context: Context, private val scope: Corouti
     private var authenticatorOverride: BiometricAuthenticator? = null
     val authenticator: BiometricAuthenticator get() = authenticatorOverride ?: realAuthenticator
 
-    /** Test seam: the number of item-content reads let through [awaitContentAccess]. */
-    val contentReads = AtomicInteger()
+    /** Test seam: the number of item-content reads let through [awaitContentAccess] (review U-02: not public). */
+    @VisibleForTesting
+    internal val contentReadsForTest = AtomicInteger()
 
     /** Called once from Application.onCreate: read the policy off the main thread and watch the process. */
     fun start() {
@@ -51,7 +52,7 @@ class AppLockController(private val context: Context, private val scope: Corouti
      */
     suspend fun awaitContentAccess() {
         status.first { it == LockStatus.UNLOCKED }
-        contentReads.incrementAndGet()
+        contentReadsForTest.incrementAndGet()
     }
 
     /** Settings and onboarding change the policy here; it is persisted off the main thread. */
