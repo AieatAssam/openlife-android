@@ -114,6 +114,27 @@ touching provenance rows.
   were measured on synthetic fixtures (`OcrEngineMeasurementTest`, opt-in) on
   dev36 API 36 locally; a run on the CI emulator is still a gap.
 
+## P2-04 evaluation gate (status 2026-11-25, no decision)
+
+- **What exists.**
+  - The evaluation set `eval/ocr/v1`: 40 synthetic fixtures.
+  - Its thresholds, in `eval/ocr/v1/gate.json`.
+  - A fail-closed gate evaluator.
+  - The instrumented harness `vault/.../ocr/eval/OcrEvaluationTest`. It is
+    opt-in and has not been run.
+- **No engine has been measured.** `./gradlew :eval:checkOcrGate` reports
+  NO_MEASUREMENT for both `tesseract-eng-fast` and `mlkit-latin`. The engine
+  switch (P2-05) and the RapidOCR fallback therefore stay undecided until a
+  physical-device run produces results. See `docs/verification/ocr-eval.md`.
+- **R7 fixtures.** The fixtures this ADR's remaining gap refers to now exist.
+  The measurements themselves are still a gap.
+- **V-15 / VS-3 (P2-04-R5).**
+  - On ground truth, one stray Cyrillic word or glyph makes whole-revision
+    abstention drop 14 to 18 Latin lines per mixed fixture. The per-span
+    policy drops none.
+  - No addendum is opened, and whole-revision abstention stays in place,
+    until the per-engine figures exist.
+
 ## Consequences
 
 - **APK size.** The release APK grew from about 33 MB to 52.5 MB. Native
