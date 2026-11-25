@@ -66,6 +66,27 @@ class ContentKindLabelTest {
         assertNull(ContentKindLabel.selected(source(UserContentKind.UNRECOGNISED, 5)))
     }
 
+    /** Review T-06: another build's label is named as such, not shown as this build's answer. */
+    @Test
+    fun onlyAnUnreadableKindIsRecordedByAnotherVersionAndAnyAnswerReplacesIt() {
+        val foreign = source(UserContentKind.UNRECOGNISED, 5)
+        assertTrue(ContentKindLabel.recordedByAnotherVersion(foreign))
+        assertEquals(ContentKindChoice.NOT_SURE, ContentKindLabel.change(foreign, ContentKindChoice.NOT_SURE))
+        assertFalse(ContentKindLabel.recordedByAnotherVersion(source(null, null)))
+        assertFalse(ContentKindLabel.recordedByAnotherVersion(source(null, 5)))
+        assertFalse(ContentKindLabel.recordedByAnotherVersion(source(UserContentKind.COMMUNICATION, 5)))
+        assertTrue(strings.contains("name=\"viewer_content_kind_other_version\""))
+    }
+
+    /** Review T-01: the label write is READY-only, so only a READY source is asked. */
+    @Test
+    fun onlyAReadySourceIsAskedTheQuestion() {
+        assertTrue(ContentKindLabel.showQuestion(source(null, null)))
+        for (state in SourceState.entries - SourceState.READY) {
+            assertFalse(state.name, ContentKindLabel.showQuestion(source(null, null).copy(state = state)))
+        }
+    }
+
     @Test
     fun notAssessedIsShownAsNotAssessedInThisVersion() {
         assertEquals(

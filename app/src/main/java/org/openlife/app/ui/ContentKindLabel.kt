@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import org.openlife.app.R
 import org.openlife.vault.model.AssessmentState
 import org.openlife.vault.model.Source
+import org.openlife.vault.model.SourceState
 import org.openlife.vault.model.UserContentKind
 
 /** The three answers to "Is this a message or request from someone?" (P2-07-R3). */
@@ -18,6 +19,20 @@ enum class ContentKindChoice(
 
 /** P2-07 viewer rules, kept out of Compose so they run on the JVM. */
 object ContentKindLabel {
+    /**
+     * Review T-01: the question is asked only of a saved (READY) source; the
+     * label write is a READY-only compare-and-set, so offering it for a
+     * CORRUPT or DELETING item would let a tap do nothing.
+     */
+    fun showQuestion(source: Source): Boolean = source.state == SourceState.READY
+
+    /**
+     * Review T-06: the stored label is one this build cannot read (written by
+     * another version). The viewer says so instead of presenting it as this
+     * build's answer; choosing an answer here replaces it.
+     */
+    fun recordedByAnotherVersion(source: Source): Boolean = source.userContentKind == UserContentKind.UNRECOGNISED
+
     /**
      * The answer the user gave, or null when they never answered. "Not sure"
      * stores no kind, so the USER timestamp is what tells it apart from

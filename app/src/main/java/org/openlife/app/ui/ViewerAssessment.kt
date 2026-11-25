@@ -1,5 +1,7 @@
 package org.openlife.app.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.UserContentKind
 
@@ -29,16 +32,28 @@ import org.openlife.vault.model.UserContentKind
  */
 @Composable
 internal fun AssessmentNotice(source: Source) {
-    Text(
-        stringResource(ContentKindLabel.assessmentText(source.assessmentState)),
-        modifier = Modifier.padding(top = 8.dp).testTag("viewer_assessment_state"),
-        style = MaterialTheme.typography.bodyLarge,
-    )
-    Text(
-        stringResource(R.string.viewer_assessment_explanation),
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(top = 4.dp),
-    )
+    // Review T-04: amber marks "not assessed" (VISUAL_IDENTITY §4) as a
+    // 1.5 dp border (>= 3:1 on the card in both themes, PaletteContrastTest).
+    // Light amber is under 4.5:1 for text, so the words keep the ink colour;
+    // the colour only accompanies them, it never carries the meaning alone.
+    Column(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .fillMaxWidth()
+            .border(BorderStroke(1.5.dp, LocalOpenLifeBrandColors.current.attention), MaterialTheme.shapes.small)
+            .padding(12.dp),
+    ) {
+        Text(
+            stringResource(ContentKindLabel.assessmentText(source.assessmentState)),
+            modifier = Modifier.testTag("viewer_assessment_state"),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            stringResource(R.string.viewer_assessment_explanation),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 /**
@@ -73,7 +88,14 @@ internal fun ContentKindQuestion(source: Source, onSetUserContentKind: (UserCont
             }
         }
     }
-    source.userContentKindAt?.let { answeredAt ->
+    val answeredAt = source.userContentKindAt
+    if (ContentKindLabel.recordedByAnotherVersion(source)) {
+        Text(
+            stringResource(R.string.viewer_content_kind_other_version),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.testTag("viewer_content_kind_other_version"),
+        )
+    } else if (answeredAt != null) {
         val time = dateTime(answeredAt)
         Text(
             withDataSpan(stringResource(R.string.viewer_content_kind_answered, time), time),

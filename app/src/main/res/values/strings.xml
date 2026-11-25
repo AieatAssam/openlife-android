@@ -142,6 +142,7 @@
     <string name="viewer_content_kind_not_sure">Not sure</string>
     <string name="viewer_content_kind_routing">Your answer tells OpenLife how to handle this item later. It is routing context, not proof of safety.</string>
     <string name="viewer_content_kind_answered">Answered by you: %1$s</string>
+    <string name="viewer_content_kind_other_version">Your answer was recorded by another version of OpenLife. This version cannot show it. Choosing an answer here replaces it.</string>
     <string name="source_imported">Imported %1$s</string>
 
     <string name="ocr_failure_source_not_ready">the saved image is not ready</string>

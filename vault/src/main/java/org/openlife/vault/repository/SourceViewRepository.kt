@@ -1,5 +1,7 @@
 package org.openlife.vault.repository
 
+import android.database.sqlite.SQLiteException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -10,6 +12,7 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.compareAndSetState
@@ -44,13 +47,14 @@ class SourceViewRepository(
      * P2-07-R3: records the user's answer to "Is this a message or request
      * from someone?" with the time ([clock]) they gave it. [kind] null is
      * "Not sure", still attributed by its timestamp. Returns false when the
-     * source is not READY (compare-and-set). The assessment state is never
-     * touched: a user label is routing context, not proof of safety (design §6).
+     * source is not READY (compare-and-set) or the write fails (see
+     * [writeUserContentKind]). The assessment state is never touched: a user
+     * label is routing context, not proof of safety (design §6).
      */
     suspend fun setUserContentKind(sourceId: UUID, kind: UserContentKind?): Boolean = withContext(ioDispatcher) {
         check(kind != UserContentKind.UNRECOGNISED) { "an unrecognised content kind is never written" }
         mutationQueue.withMutation {
-            database.sourceDao().setUserContentKind(sourceId.toString(), kind?.name, clock()) == 1
+            database.sourceDao().writeUserContentKind(sourceId, kind, clock())
         }
     }
 
@@ -98,3 +102,23 @@ class SourceViewRepository(
     suspend fun loadReadyBytes(sourceId: UUID): ByteArray? =
         (readReadyBytes(sourceId) as? ReadyReadResult.Loaded)?.bytes
 }
+
+/**
+ * P2-07 review T-03: the label write as one compare-and-set. A database
+ * error (for example a write queued behind a vault reset that closed the
+ * database) is reported as "not saved" (false), never thrown into the UI;
+ * the viewer keeps showing what is stored. Cancellation is rethrown. The
+ * label and the identifier are never logged.
+ */
+internal suspend fun SourceDao.writeUserContentKind(sourceId: UUID, kind: UserContentKind?, at: Long): Boolean =
+    try {
+        setUserContentKind(sourceId.toString(), kind?.name, at) == 1
+    } catch (cancelled: CancellationException) {
+        // A CancellationException is an IllegalStateException; it is never "not saved".
+        throw cancelled
+    } catch (_: SQLiteException) {
+        false
+    } catch (_: IllegalStateException) {
+        // Room and SQLCipher report a closed database or connection pool this way.
+        false
+    }

@@ -307,7 +307,7 @@ private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKi
             // P2-07: communication safety context; no assessment runs in this version.
             PerforationDivider(modifier = Modifier.padding(top = 12.dp))
             AssessmentNotice(source)
-            ContentKindQuestion(source, onSetUserContentKind)
+            if (ContentKindLabel.showQuestion(source)) ContentKindQuestion(source, onSetUserContentKind)
         }
     }
 }
