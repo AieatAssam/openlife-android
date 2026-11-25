@@ -71,6 +71,7 @@ fun ViewerScreen(
     onRejectSpan: (OcrSpan) -> Unit = {},
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
     onSetUserContentKind: (UserContentKind?) -> Unit = {},
+    initialSelectedSpanId: java.util.UUID? = null,
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)

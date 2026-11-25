@@ -29,6 +29,8 @@ abstract class OpenLifeDatabase : RoomDatabase() {
 
     abstract fun ocrSpanReviewDao(): OcrSpanReviewDao
 
+    abstract fun searchDao(): SearchDao
+
     companion object {
         /**
          * Room 2.8.x has no declarative way to express "every validated
@@ -50,6 +52,11 @@ abstract class OpenLifeDatabase : RoomDatabase() {
         /** Every migration, in order; never destructive (design §10). */
         val MIGRATIONS: List<androidx.room.migration.Migration> by lazy {
             listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        }
+
+        /** P2-08 (ADR-0010): the FTS5 search index. */
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase): Unit = TODO("P2-08 RED")
         }
 
         /**
