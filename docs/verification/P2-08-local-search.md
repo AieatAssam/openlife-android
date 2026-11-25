@@ -46,10 +46,15 @@ three things:
 
 The engine is SQLite, not SQLCipher; the index SQL is the same.
 
-Host latency, printed by `fiveHundredSpansOnTheHostEngine`, was 16 ms in
-the GREEN run and 43 ms in the final VERIFY run, each for 500 spans with
-50 hits (limit 50). These are host VM figures, not device figures. The
-test asserts only that the time is under 1000 ms.
+Host latency for 500 spans with 50 hits (limit 50):
+
+- FTS5 (`fiveHundredSpansOnTheHostEngine`): 16 ms in the GREEN run,
+  43 ms in the 52ed89a run, and 25 ms in the final run.
+- LIKE fallback with no index (`fiveHundredSpansOnTheLikeFallback`, R5):
+  25 ms in the final run.
+
+These are host VM figures, not device figures. Each test asserts only that
+its time is under 1000 ms.
 
 ## Schema JSON diff (4.json -> 5.json)
 
@@ -92,18 +97,24 @@ Result: `SearchIndexBoundaryTest`, 3 tests completed, 3 failed.
 
 ## VERIFY
 
-Commits: GREEN aff869b, REFACTOR 52ed89a. The VERIFY run was on 52ed89a,
-on this VM, on 2026-11-25:
+Commits:
+- GREEN aff869b;
+- REFACTOR 52ed89a;
+- review fixes 82d3d88. These show the search icon on an empty list too,
+  pass `validateDroppedTables = false` in the v5 migration validations,
+  and time the LIKE fallback.
+
+The final VERIFY run was on 82d3d88, on this VM, on 2026-11-25:
 
 ```
 ./gradlew :app:cleanTestDebugUnitTest :vault:cleanTestDebugUnitTest detekt lint \
   :app:test :vault:test assembleDebug \
   :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin --continue
-=> BUILD SUCCESSFUL in 5m 1s
+=> BUILD SUCCESSFUL in 5m 22s
 ```
 
-- vault JVM: 176/176 passed, 0 failed, 0 skipped. This includes:
-  - `SearchIndexHostTest` 10/10;
+- vault JVM: 177/177 passed, 0 failed, 0 skipped. This includes:
+  - `SearchIndexHostTest` 11/11;
   - `SearchQueryTest` 6/6;
   - `SearchSnippetTest` 6/6;
   - `SchemaV5MigrationTest` 5/5;
@@ -115,6 +126,10 @@ on this VM, on 2026-11-25:
   passes with no new exemption (R9).
 - `scripts/plan-check.sh`: steps=82, errors=0.
 - `bash scripts/tests/run.sh`: 47 passed, 0 failed.
+  - An intermediate run went 46/1. "done-evidence diagnostic names key"
+    failed because escaped double quotes in the P2-08 plan entry broke the
+    test's `sed 's/, evidence: "[^"]*"//'`.
+  - The entry now uses single quotes, and the re-run passed.
 
 Connected tests: none were run, by owner instruction. There was no CI
 run, because nothing was pushed.
