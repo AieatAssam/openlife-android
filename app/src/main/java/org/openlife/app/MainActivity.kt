@@ -33,12 +33,14 @@ import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.LockStatus
 import org.openlife.app.navigation.OpenLifeNavHost
 import org.openlife.app.navigation.Routes
+import org.openlife.app.navigation.SearchHostState
 import org.openlife.app.settings.AppLockSettings
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.OcrViewModel
 import org.openlife.app.ui.SourceListViewModel
 import org.openlife.app.ui.applySecureWindow
+import org.openlife.app.ui.search.SearchViewModel
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.repository.ReadyReadResult
 import java.util.UUID
@@ -51,6 +53,9 @@ class MainActivity : FragmentActivity() {
     }
     private val ocrViewModel: OcrViewModel by viewModels {
         OcrViewModel.factory(application as OpenLifeApp)
+    }
+    private val searchViewModel: SearchViewModel by viewModels {
+        SearchViewModel.factory(application as OpenLifeApp)
     }
     private val backgroundEpoch = MutableStateFlow(0L)
     private val openSourceRequests = MutableStateFlow<UUID?>(null)
@@ -73,6 +78,8 @@ class MainActivity : FragmentActivity() {
         viewModel.clearSensitiveContent()
         // P2-01-R4: no OCR text stays in memory while hidden; the database is the record.
         ocrViewModel.clearTransient()
+        // P2-08-R7: the search field and its results are cleared while hidden.
+        searchViewModel.clear()
         backgroundEpoch.value += 1
         super.onStop()
     }
@@ -166,6 +173,8 @@ class MainActivity : FragmentActivity() {
         val thumbnailGeneration by viewModel.sensitiveContentGeneration.collectAsState()
         val listState by viewModel.state.collectAsState()
         val lockPolicy by app.appLock.policy.collectAsState()
+        val searchQuery by searchViewModel.query.collectAsState()
+        val searchState by searchViewModel.state.collectAsState()
 
         LaunchedEffect(requestedSourceId) {
             requestedSourceId?.let {
@@ -205,6 +214,7 @@ class MainActivity : FragmentActivity() {
             setUserContentKind = viewModel::setUserContentKind,
             onImportFromPhotoPicker = rememberPhotoPickerLauncher(),
             navController = navController,
+            search = SearchHostState(searchQuery, searchState, searchViewModel::onQueryChange),
             onRetryVault = viewModel::retryVault,
             onFinishReset = viewModel::finishVaultReset,
             onResetVault = { app.resetVault() },

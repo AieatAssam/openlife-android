@@ -71,11 +71,13 @@ fun ViewerScreen(
     onRejectSpan: (OcrSpan) -> Unit = {},
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
     onSetUserContentKind: (UserContentKind?) -> Unit = {},
+    // P2-08-R4: a search result opens the viewer with its span selected. Selection
+    // rules still apply: a span that is ungrounded or rejected is not selected.
     initialSelectedSpanId: java.util.UUID? = null,
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
-    var selectedSpanId by remember(source.id) { mutableStateOf<java.util.UUID?>(null) }
+    var selectedSpanId by remember(source.id) { mutableStateOf(initialSelectedSpanId) }
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }
     var correctionText by remember(source.id) { mutableStateOf("") }
     var confirmingDelete by remember(source.id) { mutableStateOf(false) }

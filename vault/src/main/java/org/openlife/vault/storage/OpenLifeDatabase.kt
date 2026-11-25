@@ -6,7 +6,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Schema v3 adds per-span review metadata; v4 adds the communication
- * assessment state and the user's content-kind label to `sources`. Fact,
+ * assessment state and the user's content-kind label to `sources`; v5 adds
+ * the FTS5 search index (virtual tables and triggers, not entities; ADR-0010). Fact,
  * Record, and Action remain absent — later capabilities add their own
  * migrations.
  */
@@ -18,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         OcrUserRevisionEntity::class,
         OcrSpanReviewEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class OpenLifeDatabase : RoomDatabase() {
@@ -46,17 +47,29 @@ abstract class OpenLifeDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 ReadyInvariantTriggers.create(db)
+                // P2-08: a fresh database gets the same search index a migrated one has.
+                SearchIndex.create(db)
             }
         }
 
         /** Every migration, in order; never destructive (design §10). */
         val MIGRATIONS: List<androidx.room.migration.Migration> by lazy {
-            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         }
 
-        /** P2-08 (ADR-0010): the FTS5 search index. */
+        /**
+         * P2-08-R2 (ADR-0010): the FTS5 search index over span text and
+         * corrections, with its triggers, and the existing rows indexed.
+         * Additive only; no Room entity changes, so v5's exported schema
+         * equals v4's apart from the version (SchemaV5MigrationTest).
+         */
         val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
-            override fun migrate(db: SupportSQLiteDatabase): Unit = TODO("P2-08 RED")
+            override fun migrate(db: SupportSQLiteDatabase) {
+                SearchIndex.create(db)
+                // P1-18-R12: every migration ends by re-asserting the READY
+                // invariant triggers on `sources`.
+                ReadyInvariantTriggers.create(db)
+            }
         }
 
         /**

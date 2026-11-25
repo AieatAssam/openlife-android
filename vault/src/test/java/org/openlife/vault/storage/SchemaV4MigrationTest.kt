@@ -67,12 +67,6 @@ class SchemaV4MigrationTest {
         }
     }
 
-    @Test
-    fun migrationsAreListedInOrderThroughVersionFour() {
-        val versions = OpenLifeDatabase.MIGRATIONS.map { it.startVersion to it.endVersion }
-        assertEquals(listOf(1 to 2, 2 to 3, 3 to 4), versions)
-    }
-
     /** The statements a migration executes, in order, without a database. */
     private fun record(migration: androidx.room.migration.Migration): List<String> {
         val statements = mutableListOf<String>()

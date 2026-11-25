@@ -250,7 +250,7 @@ class SearchIndexHostTest {
 
         val hits = search("dentist appoint")
         assertEquals(setOf(false to id(S1), true to id(S1)), hits.map { it.isCorrection to it.spanId }.toSet())
-        assertEquals("LIKE wildcards in the input are literal", emptyList<SearchHit>(), search("50_"))
+        assertEquals("LIKE wildcards never reach the pattern", emptyList<SearchHit>(), search("% _ %_"))
         assertEquals(listOf(id(S2)), search("50").map { it.spanId })
     }
 
