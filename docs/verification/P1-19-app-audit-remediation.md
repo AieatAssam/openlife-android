@@ -30,15 +30,31 @@ against a **debug build on a device with no real OpenLife data**:
 
 - It resets and deletes vault content, and writes the app-lock policy
   (`AppLockFlowTest`, `SettingsRotationTest`, the intake and OCR flow tests).
+- The debug build's applicationId is `org.openlife`, with no suffix. Installing
+  it replaces any OpenLife install on the device, so the device must hold no
+  OpenLife install with real data.
 - `ContentTextFieldTest` writes a sentinel to the device clipboard. It saves
   the previous clip once the test window has focus and restores it afterwards
-  (or clears the clipboard if it was empty).
+  when that read succeeded. If the read returned null (empty, or unreadable)
+  the sentinel is left and the clipboard is never cleared.
 - `AppLockFlowTest.deviceCredentialUnlockOnApi29KeepsThePendingShare` sets and
   then clears a device PIN. It runs only on an emulator (`ro.kernel.qemu` or
   `ro.boot.qemu` = 1, or `Build.HARDWARE` ranchu/goldfish) **and** only when
   `-Pandroid.testInstrumentationRunnerArguments.allowDevicePinChange=true` is
   passed. On a physical device it is always skipped and never touches the
   screen lock.
+
+On-device checks still owed (reviewer's list, second round):
+
+1. `ContentTextFieldTest`, plus a manual long-press on the correction field
+   with a Translate (ACTION_PROCESS_TEXT) app installed, and a right-click
+   with a mouse: only Paste and Select all may appear.
+2. `adb shell dumpsys autofill` while the correction field is focused. This
+   is read-only; do not change the device's autofill service. Expected: no
+   OpenLife session, or none carrying the field's value.
+3. Photo Picker round trip with the lock timeout at 0: return in under 60 s
+   (no lock), over 60 s (locked), and an immediate Back from the picker.
+4. Rotate the device while the biometric prompt is open.
 
 ## Status key
 
@@ -144,8 +160,9 @@ Brand Vermilion `#C8412B` measured 4.39:1 on Paper, 4.06:1 on PaperHigh (the dia
 
 Material draws `primary` as text in many places, so the role now uses new tokens:
 
-- **`VermilionInk` `#A83420` (light).** At least 4.77:1 on every paper surface and container, 5.14:1 on primaryContainer, and RaisedPaper on it is 6.45:1.
-- **`DarkVermilionInk` `#EE7F6A` (dark).** At least 4.87:1 on every carbon surface, and onPrimary on it is 6.92:1.
+- **`VermilionInk` `#A83420` (light).** At least 4.77:1 on every paper surface role, 5.14:1 on primaryContainer, and RaisedPaper on it is 6.45:1.
+- **`DarkVermilionInk` `#EE7F6A` (dark).** At least 4.87:1 on every carbon surface role and 5.25:1 on primaryContainer, and onPrimary on it is 6.92:1.
+- **Not claimed (review U-03):** light secondaryContainer 4.35:1, dark tertiaryContainer 3.48:1, dark errorContainer 4.00:1, dark attentionContainer 4.49:1. App code does not draw on those containers; `PaletteContrastTest.otherContainersAreUsedOnlyThroughTheTheme` is the tripwire.
 
 inversePrimary swaps between the two: 6.53:1 light and 5.46:1 dark. Brand Vermilion stays for the launcher icon and the surface tint. VISUAL_IDENTITY §4 is amended with the reason. JVM: `PaletteContrastTest.primaryTextReachesAaOnEverySurfaceItCanSitOn` covers light and dark, 11 surface or container roles each, plus inverse and onPrimary. It also has a self-check that brand Vermilion fails on the dialog container. The values were computed with the WCAG formula in python3; the test itself has not run.
 
@@ -170,6 +187,97 @@ inversePrimary swaps between the two: 6.53:1 light and 5.46:1 dark. Brand Vermil
 - **`OcrPersistenceFlowTest`.** It creates its OcrViewModels through `ViewModelStore` + `ViewModelProvider` and clears them in `@After`.
 - **`NavigationBackTest.deleteFromViewerKeepsListOnTheBackStack`.** The fixed 3 s sleep is replaced by a `CompletableDeferred` gate. The test releases the gate after the flow-driven pop, then `runOnMainSync {}` and `waitForIdleSync()`.
 
+## Second review round (U-01..U-04)
+
+### U-01: autofill exported field text
+
+Read with `javap -c -p` from Compose ui 1.12.0 (the pinned version) and
+1.12.1 (the version a transitive dependency may resolve), foundation 1.12.1:
+
+| Fact | Where (class) |
+| --- | --- |
+| `getImportantForAutofill()` returns 1 (YES) unconditionally, so the flag cannot be cleared on the Compose view itself. | `ui.platform.AndroidComposeView` |
+| The constructor calls `view.setImportantForAutofill(1)`; it exists when `autofillSupported()` (SDK ≥ 26). | `ui.autofill.AndroidAutofillManager` |
+| `onFocusChanged` calls `notifyViewEntered`/`notifyViewExited` only when `isAutofillable(config)`; `notifyAutofillManager` sends `notifyValueChanged` with the text only when the content data type is Text. | `AndroidAutofillManager` |
+| `isAutofillable` is false when `ContentDataType` is `None`. `isRelatedToAutofill` decides which nodes enter the structure. | `AndroidAutofillManager_androidKt` |
+| `populate` writes `setAutofillValue(text)` from EditableText regardless of data type, and calls `setDataIsSensitive(true)` when `IsSensitiveData` is true. | `PopulateViewStructure_androidKt` |
+| Semantics are merged tail to head over the node chain, so an outer (head) modifier overrides the core field's own `contentDataType = Text`. | `node.LayoutNode` (`calculateSemanticsConfiguration`) |
+| `CoreTextField` puts the caller's modifier at the head of the root box's chain. | foundation `text.CoreTextFieldKt` |
+| A Compose `Dialog` is its own window with its own `AndroidComposeView` (`DialogLayout` via `setContentView`); `Popup` adds a view through WindowManager. | `ui.window.DialogWrapper`, `ui.window.PopupLayout` |
+
+Change (one helper, `ui/SecureWindow.kt`):
+
+- `applySecureWindow()` (every Activity) now also calls
+  `excludeWindowFromAutofill(window.decorView)`, which sets the window root to
+  `IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS`. By the platform contract
+  (`View.isImportantForAutofill()`), every view below it is then not important.
+- `ContentTextField` applies the same helper to its own window
+  (`LocalView.current`), which covers the correction dialog, and puts
+  `contentDataType = ContentDataType.None` and `isSensitiveData = true` at the
+  head of its modifier.
+- Popups: none hosts a content field (only menus with fixed labels), so they
+  are not covered and hold no content.
+
+Status: **implemented; unverified (gap — pending physical-device run).**
+JVM tripwire: `SecureWindowTest.everyActivityExcludesItsWindowFromAutofill`.
+Instrumented (compiles on CI, not run): `AutofillExclusionTest`. Read-only
+device check: `adb shell dumpsys autofill` while the field is focused.
+
+Not covered: an autofill service that requests views not important for
+autofill (`FLAG_INCLUDE_NOT_IMPORTANT_VIEWS`) and any platform handling not
+read here. The IME residual is wider than "what is typed": the keyboard can
+read the whole prefilled text through the InputConnection.
+
+### U-02: boundary tests
+
+All three scans now say in their KDoc that they are tripwires, not proofs,
+and each new pattern has a self-check sample.
+
+- `SourceEgressBoundaryTest.everyNewEgressPatternIsReported`: AndroidView
+  `EditText`/`TextView` and `setTextIsSelectable`, `SelectionContainer`,
+  backticked composable names and references, `import android.util.*` and
+  `Log`, `println`, `printStackTrace`, `System.out/err`, `Intent.ACTION_SEND`,
+  the `"android.intent.action.SEND"` literal, `ShareCompat`, `CreateDocument`
+  and `createChooser`.
+- `ButtonShapeSourceTest`: floating action buttons are filled-container
+  buttons, so they take the 8 dp shape (VISUAL_IDENTITY §6). The list FAB now
+  uses `OpenLifeExtendedFloatingActionButton`. Icon buttons are excluded: they
+  draw no container, only a circular state layer. This changes the list
+  screen's FAB corner from 16 dp to 8 dp; its golden was already stale and is
+  not hand-edited.
+- `TestSeamVisibilityTest`: extension and generic `...ForTest` functions are
+  matched, and `@VisibleForTesting` must be on that declaration (in the
+  annotation lines directly above, or inline). `AppLockController.contentReads`
+  became `@VisibleForTesting internal val contentReadsForTest`.
+- Python replication of every new regex over app/src/main and vault/src/main:
+  no violations.
+
+### U-03: primary contrast claim
+
+Constrained to the surface roles and primaryContainer (computed: light
+5.14:1, dark 5.25:1). Not claimed: light secondaryContainer 4.35:1, dark
+tertiaryContainer 3.48:1, dark errorContainer 4.00:1, dark attentionContainer
+4.49:1. `PaletteContrastTest.otherContainersAreUsedOnlyThroughTheTheme`
+fails if app code outside `ui/theme` names those containers.
+`everyBriefPairMeetsWcagAa` now checks onPrimary on the ink tokens that back
+the primary role (`VermilionInk`, `DarkVermilionInk`). The VISUAL_IDENTITY
+table row no longer says primary buttons are `#C8412B`.
+
+### U-04: accessibility Cut
+
+Kept and documented. Semantics can override the `CutText` action, but the
+core field adds it only while text is selected, and an override would add a
+permanent no-op Cut action that TalkBack announces even with no selection.
+Nothing reaches the clipboard; the selected text is removed from the field.
+
+### Optional: `endExternalActivity()` in `onResume`
+
+Not done. The biometric and device-credential unlock (LockScreen) begins an
+external trip, and on API 29 the credential screen can pause and resume the
+activity during it. Ending the trip on resume could relock behind the user
+mid-PIN, and that cannot be checked without a device. The ~700 ms residual
+from Q-02 stands.
+
 ## Existing tests changed
 
 | Test | Reason |
@@ -184,6 +292,11 @@ inversePrimary swaps between the two: 6.53:1 light and 5.46:1 dark. Brand Vermil
 | `ContentTextFieldTest.correctionFieldOffersNoCopyOrCut` | Renamed and strengthened (Q-08): Paste positive control, accessibility CopyText, clipboard save/restore. |
 | `SourceEgressBoundaryTest.everyContentTextFieldUsesTheSafeWrapper`, `ButtonShapeSourceTest`, `TestSeamVisibilityTest` | Strengthened only (Q-06/Q-07). |
 | `NavigationBackTest.deleteFromViewerKeepsListOnTheBackStack`, `OcrPersistenceFlowTest` | Q-08 hygiene; same assertions. |
+| `ContentTextFieldTest` | U round: restores the clipboard only when the initial read succeeded; never clears it. |
+| `SecureWindowTest` | Added `everyActivityExcludesItsWindowFromAutofill` (U-01). |
+| `SourceEgressBoundaryTest`, `ButtonShapeSourceTest`, `TestSeamVisibilityTest` | Strengthened only (U-02). |
+| `PaletteContrastTest.everyBriefPairMeetsWcagAa` | U-03: onPrimary is checked on `VermilionInk`/`DarkVermilionInk` (the primary role) instead of the brand Vermilion tokens. Added `otherContainersAreUsedOnlyThroughTheTheme`. |
+| `AppLockFlowTest` | Reads `contentReadsForTest` (renamed seam, U-02); same assertions. |
 
 ## Commands run (real output)
 
@@ -196,3 +309,4 @@ inversePrimary swaps between the two: 6.53:1 light and 5.46:1 dark. Brand Vermil
 | 42c1d55 tree | `bash scripts/tests/run.sh` | 47 passed, 0 failed |
 | none | `connectedDebugAndroidTest` (any module) | **Not run**: no device, by owner instruction. |
 | review round | Gradle (any task) | **Not run** locally (coordinator instruction: the host carries one build). Hosted CI verifies after push. |
+| second review round | Gradle (any task) | **Not run** locally (same instruction). Hosted CI verifies after push. |

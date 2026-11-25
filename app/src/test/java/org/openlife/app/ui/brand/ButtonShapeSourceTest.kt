@@ -13,6 +13,11 @@ import java.util.stream.Collectors
  * shape. Bare, fully qualified and referenced calls and aliased imports are
  * all caught. The instrumented ButtonShapeTest checks the drawn corner on a
  * device.
+ *
+ * Review U-02: floating action buttons are filled-container buttons, so they
+ * are in scope (VISUAL_IDENTITY §6: 8 dp on buttons). Icon buttons are not:
+ * they draw no container, only a circular state layer. This scan is a
+ * tripwire over source lines, not a proof.
  */
 class ButtonShapeSourceTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
@@ -46,11 +51,16 @@ class ButtonShapeSourceTest {
             "    androidx.compose.material3.TextButton(onClick = {}) { Text(label) }",
             "import androidx.compose.material3.OutlinedButton as PlainOutlinedButton",
             "    val button = ::FilledTonalButton",
+            "    `Button`(onClick = {}) { Text(label) }",
+            "    ExtendedFloatingActionButton(onClick = {}) { Text(label) }",
+            "    FloatingActionButton(onClick = {}) { Icon(icon, null) }",
         ).forEach { line -> assertTrue("\"$line\" must be reported", isBareButtonUse(line)) }
         listOf(
             "import androidx.compose.material3.Button",
             "    OpenLifeButton(onClick = {}) { Text(label) }",
             "    OpenLifeTextButton(onClick = {}) { Text(label) }",
+            "    OpenLifeExtendedFloatingActionButton(onClick = {}, containerColor = c, contentColor = d) {}",
+            "    IconButton(onClick = onBack) { Icon(icon, null) }",
             "    colors = ButtonDefaults.textButtonColors()",
         ).forEach { line -> assertFalse("\"$line\" must not be reported", isBareButtonUse(line)) }
     }
@@ -63,10 +73,11 @@ class ButtonShapeSourceTest {
     }
 
     private companion object {
-        const val BUTTON_NAMES = "Button|OutlinedButton|TextButton|FilledTonalButton|ElevatedButton"
-        val BARE_BUTTON = Regex("""(?<![A-Za-z0-9_.])($BUTTON_NAMES)\s*\(""")
+        const val BUTTON_NAMES = "Button|OutlinedButton|TextButton|FilledTonalButton|ElevatedButton|" +
+            "FloatingActionButton|ExtendedFloatingActionButton|SmallFloatingActionButton|LargeFloatingActionButton"
+        val BARE_BUTTON = Regex("""(?<![A-Za-z0-9_.])($BUTTON_NAMES)`?\s*\(""")
         val QUALIFIED_BUTTON = Regex("""\bandroidx\.compose\.material3?\.($BUTTON_NAMES)\s*\(""")
-        val BUTTON_REFERENCE = Regex("""::($BUTTON_NAMES)\b""")
+        val BUTTON_REFERENCE = Regex("""::`?($BUTTON_NAMES)\b""")
         val ALIASED_BUTTON_IMPORT = Regex("""^\s*import\s+[\w.]+\.($BUTTON_NAMES)\s+as\s+\w+""")
     }
 }

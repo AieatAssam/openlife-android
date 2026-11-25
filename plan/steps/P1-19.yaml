@@ -179,3 +179,12 @@ notes: >
   (commit 190be81). A-05, A-09 and AS-1..AS-6 belong to P1-20. The dialog
   golden is added here (R10) because it is the RED proof for A-04; P1-20
   keeps it green across the navigation rebuild.
+  Second review round (U-01..U-04), 2026-11-25: autofill exclusion for every
+  activity window and the content dialog window plus field-level
+  ContentDataType.None and sensitive data (implemented; unverified, gap -
+  pending physical-device run: AutofillExclusionTest and a read-only
+  `adb shell dumpsys autofill`); boundary tests extended (U-02); primary
+  contrast claim constrained with a container tripwire (U-03); accessibility
+  Cut kept and documented (U-04); endExternalActivity in onResume not done
+  (could relock during device-credential entry). No Gradle run locally;
+  hosted CI verifies. Details in docs/verification/P1-19-app-audit-remediation.md.

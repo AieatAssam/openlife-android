@@ -11,9 +11,11 @@ import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMe
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentDataType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
@@ -24,7 +26,11 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
+import androidx.compose.ui.semantics.contentDataType
+import androidx.compose.ui.semantics.isSensitiveData
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 
 /**
@@ -47,6 +53,17 @@ import androidx.compose.ui.text.input.KeyboardType
  *   copy.
  * - Autocorrect is off and the keyboard is asked not to learn from what is
  *   typed (IME_FLAG_NO_PERSONALIZED_LEARNING).
+ * - Autofill (review U-01, ui 1.12.0/1.12.1): foundation marks every text
+ *   field `contentDataType = Text`, so AndroidAutofillManager would call
+ *   notifyViewEntered on focus and notifyValueChanged with the text on every
+ *   edit, and PopulateViewStructure would put the text in the structure.
+ *   This field's outer semantics set `contentDataType = None` (the
+ *   manager's isAutofillable is false for None, and value changes are sent
+ *   only for Text) and `isSensitiveData = true` (setDataIsSensitive, so the
+ *   value is stripped from fill requests). The outer modifier wins because a
+ *   layout node applies its semantics modifiers tail to head. The field also
+ *   marks its own window, which is a separate dialog window in the viewer,
+ *   not important for autofill ([excludeWindowFromAutofill]).
  * Smart selection, which sends selected text to the system TextClassifier,
  * is switched off app-wide in OpenLifeApp.
  */
@@ -61,6 +78,11 @@ fun ContentTextField(
     minLines: Int = 1,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
 ) {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        excludeWindowFromAutofill(view)
+        onDispose {}
+    }
     val platformClipboard = LocalClipboard.current
     val clipboard = remember(platformClipboard) { ReadOnlyClipboard(platformClipboard) }
     CompositionLocalProvider(LocalClipboard provides clipboard) {
@@ -70,7 +92,12 @@ fun ContentTextField(
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
-                modifier = modifier
+                modifier = Modifier
+                    .semantics {
+                        contentDataType = ContentDataType.None
+                        isSensitiveData = true
+                    }
+                    .then(modifier)
                     .filterTextContextMenuComponents { ContentTextPolicy.keepsContextMenuItem(it.key) }
                     .onPreviewKeyEvent { event ->
                         ContentTextPolicy.isClipboardWriteShortcut(

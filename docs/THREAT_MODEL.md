@@ -44,16 +44,32 @@ adversary.
       before they reach the field.
     - Autocorrect is off, and the keyboard is asked not to learn
       (`IME_FLAG_NO_PERSONALIZED_LEARNING`).
+    - **Autofill (review U-01).** Compose reports every text field to the
+      autofill framework by default: on focus it calls `notifyViewEntered`,
+      on each edit `notifyValueChanged` with the text, and it writes the
+      text into the structure an autofill service receives. FLAG_SECURE does
+      not stop this. The content field now declares no autofill data type
+      (`ContentDataType.None`), so Compose sends neither call for it, and
+      marks its data sensitive, so its value is stripped from fill requests.
+      Every activity window, and the dialog window the correction field
+      opens in, is marked not important for autofill with its descendants.
+      Implemented; unverified (gap — pending physical-device run).
     A boundary test fails on any other text field in the app, and on any
     clipboard reference outside `ContentTextField`. The vault-reset word
     field is the one named exemption, because it holds only a fixed
     confirmation word.
   - **Residual (not closed):**
-    - The keyboard sees everything typed. The no-learning flag is a
-      request, and a keyboard that ignores it can learn a correction.
+    - The keyboard can read the whole field, not only what is typed: an
+      IME reads the prefilled OCR text through the InputConnection
+      (`getExtractedText`, `getTextBeforeCursor`). The no-learning flag is
+      a request, and a keyboard that ignores it can keep that text.
     - A screen reader reads the field aloud, by design.
     - An accessibility Cut action removes the selected text from the field,
-      though nothing reaches the clipboard.
+      though nothing reaches the clipboard, so the cut text is lost from the
+      field (review U-04: kept and documented; see the verification record).
+    - An autofill service that asks the platform to include views not
+      important for autofill, or a platform that ignores the flag, is not
+      covered by the window exclusion; the field-level settings still apply.
     - None of this is device-verified yet; the instrumented
       `ContentTextFieldTest` is pending.
 - **Incoming share grants (P1-19-R18).** The sender sets

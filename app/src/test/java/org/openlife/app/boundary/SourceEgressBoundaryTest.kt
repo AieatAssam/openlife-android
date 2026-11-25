@@ -7,6 +7,14 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
 
+/**
+ * Source-level egress boundaries. These scans are tripwires, not proofs: they
+ * read source lines and catch the known ways content could leave (clipboard,
+ * logs, share and document intents, selectable platform text views,
+ * selection containers, unwrapped text fields), each with a self-check
+ * sample. Code that reaches the same API by a route the patterns do not name
+ * (reflection, a new library) is not caught.
+ */
 class SourceEgressBoundaryTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
     private val sourceRoots = listOf(
@@ -67,6 +75,44 @@ class SourceEgressBoundaryTest {
         return clipboardViolation(file, line, location)
             ?: logViolation(file, line, location, recoveryLogIsDebugOnly, debugOnly)
             ?: activityViolation(file, line, location)
+            ?: selectableTextViolation(line, location)
+            ?: shareViolation(line, location)
+    }
+
+    /** Review U-02: platform text views (AndroidView-hosted) and SelectionContainer can copy shown text. */
+    private fun selectableTextViolation(line: String, location: String): String? =
+        if (SELECTABLE_TEXT.containsMatchIn(line)) "$location: selectable platform text or SelectionContainer" else null
+
+    /** Review U-02: no share sheet or document export anywhere in shipped code. */
+    private fun shareViolation(line: String, location: String): String? =
+        if (SHARE_OR_EXPORT.containsMatchIn(line)) "$location: share or document-export API" else null
+
+    /** Review U-02 self-checks: each new egress pattern appended to ViewerScreen is reported. */
+    @Test
+    fun everyNewEgressPatternIsReported() {
+        val viewer = projectDir.resolve("app/src/main/java/org/openlife/app/ui/ViewerScreen.kt")
+        val lines = Files.readAllLines(viewer)
+        listOf(
+            "    AndroidView(factory = { context -> EditText(context) })",
+            "    AndroidView(factory = { context -> TextView(context).apply { setTextIsSelectable(true) } })",
+            "    SelectionContainer { Text(text) }",
+            "import android.util.*",
+            "import android.util.Log",
+            "    Log.d(\"Viewer\", text)",
+            "    println(text)",
+            "    error.printStackTrace()",
+            "    System.err.write(bytes)",
+            "    val send = Intent(Intent.ACTION_SEND)",
+            "    val send = Intent(\"android.intent.action.SEND\")",
+            "    ShareCompat.IntentBuilder(context).setText(text).startChooser()",
+            "    rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(\"text/plain\")) {}",
+            "    context.startActivity(Intent.createChooser(intent, null))",
+        ).forEach { mutation ->
+            assertFalse(
+                "\"$mutation\" in ViewerScreen must be a violation",
+                boundaryViolations(viewer, lines + mutation).isEmpty(),
+            )
+        }
     }
 
     /**
@@ -143,6 +189,7 @@ class SourceEgressBoundaryTest {
         recoveryLogIsDebugOnly: Boolean,
         debugOnly: Boolean,
     ): String? {
+        if (BARE_OUTPUT.containsMatchIn(line)) return "$location: bare Log, println, printStackTrace or System output"
         if (!line.contains("android.util.Log") || allowlistedLog(file, line, recoveryLogIsDebugOnly, debugOnly)) {
             return null
         }
@@ -227,6 +274,8 @@ class SourceEgressBoundaryTest {
             "    SearchBarDefaults.InputField(query = text, onQueryChange = {}, onSearch = {}, expanded = false)",
             "    SearchBar(inputField = {}, expanded = false, onExpandedChange = {}) {}",
             "    val field = ::BasicTextField",
+            "    `OutlinedTextField`(value = text, onValueChange = {})",
+            "    val field = ::`TextField`",
         ).forEach { mutation ->
             assertFalse(
                 "\"$mutation\" in ViewerScreen must be a violation",
@@ -291,12 +340,21 @@ class SourceEgressBoundaryTest {
         const val ALLOWED_EVIDENCE_BOUNDS_LOG = "android.util.Log.d(\"EvidenceBounds\", message)"
         const val DEBUG_GUARD = "if (BuildConfig.DEBUG) {"
         const val DEBUG_GUARD_HEADER = "if (BuildConfig.DEBUG)"
-        val OUTBOUND_ACTION = Regex("ACTION_(VIEW|SEND|SENDTO)")
+        val OUTBOUND_ACTION = Regex("""ACTION_(VIEW|SEND|SENDTO)|"android\.intent\.action\.(VIEW|SEND|SENDTO)""")
+        val SELECTABLE_TEXT = Regex(
+            """\b(EditText|TextView|AppCompatEditText|AppCompatTextView|TextInputEditText|SelectionContainer)\b|""" +
+                """TextIsSelectable|textIsSelectable""",
+        )
+        val SHARE_OR_EXPORT = Regex("""\bShareCompat\b|\bCreateDocument\b|ACTION_CREATE_DOCUMENT|\bcreateChooser\b""")
+        val BARE_OUTPUT = Regex(
+            """^\s*import\s+android\.util\.(\*|Log\b)|(?<![\w.])Log\.(v|d|i|w|e|wtf|println)\s*\(|""" +
+                """\bprintln\s*\(|\.printStackTrace\s*\(|\bSystem\.(out|err)\b""",
+        )
         const val TEXT_FIELD_NAMES =
             "TextField|OutlinedTextField|BasicTextField|BasicSecureTextField|SecureTextField|" +
                 "OutlinedSecureTextField|SearchBar|DockedSearchBar|InputField"
-        val BARE_TEXT_FIELD = Regex("""(?<![A-Za-z0-9_])($TEXT_FIELD_NAMES)\s*\(""")
-        val TEXT_FIELD_REFERENCE = Regex("""::($TEXT_FIELD_NAMES)\b""")
+        val BARE_TEXT_FIELD = Regex("""(?<![A-Za-z0-9_])($TEXT_FIELD_NAMES)`?\s*\(""")
+        val TEXT_FIELD_REFERENCE = Regex("""::`?($TEXT_FIELD_NAMES)\b""")
         val ALIASED_TEXT_FIELD_IMPORT = Regex("""^\s*import\s+[\w.]+\.($TEXT_FIELD_NAMES)\s+as\s+\w+""")
         const val ALLOWED_CLIPBOARD_READ =
             "override val clipboardManager get() = (platform as AndroidClipboard).clipboardManager"
