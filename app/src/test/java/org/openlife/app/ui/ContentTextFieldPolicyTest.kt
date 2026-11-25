@@ -2,7 +2,6 @@ package org.openlife.app.ui
 
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
-import androidx.compose.foundation.text.contextmenu.data.ProcessTextKey
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
@@ -27,9 +26,9 @@ class ContentTextFieldPolicyTest {
         assertFalse("Copy", ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.CopyKey))
         assertFalse("Cut", ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.CutKey))
         assertFalse("Autofill", ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.AutofillKey))
-        assertFalse("ACTION_PROCESS_TEXT item", ContentTextPolicy.keepsContextMenuItem(ProcessTextKey(1)))
-        // Text-classification items and separators carry keys of their own; an
-        // allow-list drops any key it does not name.
+        // ACTION_PROCESS_TEXT and text-classification items carry keys of their
+        // own (ProcessTextKey's constructor is internal to Compose, so it cannot
+        // be built here); an allow-list drops any key it does not name.
         assertFalse("unknown key", ContentTextPolicy.keepsContextMenuItem(Any()))
     }
 
