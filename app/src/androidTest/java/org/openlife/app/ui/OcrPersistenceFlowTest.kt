@@ -4,6 +4,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
@@ -18,6 +20,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -48,13 +51,26 @@ class OcrPersistenceFlowTest {
     val composeRule = createComposeRule()
 
     private val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as OpenLifeApp
+    private val viewModelStores = mutableListOf<ViewModelStore>()
+
+    /** Review Q-08: every OcrViewModel made here is cleared after the test, as a screen's would be. */
+    @After
+    fun clearViewModels() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { viewModelStores.forEach { it.clear() } }
+        viewModelStores.clear()
+    }
+
+    private suspend fun newOcrViewModel(): OcrViewModel = withContext(Dispatchers.Main) {
+        val store = ViewModelStore().also(viewModelStores::add)
+        ViewModelProvider(store, OcrViewModel.factory(app))[OcrViewModel::class.java]
+    }
 
     @Test
     fun readyRevisionIsShownAfterViewModelRecreationWithoutRerunning(): Unit = runBlocking {
         val access = app.vault() as VaultAccess.Ready
         val sourceId = saveSyntheticSource(access)
         try {
-            val first = withContext(Dispatchers.Main) { OcrViewModel(app) }
+            val first = newOcrViewModel()
             withContext(Dispatchers.Main) { first.run(sourceId) }
             val persisted = withTimeout(OCR_TIMEOUT_MS) {
                 access.ocrRepository.observeOcrView(sourceId).first { view ->
@@ -63,7 +79,7 @@ class OcrPersistenceFlowTest {
             }!!
 
             // A new ViewModel, as after process death: it must read, not re-run.
-            val second = withContext(Dispatchers.Main) { OcrViewModel(app) }
+            val second = newOcrViewModel()
             composeRule.setContent {
                 val state by second.state(sourceId).collectAsState()
                 ViewerScreen(
@@ -135,7 +151,7 @@ class OcrPersistenceFlowTest {
         }
         var sourceId: UUID? = null
         try {
-            val viewModel = withContext(Dispatchers.Main) { OcrViewModel(app) }
+            val viewModel = newOcrViewModel()
             var access = app.vault()
             val deadline = System.currentTimeMillis() + VIEW_TIMEOUT_MS
             while (access !is VaultAccess.Ready && System.currentTimeMillis() < deadline) {

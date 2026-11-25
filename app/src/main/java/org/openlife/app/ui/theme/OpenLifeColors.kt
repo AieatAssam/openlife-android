@@ -35,6 +35,17 @@ internal val DarkRule = Color(0xFF2E2B23)
 internal val Outline = Color(0xFF7D776B)
 internal val DarkOutline = Color(0xFF857F75)
 
+/**
+ * Review Q-03: Material draws the primary role as text too (text buttons,
+ * focused field labels, links, the Saved stamp). Brand Vermilion is 4.06 to
+ * 4.39:1 on the paper steps, below AA, so the primary role uses a deeper
+ * vermilion ink (>= 4.77:1 on every paper surface) and a lighter one in dark
+ * (>= 4.87:1 on every carbon surface). Vermilion itself stays the brand mark
+ * colour (launcher icon background, surface tint).
+ */
+internal val VermilionInk = Color(0xFFA83420)
+internal val DarkVermilionInk = Color(0xFFEE7F6A)
+
 // P1-19-R8: the paper and carbon surface steps for Material's container roles,
 // lightest to darkest in light and darkest to lightest in dark.
 internal val PaperLow = Color(0xFFFAF6EE)
@@ -79,7 +90,7 @@ val LocalOpenLifeBrandColors = androidx.compose.runtime.staticCompositionLocalOf
 }
 
 val OpenLifeLightColors = androidx.compose.material3.lightColorScheme(
-    primary = Vermilion,
+    primary = VermilionInk,
     onPrimary = RaisedPaper,
     primaryContainer = VermilionContainer,
     onPrimaryContainer = Ink,
@@ -106,7 +117,7 @@ val OpenLifeLightColors = androidx.compose.material3.lightColorScheme(
     surfaceTint = Vermilion,
     inverseSurface = Ink,
     inverseOnSurface = Paper,
-    inversePrimary = DarkVermilion,
+    inversePrimary = DarkVermilionInk,
     scrim = Ink,
     surfaceBright = RaisedPaper,
     surfaceDim = PaperDim,
@@ -130,7 +141,7 @@ val OpenLifeLightColors = androidx.compose.material3.lightColorScheme(
 )
 
 val OpenLifeDarkColors = androidx.compose.material3.darkColorScheme(
-    primary = DarkVermilion,
+    primary = DarkVermilionInk,
     onPrimary = DarkSurface,
     primaryContainer = VermilionDarkContainer,
     onPrimaryContainer = Color(0xFFFFDBD1),
@@ -157,7 +168,7 @@ val OpenLifeDarkColors = androidx.compose.material3.darkColorScheme(
     surfaceTint = DarkVermilion,
     inverseSurface = DarkInk,
     inverseOnSurface = Ink,
-    inversePrimary = Vermilion,
+    inversePrimary = VermilionInk,
     scrim = CarbonLowest,
     surfaceBright = CarbonBright,
     surfaceDim = DarkSurface,

@@ -71,11 +71,13 @@ object IntakeIntentValidator {
         // is defensive: sender-supplied paths and authorities are never
         // trusted (design §8), and this stops a future provider addition
         // from becoming a same-app confused-deputy vector by default.
-        // P1-19-R19 (A-16): compare the host only. The authority string also
-        // carries userinfo ("x@org.openlife.y") and a port, which the platform
-        // strips before resolving the provider, so a prefix test on the raw
-        // authority could be bypassed. Userinfo itself is not rejected: a
+        // P1-19-R19 (A-16): compare the host only. The platform strips a
+        // "userId@" prefix before resolving the provider (so
+        // "10@org.openlife.y" reaches org.openlife.y), which defeats a prefix
+        // test on the raw authority. Userinfo itself is not rejected: a
         // cross-profile share legitimately arrives as "10@com.example.provider".
+        // The platform does not strip a port; it is removed here only so that
+        // "org.openlife.y:1" cannot hide this app's own authority from the check.
         val host = parsed.authority?.substringAfterLast('@')?.substringBefore(':')
         if (host != null &&
             (

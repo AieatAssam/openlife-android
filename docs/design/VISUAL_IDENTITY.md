@@ -66,7 +66,7 @@ confirmed or verified states so it keeps meaning; amber marks uncertainty;
 never use colour alone (every state has a label). Delete actions use the
 error colour and an outlined button, never the primary filled button.
 
-Material 3 mapping (P0-07 theme): primary=Vermilion, onPrimary=Surface,
+Material 3 mapping (P0-07 theme; primary amended below): primary=Vermilion, onPrimary=Surface,
 primaryContainer=Vermilion container, secondary=Ink muted, tertiary=Stamp
 green, surface/onSurface=Surface/Ink, outline=Outline, outlineVariant=Rule,
 error=Error.
@@ -83,6 +83,19 @@ P1-19 amendments (audit A-04, A-08):
   Material's baseline; it is kept as this brief's value.
 - **Buttons.** Every button uses the 8 dp corner (`OpenLifeButton` and its
   variants).
+- **Primary ink (review Q-03).** Material draws the primary role as text as
+  well as fill: text and outlined buttons, focused field labels, the Saved
+  stamp, the snackbar action (inversePrimary). Brand Vermilion `#C8412B` is
+  only 4.39:1 on Surface, 4.06:1 on the dialog container and 3.57:1 on the
+  dimmest paper step, which fails this brief's AA rule. The primary role
+  therefore uses **Vermilion ink** `#A83420` in light (≥ 4.77:1 on every
+  paper surface and container) and **`#EE7F6A`** in dark (≥ 4.87:1 on every
+  carbon surface; `#E0654F` was 3.80:1 on the brightest carbon step).
+  inversePrimary swaps the two. This also deepens filled primary buttons and
+  the Saved stamp; onPrimary on them stays ≥ 6.4:1. Brand Vermilion
+  `#C8412B` is unchanged as the mark colour: the launcher icon background and
+  the surface tint. `PaletteContrastTest` enforces ≥ 4.5:1 for primary on
+  every surface and container role, light and dark.
 
 ## 5. Typography (all OFL, bundled, licences in About)
 
