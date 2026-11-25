@@ -11,6 +11,10 @@ sealed interface Routes {
     @Serializable
     data class Viewer(val sourceId: String, val spanId: String? = null) : Routes
 
+    /** P1-20-R3: the list-detail destination; the selected source is part of the route. */
+    @Serializable
+    data class ListDetail(val sourceId: String, val spanId: String? = null) : Routes
+
     /** P2-08: local search. The query is never a route argument. */
     @Serializable
     data object Search : Routes
