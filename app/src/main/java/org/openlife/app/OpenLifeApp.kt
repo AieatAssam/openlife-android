@@ -29,6 +29,7 @@ import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryReport
 import org.openlife.vault.repository.RecoveryRepository
+import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.repository.VaultResetRepository
 import org.openlife.vault.repository.VaultResetResult
@@ -160,6 +161,7 @@ class OpenLifeApp : Application() {
             ),
             lastRecovery = report,
             recoveryRepository = recoveryRepository,
+            searchRepository = SearchRepository(database),
         )
     }
 

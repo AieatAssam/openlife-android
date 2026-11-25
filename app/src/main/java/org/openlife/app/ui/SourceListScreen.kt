@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +71,7 @@ fun SourceListScreen(
     onOpenSettings: () -> Unit = {},
     onFinishReset: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenSearch: (() -> Unit)? = null,
 ) {
     var pendingDelete by remember { mutableStateOf<Source?>(null) }
 
@@ -80,7 +82,18 @@ fun SourceListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.list_title)) },
-                actions = { ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout) },
+                actions = {
+                    // P2-08: local search; an empty vault simply finds nothing.
+                    if (onOpenSearch != null) {
+                        IconButton(onClick = onOpenSearch) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = stringResource(R.string.list_search_content_description),
+                            )
+                        }
+                    }
+                    ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
+                },
             )
         },
         // VISUAL_IDENTITY §7: one filled primary action per screen. An empty

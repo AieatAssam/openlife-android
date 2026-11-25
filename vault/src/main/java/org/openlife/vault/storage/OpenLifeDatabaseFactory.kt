@@ -48,6 +48,8 @@ object OpenLifeDatabaseFactory {
             .addMigrations(*migrations.toTypedArray())
             .addCallback(OpenLifeDatabase.readyInvariantCallback)
             .addCallback(DurableWrites.callback)
+            // P2-08 review: the search index is checked, and recreated if needed, at every open.
+            .addCallback(SearchIndex.callback)
             .build()
     }
 
