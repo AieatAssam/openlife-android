@@ -4,9 +4,9 @@ import androidx.sqlite.db.SupportSQLiteProgram
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import org.junit.Assume.assumeTrue
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
-import org.junit.Assume.assumeTrue
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SearchDao
 import org.openlife.vault.storage.SearchRow

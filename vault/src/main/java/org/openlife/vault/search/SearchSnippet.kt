@@ -58,7 +58,9 @@ object SearchSnippet {
                 val end = from + needle.length
                 val startsWord = from == 0 || !haystack[from - 1].isLetterOrDigit()
                 val endsWord = end == haystack.length || !haystack[end].isLetterOrDigit()
-                if (!wholeWords || (startsWord && (tokenIndex == tokens.lastIndex || endsWord))) {
+                val prefixAllowed = tokenIndex == tokens.lastIndex
+                val wordMatch = startsWord && (prefixAllowed || endsWord)
+                if (!wholeWords || wordMatch) {
                     found += origin[from]..extendOverMarks(text, origin[end - 1])
                 }
                 from = haystack.indexOf(needle, from + 1)
