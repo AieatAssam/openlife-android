@@ -1,0 +1,258 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "receipt-06",
+  "category": "receipt",
+  "image": "fixtures/receipt-06.png",
+  "width": 576,
+  "height": 686,
+  "seed": 20261125020,
+  "style": "thermal-receipt",
+  "skew_degrees": 0.4,
+  "noise_density": 0.0043,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "EXAMPLE HARDWARE",
+      "box": [176, 52, 404, 71],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "EXAMPLE HARDWARE",
+          "box": [176, 52, 404, 71],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "3 EXAMPLE STREET",
+      "box": [46, 87, 276, 106],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "3 EXAMPLE STREET",
+          "box": [46, 87, 276, 106],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEL 0100 555 0194",
+      "box": [46, 123, 290, 142],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0194",
+          "box": [46, 123, 290, 142],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "DATE 24/03/2027 13:45",
+      "box": [47, 158, 346, 181],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 24/03/2027 13:45",
+          "box": [47, 158, 346, 181],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CROISSANT                     4.71",
+      "box": [46, 195, 534, 216],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CROISSANT",
+          "box": [46, 195, 175, 214],
+          "script": "latin"
+        },
+        {
+          "text": "4.71",
+          "box": [477, 198, 534, 216],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "FLAT WHITE                    4.26",
+      "box": [46, 231, 533, 252],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "FLAT WHITE",
+          "box": [46, 231, 187, 250],
+          "script": "latin"
+        },
+        {
+          "text": "4.26",
+          "box": [477, 234, 533, 252],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "PASTA 500G                    3.35",
+      "box": [46, 267, 533, 288],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PASTA 500G",
+          "box": [46, 267, 187, 286],
+          "script": "latin"
+        },
+        {
+          "text": "3.35",
+          "box": [477, 270, 533, 288],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "PLASTERS                      2.74",
+      "box": [46, 303, 533, 324],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLASTERS",
+          "box": [46, 303, 158, 322],
+          "script": "latin"
+        },
+        {
+          "text": "2.74",
+          "box": [477, 306, 533, 324],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "COFFEE BEANS 250G             7.79",
+      "box": [45, 339, 533, 360],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [45, 339, 287, 359],
+          "script": "latin"
+        },
+        {
+          "text": "7.79",
+          "box": [477, 342, 533, 360],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "MILK 1L                      10.65",
+      "box": [45, 375, 532, 396],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "MILK 1L",
+          "box": [45, 375, 143, 393],
+          "script": "latin"
+        },
+        {
+          "text": "10.65",
+          "box": [462, 378, 532, 396],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SOAP BAR                      0.61",
+      "box": [44, 411, 532, 432],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SOAP BAR",
+          "box": [44, 411, 158, 430],
+          "script": "latin"
+        },
+        {
+          "text": "0.61",
+          "box": [476, 414, 532, 432],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SUBTOTAL                     28.43",
+      "box": [44, 447, 531, 468],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [44, 447, 157, 466],
+          "script": "latin"
+        },
+        {
+          "text": "28.43",
+          "box": [462, 450, 531, 468],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "VAT 20%                       5.68",
+      "box": [43, 483, 532, 504],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [43, 483, 144, 502],
+          "script": "latin"
+        },
+        {
+          "text": "5.68",
+          "box": [476, 486, 532, 504],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOTAL                       £34.11",
+      "box": [43, 519, 532, 540],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [43, 519, 114, 537],
+          "script": "latin"
+        },
+        {
+          "text": "£34.11",
+          "box": [447, 522, 532, 540],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [44, 555, 215, 574],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [44, 555, 215, 574],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "THANK YOU",
+      "box": [222, 592, 350, 611],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [222, 592, 350, 611],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

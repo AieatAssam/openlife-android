@@ -1,0 +1,172 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "screenshot-13",
+  "category": "screenshot",
+  "image": "fixtures/screenshot-13.png",
+  "width": 1080,
+  "height": 2400,
+  "seed": 20261125012,
+  "style": "phone-screenshot",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "09:40",
+      "box": [50, 41, 138, 67],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "09:40",
+          "box": [50, 41, 138, 67],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Sam Sample",
+      "box": [61, 150, 326, 195],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Sam Sample",
+          "box": [61, 150, 326, 195],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Today",
+      "box": [496, 286, 584, 317],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Today",
+          "box": [496, 286, 584, 317],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Table booked for four",
+      "box": [80, 392, 485, 425],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Table booked for four",
+          "box": [80, 392, 485, 425],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Call me after lunch",
+      "box": [648, 531, 997, 564],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Call me after lunch",
+          "box": [648, 531, 997, 564],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Can you bring the receipts?",
+      "box": [82, 697, 590, 738],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Can you bring the receipts?",
+          "box": [82, 697, 590, 738],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Did you pay the gas bill?",
+      "box": [550, 855, 999, 896],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Did you pay the gas bill?",
+          "box": [550, 855, 999, 896],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Room 4B on the left",
+      "box": [83, 995, 453, 1028],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Room 4B on the left",
+          "box": [83, 995, 453, 1028],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Running ten minutes late",
+      "box": [532, 1145, 999, 1186],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Running ten minutes late",
+          "box": [532, 1145, 999, 1186],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Bring an umbrella",
+      "box": [83, 1308, 413, 1349],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Bring an umbrella",
+          "box": [83, 1308, 413, 1349],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "I will pick up the keys",
+      "box": [595, 1437, 998, 1478],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "I will pick up the keys",
+          "box": [595, 1437, 998, 1478],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Train leaves at 08:15",
+      "box": [80, 1575, 475, 1608],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Train leaves at 08:15",
+          "box": [80, 1575, 475, 1608],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "The parcel arrived today",
+      "box": [544, 1710, 1000, 1751],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "The parcel arrived today",
+          "box": [544, 1710, 1000, 1751],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

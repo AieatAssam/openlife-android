@@ -34,3 +34,6 @@ rootProject.name = "openlife"
 
 include(":app")
 include(":vault")
+// P2-04: synthetic OCR evaluation set, metrics and gate. A JVM module that no
+// shipped configuration depends on (eval/ocr/v1/README.md).
+include(":eval")

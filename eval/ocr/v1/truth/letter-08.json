@@ -1,0 +1,136 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "letter-08",
+  "category": "letter",
+  "image": "fixtures/letter-08.png",
+  "width": 1240,
+  "height": 1754,
+  "seed": 20261125037,
+  "style": "letter",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "non_latin",
+  "expected_abstain": true,
+  "lines": [
+    {
+      "text": "Εταιρεία Δοκιμών",
+      "box": [103, 116, 438, 160],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Εταιρεία Δοκιμών",
+          "box": [103, 116, 438, 160],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "14/03/2027",
+      "box": [963, 256, 1138, 285],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "14/03/2027",
+          "box": [963, 256, 1138, 285],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Αγαπητέ κύριε Δοκιμαστή,",
+      "box": [100, 375, 467, 407],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Αγαπητέ κύριε Δοκιμαστή,",
+          "box": [100, 375, 467, 407],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Σας ευχαριστούμε για την επιστολή σας.",
+      "box": [101, 465, 660, 497],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Σας ευχαριστούμε για την επιστολή σας.",
+          "box": [101, 465, 660, 497],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Η συνάντηση θα γίνει την Τρίτη στις δέκα.",
+      "box": [102, 525, 679, 557],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Η συνάντηση θα γίνει την Τρίτη στις δέκα.",
+          "box": [102, 525, 679, 557],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Παρακαλούμε φέρτε αυτό το έγγραφο μαζί σας.",
+      "box": [102, 585, 759, 617],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Παρακαλούμε φέρτε αυτό το έγγραφο μαζί σας.",
+          "box": [102, 585, 759, 617],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Η πληρωμή σας έχει καταχωρηθεί.",
+      "box": [102, 645, 584, 677],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Η πληρωμή σας έχει καταχωρηθεί.",
+          "box": [102, 645, 584, 677],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Για ερωτήσεις καλέστε το γραφείο μας.",
+      "box": [102, 705, 639, 737],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Για ερωτήσεις καλέστε το γραφείο μας.",
+          "box": [102, 705, 639, 737],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Με εκτίμηση,",
+      "box": [102, 765, 279, 797],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Με εκτίμηση,",
+          "box": [102, 765, 279, 797],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Γιώργος Παράδειγμα",
+      "box": [102, 855, 395, 887],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Γιώργος Παράδειγμα",
+          "box": [102, 855, 395, 887],
+          "script": "non_latin"
+        }
+      ]
+    }
+  ]
+}

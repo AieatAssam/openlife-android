@@ -1,0 +1,241 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "receipt-15",
+  "category": "receipt",
+  "image": "fixtures/receipt-15.png",
+  "width": 576,
+  "height": 650,
+  "seed": 20261125029,
+  "style": "thermal-receipt",
+  "skew_degrees": -0.3,
+  "noise_density": 0.0039,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "CORNER GROCER",
+      "box": [194, 52, 380, 71],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CORNER GROCER",
+          "box": [194, 52, 380, 71],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "32 EXAMPLE STREET",
+      "box": [43, 89, 287, 108],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "32 EXAMPLE STREET",
+          "box": [43, 89, 287, 108],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEL 0100 555 0722",
+      "box": [43, 124, 287, 144],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0722",
+          "box": [43, 124, 287, 144],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "DATE 7/08/2027 15:35",
+      "box": [45, 160, 330, 183],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 7/08/2027 15:35",
+          "box": [45, 160, 330, 183],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SCREWS 40MM                   7.82",
+      "box": [44, 195, 532, 216],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SCREWS 40MM",
+          "box": [44, 197, 201, 216],
+          "script": "latin"
+        },
+        {
+          "text": "7.82",
+          "box": [476, 195, 532, 214],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SOAP BAR                      9.25",
+      "box": [44, 231, 532, 252],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SOAP BAR",
+          "box": [44, 233, 158, 252],
+          "script": "latin"
+        },
+        {
+          "text": "9.25",
+          "box": [477, 231, 532, 250],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEA BAGS X80                  1.23",
+      "box": [44, 267, 532, 288],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEA BAGS X80",
+          "box": [44, 269, 216, 288],
+          "script": "latin"
+        },
+        {
+          "text": "1.23",
+          "box": [476, 267, 532, 286],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "FLAT WHITE                    9.96",
+      "box": [46, 303, 533, 324],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "FLAT WHITE",
+          "box": [46, 305, 187, 324],
+          "script": "latin"
+        },
+        {
+          "text": "9.96",
+          "box": [477, 303, 533, 322],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "BREAD WHOLEMEAL              10.42",
+      "box": [46, 339, 533, 360],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "BREAD WHOLEMEAL",
+          "box": [46, 341, 259, 360],
+          "script": "latin"
+        },
+        {
+          "text": "10.42",
+          "box": [462, 339, 533, 358],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOOTHPASTE                    9.79",
+      "box": [44, 375, 533, 396],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOOTHPASTE",
+          "box": [44, 377, 187, 396],
+          "script": "latin"
+        },
+        {
+          "text": "9.79",
+          "box": [477, 375, 533, 394],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SUBTOTAL                     40.40",
+      "box": [45, 411, 533, 432],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [45, 413, 159, 432],
+          "script": "latin"
+        },
+        {
+          "text": "40.40",
+          "box": [462, 411, 533, 430],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "VAT 20%                       8.07",
+      "box": [45, 447, 533, 468],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [45, 449, 146, 468],
+          "script": "latin"
+        },
+        {
+          "text": "8.07",
+          "box": [478, 447, 533, 466],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOTAL                        48.47",
+      "box": [45, 483, 533, 504],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [45, 486, 116, 504],
+          "script": "latin"
+        },
+        {
+          "text": "48.47",
+          "box": [463, 483, 533, 502],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [46, 521, 218, 540],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [46, 521, 218, 540],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "THANK YOU",
+      "box": [225, 556, 353, 575],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [225, 556, 353, 575],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

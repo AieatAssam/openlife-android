@@ -1,0 +1,258 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "receipt-13",
+  "category": "receipt",
+  "image": "fixtures/receipt-13.png",
+  "width": 576,
+  "height": 686,
+  "seed": 20261125027,
+  "style": "thermal-receipt",
+  "skew_degrees": -1.2,
+  "noise_density": 0.0042,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "TESTFORD MARKET",
+      "box": [174, 51, 390, 73],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TESTFORD MARKET",
+          "box": [174, 51, 390, 73],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "94 EXAMPLE STREET",
+      "box": [40, 89, 283, 112],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "94 EXAMPLE STREET",
+          "box": [40, 89, 283, 112],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEL 0100 555 0558",
+      "box": [40, 125, 284, 148],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0558",
+          "box": [40, 125, 284, 148],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "DATE 4/02/2027 16:30",
+      "box": [42, 160, 328, 185],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 4/02/2027 16:30",
+          "box": [42, 160, 328, 185],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "COFFEE BEANS 250G             8.41",
+      "box": [42, 192, 530, 220],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [42, 197, 285, 220],
+          "script": "latin"
+        },
+        {
+          "text": "8.41",
+          "box": [474, 192, 530, 211],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "LIGHT BULB                    6.73",
+      "box": [44, 227, 530, 256],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "LIGHT BULB",
+          "box": [44, 235, 185, 256],
+          "script": "latin"
+        },
+        {
+          "text": "6.73",
+          "box": [475, 227, 530, 247],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CROISSANT                     1.66",
+      "box": [44, 264, 531, 292],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CROISSANT",
+          "box": [44, 271, 172, 292],
+          "script": "latin"
+        },
+        {
+          "text": "1.66",
+          "box": [475, 264, 531, 283],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "MILK 1L                       1.10",
+      "box": [44, 299, 532, 328],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "MILK 1L",
+          "box": [44, 308, 143, 328],
+          "script": "latin"
+        },
+        {
+          "text": "1.10",
+          "box": [476, 299, 532, 319],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SCREWS 40MM                  10.62",
+      "box": [45, 335, 533, 364],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SCREWS 40MM",
+          "box": [45, 343, 202, 364],
+          "script": "latin"
+        },
+        {
+          "text": "10.62",
+          "box": [462, 335, 533, 355],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEA BAGS X80                  2.23",
+      "box": [45, 371, 533, 399],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEA BAGS X80",
+          "box": [45, 378, 217, 399],
+          "script": "latin"
+        },
+        {
+          "text": "2.23",
+          "box": [478, 371, 533, 391],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "FLAT WHITE                   12.00",
+      "box": [47, 407, 534, 436],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "FLAT WHITE",
+          "box": [47, 415, 188, 436],
+          "script": "latin"
+        },
+        {
+          "text": "12.00",
+          "box": [464, 407, 534, 427],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SUBTOTAL                     35.63",
+      "box": [47, 443, 535, 472],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [47, 452, 161, 472],
+          "script": "latin"
+        },
+        {
+          "text": "35.63",
+          "box": [465, 443, 535, 463],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "VAT 20%                       7.12",
+      "box": [47, 479, 536, 507],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [47, 488, 148, 507],
+          "script": "latin"
+        },
+        {
+          "text": "7.12",
+          "box": [480, 479, 536, 498],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOTAL                        42.75",
+      "box": [48, 516, 536, 543],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [48, 525, 119, 543],
+          "script": "latin"
+        },
+        {
+          "text": "42.75",
+          "box": [466, 516, 536, 535],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [50, 558, 221, 580],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [50, 558, 221, 580],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "THANK YOU",
+      "box": [229, 591, 357, 612],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [229, 591, 357, 612],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "letter-10",
+  "category": "letter",
+  "image": "fixtures/letter-10.png",
+  "width": 1240,
+  "height": 1754,
+  "seed": 20261125039,
+  "style": "form",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "Registration form",
+      "box": [103, 134, 486, 181],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Registration form",
+          "box": [103, 134, 486, 181],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Please complete every field in capitals.",
+      "box": [102, 216, 656, 247],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Please complete every field in capitals.",
+          "box": [102, 216, 656, 247],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Full name: JO PLACEHOLDER",
+      "box": [126, 338, 544, 363],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Full name: JO PLACEHOLDER",
+          "box": [126, 338, 544, 363],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Date of birth: 01/03/1997",
+      "box": [126, 458, 496, 487],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Date of birth: 01/03/1997",
+          "box": [126, 458, 496, 487],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Address: 57 EXAMPLE ROAD",
+      "box": [124, 578, 535, 603],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Address: 57 EXAMPLE ROAD",
+          "box": [124, 578, 535, 603],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Postcode: TE6 1XX",
+      "box": [126, 698, 397, 723],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Postcode: TE6 1XX",
+          "box": [126, 698, 397, 723],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Phone: 0100 555 0292",
+      "box": [126, 818, 457, 843],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Phone: 0100 555 0292",
+          "box": [126, 818, 457, 843],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Email: member24@example.org",
+      "box": [126, 938, 589, 969],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Email: member24@example.org",
+          "box": [126, 938, 589, 969],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Membership no: M-689037",
+      "box": [126, 1058, 516, 1089],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Membership no: M-689037",
+          "box": [126, 1058, 516, 1089],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "[X] I agree to the terms",
+      "box": [126, 1177, 454, 1209],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "[X] I agree to the terms",
+          "box": [126, 1177, 454, 1209],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Signed: A. Example",
+      "box": [125, 1298, 399, 1329],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Signed: A. Example",
+          "box": [125, 1298, 399, 1329],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Date: 26/03/2027",
+      "box": [126, 1418, 385, 1447],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Date: 26/03/2027",
+          "box": [126, 1418, 385, 1447],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

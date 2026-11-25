@@ -1,0 +1,160 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "screenshot-04",
+  "category": "screenshot",
+  "image": "fixtures/screenshot-04.png",
+  "width": 1080,
+  "height": 2400,
+  "seed": 20261125003,
+  "style": "phone-screenshot",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "10:55",
+      "box": [49, 41, 138, 67],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "10:55",
+          "box": [49, 41, 138, 67],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Sam Sample",
+      "box": [61, 150, 326, 195],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Sam Sample",
+          "box": [61, 150, 326, 195],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Today",
+      "box": [496, 286, 584, 317],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Today",
+          "box": [496, 286, 584, 317],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Dentist is on Tuesday",
+      "box": [83, 392, 483, 433],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Dentist is on Tuesday",
+          "box": [83, 392, 483, 433],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "See you there",
+      "box": [742, 553, 999, 594],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "See you there",
+          "box": [742, 553, 999, 594],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Are we still on for Friday?",
+      "box": [80, 686, 555, 727],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Are we still on for Friday?",
+          "box": [80, 686, 555, 727],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Yes, see you at 7.30",
+      "box": [621, 848, 998, 887],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Yes, see you at 7.30",
+          "box": [621, 848, 998, 887],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Paid it this morning",
+      "box": [83, 975, 443, 1016],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Paid it this morning",
+          "box": [83, 975, 443, 1016],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Running ten minutes late",
+      "box": [532, 1118, 999, 1159],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Running ten minutes late",
+          "box": [532, 1118, 999, 1159],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Did you pay the gas bill?",
+      "box": [83, 1259, 532, 1300],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Did you pay the gas bill?",
+          "box": [83, 1259, 532, 1300],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Can you bring the receipts?",
+      "box": [491, 1403, 999, 1444],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Can you bring the receipts?",
+          "box": [491, 1403, 999, 1444],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Room 4B on the left",
+      "box": [83, 1540, 453, 1573],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Room 4B on the left",
+          "box": [83, 1540, 453, 1573],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}
