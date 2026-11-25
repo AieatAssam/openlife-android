@@ -110,15 +110,14 @@ class SourceViewRepository(
  * the viewer keeps showing what is stored. Cancellation is rethrown. The
  * label and the identifier are never logged.
  */
-internal suspend fun SourceDao.writeUserContentKind(sourceId: UUID, kind: UserContentKind?, at: Long): Boolean =
-    try {
-        setUserContentKind(sourceId.toString(), kind?.name, at) == 1
-    } catch (cancelled: CancellationException) {
-        // A CancellationException is an IllegalStateException; it is never "not saved".
-        throw cancelled
-    } catch (_: SQLiteException) {
-        false
-    } catch (_: IllegalStateException) {
-        // Room and SQLCipher report a closed database or connection pool this way.
-        false
-    }
+internal suspend fun SourceDao.writeUserContentKind(sourceId: UUID, kind: UserContentKind?, at: Long): Boolean = try {
+    setUserContentKind(sourceId.toString(), kind?.name, at) == 1
+} catch (cancelled: CancellationException) {
+    // A CancellationException is an IllegalStateException; it is never "not saved".
+    throw cancelled
+} catch (_: SQLiteException) {
+    false
+} catch (_: IllegalStateException) {
+    // Room and SQLCipher report a closed database or connection pool this way.
+    false
+}
