@@ -46,6 +46,17 @@ android {
         }
     }
 
+    // P2-04: the OCR evaluation harness. The fixture set is packaged into the
+    // androidTest APK only (assets/v1/...), never into a shipped variant, and
+    // the shared metric code compiles from eval's dependency-free core.
+    // scripts/check-no-eval-fixtures.sh fails a release APK that carries them.
+    sourceSets {
+        getByName("androidTest") {
+            java.srcDir(rootProject.file("eval/src/core/kotlin"))
+            assets.srcDir(rootProject.file("eval/ocr"))
+        }
+    }
+
     lint {
         abortOnError = true
         warningsAsErrors = true
@@ -85,12 +96,19 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // P2-04-R5: the stray-glyph policy cost on ground truth, with the production classifier.
+    testImplementation(project(":eval"))
     detektPlugins(libs.detekt.rules.ktlint.wrapper)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("openlife.rootDir", rootProject.projectDir.absolutePath)
+    inputs.files(rootProject.fileTree("eval/ocr/v1")).withPropertyName("ocrSet")
 }
 
 detekt {

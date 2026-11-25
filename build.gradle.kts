@@ -15,7 +15,7 @@ plugins {
 tasks.register("detekt") {
     group = "verification"
     description = "Run detekt for every shipped Kotlin module."
-    dependsOn(":app:detekt", ":vault:detekt")
+    dependsOn(":app:detekt", ":vault:detekt", ":eval:detekt")
 }
 
 tasks.register("generateLicenseReport") {
