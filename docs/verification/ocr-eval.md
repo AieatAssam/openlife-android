@@ -20,6 +20,23 @@ OCR gate not passed: [tesseract-eng-fast=NO_MEASUREMENT, mlkit-latin=NO_MEASUREM
 
 Neither engine may be selected as the default on the strength of this gate.
 
+The gate checks the provenance of a results file before scoring it.
+
+- The engine's model version must equal the pin in `gate.json`. The pins
+  are `t4a-4.9.0+tessdata_fast-4.1.0-7d4322bd` for Tesseract and `16.0.1`
+  for ML Kit.
+- The file must name the code commit and the device.
+- Each fixture's CER and matched lines are recomputed from the recorded
+  spans. CER may differ by at most 1e-9, and the line count must be equal.
+- A results file that fails any of these is INVALID and is never scored.
+
+**Stricter than R3.** By acting-owner ruling on 2026-11-25, one abstention
+on a Latin fixture fails the engine.
+
+- R3 averaged such an abstention into the category's CER mean as 1.0.
+- On this set, one wrong abstention among 13 or 14 Latin fixtures still
+  passed under that rule.
+
 | Check | Limit | tesseract-eng-fast | mlkit-latin |
 | --- | --- | --- | --- |
 | Mean CER, screenshots | <= 0.08 | gap — pending physical-device run | gap — pending physical-device run |
@@ -27,6 +44,8 @@ Neither engine may be selected as the default on the strength of this gate.
 | Mean CER, letters | <= 0.10 | gap — pending physical-device run | gap — pending physical-device run |
 | Lines matched at IoU >= 0.5 | >= 0.90 | gap — pending physical-device run | gap — pending physical-device run |
 | Correct abstention, non-Latin fixtures | 1.0 | gap — pending physical-device run | gap — pending physical-device run |
+| Abstentions on Latin fixtures (acting-owner ruling, X-03) | 0 | gap — pending physical-device run | gap — pending physical-device run |
+| Timed-out images (60 s each; added in review, not owner-reviewed) | 0 | gap — pending physical-device run | gap — pending physical-device run |
 | p95 duration | <= 6000 ms | gap — pending physical-device run | gap — pending physical-device run |
 | Peak PSS delta | <= 122880 KiB (120 MiB) | gap — pending physical-device run | gap — pending physical-device run |
 
@@ -73,12 +92,22 @@ These need tablet `U8BBB20806201256`, when no other agent is using it:
 ```bash
 ./gradlew :vault:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.ocr.eval.OcrEvaluationTest \
-  -Pandroid.testInstrumentationRunnerArguments.p204Eval=true
+  -Pandroid.testInstrumentationRunnerArguments.p204Eval=true \
+  -Pandroid.testInstrumentationRunnerArguments.p204Commit=$(git rev-parse HEAD)
 ./gradlew :eval:checkOcrGate \
   -PocrResults=<dir>/results-tesseract-eng-fast-<date>.json,<dir>/results-mlkit-latin-<date>.json
 ```
 
 The harness writes `results-<engine>-<date>.json` to the
-`additionalTestOutputDir` instrumentation argument, falling back to the app's
-external files dir `ocr-eval/`. It also logs the JSON under the logcat tag
-`P204Eval`.
+`additionalTestOutputDir` instrumentation argument. AGP copies it to
+`vault/build/outputs/connected_android_test_additional_output/`.
+
+- If that argument is absent, the harness writes to the test package's
+  external files directory under `ocr-eval/`. Retrieve that with
+  `adb pull`; no root is needed.
+- It also logs the JSON under the logcat tag `P204Eval`, in entries of at
+  most 3000 UTF-8 bytes. Only synthetic fixture text may be logged there.
+- Before the first run, read the checklist in
+  `docs/verification/P2-04-ocr-evaluation.md`.
+- The review suspects that the English-only models cannot emit Cyrillic or
+  Greek. If so, the abstention check would read 0/5 by construction.

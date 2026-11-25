@@ -128,6 +128,15 @@ touching provenance rows.
   physical-device run produces results. See `docs/verification/ocr-eval.md`.
 - **R7 fixtures.** The fixtures this ADR's remaining gap refers to now exist.
   The measurements themselves are still a gap.
+- **Gate ruling, stricter than R3 (acting owner, 2026-11-25).**
+  - R3 averaged an abstention on a Latin fixture into that category's CER
+    mean as 1.0. On this set, one wrong abstention among 13 or 14 Latin
+    fixtures was diluted into a pass.
+  - The gate therefore fails an engine on any abstention on a Latin
+    fixture (`abstentions_on_latin`, limit 0).
+  - In the same review the gate also gained a `timeouts` check (limit 0)
+    and model-version pins per engine. The `timeouts` check is not yet
+    owner-reviewed.
 - **V-15 / VS-3 (P2-04-R5).**
   - On ground truth, one stray Cyrillic word or glyph makes whole-revision
     abstention drop 14 to 18 Latin lines per mixed fixture. The per-span
