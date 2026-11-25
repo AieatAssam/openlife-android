@@ -44,6 +44,33 @@ class PaletteContrastTest {
         }
     }
 
+    /**
+     * P2-07 review T-04: the amber "not assessed" marker is a non-text
+     * boundary on the viewer card (surfaceVariant) and the page, so it needs
+     * 3:1 (WCAG 1.4.11). Light amber is below 4.5:1, so it is never text.
+     */
+    @Test
+    fun attentionMarkerMeetsThreeToOneOnPaperAndCard() {
+        val source = Files.readString(
+            projectDir.resolve("app/src/main/java/org/openlife/app/ui/theme/OpenLifeColors.kt"),
+        )
+        val colors = Regex("(?:internal val|val)\\s+(\\w+)\\s*=\\s*Color\\(0xFF([0-9A-Fa-f]{6})\\)")
+            .findAll(source)
+            .associate { it.groupValues[1] to it.groupValues[2].toLong(16) }
+        listOf(
+            "Attention" to "RaisedPaper",
+            "Attention" to "Paper",
+            "DarkAttention" to "DarkRaisedSurface",
+            "DarkAttention" to "DarkSurface",
+        ).forEach { (marker, background) ->
+            val contrast = contrastRatio(
+                colors[marker] ?: error("Missing marker token $marker"),
+                colors[background] ?: error("Missing background token $background"),
+            )
+            assertTrue("$marker on $background has contrast $contrast", contrast >= 3.0)
+        }
+    }
+
     private fun contrastRatio(first: Long, second: Long): Double {
         val firstLuminance = relativeLuminance(first)
         val secondLuminance = relativeLuminance(second)

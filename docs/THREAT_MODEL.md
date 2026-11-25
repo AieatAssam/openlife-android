@@ -226,6 +226,29 @@ open and in both WAL and TRUNCATE journal modes. The value observed on a
 device (`DatabasePragmaTest`) and the write-latency cost of FULL are
 pending a physical-device run.
 
+## Communication safety (design §6, P2-07)
+
+A shared screenshot of a message can ask the user to pay, sign in or reply.
+OpenLife stores such an item as inert content and does not judge it. From
+C1 on, every Source carries an explicit assessment state; in this build it
+is always `NOT_ASSESSED`, because no assessment method exists yet, and the
+viewer says "Safety check: not assessed in this version". No state, label
+or copy in the app may present an item as safe; `NO_INDICATORS_FOUND`, when
+a later capability can produce it, will mean only that a completed check
+found no indicators. The user may answer "Is this a message or request from
+someone?". That answer is stored with its time as routing context for later
+capabilities (C3 must refuse or defer actionable proposals from
+communication-like content that is not assessed). It is not proof of
+safety and never changes the assessment state. A user can mislabel a
+message as "No"; later capabilities must therefore not treat "No" as an
+assessment, and an unanswered or "Not sure" item must not silently take the
+non-communication path. Links and requests in the content stay inert.
+
+| Threat | Required defence | Residual limit |
+| --- | --- | --- |
+| A scam message is read as vetted because the app stored or labelled it | Explicit `NOT_ASSESSED` state and copy; no "safe" wording; the user label is attributed and never sets the assessment | The app gives no protection beyond inert display until an assessment exists (C3 gate, C10) |
+| A newer build's assessment result is misread by an older build | Unknown stored values decode to `UNRECOGNISED`, are shown as recorded by another version, and are never written back | The older build cannot show the newer result or its evidence |
+
 ## Environment-specific gaps in this build (recorded, not hidden)
 
 - Instrumented and adversarial testing in this repository's development

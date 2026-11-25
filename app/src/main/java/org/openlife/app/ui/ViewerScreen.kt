@@ -44,6 +44,7 @@ import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.ocr.OcrReviewState
 import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.repository.ReadyReadResult
@@ -69,6 +70,7 @@ fun ViewerScreen(
     onReview: (OcrReviewState) -> Unit = {},
     onRejectSpan: (OcrSpan) -> Unit = {},
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
+    onSetUserContentKind: (UserContentKind?) -> Unit = {},
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
@@ -104,6 +106,7 @@ fun ViewerScreen(
                 onRejectSpan(span)
             },
             onUndoRejectSpan = onUndoRejectSpan,
+            onSetUserContentKind = onSetUserContentKind,
         )
     }
 
@@ -171,6 +174,7 @@ private fun ViewerContent(
     onReview: (OcrReviewState) -> Unit,
     onRejectSpan: (OcrSpan) -> Unit,
     onUndoRejectSpan: (OcrSpan) -> Unit,
+    onSetUserContentKind: (UserContentKind?) -> Unit,
 ) {
     val ready = ocrState as? OcrUiState.Ready
     val spans = ready?.spans.orEmpty()
@@ -216,7 +220,11 @@ private fun ViewerContent(
                 onUndoRejectSpan = onUndoRejectSpan,
             )
             PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            DetailsSection(source = source, verified = content is ViewerContentState.Shown)
+            DetailsSection(
+                source = source,
+                verified = content is ViewerContentState.Shown,
+                onSetUserContentKind = onSetUserContentKind,
+            )
         }
     }
 }
@@ -266,7 +274,7 @@ private fun ViewerCorrectionDialog(
 }
 
 @Composable
-private fun DetailsSection(source: Source, verified: Boolean) {
+private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKind: (UserContentKind?) -> Unit) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
@@ -296,6 +304,10 @@ private fun DetailsSection(source: Source, verified: Boolean) {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            // P2-07: communication safety context; no assessment runs in this version.
+            PerforationDivider(modifier = Modifier.padding(top = 12.dp))
+            AssessmentNotice(source)
+            if (ContentKindLabel.showQuestion(source)) ContentKindQuestion(source, onSetUserContentKind)
         }
     }
 }
