@@ -20,7 +20,8 @@ class SearchFixture(val host: HostSqlite) {
         if (state == "READY") {
             host.exec(
                 "INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height, " +
-                    "orientation, wrappedDek, artefactVersion) VALUES (?, 'READY', ?, 'SHARE', 'image/png', 10, X'01', " +
+                    "orientation, wrappedDek, artefactVersion) " +
+                    "VALUES (?, 'READY', ?, 'SHARE', 'image/png', 10, X'01', " +
                     "10, 10, 'NORMAL', X'02', 1)",
                 id,
                 clock++,
@@ -51,7 +52,8 @@ class SearchFixture(val host: HostSqlite) {
 
     fun span(id: String, revisionId: String, ordinal: Int, text: String) {
         host.exec(
-            "INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, `left`, top, `right`, " +
+            "INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, " +
+                "`left`, top, `right`, " +
                 "bottom) VALUES (?, ?, ?, ?, NULL, 'SOURCE_PIXELS', 1, 1, 5, 5)",
             id,
             revisionId,
@@ -76,7 +78,7 @@ class SearchFixture(val host: HostSqlite) {
         host.exec(
             "INSERT INTO ocr_span_reviews(id, spanId, reviewState, createdAt, sequence) " +
                 "SELECT ?, ?, ?, ?, COALESCE(MAX(sequence), 0) + 1 FROM ocr_span_reviews WHERE spanId = ?",
-            "review-${clock}",
+            "review-$clock",
             spanId,
             state,
             clock++,

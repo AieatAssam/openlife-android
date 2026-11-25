@@ -27,10 +27,7 @@ import java.util.UUID
  * writes the index (the triggers do) and never logs the query or a result.
  * The flow re-emits when the content tables change.
  */
-class SearchRepository(
-    private val dao: SearchDao,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
+class SearchRepository(private val dao: SearchDao, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     /** The app's entry point: callers outside the vault never see Room types. */
     constructor(database: OpenLifeDatabase) : this(database.searchDao())
 

@@ -216,19 +216,7 @@ fun OpenLifeNavHost(
                     ViewerDestination(screens, route.sourceId, route.spanId.toUuidOrNull(), navController)
                 }
             }
-            composable<Routes.Search> {
-                val host = search ?: SearchHostState()
-                SearchScreen(
-                    query = host.query,
-                    state = host.state,
-                    onQueryChange = host.onQueryChange,
-                    onOpenResult = { hit ->
-                        navController.navigate(Routes.Viewer(hit.sourceId.toString(), hit.spanId?.toString()))
-                    },
-                    onBack = { navController.popBackStack() },
-                    labelFor = { id -> screens.find(id.toString())?.let { sourceLabel(it) } },
-                )
-            }
+            composable<Routes.Search> { SearchDestination(screens, search ?: SearchHostState(), navController) }
             composable<Routes.Settings> {
                 SettingsScreen(
                     onResetVault,
@@ -245,6 +233,20 @@ fun OpenLifeNavHost(
             }
         }
     }
+}
+
+@Composable
+private fun SearchDestination(screens: SourceScreens, host: SearchHostState, navController: NavHostController) {
+    SearchScreen(
+        query = host.query,
+        state = host.state,
+        onQueryChange = host.onQueryChange,
+        onOpenResult = { hit ->
+            navController.navigate(Routes.Viewer(hit.sourceId.toString(), hit.spanId?.toString()))
+        },
+        onBack = { navController.popBackStack() },
+        labelFor = { id -> screens.find(id.toString())?.let { sourceLabel(it) } },
+    )
 }
 
 @Composable

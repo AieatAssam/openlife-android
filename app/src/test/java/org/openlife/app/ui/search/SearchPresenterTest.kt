@@ -39,7 +39,8 @@ class SearchPresenterTest {
         assertEquals(SearchUiState.Results(listOf(hit("dentist"))), presenter.state.value)
 
         results.value = listOf(hit("dentist"), hit("dentist bill"))
-        assertEquals("a later database change updates the list", 2, (presenter.state.value as SearchUiState.Results).hits.size)
+        val results = presenter.state.value as SearchUiState.Results
+        assertEquals("a later database change updates the list", 2, results.hits.size)
     }
 
     @Test

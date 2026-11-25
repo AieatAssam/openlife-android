@@ -29,7 +29,9 @@ object SearchSnippet {
         val prefix = if (start > 0) ELLIPSIS else ""
         val suffix = if (cutEnd < text.length) ELLIPSIS else ""
         val shift = prefix.length - start
-        val inside = ranges.filter { it.first >= start && it.last < cutEnd }.map { (it.first + shift)..(it.last + shift) }
+        val inside = ranges
+            .filter { it.first >= start && it.last < cutEnd }
+            .map { (it.first + shift)..(it.last + shift) }
         return Snippet(prefix + text.substring(start, cutEnd) + suffix, inside)
     }
 
@@ -39,7 +41,10 @@ object SearchSnippet {
         val origin = mutableListOf<Int>()
         text.forEachIndexed { index, char ->
             val piece = fold(char.toString())
-            piece.forEach { folded.append(it); origin += index }
+            piece.forEach {
+                folded.append(it)
+                origin += index
+            }
         }
         val haystack = folded.toString()
         val found = mutableListOf<IntRange>()

@@ -44,16 +44,19 @@ class HostSqlite : Closeable {
         input.write(line)
         input.write("\n")
         input.flush()
-        val status = output.readLine() ?: throw Failure("python3 exited: ${process.errorStream.bufferedReader().readText()}")
+        val status = nextLine()
         val rows = mutableListOf<List<Any?>>()
         while (true) {
-            val row = output.readLine() ?: throw Failure("python3 exited mid-result")
+            val row = nextLine()
             if (row == "END") break
             rows += row.split(' ').map(::decode)
         }
         if (status.startsWith("ERR ")) throw Failure(String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8))
         return rows
     }
+
+    private fun nextLine(): String = output.readLine()
+        ?: throw Failure("python3 exited: ${process.errorStream.bufferedReader().readText()}")
 
     fun long(sql: String, vararg args: Any?): Long = query(sql, *args).single().single() as Long
 
@@ -92,7 +95,8 @@ class HostSqlite : Closeable {
 
         private fun hex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it) }
 
-        private fun unhex(text: String) = ByteArray(text.length / 2) { text.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+        private fun unhex(text: String) =
+            ByteArray(text.length / 2) { text.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
         private fun encode(value: Any?): String = when (value) {
             null -> "n"

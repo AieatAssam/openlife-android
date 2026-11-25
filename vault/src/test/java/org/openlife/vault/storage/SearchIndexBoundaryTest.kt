@@ -17,7 +17,10 @@ class SearchIndexBoundaryTest {
 
     @Test
     fun onlySearchIndexWritesFtsRows() {
-        val write = Regex("(INSERT|DELETE|UPDATE|REPLACE)[^\\n]*(ocr_text_fts|ocr_correction_fts)", RegexOption.IGNORE_CASE)
+        val write = Regex(
+            "(INSERT|DELETE|UPDATE|REPLACE)[^\\n]*(ocr_text_fts|ocr_correction_fts)",
+            RegexOption.IGNORE_CASE,
+        )
         val writers = sources.filter { write.containsMatchIn(it.readText()) }.map { it.name }
         assertEquals(listOf("SearchIndex.kt"), writers)
     }
@@ -31,6 +34,12 @@ class SearchIndexBoundaryTest {
     @Test
     fun nothingRunsVacuum() {
         val vacuum = Regex("\\bVACUUM\\b", RegexOption.IGNORE_CASE)
-        assertEquals(emptyList<String>(), sources.filter { vacuum.containsMatchIn(it.readText().lines().filterNot { l -> l.trim().startsWith("*") || l.trim().startsWith("//") }.joinToString("\n")) }.map { it.name })
+        val runners = sources.filter { file -> vacuum.containsMatchIn(codeOnly(file.readText())) }.map { it.name }
+        assertEquals(emptyList<String>(), runners)
     }
+
+    private fun codeOnly(text: String): String = text.lines().filterNot { line ->
+        val trimmed = line.trim()
+        trimmed.startsWith("*") || trimmed.startsWith("//")
+    }.joinToString("\n")
 }

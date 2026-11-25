@@ -58,7 +58,9 @@ object SearchSql {
      */
     fun like(patterns: List<String>, limit: Int): Statement {
         require(patterns.isNotEmpty())
-        fun matches(column: String) = patterns.indices.joinToString(" AND ") { "lower($column) LIKE ?${it + 1} ESCAPE '\\'" }
+        fun matches(column: String) = patterns.indices.joinToString(" AND ") { index ->
+            "lower($column) LIKE ?${index + 1} ESCAPE '\\'"
+        }
         val sql = "SELECT sourceId, revisionId, spanId, text, isCorrection, score, ordinal FROM (" +
             "SELECT r.sourceId AS sourceId, s.revisionId AS revisionId, s.id AS spanId, s.text AS text, " +
             "0 AS isCorrection, 0.0 AS score, s.ordinal AS ordinal " +

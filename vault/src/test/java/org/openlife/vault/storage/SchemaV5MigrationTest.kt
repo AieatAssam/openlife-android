@@ -44,7 +44,7 @@ class SchemaV5MigrationTest {
         val triggers = ReadyInvariantTriggers.names
         assertTrue("the migration runs every index statement in order", executed.containsAll(index))
         assertEquals(index, executed.filter { it in index })
-        assertTrue(executed.none { it.startsWith("ALTER") || it.startsWith("DROP TABLE") && !it.contains("temp.") })
+        assertTrue(executed.none { it.startsWith("ALTER") || (it.startsWith("DROP TABLE") && !it.contains("temp.")) })
         val tail = executed.takeLast(triggers.size * 2)
         triggers.forEachIndexed { i, name ->
             assertEquals("DROP TRIGGER IF EXISTS $name", tail[i * 2])
@@ -55,7 +55,10 @@ class SchemaV5MigrationTest {
     @Test
     fun indexStatementsUseTheBriefsTablesTokenizerAndTriggers() {
         val sql = SearchIndex.statements()
-        listOf(SearchIndex.TEXT_TABLE to "content='ocr_spans'", SearchIndex.CORRECTION_TABLE to "content='ocr_user_revisions'")
+        listOf(
+            SearchIndex.TEXT_TABLE to "content='ocr_spans'",
+            SearchIndex.CORRECTION_TABLE to "content='ocr_user_revisions'",
+        )
             .forEach { (table, content) ->
                 val create = sql.single { it.startsWith("CREATE VIRTUAL TABLE IF NOT EXISTS $table ") }
                 assertTrue(create, create.contains("USING fts5("))
@@ -67,7 +70,8 @@ class SchemaV5MigrationTest {
         SearchIndex.triggerNames.forEach { name ->
             assertTrue(name, sql.any { it.startsWith("CREATE TRIGGER $name AFTER") })
         }
-        assertTrue(listOf("INSERT", "UPDATE", "DELETE").all { event -> sql.count { it.contains("AFTER $event ON") } == 2 })
+        val events = listOf("INSERT", "UPDATE", "DELETE")
+        assertTrue(events.all { event -> sql.count { it.contains("AFTER $event ON") } == 2 })
     }
 
     @Test

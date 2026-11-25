@@ -107,8 +107,11 @@ private fun SearchResults(
 ) {
     when (state) {
         SearchUiState.Idle -> Message(stringResource(R.string.search_idle))
+
         SearchUiState.Searching -> Message(stringResource(R.string.search_searching))
+
         SearchUiState.NoResults -> Message(stringResource(R.string.search_no_results))
+
         is SearchUiState.Results -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
             // Keys are positional: the same span can appear as extracted text and as a correction.
             itemsIndexed(state.hits, key = { index, _ -> index }) { index, hit ->
@@ -141,8 +144,9 @@ private fun ResultRow(hit: SearchHit, itemLabel: String?, onOpen: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("search_result"),
     ) {
+        val kind = if (hit.isCorrection) R.string.search_result_corrected else R.string.search_result_extracted
         Text(
-            stringResource(if (hit.isCorrection) R.string.search_result_corrected else R.string.search_result_extracted),
+            stringResource(kind),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

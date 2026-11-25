@@ -82,7 +82,8 @@ class SearchIndexHostTest {
         assertEquals("Dentist bill paid at reception", correction.snippet)
         assertEquals(listOf(0..6), correction.highlights)
 
-        assertEquals("prefix of the last word", listOf(id(S2)), search("recep").filterNot { it.isCorrection }.map { it.spanId })
+        val prefixHits = search("recep").filterNot { it.isCorrection }.map { it.spanId }
+        assertEquals("prefix of the last word", listOf(id(S2)), prefixHits)
         assertEquals("diacritics fold both ways", listOf(id(S3)), search("cafe lumiere").map { it.spanId })
         assertEquals(listOf(id(S3)), search("CAFÉ").map { it.spanId })
         assertEquals("all words must match", emptyList<SearchHit>(), search("dentist lumiere"))
@@ -93,7 +94,11 @@ class SearchIndexHostTest {
         SearchFixture.migrated(host) {
             // Revision rejected by the user.
             source("10000000-0000-0000-0000-000000000001")
-            revision("20000000-0000-0000-0000-000000000001", "10000000-0000-0000-0000-000000000001", reviewState = "REJECTED")
+            revision(
+                "20000000-0000-0000-0000-000000000001",
+                "10000000-0000-0000-0000-000000000001",
+                reviewState = "REJECTED",
+            )
             span("30000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000001", 0, "walrus rejected")
             // Latest revision STALE; an older READY one has the word.
             source("10000000-0000-0000-0000-000000000002")
@@ -111,14 +116,34 @@ class SearchIndexHostTest {
             revision("20000000-0000-0000-0000-000000000006", "10000000-0000-0000-0000-000000000004")
             span("30000000-0000-0000-0000-000000000006", "20000000-0000-0000-0000-000000000006", 0, "walrus new run")
             // A rejected span, and a span whose rejection was undone.
-            span("30000000-0000-0000-0000-000000000007", "20000000-0000-0000-0000-000000000006", 1, "walrus span rejected")
+            span(
+                "30000000-0000-0000-0000-000000000007",
+                "20000000-0000-0000-0000-000000000006",
+                1,
+                "walrus span rejected",
+            )
             review("30000000-0000-0000-0000-000000000007", "REJECTED")
-            span("30000000-0000-0000-0000-000000000008", "20000000-0000-0000-0000-000000000006", 2, "walrus span restored")
+            span(
+                "30000000-0000-0000-0000-000000000008",
+                "20000000-0000-0000-0000-000000000006",
+                2,
+                "walrus span restored",
+            )
             review("30000000-0000-0000-0000-000000000008", "REJECTED")
             review("30000000-0000-0000-0000-000000000008", "UNREVIEWED")
             // A superseded correction no longer matches; the latest one does.
-            correction("40000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000006", "30000000-0000-0000-0000-000000000006", "zebra")
-            correction("40000000-0000-0000-0000-000000000002", "20000000-0000-0000-0000-000000000006", "30000000-0000-0000-0000-000000000006", "yak")
+            correction(
+                "40000000-0000-0000-0000-000000000001",
+                "20000000-0000-0000-0000-000000000006",
+                "30000000-0000-0000-0000-000000000006",
+                "zebra",
+            )
+            correction(
+                "40000000-0000-0000-0000-000000000002",
+                "20000000-0000-0000-0000-000000000006",
+                "30000000-0000-0000-0000-000000000006",
+                "yak",
+            )
         }
 
         assertEquals(
@@ -217,7 +242,10 @@ class SearchIndexHostTest {
             "\u0000", "parcel\nslip", "​parcel",
         )
         hostile.forEach { input ->
-            val hits = runCatching { search(input) }.getOrElse { fail("'$input' failed: $it"); emptyList() }
+            val hits = runCatching { search(input) }.getOrElse {
+                fail("'$input' failed: $it")
+                emptyList()
+            }
             val literal = SearchQuery.tokens(input)
             hits.forEach { hit ->
                 assertTrue(
@@ -268,7 +296,7 @@ class SearchIndexHostTest {
         val started = System.nanoTime()
         val hits = search("receipt total")
         val elapsedMs = (System.nanoTime() - started) / 1_000_000
-        println("P2-08 host-engine search latency: ${elapsedMs} ms for $SPANS spans, ${hits.size} hits (limit 50)")
+        println("P2-08 host-engine search latency: $elapsedMs ms for $SPANS spans, ${hits.size} hits (limit 50)")
         assertEquals(SearchRepository.DEFAULT_LIMIT, hits.size)
         assertTrue("host search took $elapsedMs ms", elapsedMs < HOST_BUDGET_MS)
     }
