@@ -97,7 +97,10 @@ class SearchFixture(val host: HostSqlite) {
      * with distinct first letters.
      */
     fun dataContains(table: String, term: String): Boolean {
-        val needle = term.toByteArray(Charsets.UTF_8)
+        // FTS5 prefix-compresses each term against the one before it in the
+        // segment ("lamp" then "lighthouse" stores only "ighthouse"), so the
+        // scan looks for the term's tail, which is stored whenever the term is.
+        val needle = term.drop(if (term.length >= LONG_TERM) 2 else 1).toByteArray(Charsets.UTF_8)
         return host.query("SELECT block FROM ${table}_data").any { row ->
             val block = row.single() as? ByteArray ?: return@any false
             (0..block.size - needle.size).any { start -> needle.indices.all { block[start + it] == needle[it] } }
@@ -112,6 +115,8 @@ class SearchFixture(val host: HostSqlite) {
     fun integrityCheck(table: String) = host.exec("INSERT INTO $table($table) VALUES('integrity-check')")
 
     companion object {
+        private const val LONG_TERM = 6
+
         val V4: File = File("schemas/org.openlife.vault.storage.OpenLifeDatabase/4.json")
         val V5: File = File("schemas/org.openlife.vault.storage.OpenLifeDatabase/5.json")
 

@@ -265,3 +265,23 @@ Room's runtime acceptance of the non-entity FTS tables (no "Unexpected
 table" or identity failure at open, and `validateDroppedTables = false`
 validating the rest) is believed from reading room 2.8.5, and is
 unconfirmed until a device run.
+
+## Local run of the index tests after the review fixes (2026-11-25)
+
+Hosted CI's SQLite may be older than 3.42, in which case the index cases
+skip there, so the suite was run on this VM (python3 SQLite 3.53.3) at the
+review-fix head:
+
+- First run: `SearchIndexHostTest.cascadeOnlyDeletionLeavesNoFtsRows` failed
+  on its positive control. Cause: the byte scan looked for whole terms, but
+  FTS5 prefix-compresses each term against its predecessor ("lamp" then
+  "lighthouse" stores "ighthouse"). `SearchFixture.dataContains` now scans
+  for the term's tail.
+- After the fix: `./gradlew :vault:detekt :vault:testDebugUnitTest` =>
+  BUILD SUCCESSFUL, vault 191 tests, 0 skipped, 0 failed
+  (`SearchIndexHostTest` 15/15).
+- Recorded mutation: setting `secure-delete` to 0 on both tables makes 6 of
+  15 `SearchIndexHostTest` cases fail, including the three deletion cases
+  that scan `<table>_data`; reverted.
+
+This is host SQLite, not SQLCipher; the on-device checks above still stand.
