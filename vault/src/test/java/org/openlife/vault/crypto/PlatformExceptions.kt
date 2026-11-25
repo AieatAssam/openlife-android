@@ -16,6 +16,8 @@ internal object PlatformExceptions {
 
     fun keyPermanentlyInvalidated(): Throwable = allocate(KEY_PERMANENTLY_INVALIDATED)
 
+    fun sqliteException(): Throwable = allocate("android.database.sqlite.SQLiteException")
+
     private fun allocate(name: String): Throwable {
         val instance = runCatching {
             val unsafeType = Class.forName("sun.misc.Unsafe")

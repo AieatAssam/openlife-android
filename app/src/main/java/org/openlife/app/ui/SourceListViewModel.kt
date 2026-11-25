@@ -124,7 +124,7 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
             val result = access.deletionRepository.deleteSource(sourceId)
             if (result is DeleteResult.Deleted) thumbnailCache.remove(sourceId)
             // A-10 test hook: lets the Room flow win the race against the callback.
-            if (deleteResultDelayMillisForTest > 0) kotlinx.coroutines.delay(deleteResultDelayMillisForTest)
+            beforeDeleteResultForTest?.invoke()
             onResult(result)
         }
     }
@@ -156,10 +156,14 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     }
 
     companion object {
-        /** Test seam (P1-19-R14): holds back the delete callback so the list flow emits first. */
+        /**
+         * Test seam (P1-19-R14): holds back the delete callback until the test
+         * releases it, so the list flow emits first. Kept until P1-20, which
+         * rebuilds ViewModel scoping and can inject the repository instead.
+         */
         @VisibleForTesting
         @Volatile
-        internal var deleteResultDelayMillisForTest = 0L
+        internal var beforeDeleteResultForTest: (suspend () -> Unit)? = null
 
         private const val THUMBNAIL_TARGET_PIXELS = 40_000L
 

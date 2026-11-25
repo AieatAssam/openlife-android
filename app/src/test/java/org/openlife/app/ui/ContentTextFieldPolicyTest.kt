@@ -3,51 +3,45 @@ package org.openlife.app.ui
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.TextToolbar
-import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A-02 (P1-19-R5): the parts of [ContentTextField] that decide what may leave
- * a content-bearing field. The composable wiring is covered by the
- * instrumented ContentTextFieldTest; these rules are pure.
+ * A-02 (P1-19-R5, review Q-01): the parts of [ContentTextField] that decide
+ * what may leave a content-bearing field. The composable wiring is covered by
+ * the instrumented ContentTextFieldTest; these rules are pure.
  */
 class ContentTextFieldPolicyTest {
     @Test
-    fun theToolbarNeverOffersCopyOrCut() {
-        val platform = RecordingToolbar()
-        val toolbar = NoClipboardWriteTextToolbar(platform)
+    fun theContextMenuKeepsOnlyPasteAndSelectAll() {
+        assertTrue(ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.PasteKey))
+        assertTrue(ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.SelectAllKey))
 
-        toolbar.showMenu(
-            Rect.Zero,
-            onCopyRequested = {},
-            onPasteRequested = {},
-            onCutRequested = {},
-            onSelectAllRequested = {},
-        )
-
-        assertNull("no Copy", platform.copy)
-        assertNull("no Cut", platform.cut)
-        assertNotNull("Paste may stay", platform.paste)
-        assertNotNull("Select all may stay", platform.selectAll)
-
-        toolbar.showMenu(Rect.Zero, {}, {}, {}, {}, {})
-        assertNull("no Copy (autofill overload)", platform.copy)
-        assertNull("no Cut (autofill overload)", platform.cut)
+        assertFalse("Copy", ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.CopyKey))
+        assertFalse("Cut", ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.CutKey))
+        assertFalse("Autofill", ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.AutofillKey))
+        // ACTION_PROCESS_TEXT and text-classification items carry keys of their
+        // own (ProcessTextKey's constructor is internal to Compose, so it cannot
+        // be built here); an allow-list drops any key it does not name.
+        assertFalse("unknown key", ContentTextPolicy.keepsContextMenuItem(Any()))
     }
 
     @Test
-    fun theNewContextMenuDropsCopyAndCutComponents() {
-        assertFalse(ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.CopyKey))
-        assertFalse(ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.CutKey))
-        assertTrue(ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.PasteKey))
-        assertTrue(ContentTextPolicy.keepsContextMenuItem(TextContextMenuKeys.SelectAllKey))
+    fun theFieldClipboardDropsWritesAndKeepsReads(): Unit = runBlocking {
+        val platform = CountingClipboard()
+        val clipboard = ReadOnlyClipboard(platform)
+
+        clipboard.setClipEntry(null)
+        assertEquals("a write reached the platform clipboard", 0, platform.writes)
+
+        assertNull(clipboard.getClipEntry())
+        assertEquals("Paste must still read the platform clipboard", 1, platform.reads)
     }
 
     @Test
@@ -74,35 +68,17 @@ class ContentTextFieldPolicyTest {
         assertFalse(ContentTextPolicy.isClipboardWriteShortcut(KeyEvent.KEYCODE_C, ctrl = false, shift = false))
     }
 
-    private class RecordingToolbar : TextToolbar {
-        var copy: (() -> Unit)? = null
-        var paste: (() -> Unit)? = null
-        var cut: (() -> Unit)? = null
-        var selectAll: (() -> Unit)? = null
-        override val status: TextToolbarStatus = TextToolbarStatus.Hidden
+    private class CountingClipboard : Clipboard {
+        var reads = 0
+        var writes = 0
 
-        override fun showMenu(
-            rect: Rect,
-            onCopyRequested: (() -> Unit)?,
-            onPasteRequested: (() -> Unit)?,
-            onCutRequested: (() -> Unit)?,
-            onSelectAllRequested: (() -> Unit)?,
-        ) {
-            copy = onCopyRequested
-            paste = onPasteRequested
-            cut = onCutRequested
-            selectAll = onSelectAllRequested
+        override suspend fun getClipEntry(): ClipEntry? {
+            reads++
+            return null
         }
 
-        override fun showMenu(
-            rect: Rect,
-            onCopyRequested: (() -> Unit)?,
-            onPasteRequested: (() -> Unit)?,
-            onCutRequested: (() -> Unit)?,
-            onSelectAllRequested: (() -> Unit)?,
-            onAutofillRequested: (() -> Unit)?,
-        ) = showMenu(rect, onCopyRequested, onPasteRequested, onCutRequested, onSelectAllRequested)
-
-        override fun hide() = Unit
+        override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+            writes++
+        }
     }
 }

@@ -6,6 +6,8 @@ import android.database.sqlite.SQLiteException
 import android.icu.text.ListFormatter
 import android.os.StrictMode
 import androidx.annotation.VisibleForTesting
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -83,8 +85,13 @@ class OpenLifeApp : Application() {
     private val preResetCallbacks = mutableSetOf<() -> Unit>()
     private var bootstrapOverrideForTest: ((VaultPaths, KeystoreWrapper) -> VaultBootstrapResult)? = null
 
+    @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate() {
         super.onCreate()
+        // Review Q-01: smart selection sends selected text to the system
+        // TextClassifier and offers its actions (Call, Map). Content text never
+        // goes there. Read at composition time, so it is set before any UI.
+        ComposeFoundationFlags.isSmartSelectionEnabled = false
         appLock.start()
         if (BuildConfig.DEBUG) {
             // P1-13-R3: surface main-thread disk and network access during

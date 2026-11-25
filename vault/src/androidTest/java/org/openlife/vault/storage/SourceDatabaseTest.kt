@@ -1,5 +1,6 @@
 package org.openlife.vault.storage
 
+import android.content.Context
 import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -28,8 +29,19 @@ class SourceDatabaseTest {
 
     @Test
     fun migrationAddsAssessmentColumnsWithNotAssessedDefaultAndPreservesRows() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val passphrase = ByteArray(32) { 13 }
         val name = "p207-assessment-${UUID.randomUUID()}"
+        // Review T-05: the file is deleted even when an assertion fails.
+        try {
+            migrateFromV3(name, passphrase)
+            labelAfterReopen(context, name, passphrase)
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    private fun migrateFromV3(name: String, passphrase: ByteArray) {
         val helper = MigrationTestHelper(
             InstrumentationRegistry.getInstrumentation(),
             OpenLifeDatabase::class.java,
@@ -99,8 +111,9 @@ class SourceDatabaseTest {
         } finally {
             migrated.close()
         }
+    }
 
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private fun labelAfterReopen(context: Context, name: String, passphrase: ByteArray) {
         val reopened = OpenLifeDatabaseFactory.create(
             context = context,
             paths = VaultPaths(context),
@@ -132,7 +145,6 @@ class SourceDatabaseTest {
             }
         } finally {
             reopened.close()
-            context.deleteDatabase(name)
         }
     }
 }

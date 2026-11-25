@@ -52,6 +52,7 @@ fi
 require "cmdline-tools setup is resilient" 'cmdline-tools/latest'
 require "CI invokes plan-check" 'scripts/plan-check\.sh'
 require "CI invokes the standard verification command" './gradlew detekt lint :app:test :vault:test assembleDebug'
+require "CI compiles the instrumented test sources" './gradlew :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin'
 if grep -Eq 'name: *app-debug-apk' "$WORKFLOW" &&
     grep -Fq 'app/build/outputs/apk/debug/app-debug.apk' "$WORKFLOW" &&
     grep -Eq 'if: *success\(\)' "$WORKFLOW"; then

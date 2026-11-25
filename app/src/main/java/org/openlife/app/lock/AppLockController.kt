@@ -19,10 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class AppLockController(private val context: Context, private val scope: CoroutineScope) {
     /** elapsedRealtime keeps counting through device sleep; see [AppLockState]. */
-    val state = AppLockState(clock = { SystemClock.elapsedRealtime() + clockOffsetForTest })
-
-    @Volatile
-    private var clockOffsetForTest = 0L
+    val state = AppLockState(clock = { SystemClock.elapsedRealtime() })
     val status: StateFlow<LockStatus> get() = state.status
     val policy: StateFlow<AppLockPolicy> get() = state.policy
 
@@ -32,8 +29,9 @@ class AppLockController(private val context: Context, private val scope: Corouti
     private var authenticatorOverride: BiometricAuthenticator? = null
     val authenticator: BiometricAuthenticator get() = authenticatorOverride ?: realAuthenticator
 
-    /** Test seam: the number of item-content reads let through [awaitContentAccess]. */
-    val contentReads = AtomicInteger()
+    /** Test seam: the number of item-content reads let through [awaitContentAccess] (review U-02: not public). */
+    @VisibleForTesting
+    internal val contentReadsForTest = AtomicInteger()
 
     /** Called once from Application.onCreate: read the policy off the main thread and watch the process. */
     fun start() {
@@ -54,7 +52,7 @@ class AppLockController(private val context: Context, private val scope: Corouti
      */
     suspend fun awaitContentAccess() {
         status.first { it == LockStatus.UNLOCKED }
-        contentReads.incrementAndGet()
+        contentReadsForTest.incrementAndGet()
     }
 
     /** Settings and onboarding change the policy here; it is persisted off the main thread. */
@@ -73,15 +71,8 @@ class AppLockController(private val context: Context, private val scope: Corouti
 
     @VisibleForTesting
     internal fun resetForTest() {
-        clockOffsetForTest = 0L
         authenticatorOverride = null
         AppLockPolicyStore.write(context, AppLockPolicy())
         state.start(AppLockPolicy())
-    }
-
-    /** Test seam: moves the lock's elapsedRealtime clock forward, as time spent away would. */
-    @VisibleForTesting
-    internal fun advanceClockForTest(millis: Long) {
-        clockOffsetForTest += millis
     }
 }

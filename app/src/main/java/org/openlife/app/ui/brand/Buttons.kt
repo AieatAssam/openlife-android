@@ -6,11 +6,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
@@ -91,6 +93,30 @@ fun OpenLifeFilledTonalButton(
         enabled = enabled,
         shape = OpenLifeButtonShape,
         colors = colors,
+        content = content,
+    )
+}
+
+/**
+ * Review U-02: the screen's one primary action (VISUAL_IDENTITY §7) is an
+ * extended FAB, a button with a filled container, so it takes the same 8 dp
+ * corner instead of Material's 16 dp. Icon buttons have no container (only a
+ * circular state layer), so they are not wrapped.
+ */
+@Composable
+fun OpenLifeExtendedFloatingActionButton(
+    onClick: () -> Unit,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = OpenLifeButtonShape,
+        containerColor = containerColor,
+        contentColor = contentColor,
         content = content,
     )
 }

@@ -110,6 +110,31 @@ keys on `source.id` and `source.state`; viewer state on `source.id`; list
 thumbnails on `sourceId`), so a label write, which emits a new `Source`, does
 not reload, re-authenticate or re-decode the image.
 
+## Review round (T-01..T-06)
+
+An independent review returned "accept after fixes". The fixes are in one
+commit, `P2-07: address review findings T-01..T-06`. **They were not
+compiled or run locally**: another agent held the host's only Gradle slot,
+so verification of this commit is the hosted CI run after the coordinator
+pushes. Nothing below is claimed as passed until CI reports.
+
+| Finding | Change | Test (not yet run) |
+|---|---|---|
+| T-01 | `ContentKindLabel.showQuestion`: the question renders only for a READY source (the write is READY-only, so a CORRUPT or DELETING tap did nothing). The selection is derived from the stored `Source` flow, so a write that returns false leaves the displayed answer equal to the stored one. | `ContentKindLabelTest.onlyAReadySourceIsAskedTheQuestion` |
+| T-02 | `AssessmentStateBoundaryTest` scans each file as one text (DOTALL) with five rules: a result name; `UPDATE sources SET ... assessmentState/assessmentMethodVersion =` across lines; `INSERT ... (... assessmentState/assessmentMethodVersion`; any assignment `assessmentState =` / `assessmentMethodVersion =` (named argument, `copy`, property) outside the storage mapper; `AssessmentState.entries/values()/valueOf()` or `enumValueOf/enumValues<AssessmentState>` outside the declaration and mapper. Each rule has a built-in mutation sample it must match (`everyRuleMatchesItsMutationSample`). Pre-check with the same patterns in Python over the 143 main sources: no violation; every sample matches; adding a continuation line `assessmentState = :kind,` to the real `SourceDao` query is caught. | `AssessmentStateBoundaryTest` (2 tests) |
+| T-03 | `SourceDao.writeUserContentKind` (internal, in `SourceViewRepository.kt`): `SQLiteException`, and the `IllegalStateException` Room uses for a closed database, return false; `CancellationException` (itself an `IllegalStateException`) is rethrown first. No logging. | `UserContentKindWriteTest` (5 tests, fake DAO; the SQLiteException instance comes from `PlatformExceptions`, skipped via Assume if it cannot be allocated) |
+| T-04 | The "not assessed" notice sits in a 1.5 dp amber (`brand.attention`) border; its text stays in the ink colour. Contrast computed: light amber on RaisedPaper 3.55:1, on Paper 3.23:1 (below 4.5:1, so never text); dark amber on DarkRaisedSurface 8.58:1, on DarkSurface 9.29:1. | `PaletteContrastTest.attentionMarkerMeetsThreeToOneOnPaperAndCard` (3:1) |
+| T-05 | `SourceDatabaseTest`: the body is split into `migrateFromV3` and `labelAfterReopen` under one outer try/finally that always deletes the database file. | device gap (below) |
+| T-06 | A stored label kind this build cannot read shows `viewer_content_kind_other_version` instead of "Answered by you: <time>"; nothing is selected and choosing any answer overwrites the other version's value (documented in C1-R9). | `ContentKindLabelTest.onlyAnUnreadableKindIsRecordedByAnotherVersionAndAnyAnswerReplacesIt` |
+
+Schema history: `schemas/.../4.json` was first committed in RED (dc73a8b)
+as a stub so the failing tests could name it; GREEN replaced it with Room's
+generated export. The reviewer confirmed the final file against Room's
+generated `OpenLifeDatabase_Impl` identity hash
+`e306b4a786aeffc4c9d42f263e2059f7`. Room's own on-device validation of the
+migrated schema (`runMigrationsAndValidate`) is still a gap: it runs only in
+`SourceDatabaseTest` on a device.
+
 ## Instrumented tests awaiting a device
 
 Each: implemented; unverified (gap — pending physical-device run).
