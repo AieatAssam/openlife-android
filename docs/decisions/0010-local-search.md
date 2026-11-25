@@ -111,9 +111,13 @@ filters. The pattern is `%token%` with `% _ \` escaped. This fallback is
 unranked and ordered by source.
 
 **Deviation recorded.** The brief asks for "a normalised lowercase
-column". No column was added: a stored lowercase copy would be a second
-plaintext copy of the content inside the vault, and the fallback exists
-only for a build that the evidence above says we do not ship. SQLite's
+column". No column was added. Such a column would sit inside SQLCipher, so
+it would not breach the no-plaintext-index rule. But it would change two
+entities and the schema's identityHash, and add write paths, all for a
+code path that the pinned engine never takes (see the evidence above).
+Performance is recorded on the host engine for both paths:
+`fiveHundredSpansOnTheLikeFallback` times the fallback, and
+`fiveHundredSpansOnTheHostEngine` times FTS5. SQLite's
 `lower()` folds ASCII only, so the fallback does not fold diacritics or
 non-Latin case. A database that was created without FTS5 does not gain
 the index later on its own. The migration has already run, so a later
@@ -121,8 +125,8 @@ step would need its own migration to rebuild it.
 
 ### UI (R4, R7, R9)
 
-- A search icon in the list's top bar (shown when the list has items)
-  opens `Routes.Search`. The query is never a route argument.
+- A search icon in the list's top bar opens `Routes.Search`. It is always
+  shown; in an empty vault the search simply finds nothing. The query is never a route argument.
 - The field is `ContentTextField`: no Copy/Cut, no autocorrect, no keyboard
   learning (A-02). It does not autocomplete and keeps no history.
 - Results update as the user types (200 ms debounce, latest query only).
@@ -149,8 +153,9 @@ step would need its own migration to rebuild it.
   - This proves the SQL and the trigger behaviour, but not SQLCipher.
   - The same cases are written for SQLCipher in `SearchRepositoryTest`
     (instrumented, device gap).
-- Measured latency is **host only**: 500 spans, 50 hits, about 16 ms on
-  the development VM. The acceptance target (under 200 ms for 500 spans
+- Measured latency is **host only** (500 spans, 50 hits, on the
+  development VM). The figures are in
+  `docs/verification/P2-08-local-search.md`. The acceptance target (under 200 ms for 500 spans
   on a device) is unverified until the instrumented run.
 
 ## Consequences

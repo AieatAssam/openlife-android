@@ -140,7 +140,15 @@ class SearchRepositoryTest {
             SupportOpenHelperFactory(ByteArray(32) { 3 }),
         )
         helper.createDatabase(migrationName, 4).close()
-        val migrated = helper.runMigrationsAndValidate(migrationName, 5, true, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
+        // validateDroppedTables = false: Room's scan of sqlite_master rejects any table that is not an
+        // entity, and the FTS5 tables (and their shadow tables) deliberately are not. Every entity table
+        // is still validated against 5.json.
+        val migrated = helper.runMigrationsAndValidate(
+            migrationName,
+            5,
+            false,
+            *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
+        )
         try {
             migrated.query("SELECT COUNT(*) FROM sqlite_master WHERE name IN ('ocr_text_fts', 'ocr_correction_fts')").use {
                 assertTrue(it.moveToFirst())

@@ -247,7 +247,9 @@ class OcrDatabaseTest {
         val migrated = cipherHelper.runMigrationsAndValidate(
             databaseName,
             currentDatabaseVersion(),
-            true,
+            // P2-08: v5's FTS5 tables are not entities, so the dropped-table scan would reject them;
+            // every entity table is still validated.
+            false,
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
         val tableExists = migrated.query(
@@ -295,7 +297,9 @@ class OcrDatabaseTest {
         val migrated = helper.runMigrationsAndValidate(
             name,
             currentDatabaseVersion(),
-            true,
+            // P2-08: v5's FTS5 tables are not entities, so the dropped-table scan would reject them;
+            // every entity table is still validated.
+            false,
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
         fun insertReady(id: String, mimeType: String?) = runCatching {
@@ -341,7 +345,9 @@ class OcrDatabaseTest {
         val migrated = helper.runMigrationsAndValidate(
             name,
             currentDatabaseVersion(),
-            true,
+            // P2-08: v5's FTS5 tables are not entities, so the dropped-table scan would reject them;
+            // every entity table is still validated.
+            false,
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
         try {

@@ -301,6 +301,26 @@ class SearchIndexHostTest {
         assertTrue("host search took $elapsedMs ms", elapsedMs < HOST_BUDGET_MS)
     }
 
+    /** P2-08-R5: the LIKE fallback's latency on the same 500 spans, with no index (host engine only). */
+    @Test
+    fun fiveHundredSpansOnTheLikeFallback() {
+        host.createFromExportedSchema(SearchFixture.V5)
+        SearchFixture(host).apply {
+            source(A)
+            revision(RA, A)
+            repeat(SPANS) { i ->
+                span(UUID(3L, i.toLong()).toString(), RA, i, "line $i of a synthetic receipt total ${i * 7} item w$i")
+            }
+        }
+        search("synthetic")
+        val started = System.nanoTime()
+        val hits = search("receipt total")
+        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+        println("P2-08 host-engine LIKE fallback latency: $elapsedMs ms for $SPANS spans, ${hits.size} hits (limit 50)")
+        assertEquals(SearchRepository.DEFAULT_LIMIT, hits.size)
+        assertTrue("host fallback search took $elapsedMs ms", elapsedMs < HOST_BUDGET_MS)
+    }
+
     private fun indexSchema(db: HostSqlite): List<String> = db.query(
         "SELECT type || ' ' || name || ' ' || COALESCE(sql, '') FROM sqlite_master " +
             "WHERE name LIKE '%fts%' ORDER BY type, name",

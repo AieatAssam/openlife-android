@@ -83,8 +83,8 @@ fun SourceListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.list_title)) },
                 actions = {
-                    // P2-08: search is offered once there is something to search.
-                    if (hasItems && onOpenSearch != null) {
+                    // P2-08: local search; an empty vault simply finds nothing.
+                    if (onOpenSearch != null) {
                         IconButton(onClick = onOpenSearch) {
                             Icon(
                                 Icons.Filled.Search,

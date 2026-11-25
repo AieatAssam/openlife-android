@@ -125,6 +125,18 @@ run, because nothing was pushed.
   removed. It asserted that the migration list ends at 3→4.
   `SchemaV5MigrationTest.migrationsAreListedInOrderThroughVersionFive`
   supersedes it.
+- `OcrDatabaseTest` (instrumented; three tests that migrate to
+  `currentDatabaseVersion()`) and the new
+  `SearchRepositoryTest.roomValidatesAMigratedDatabaseWithTheFtsTablesPresent`
+  now pass `validateDroppedTables = false` to `runMigrationsAndValidate`.
+  - Reason, read from room-testing 2.8.5 (`MigrateOpenDelegate.class`): with
+    `true`, Room runs `SELECT name FROM sqlite_master WHERE type = 'table'
+    AND name NOT IN (?, ?, ?)`, excluding room_master_table,
+    sqlite_sequence and android_metadata. It throws "Unexpected table" for
+    any table that is not an entity, which includes the FTS5 tables and
+    their shadow tables.
+  - Every entity table is still validated against the exported schema.
+  - Not run (device gap).
 - `SearchIndexHostTest.likeFallbackHasTheSameApiWhenFts5IsAbsent` (a
   P2-08 RED test) changed during GREEN. The RED input `"50_"` cannot test
   literal wildcards, because the sanitiser drops `_` and searches for the
