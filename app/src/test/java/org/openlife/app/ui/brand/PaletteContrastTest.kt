@@ -110,6 +110,51 @@ class PaletteContrastTest {
         assertTrue("decorative dividers keep Rule", light.outlineVariant == org.openlife.app.ui.theme.Rule)
     }
 
+    /**
+     * Review Q-03: Material draws the primary role as text (text and outlined
+     * buttons, focused field labels, links, the Saved stamp) on any surface or
+     * container, and inversePrimary as the snackbar action on inverseSurface.
+     * Each must reach 4.5:1 there, in light and in dark. Brand Vermilion
+     * #C8412B fails this (4.06:1 on surfaceContainerHigh, the dialog).
+     */
+    @Test
+    fun primaryTextReachesAaOnEverySurfaceItCanSitOn() {
+        val failures = listOf(
+            "light" to org.openlife.app.ui.theme.OpenLifeLightColors,
+            "dark" to org.openlife.app.ui.theme.OpenLifeDarkColors,
+        ).flatMap { (name, scheme) ->
+            val surfaces = listOf(
+                "background" to scheme.background,
+                "surface" to scheme.surface,
+                "surfaceVariant" to scheme.surfaceVariant,
+                "surfaceBright" to scheme.surfaceBright,
+                "surfaceDim" to scheme.surfaceDim,
+                "surfaceContainerLowest" to scheme.surfaceContainerLowest,
+                "surfaceContainerLow" to scheme.surfaceContainerLow,
+                "surfaceContainer" to scheme.surfaceContainer,
+                "surfaceContainerHigh" to scheme.surfaceContainerHigh,
+                "surfaceContainerHighest" to scheme.surfaceContainerHighest,
+                "primaryContainer" to scheme.primaryContainer,
+            )
+            val pairs = surfaces.map { (surface, color) -> "$name primary on $surface" to (scheme.primary to color) } +
+                listOf(
+                    "$name inversePrimary on inverseSurface" to (scheme.inversePrimary to scheme.inverseSurface),
+                    "$name onPrimary on primary" to (scheme.onPrimary to scheme.primary),
+                )
+            pairs.mapNotNull { (label, pair) ->
+                val ratio = ratio(pair.first.toArgb(), pair.second.toArgb())
+                if (ratio < 4.5) "$label is $ratio:1" else null
+            }
+        }
+        assertTrue("primary text below AA: $failures", failures.isEmpty())
+
+        val brandOnDialog = ratio(
+            org.openlife.app.ui.theme.Vermilion.toArgb(),
+            org.openlife.app.ui.theme.OpenLifeLightColors.surfaceContainerHigh.toArgb(),
+        )
+        assertTrue("self-check: brand Vermilion on the dialog container fails ($brandOnDialog:1)", brandOnDialog < 4.5)
+    }
+
     private fun androidx.compose.ui.graphics.Color.toArgb(): Long =
         ((alpha * 255).toLong() shl 24) or ((red * 255 + 0.5f).toLong() shl 16) or
             ((green * 255 + 0.5f).toLong() shl 8) or (blue * 255 + 0.5f).toLong()

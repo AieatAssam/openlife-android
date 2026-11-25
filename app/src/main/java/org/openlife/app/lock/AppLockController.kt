@@ -19,10 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class AppLockController(private val context: Context, private val scope: CoroutineScope) {
     /** elapsedRealtime keeps counting through device sleep; see [AppLockState]. */
-    val state = AppLockState(clock = { SystemClock.elapsedRealtime() + clockOffsetForTest })
-
-    @Volatile
-    private var clockOffsetForTest = 0L
+    val state = AppLockState(clock = { SystemClock.elapsedRealtime() })
     val status: StateFlow<LockStatus> get() = state.status
     val policy: StateFlow<AppLockPolicy> get() = state.policy
 
@@ -73,15 +70,8 @@ class AppLockController(private val context: Context, private val scope: Corouti
 
     @VisibleForTesting
     internal fun resetForTest() {
-        clockOffsetForTest = 0L
         authenticatorOverride = null
         AppLockPolicyStore.write(context, AppLockPolicy())
         state.start(AppLockPolicy())
-    }
-
-    /** Test seam: moves the lock's elapsedRealtime clock forward, as time spent away would. */
-    @VisibleForTesting
-    internal fun advanceClockForTest(millis: Long) {
-        clockOffsetForTest += millis
     }
 }

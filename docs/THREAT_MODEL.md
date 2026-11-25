@@ -27,17 +27,35 @@ adversary.
   No user data is sent to browser, calendar, messaging, email or share
   intents. No content in logs, clipboard, crash attachments, public caches,
   notifications or recents previews.
-  - **Clipboard and keyboard (P1-19-R5).** Every text field that can hold
-    user content is `ContentTextField`. It offers no Copy or Cut in the
-    selection toolbar or the context menu, blocks Ctrl+C, Ctrl+X,
-    Ctrl+Insert, Shift+Delete and the Copy/Cut keys, and refuses the
-    keyboard's own copy and cut requests. It also turns autocorrect off and
-    asks the keyboard not to learn from what is typed
-    (`IME_FLAG_NO_PERSONALIZED_LEARNING`). A boundary test fails on any other
-    text field in the app; the vault-reset word field is the one named
-    exemption, because it holds only a fixed confirmation word.
-  - **Residual:** the no-learning flag is a request. A keyboard that
-    ignores it can still learn what is typed in a correction.
+  - **Clipboard and keyboard (P1-19-R5, review Q-01).** Every text field
+    that can hold user content is `ContentTextField`. Closed, as established
+    from the compiled Compose foundation 1.12 classes
+    (docs/verification/P1-19-app-audit-remediation.md):
+    - The field's `LocalClipboard` drops every write, so no route the field
+      offers can put its text on the clipboard. That covers menu Copy/Cut,
+      shortcuts, the keyboard's copy/cut requests and the accessibility
+      Copy/Cut actions. Paste still reads the clipboard.
+    - The context menu is an allow-list of Paste and Select all. Copy, Cut,
+      Autofill, ACTION_PROCESS_TEXT apps (Translate and the like) and
+      text-classification actions are not offered.
+    - Smart selection is off app-wide, so selected text is not sent to the
+      system TextClassifier.
+    - Copy/Cut shortcuts and the keyboard's copy/cut requests are refused
+      before they reach the field.
+    - Autocorrect is off, and the keyboard is asked not to learn
+      (`IME_FLAG_NO_PERSONALIZED_LEARNING`).
+    A boundary test fails on any other text field in the app, and on any
+    clipboard reference outside `ContentTextField`. The vault-reset word
+    field is the one named exemption, because it holds only a fixed
+    confirmation word.
+  - **Residual (not closed):**
+    - The keyboard sees everything typed. The no-learning flag is a
+      request, and a keyboard that ignores it can learn a correction.
+    - A screen reader reads the field aloud, by design.
+    - An accessibility Cut action removes the selected text from the field,
+      though nothing reaches the clipboard.
+    - None of this is device-verified yet; the instrumented
+      `ContentTextFieldTest` is pending.
 - **Incoming share grants (P1-19-R18).** The sender sets
   `FLAG_GRANT_READ_URI_PERMISSION`, so its presence is not a control.
   OpenLife's defence is that it holds no media or storage permission: it
@@ -160,10 +178,12 @@ authenticates.
     the longer of the timeout and 60 seconds (P1-19-R1). Within that window,
     someone else who picks up the phone can return to OpenLife unprompted.
     A longer trip locks on return, even if the picker's result never
-    arrives. If a picker result is dropped, though, the trip flag stays set
-    until the next unlock. Every background period until then gets the same
-    60-second grace, so a zero timeout behaves as 60 seconds (audit A-07;
-    clearing the flag in `onStart` waits on device confirmation).
+    arrives. Returning to the foreground ends the trip (review Q-02), so a
+    dropped picker result no longer extends the grace to later background
+    periods. Residual: a return within ProcessLifecycleOwner's ~700 ms stop
+    delay sends no foreground event; if the result is also dropped, the
+    next background period still gets the trip grace. JVM-tested; the
+    device test is pending (audit A-07).
 - **If the device can no longer verify the user** (screen lock removed):
   OpenLife stays locked and explains how to restore a screen lock. It never
   unlocks silently.

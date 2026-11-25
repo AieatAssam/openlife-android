@@ -26,8 +26,11 @@ enum class LockStatus { UNKNOWN, LOCKED, UNLOCKED }
  * Leaving for an activity OpenLife itself started (the system credential
  * screen, the Photo Picker) is exempt only for a short round trip
  * (P1-19-R1): the time away is still measured, and on return the lock
- * engages once it reaches max(timeout, [EXTERNAL_GRACE_MILLIS]). A trip whose
- * result never arrives therefore cannot switch the lock off.
+ * engages once it reaches max(timeout, [EXTERNAL_GRACE_MILLIS]). Returning
+ * to the foreground ends the trip (review Q-02), so a trip whose result never
+ * arrives exempts at most its own background period. A return within
+ * ProcessLifecycleOwner's ~700 ms stop delay dispatches no foreground event;
+ * the flag then stays set until the result, the next return, or an unlock.
  */
 class AppLockState(private val clock: () -> Long) {
     private val mutableStatus = MutableStateFlow(LockStatus.UNKNOWN)
@@ -78,6 +81,11 @@ class AppLockState(private val clock: () -> Long) {
 
     @Synchronized
     fun onForeground() {
+        // Review Q-02 (A-07): coming back to the foreground ends any trip.
+        // The trip's own background period was classified in onBackground; a
+        // result callback that arrives later finds the flag already clear, and
+        // one that never arrives cannot leave it set (fails closed).
+        externalActivity = false
         val since = backgroundedAt ?: return
         backgroundedAt = null
         val current = mutablePolicy.value

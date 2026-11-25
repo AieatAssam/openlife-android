@@ -12,11 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
@@ -26,6 +28,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -37,9 +41,11 @@ import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.theme.OpenLifeTheme
 
 /**
- * A-02 (P1-19-R5): the OCR correction field holds user content. It must not
- * offer Copy or Cut, must not write the clipboard through keyboard
- * shortcuts, and must ask the keyboard not to learn from what is typed.
+ * A-02 (P1-19-R5, review Q-01/Q-08): the OCR correction field holds user
+ * content. It must offer Paste but not Copy or Cut, must not write the
+ * clipboard through keyboard shortcuts or the accessibility Copy action, and
+ * must ask the keyboard not to learn from what is typed. The test writes a
+ * sentinel to the device clipboard and restores the previous clip afterwards.
  */
 @RunWith(AndroidJUnit4::class)
 class ContentTextFieldTest {
@@ -51,26 +57,47 @@ class ContentTextFieldTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val device = UiDevice.getInstance(instrumentation)
+    private val clipboard = instrumentation.targetContext.getSystemService(ClipboardManager::class.java)
+
+    /** The device clipboard as it was before this test; put back in [restoreClipboard]. */
+    private var savedClip: ClipData? = null
+    private var clipSaved = false
+
+    @After
+    fun restoreClipboard() {
+        if (!clipSaved) return
+        instrumentation.runOnMainSync {
+            val saved = savedClip
+            if (saved != null) clipboard.setPrimaryClip(saved) else clipboard.clearPrimaryClip()
+        }
+    }
 
     @Test
-    fun correctionFieldOffersNoCopyOrCut() {
-        val clipboard = instrumentation.targetContext.getSystemService(ClipboardManager::class.java)
-        instrumentation.runOnMainSync { clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", SENTINEL)) }
+    fun correctionFieldOffersPasteButNoCopyOrCutAndNeverWritesTheClipboard() {
         composeRule.setContent {
             OpenLifeTheme {
                 var text by remember { mutableStateOf(SYNTHETIC_CONTENT) }
                 ContentTextField(value = text, onValueChange = { text = it }, modifier = Modifier.testTag(FIELD))
             }
         }
-
         val field = composeRule.onNodeWithTag(FIELD)
         field.performClick()
+        composeRule.waitForIdle()
+        // Saved after the window has focus: from API 29 an unfocused app reads null.
+        instrumentation.runOnMainSync {
+            savedClip = clipboard.primaryClip
+            clipSaved = true
+            clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", SENTINEL))
+        }
+
         field.performTextInputSelection(TextRange(0, SYNTHETIC_CONTENT.length))
         field.performTouchInput { longClick() }
         composeRule.waitForIdle()
-        device.waitForIdle()
+        // Positive control: the menu is shown and Paste is offered.
+        assertTrue("Paste is not offered", device.wait(Until.hasObject(By.text("Paste")), WAIT_MS))
         assertFalse("a Copy item is offered", device.hasObject(By.text("Copy")))
         assertFalse("a Cut item is offered", device.hasObject(By.text("Cut")))
+        device.pressBack()
 
         field.performTextInputSelection(TextRange(0, SYNTHETIC_CONTENT.length))
         field.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.C) } }
@@ -78,10 +105,19 @@ class ContentTextFieldTest {
         field.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.Insert) } }
         field.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Delete) } }
         composeRule.waitForIdle()
+        assertEquals("a shortcut wrote the clipboard", SENTINEL, primaryClipText())
 
+        // The accessibility route (TalkBack / Voice Access "Copy").
+        field.performTextInputSelection(TextRange(0, SYNTHETIC_CONTENT.length))
+        field.performSemanticsAction(SemanticsActions.CopyText)
+        composeRule.waitForIdle()
+        assertEquals("the accessibility Copy action wrote the clipboard", SENTINEL, primaryClipText())
+    }
+
+    private fun primaryClipText(): String? {
         var clip: CharSequence? = null
         instrumentation.runOnMainSync { clip = clipboard.primaryClip?.getItemAt(0)?.text }
-        assertEquals("the clipboard was written from a content field", SENTINEL, clip?.toString())
+        return clip?.toString()
     }
 
     @OptIn(ExperimentalComposeUiApi::class)

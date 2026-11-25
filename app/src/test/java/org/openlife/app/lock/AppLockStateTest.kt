@@ -115,25 +115,66 @@ class AppLockStateTest {
     }
 
     /**
-     * A-07 backstop (P1-19-R1/R2): a picker result that never arrives leaves
-     * the external flag set. Every later absence of at least the grace period
-     * still locks, so the lock is never left disabled.
+     * A-07 (P1-19-R1/R2, review Q-02): a picker result that never arrives must
+     * not leave the trip flag set. Returning to the foreground ends the trip,
+     * so the next ordinary background period with a zero timeout locks at
+     * once, with no grace.
      */
     @Test
     fun aDroppedPickerResultCannotLeaveTheLockDisabled() {
         state.start(AppLockPolicy(enabled = true, timeoutSeconds = 0))
         state.onUnlocked()
         state.beginExternalActivity()
+        state.onBackground()
+        now += 5_000
+        state.onForeground()
         // endExternalActivity() is never called: the result was dropped.
-        repeat(3) { round ->
-            state.onBackground()
-            now += AppLockState.EXTERNAL_GRACE_MILLIS
-            state.onForeground()
-            assertEquals("round $round locks", LockStatus.LOCKED, state.status.value)
-            state.onUnlocked()
-            // The user unlocked; a fresh trip that is again dropped must still be bounded.
-            state.beginExternalActivity()
-        }
+        assertEquals("the short trip itself is exempt", LockStatus.UNLOCKED, state.status.value)
+
+        state.onBackground()
+        now += 5_000
+        assertEquals("an ordinary 5 s background with timeout 0", LockStatus.LOCKED, state.status.value)
+        state.onForeground()
+        assertEquals(LockStatus.LOCKED, state.status.value)
+    }
+
+    /**
+     * Review Q-02: the legitimate picker round trip in the order the platform
+     * delivers it. The process stops (~700 ms after the activity), returns,
+     * and only then does the result callback end the trip.
+     */
+    @Test
+    fun aPickerRoundTripKeepsItsGraceWhenTheResultArrivesAfterTheReturn() {
+        state.start(AppLockPolicy(enabled = true, timeoutSeconds = 0))
+        state.onUnlocked()
+
+        state.beginExternalActivity()
+        state.onBackground()
+        now += 20_000
+        state.onForeground()
+        state.endExternalActivity()
+        assertEquals("a 20 s pick is within the grace", LockStatus.UNLOCKED, state.status.value)
+
+        // A pick faster than the process stop delay: no background, no foreground.
+        state.beginExternalActivity()
+        state.endExternalActivity()
+        assertEquals(LockStatus.UNLOCKED, state.status.value)
+
+        state.onBackground()
+        assertEquals("the next ordinary background locks", LockStatus.LOCKED, state.status.value)
+    }
+
+    /** Review Q-02: a stale flag must not survive into a policy change. */
+    @Test
+    fun aDroppedResultWhileTheLockWasOffDoesNotExemptItOnceEnabled() {
+        state.start(AppLockPolicy(enabled = false))
+        state.beginExternalActivity()
+        state.onBackground()
+        state.onForeground()
+
+        state.onPolicyChanged(AppLockPolicy(enabled = true, timeoutSeconds = 0))
+        state.onBackground()
+        assertEquals(LockStatus.LOCKED, state.status.value)
     }
 
     @Test

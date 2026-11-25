@@ -159,12 +159,16 @@ class AppLockFlowTest {
     }
 
     /**
-     * A-07 (P1-19-R2): MainActivity calls beginExternalActivity() before the
-     * Photo Picker launches and endExternalActivity() only in the result
-     * callback. Here the trip begins and the activity is recreated without a
-     * result ever being delivered, then the app is backgrounded past
-     * max(timeout, 60 s). Before P1-19-R1 the stale flag skipped the
-     * background period entirely, so the lock never engaged.
+     * A-07 (P1-19-R2, review Q-02): MainActivity calls beginExternalActivity()
+     * before the Photo Picker launches and endExternalActivity() only in the
+     * result callback. Here the trip begins and no result is ever delivered.
+     * The process goes to the background and returns (the trip's own period,
+     * which keeps its grace), then goes to the background again. With a zero
+     * timeout that second, ordinary background must lock at once.
+     *
+     * This test does not launch a picker, so it cannot confirm or refute how
+     * often a real result is dropped; it proves the lock state machine under
+     * real ProcessLifecycleOwner events.
      */
     @Test
     fun droppedPickerResultDoesNotLeaveTheLockDisabled() {
@@ -177,16 +181,20 @@ class AppLockFlowTest {
             awaitTrue("not unlocked") { app.appLock.status.value == LockStatus.UNLOCKED }
 
             scenario.onActivity { app.appLock.state.beginExternalActivity() }
-            scenario.recreate()
-
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
             awaitTrue("process never reported stop") { processStopped() }
-            app.appLock.advanceClockForTest(AppLockState.EXTERNAL_GRACE_MILLIS + 1_000)
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            awaitTrue("process never reported start") { !processStopped() }
+            assertEquals("the trip itself is within the grace", LockStatus.UNLOCKED, app.appLock.status.value)
 
-            awaitTrue("a dropped picker result left the lock disabled") {
-                app.appLock.status.value == LockStatus.LOCKED
-            }
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            awaitTrue("process never reported the second stop") { processStopped() }
+            assertEquals(
+                "a dropped picker result left the lock disabled",
+                LockStatus.LOCKED,
+                app.appLock.status.value,
+            )
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
             assertTrue("lock screen not shown", device.wait(Until.hasObject(By.text(LOCKED_TITLE)), WAIT_MS))
         }
     }
@@ -195,8 +203,12 @@ class AppLockFlowTest {
      * A-12 (P1-19-R4): on API 29 the DEVICE_CREDENTIAL fallback is a separate
      * ConfirmDeviceCredential activity. IntakeActivity is noHistory, so the
      * audit suspects that leaving it for that activity finishes it and drops
-     * the pending share. Needs API 29 and a real PIN, which this test sets
-     * with locksettings (the P1-07 manual procedure) and clears afterwards.
+     * the pending share. Needs API 29 and a PIN, which this test sets with
+     * locksettings and clears afterwards.
+     *
+     * Device safety (review): it never changes the screen lock of a real
+     * device. It runs only on an emulator, and only when the instrumentation
+     * argument allowDevicePinChange=true is passed; otherwise it is skipped.
      */
     @Test
     fun deviceCredentialUnlockOnApi29KeepsThePendingShare() {
@@ -204,11 +216,19 @@ class AppLockFlowTest {
             "A-12 needs API 29 (BIOMETRIC_WEAK|DEVICE_CREDENTIAL); this device is API ${android.os.Build.VERSION.SDK_INT}",
             android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q,
         )
+        assumeTrue(
+            "skipped: sets a device PIN; pass -e allowDevicePinChange true to opt in (emulators only)",
+            InstrumentationRegistry.getArguments().getString(ALLOW_PIN_CHANGE_ARGUMENT) == "true",
+        )
+        assumeTrue(
+            "skipped: not an emulator; this test never changes a real device's screen lock",
+            isEmulator(),
+        )
         val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
         // Never touch a device that already has a screen lock: set-pin would
         // fail, and the clear below must only undo a PIN this test set.
         assumeTrue("the device already has a screen lock; not changing it", !keyguard.isDeviceSecure)
-        val pin = InstrumentationRegistry.getArguments().getString("devicePin") ?: TEST_PIN
+        val pin = TEST_PIN
         shell("locksettings set-pin $pin")
         try {
             assumeTrue("locksettings could not set a PIN on this image", keyguard.isDeviceSecure)
@@ -248,11 +268,16 @@ class AppLockFlowTest {
         return stopped
     }
 
-    private fun shell(command: String) {
-        instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->
-            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+    private fun shell(command: String): String =
+        instrumentation.uiAutomation.executeShellCommand(command).let { descriptor ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { String(it.readBytes()) }
         }
-    }
+
+    /** Positive emulator detection only; anything unrecognised counts as a real device. */
+    private fun isEmulator(): Boolean =
+        android.os.Build.HARDWARE in setOf("ranchu", "goldfish") ||
+            shell("getprop ro.kernel.qemu").trim() == "1" ||
+            shell("getprop ro.boot.qemu").trim() == "1"
 
     private fun saveSyntheticSource(): UUID = runBlocking {
         val access = app.vault() as VaultAccess.Ready
@@ -299,5 +324,6 @@ class AppLockFlowTest {
         const val JPEG_QUALITY = 90
         const val OPAQUE = 0xFF000000.toInt()
         const val TEST_PIN = "1357"
+        const val ALLOW_PIN_CHANGE_ARGUMENT = "allowDevicePinChange"
     }
 }

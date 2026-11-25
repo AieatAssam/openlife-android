@@ -50,8 +50,15 @@ unrecoverable, which design §10 treats as the outcome to avoid.
     (`AppLockState.EXTERNAL_GRACE_MILLIS`). Originally the exemption had no
     bound, so a trip whose result never arrived left the lock off until the
     process died (audit A-01, A-07).
-  - The accepted residual: within that window, someone else could pick up
-    the phone and return to OpenLife unprompted.
+  - **The trip ends on return (review Q-02, 2026-11-25).** `onForeground`
+    clears the trip flag before deciding, so a picker result that never
+    arrives cannot carry the grace into later, ordinary background periods.
+    The legitimate round trip is unaffected: its background period was
+    already classified as a trip when it began.
+  - The accepted residuals: within that window, someone else could pick up
+    the phone and return to OpenLife unprompted. A return within the ~700 ms
+    process stop delay produces no foreground event, so if that trip's
+    result is also dropped, the next background period still gets the grace.
 - **Enforced twice.**
   - While locked, `AppLockGate` composes no content-bearing composable.
   - Every UI path that decrypts item bytes or opens a shared stream also

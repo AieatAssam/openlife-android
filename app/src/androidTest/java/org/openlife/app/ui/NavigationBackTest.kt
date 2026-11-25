@@ -15,6 +15,7 @@ import androidx.test.uiautomator.Until
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -98,10 +99,12 @@ class NavigationBackTest {
             putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
             putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
         }
-        SourceListViewModel.deleteResultDelayMillisForTest = DELETE_CALLBACK_DELAY_MS
+        val releaseDeleteResult = CompletableDeferred<Unit>()
+        SourceListViewModel.beforeDeleteResultForTest = { releaseDeleteResult.await() }
         try {
             ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-                val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                val instrumentation = InstrumentationRegistry.getInstrumentation()
+                val device = UiDevice.getInstance(instrumentation)
                 assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), 30_000))
                 device.findObject(By.desc("Delete")).click()
                 device.wait(Until.findObject(By.res("delete_confirm")), 5_000)?.click()
@@ -111,9 +114,13 @@ class NavigationBackTest {
                     "the flow-driven pop should show the list",
                     device.wait(Until.hasObject(By.text("Import from photos")), 10_000),
                 )
-                // Let the held-back delete callback run its own pop.
-                Thread.sleep(DELETE_CALLBACK_DELAY_MS * 2)
-                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                // Release the held-back delete callback. Its continuation is
+                // posted to the main looper before the runOnMainSync below, so
+                // once that returns the callback's own pop has run.
+                releaseDeleteResult.complete(Unit)
+                instrumentation.runOnMainSync {}
+                instrumentation.waitForIdleSync()
+                device.waitForIdle()
                 assertTrue(
                     "the list was popped off the back stack by the second pop",
                     device.wait(Until.hasObject(By.text("Import from photos")), 2_000),
@@ -124,7 +131,8 @@ class NavigationBackTest {
             }
             sourceId = null
         } finally {
-            SourceListViewModel.deleteResultDelayMillisForTest = 0L
+            releaseDeleteResult.complete(Unit)
+            SourceListViewModel.beforeDeleteResultForTest = null
         }
     }
 
@@ -174,9 +182,5 @@ class NavigationBackTest {
         bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output)
         bitmap.recycle()
         return output.toByteArray()
-    }
-
-    private companion object {
-        const val DELETE_CALLBACK_DELAY_MS = 1_500L
     }
 }
