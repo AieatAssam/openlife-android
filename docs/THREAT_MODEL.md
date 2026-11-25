@@ -213,6 +213,28 @@ non-communication path. Links and requests in the content stay inert.
 | A scam message is read as vetted because the app stored or labelled it | Explicit `NOT_ASSESSED` state and copy; no "safe" wording; the user label is attributed and never sets the assessment | The app gives no protection beyond inert display until an assessment exists (C3 gate, C10) |
 | A newer build's assessment result is misread by an older build | Unknown stored values decode to `UNRECOGNISED`, are shown as recorded by another version, and are never written back | The older build cannot show the newer result or its evidence |
 
+## Local search index (P2-08, ADR-0010)
+
+Search reads OCR text and corrections, which are personal content. The
+index is two FTS5 external-content tables inside the SQLCipher database, so
+it is encrypted with the vault. No plaintext index, cache or query history
+exists on disk. FTS5 term data is a derivative of the content, so it must
+leave with the content. Only triggers write it, and every row deleted from
+`ocr_spans` or `ocr_user_revisions`, including by `ON DELETE CASCADE`,
+deletes its index entry. A boundary test forbids any other writer and any
+VACUUM, which could renumber the rowids the index is keyed on. The query is
+user content too. It is typed into the content field (no Copy/Cut, no
+keyboard learning), held in memory only (no saved state, no route
+argument), cleared on `onStop`, on memory trim and before a reset, and
+never logged. Errors are not logged either, because SQLite messages can
+echo the query.
+
+| Threat | Required defence | Residual limit |
+| --- | --- | --- |
+| Deleted content survives as index terms | Trigger-only index maintenance; cascade-only deletion test asserts zero `_docsize` rows and passes `integrity-check` | FTS5 segment pages are freed, not zeroed, inside the encrypted file until SQLite reuses them (same as any deleted row; `secure_delete` is not enabled) |
+| Query text leaks through logs, saved state or the keyboard | Content field, in-memory view model cleared on stop, no logging of queries, results or errors | The IME process sees typed text, as for every content field |
+| Crafted text or input changes the query | Input reduced to quoted letter/digit tokens and bound as an argument; FTS5 operators are literal | None known |
+
 ## Environment-specific gaps in this build (recorded, not hidden)
 
 - Instrumented and adversarial testing in this repository's development
