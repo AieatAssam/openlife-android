@@ -16,8 +16,8 @@ added.
 | Instrumented test | Command (run on the tablet when it is free) |
 | --- | --- |
 | `FtsAvailabilityTest.sqlcipherBuildSupportsFts5` | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.storage.FtsAvailabilityTest` |
-| `SearchRepositoryTest` (5 brief-named tests + `roomValidatesAMigratedDatabaseWithTheFtsTablesPresent`) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.search.SearchRepositoryTest` |
-| `SearchScreenTest.resultOpensViewerWithSpanSelectedAndFieldClearsOnStop` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.search.SearchScreenTest` |
+| `SearchRepositoryTest` (5 brief-named tests, `secureDeleteIsOnForBothTables`, `anUpdatedCorrectionLeavesNoOldTermInTheIndex`, `roomValidatesAMigratedDatabaseWithTheFtsTablesPresent`) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.search.SearchRepositoryTest` |
+| `SearchScreenTest` (3 tests: compact and expanded routes through `OpenLifeNavHost`, field cleared on stop) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.search.SearchScreenTest` |
 | Existing migration tests now run through v5 (`OcrDatabaseTest`, `SourceDatabaseTest`, `OpenLifeDatabaseReadyInvariantTest`) | same command with each class |
 
 The acceptance target of "under 200 ms for 500 spans on the emulator" is
@@ -36,8 +36,10 @@ contain the compile options `ENABLE_FTS5`, `ENABLE_FTS3`/`FTS4`,
 
 `HostSqlite` (vault test sources) runs SQL through `python3 -I` with the
 stdlib `sqlite3` module (SQLite 3.53.3, FTS5 present). It turns on
-`foreign_keys` and `recursive_triggers`, so `ON DELETE CASCADE` fires the
-FTS delete triggers as it does on the device. `SearchIndexHostTest` does
+`foreign_keys` and `recursive_triggers`, as the device build does. (An
+earlier version of this record said `recursive_triggers` is what makes the
+cascade fire the FTS delete triggers. That was wrong: a host check showed
+they fire with it off too.) `SearchIndexHostTest` does
 three things:
 - builds the v4 schema from `4.json`;
 - seeds it and runs the real `MIGRATION_4_5`;
@@ -160,3 +162,106 @@ run, because nothing was pushed.
 No other existing test changed. `ContentTextField`,
 `SourceEgressBoundaryTest`, `ButtonShapeSourceTest`, lock files and theme
 files are unchanged.
+
+## Review round W-01..W-06 (commit "P2-08: address review findings W-01..W-06")
+
+**Status: not compiled or run locally until CI reports.** Gradle was not
+run for this round (another agent held the host's single build slot). The
+JVM tests below are written; their results come from the hosted CI run
+after the coordinator pushes. Nothing in this section is device evidence.
+
+### Host experiments (python3 -I, sqlite3 3.53.3, run 2026-11-25)
+
+Scripts in the session scratchpad (`exp208/e1.py`..`e5.py`), stdlib only:
+- Without `secure-delete`, a deleted term's bytes stayed in `<t>_data`
+  (reviewer's result, re-run). With `secure-delete = 1` they were absent
+  after a cascade from `sources`, a single-source delete and an in-place
+  update of a correction; terms of the other source stayed (positive
+  control).
+- The option is a `<t>_config` row (`k = 'secure-delete'`, `v = 1`). It
+  was still there after close and reopen of a file database.
+- An unknown FTS5 option raises "SQL logic error", which is what SQLite
+  before 3.42 reports for `secure-delete`; the probe treats it as "no index".
+- `recursive_triggers` off: the cascade still fired the FTS delete triggers.
+- FTS5 prefix-compresses terms in `_data`, so the byte oracle needs a
+  positive control and terms with distinct first letters.
+- unicode61: `Ⅻ`, `x²`, `½` are tokens and match; `請求書` inside
+  `東京都の請求書` is not found by MATCH but is by LIKE; LIKE found
+  `รับเงิน` and `पत्र` as substrings; `%Ärzte%` found `Ärzte`, `%ärzte%` did not.
+- A failed create (correction triggers on a missing table) followed by the
+  drop left no FTS object in `sqlite_master`.
+- Pinned `libsqlcipher.so` (arm64-v8a) compile options: no `ENABLE_ICU`,
+  no `SECURE_DELETE`; so `lower()` is ASCII-only and `PRAGMA secure_delete`
+  defaults to off.
+
+### CI caveat: host SQLite version
+
+The JVM job runs on `ubuntu-22.04` and installs no Python of its own, so
+`python3` is the distro's, linked to the distro SQLite (believed 3.37.2;
+not checked on the runner; below 3.42 either way), which has no FTS5
+secure-delete. On that host the migration correctly creates no index, and
+about 12 of the 15 `SearchIndexHostTest` cases (every one that goes through
+`SearchFixture.migrated`, including the 8 FTS cases that ran on 22.04
+before this round) are **skipped** by `SearchFixture.assumeIndexed` with a
+message naming the version, not run. A green CI therefore does not verify
+W-01. The cheapest real check is `./gradlew :vault:test` on this VM (host
+SQLite 3.53.3) when the build slot is free. The tests that do not need the index (the LIKE fallback,
+`aFailedCreateLeavesNoPartialIndex`, the sanitiser and snippet unit tests)
+still run. For the W-01 oracle to run in CI the JVM job needs SQLite 3.42+
+(for example `ubuntu-24.04`, SQLite 3.45). Owner/coordinator decision; not
+changed here.
+
+### What changed
+
+- W-01: `SearchIndex.statements()` sets `secure-delete` after each
+  `CREATE VIRTUAL TABLE`; `create` probes FTS5 and the option on a temp
+  table and, on any failure, drops every index table and trigger (fail
+  closed). `SearchIndex.ensure`, run by `SearchIndex.callback` at every
+  open (added in `OpenLifeDatabaseFactory`), recreates an incomplete
+  index. The open pragmas are unchanged (`PRAGMA secure_delete` stays off;
+  residual recorded in THREAT_MODEL, C1-R10 and ADR-0010).
+- W-02: sanitiser token characters follow unicode61; scripts without word
+  spacing and Indic marks route to the LIKE substring path; limits
+  disclosed in ADR-0010 and C1-R10.
+- W-03: the sanitised expression runs directly on the engine with no catch;
+  raw `parcel OR zebra` is shown to widen and the sanitised search not to.
+- W-04: `NonEntityTables.assertOnlySearchIndex` (vault androidTest) asserts
+  that the only non-entity tables after migrating are the two FTS tables
+  and their `_data`, `_idx`, `_docsize` and `_config` shadow tables; used in
+  the three `OcrDatabaseTest` migrations and in `SearchRepositoryTest`.
+- W-05: LIKE patterns lowercase ASCII only, matching SQLite's `lower()`.
+- W-06: `SearchScreenTest` restores the first-run flag in `finally`, skips
+  (Assume) when app lock is on, and drives the real `OpenLifeNavHost`
+  (span id on the viewer route; compact Back to results; expanded detail
+  pane after the pop to the list). Unexercised: the vault query behind the
+  screen (covered by `SearchRepositoryTest`) and `SearchViewModel`'s flow
+  (the host gets a fixed `SearchHostState`).
+
+### Changed existing tests (this round)
+
+`SearchIndexHostTest` (byte oracle in the delete/cascade/update tests;
+sanitiser test rewritten; W-05 assertions in the fallback test; new tests
+for reopen, ensure, fail-closed, scripts), `SearchFixture` (oracle,
+`assumeIndexed`), `HostSqlite` (query/transaction proxy, file path,
+comment), `SearchQueryTest`, `SearchSnippetTest`, `SchemaV5MigrationTest`
+(secure-delete statement order), `SearchRepositoryTest`, `OcrDatabaseTest`
+(three migrations), `SearchScreenTest` (rewritten through the NavHost; the
+old hand-wired test is replaced).
+
+### Device checks still owed (reviewer's list)
+
+1. `FtsAvailabilityTest`, plus a `PRAGMA compile_options` dump from the
+   device's SQLCipher.
+2. Upgrade a real v4 install that has data: the app opens, the list loads,
+   and search finds existing text.
+3. Cascade delete on SQLCipher, then scan `_data` for the term
+   (`SearchRepositoryTest.deletingASourceRemovesItsHits` /
+   `cascadeOnlyDeletionLeavesNoFtsRows`).
+4. Latency for 500 spans on the device (target under 200 ms).
+5. TalkBack reads each result as one node, and a result opened at expanded
+   width selects the span.
+
+Room's runtime acceptance of the non-entity FTS tables (no "Unexpected
+table" or identity failure at open, and `validateDroppedTables = false`
+validating the rest) is believed from reading room 2.8.5, and is
+unconfirmed until a device run.

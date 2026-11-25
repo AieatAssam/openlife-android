@@ -65,6 +65,8 @@ class SchemaV5MigrationTest {
                 assertTrue(create, create.contains(content))
                 assertTrue(create, create.contains("tokenize='${SearchIndex.TOKENIZER}'"))
                 assertTrue("existing rows are indexed", sql.contains("INSERT INTO $table($table) VALUES('rebuild')"))
+                val secureDelete = "INSERT INTO $table($table, rank) VALUES('secure-delete', 1)"
+                assertEquals("W-01: secure-delete next", sql.indexOf(create) + 1, sql.indexOf(secureDelete))
             }
         assertEquals(6, SearchIndex.triggerNames.size)
         SearchIndex.triggerNames.forEach { name ->

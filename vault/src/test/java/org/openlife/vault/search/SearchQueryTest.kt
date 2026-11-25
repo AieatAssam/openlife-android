@@ -1,6 +1,7 @@
 package org.openlife.vault.search
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,5 +54,37 @@ class SearchQueryTest {
     fun likePatternsEscapeWildcardsAndLowercase() {
         assertEquals(listOf("%dentist%"), SearchQuery.likePatterns(listOf("Dentist")))
         assertEquals(listOf("%a\\%b\\_c\\\\d%"), SearchQuery.likePatterns(listOf("a%b_c\\d")))
+    }
+
+    /** W-05: only A-Z are lowercased, exactly as SQLite's lower() treats the column. */
+    @Test
+    fun likePatternsLowercaseOnlyAsciiLikeSqlite() {
+        assertEquals(listOf("%Ärzte%"), SearchQuery.likePatterns(listOf("ÄRZTE")))
+        assertEquals(listOf("%Ärzte%"), SearchQuery.likePatterns(listOf("Ärzte")))
+        assertEquals("istanbul ı İ", SearchQuery.asciiLowercase("ISTANBUL ı İ"))
+    }
+
+    /** W-02: token characters follow unicode61 (letters, all numbers, private use). */
+    @Test
+    fun numberFormsAndPrivateUseStayInTheirToken() {
+        assertEquals(listOf("Chapter", "Ⅻ", "x²", "½", "\uE000ab"), SearchQuery.tokens("Chapter Ⅻ, x² ½ \uE000ab"))
+    }
+
+    /** W-02: scripts the word index cannot match as typed are routed to substring search. */
+    @Test
+    fun unspacedAndIndicScriptsNeedSubstringSearch() {
+        listOf("請求書", "とうきょう", "カタカナ", "รับเงิน", "ພາສາ", "ភាសា", "မြန်မာ", "བོད", "पत्र", "invoice 東京").forEach {
+            assertTrue(it, SearchQuery.needsSubstringSearch(it))
+        }
+        listOf("Café", "Cafe\u0301", "Łódź", "Ärzte", "Москва", "Αθήνα", "كتاب", "4471", "x²").forEach {
+            assertFalse(it, SearchQuery.needsSubstringSearch(it))
+        }
+    }
+
+    @Test
+    fun substringTermsKeepCombiningMarksInsideTheTerm() {
+        assertEquals(listOf("ใบเสร็จรับเงิน"), SearchQuery.substringTerms("ใบเสร็จรับเงิน"))
+        assertEquals(listOf("हिन्दी", "पत्र"), SearchQuery.substringTerms("हिन्दी पत्र!"))
+        assertEquals(emptyList<String>(), SearchQuery.substringTerms("\u0301 \u0E31"))
     }
 }

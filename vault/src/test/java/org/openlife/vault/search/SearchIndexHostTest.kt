@@ -5,13 +5,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
 import org.openlife.vault.storage.SearchIndex
+import java.io.File
 import java.util.UUID
 
 /**
@@ -19,6 +20,8 @@ import java.util.UUID
  * through [HostSqlite]): the shipped MIGRATION_4_5, the index triggers, the
  * cascades and the repository's own queries. Not SQLCipher and not a device;
  * the same names run on SQLCipher in the instrumented SearchRepositoryTest.
+ * Tests that need the index skip on a host SQLite older than 3.42 (no FTS5
+ * secure-delete; see [SearchFixture.assumeIndexed]).
  */
 class SearchIndexHostTest {
     private val host = HostSqlite()
@@ -51,9 +54,13 @@ class SearchIndexHostTest {
         val fresh = HostSqlite()
         try {
             fresh.createFromExportedSchema(SearchFixture.V5)
-            SearchIndex.create(fresh.asSupportDatabase())
+            assertTrue(SearchIndex.create(fresh.asSupportDatabase()))
             assertEquals(indexSchema(host), indexSchema(fresh))
             assertTrue(indexSchema(fresh).any { it.contains("fts5") && it.contains(SearchIndex.TOKENIZER) })
+            SearchIndex.tables.forEach { table ->
+                assertEquals("$table secure-delete after migration", 1L, SearchFixture(host).secureDelete(table))
+                assertEquals("$table secure-delete on a fresh vault", 1L, SearchFixture(fresh).secureDelete(table))
+            }
         } finally {
             fresh.close()
         }
@@ -159,18 +166,25 @@ class SearchIndexHostTest {
         val fixture = SearchFixture.migrated(host) {
             source(A)
             revision(RA, A)
-            span(S1, RA, 0, "ferry ticket")
-            correction(C1, RA, S1, "ferry ticket return")
+            span(S1, RA, 0, "ferry kumquat")
+            correction(C1, RA, S1, "ferry kumquat jicama")
             source(B)
             revision(RB, B)
-            span(S2, RB, 0, "ferry timetable")
+            span(S2, RB, 0, "ferry walnut")
         }
         assertEquals(3, search("ferry").size)
+        assertTrue("positive control", fixture.dataContains(SearchIndex.TEXT_TABLE, "kumquat"))
+        assertTrue("positive control", fixture.dataContains(SearchIndex.CORRECTION_TABLE, "jicama"))
 
         host.exec("DELETE FROM sources WHERE id = ?", A)
 
         assertEquals(listOf(id(S2)), search("ferry").map { it.spanId })
-        assertEquals(emptyList<SearchHit>(), search("return"))
+        assertEquals(emptyList<SearchHit>(), search("jicama"))
+        // W-01: secure-delete removes the deleted source's terms from the live segments.
+        assertFalse(fixture.dataContains(SearchIndex.TEXT_TABLE, "kumquat"))
+        assertFalse(fixture.dataContains(SearchIndex.CORRECTION_TABLE, "kumquat"))
+        assertFalse(fixture.dataContains(SearchIndex.CORRECTION_TABLE, "jicama"))
+        assertTrue("the other source stays indexed", fixture.dataContains(SearchIndex.TEXT_TABLE, "walnut"))
         assertEquals(1L, fixture.indexedDocuments(SearchIndex.TEXT_TABLE))
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
         fixture.integrityCheck(SearchIndex.TEXT_TABLE)
@@ -191,9 +205,15 @@ class SearchIndexHostTest {
         }
         assertEquals(2L, fixture.indexedDocuments(SearchIndex.TEXT_TABLE))
         assertEquals(2L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
+        val terms = listOf("lighthouse", "keeper", "corrected", "whole")
+        assertTrue("positive control", fixture.dataContains(SearchIndex.TEXT_TABLE, "lighthouse"))
+        assertTrue("positive control", fixture.dataContains(SearchIndex.CORRECTION_TABLE, "whole"))
 
         host.exec("DELETE FROM sources")
 
+        SearchIndex.tables.forEach { table ->
+            terms.forEach { assertFalse("$it left in ${table}_data", fixture.dataContains(table, it)) }
+        }
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.TEXT_TABLE))
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
         fixture.integrityCheck(SearchIndex.TEXT_TABLE)
@@ -209,8 +229,13 @@ class SearchIndexHostTest {
             span(S1, RA, 0, "orchard")
             correction(C1, RA, S1, "meadow")
         }
+        assertTrue("positive control", fixture.dataContains(SearchIndex.TEXT_TABLE, "orchard"))
+        assertTrue("positive control", fixture.dataContains(SearchIndex.CORRECTION_TABLE, "meadow"))
         host.exec("UPDATE ocr_spans SET text = 'harbour' WHERE id = ?", S1)
         host.exec("UPDATE ocr_user_revisions SET correctedText = 'valley' WHERE id = ?", C1)
+        assertFalse("W-01: old text leaves _data", fixture.dataContains(SearchIndex.TEXT_TABLE, "orchard"))
+        assertFalse(fixture.dataContains(SearchIndex.CORRECTION_TABLE, "meadow"))
+        assertTrue(fixture.dataContains(SearchIndex.CORRECTION_TABLE, "valley"))
         assertEquals(emptyList<SearchHit>(), search("orchard"))
         assertEquals(emptyList<SearchHit>(), search("meadow"))
         assertEquals(1, search("harbour").size)
@@ -221,8 +246,70 @@ class SearchIndexHostTest {
         host.exec("DELETE FROM ocr_revisions WHERE id = ?", RA)
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.TEXT_TABLE))
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
+        assertFalse(fixture.dataContains(SearchIndex.TEXT_TABLE, "harbour"))
+        assertFalse(fixture.dataContains(SearchIndex.CORRECTION_TABLE, "valley"))
     }
 
+    /** Review: the option is stored in the database and holds after a reopen; [SearchIndex.ensure] then only reads. */
+    @Test
+    fun secureDeletePersistsAcrossReopenAndEnsureLeavesACompleteIndexAlone() {
+        val file = File.createTempFile("search-index", ".db").apply { deleteOnExit() }
+        try {
+            HostSqlite(file).use { first -> SearchFixture.migrated(first) }
+            HostSqlite(file).use { reopened ->
+                val fixture = SearchFixture(reopened)
+                SearchIndex.tables.forEach { assertEquals(1L, fixture.secureDelete(it)) }
+                val executed = mutableListOf<String>()
+                assertTrue(SearchIndex.ensure(reopened.asSupportDatabase(executed)))
+                assertTrue("only reads: $executed", executed.all { it.startsWith("SELECT") })
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    /** Review: at each open, an incomplete index or one without secure-delete is rebuilt over existing rows. */
+    @Test
+    fun ensureRecreatesAnIncompleteIndexAtOpen() {
+        val fixture = SearchFixture.migrated(host) {
+            source(A)
+            revision(RA, A)
+            span(S1, RA, 0, "quince")
+        }
+        host.exec("INSERT INTO ocr_text_fts(ocr_text_fts, rank) VALUES('secure-delete', 0)")
+        host.exec("DROP TRIGGER ocr_correction_fts_ad")
+        assertFalse(SearchIndex.isComplete(host.asSupportDatabase()))
+
+        assertTrue(SearchIndex.ensure(host.asSupportDatabase()))
+
+        assertTrue(SearchIndex.isComplete(host.asSupportDatabase()))
+        assertEquals(1L, fixture.secureDelete(SearchIndex.TEXT_TABLE))
+        assertEquals(listOf(id(S1)), search("quince").map { it.spanId })
+
+        host.exec("DROP TABLE ocr_text_fts")
+        host.exec("DROP TABLE ocr_correction_fts")
+        assertTrue("a vault whose index was lost gets it back", SearchIndex.ensure(host.asSupportDatabase()))
+        assertEquals(listOf(id(S1)), search("quince").map { it.spanId })
+    }
+
+    /** W-01 fail closed: if any index statement fails, no part of the index is left behind. Runs on any host SQLite. */
+    @Test
+    fun aFailedCreateLeavesNoPartialIndex() {
+        host.createFromExportedSchema(SearchFixture.V4)
+        // The correction triggers cannot be created without their table.
+        host.exec("DROP TABLE ocr_user_revisions")
+
+        assertFalse(SearchIndex.create(host.asSupportDatabase()))
+
+        assertEquals(0L, host.long("SELECT COUNT(*) FROM sqlite_master WHERE name LIKE '%fts%'"))
+        assertEquals(0L, host.long("SELECT COUNT(*) FROM sqlite_temp_master WHERE name LIKE '%fts%'"))
+    }
+
+    /**
+     * W-03: the sanitised expression is run directly on the engine, with no
+     * catch, so an FTS5 syntax error fails the test; and every row it matches
+     * must contain every typed word, checked against the stored text.
+     */
     @Test
     fun queryIsSanitisedAgainstFts5Syntax() {
         SearchFixture.migrated(host) {
@@ -230,35 +317,62 @@ class SearchIndexHostTest {
             revision(RA, A)
             span(S1, RA, 0, "parcel collection slip")
             span(S2, RA, 1, "say \"hello\" * star")
+            span(S3, RA, 2, "zebra crossing")
         }
-        // The same inputs as raw MATCH syntax would error or widen; prove at least one errors raw.
-        val raw = runCatching { host.query("SELECT rowid FROM ocr_text_fts WHERE ocr_text_fts MATCH ?", "NEAR(") }
+        val raw = runCatching { host.query(MATCH_SQL, "NEAR(") }
         assertTrue("raw NEAR( must be an FTS5 syntax error on this engine", raw.isFailure)
+        // Non-vacuous: as raw syntax this widens to a row without "parcel"; sanitised it must not.
+        assertEquals(2, host.query(MATCH_SQL, "parcel OR zebra").size)
+        assertEquals(emptyList<SearchHit>(), search("parcel OR zebra"))
 
         val hostile = listOf(
             "\"", "\"\"", "*", "NEAR(", "NEAR(parcel slip)", "OR", "parcel OR", "OR parcel", "NOT parcel",
             "parcel NOT slip", "-parcel", "text:parcel", "{text}: parcel", "^parcel", "parcel AND", "(", ")",
             "parcel\"*", "\"parcel", "pa*rcel", "parcel + slip", "'; DROP TABLE sources; --", "\\", "%", "_",
-            "\u0000", "parcel\nslip", "​parcel",
+            "\u0000", "parcel\nslip", "\u200Bparcel", "parcel OR zebra", "zebra NOT parcel", "parcel* zebra",
         )
+        var matchedSomething = false
         hostile.forEach { input ->
-            val hits = runCatching { search(input) }.getOrElse {
-                fail("'$input' failed: $it")
-                emptyList()
-            }
-            val literal = SearchQuery.tokens(input)
-            hits.forEach { hit ->
-                assertTrue(
-                    "'$input' widened to a hit that lacks its words: ${hit.snippet}",
-                    literal.all { token -> hit.snippet.lowercase().contains(token.lowercase()) },
-                )
+            val tokens = SearchQuery.tokens(input)
+            val expression = SearchQuery.matchExpression(tokens) ?: return@forEach
+            val rowids = host.query(MATCH_SQL, expression).map { it.single() as Long }
+            rowids.forEach { rowid ->
+                matchedSomething = true
+                val text = host.query("SELECT text FROM ocr_spans WHERE rowid = ?", rowid).single().single() as String
+                val words = text.lowercase().split(Regex("[^\\p{L}\\p{N}]+"))
+                tokens.forEachIndexed { index, token ->
+                    val word = token.lowercase()
+                    val found = if (index == tokens.lastIndex) words.any { it.startsWith(word) } else word in words
+                    assertTrue("'$input' widened to a row without '$token': $text", found)
+                }
             }
         }
+        assertTrue("the hostile list must also match some rows", matchedSomething)
         assertEquals("OR is a word, not an operator", emptyList<SearchHit>(), search("parcel OR"))
         assertEquals("NOT is a word, not an operator", emptyList<SearchHit>(), search("NOT parcel"))
         assertEquals("quotes are not syntax", listOf(id(S2)), search("\"hello\"").map { it.spanId })
         assertEquals("punctuation-only input searches nothing", emptyList<SearchHit>(), search("* \" ( )"))
         assertEquals(1L, host.long("SELECT COUNT(*) FROM sources"))
+    }
+
+    /** W-02: text the word index cannot split as typed is found as a substring, through the same API. */
+    @Test
+    fun scriptsWithoutWordSpacingAndNumberFormsAreFound() {
+        SearchFixture.migrated(host) {
+            source(A)
+            revision(RA, A)
+            span(S1, RA, 0, "東京都の請求書")
+            span(S2, RA, 1, "ใบเสร็จรับเงิน")
+            span(S3, RA, 2, "हिन्दी में पत्र")
+            span(S4, RA, 3, "Chapter Ⅻ total x² ½ off")
+        }
+        assertEquals(listOf(id(S1)), search("請求書").map { it.spanId })
+        assertEquals(listOf(0..1), search("東京").single().highlights)
+        assertEquals(listOf(id(S2)), search("รับเงิน").map { it.spanId })
+        assertEquals(listOf(id(S3)), search("पत्र").map { it.spanId })
+        assertEquals(listOf(id(S4)), search("Ⅻ").map { it.spanId })
+        assertEquals(listOf(id(S4)), search("x²").map { it.spanId })
+        assertEquals(listOf(id(S4)), search("½").map { it.spanId })
     }
 
     @Test
@@ -269,6 +383,7 @@ class SearchIndexHostTest {
             revision(RA, A)
             span(S1, RA, 0, "Dentist appointment")
             span(S2, RA, 1, "Pay 50% at reception_desk")
+            span(S4, RA, 2, "Ärzte Praxis")
             correction(C1, RA, S1, "Dentist appointment moved")
             source(B, state = "STAGED")
             revision(RB, B)
@@ -280,6 +395,11 @@ class SearchIndexHostTest {
         assertEquals(setOf(false to id(S1), true to id(S1)), hits.map { it.isCorrection to it.spanId }.toSet())
         assertEquals("LIKE wildcards never reach the pattern", emptyList<SearchHit>(), search("% _ %_"))
         assertEquals(listOf(id(S2)), search("50").map { it.spanId })
+        // W-05: the pattern is lowercased as SQLite's lower() lowercases the column (ASCII only).
+        assertEquals("typed exactly as stored", listOf(id(S4)), search("Ärzte").map { it.spanId })
+        assertEquals(listOf(id(S4)), search("ÄRZTE praxis").map { it.spanId })
+        // Disclosed limit (ADR-0010): no non-ASCII case folding on the fallback.
+        assertEquals(emptyList<SearchHit>(), search("ärzte"))
     }
 
     /** Acceptance asks < 200 ms for 500 spans on a device; this is the host engine only (recorded). */
@@ -336,9 +456,11 @@ class SearchIndexHostTest {
         const val S1 = "51000000-0000-0000-0000-000000000001"
         const val S2 = "52000000-0000-0000-0000-000000000002"
         const val S3 = "53000000-0000-0000-0000-000000000003"
+        const val S4 = "54000000-0000-0000-0000-000000000004"
         const val C1 = "c1000000-0000-0000-0000-000000000001"
         const val C2 = "c2000000-0000-0000-0000-000000000002"
         const val SPANS = 500
         const val HOST_BUDGET_MS = 1_000L
+        const val MATCH_SQL = "SELECT rowid FROM ocr_text_fts WHERE ocr_text_fts MATCH ?"
     }
 }

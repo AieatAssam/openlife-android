@@ -23,7 +23,9 @@ import java.util.UUID
 /**
  * P2-08-R3/R5: local search over OCR span text and the user's corrections,
  * inside the encrypted database. Uses the FTS5 index when it exists and the
- * LIKE fallback otherwise, with the same results type. Read-only: it never
+ * LIKE fallback otherwise, with the same results type. Input in a script the
+ * word index cannot match as typed (text without spaces, Indic vowel signs;
+ * review W-02) is searched with the LIKE path even when the index exists. Read-only: it never
  * writes the index (the triggers do) and never logs the query or a result.
  * The flow re-emits when the content tables change.
  */
@@ -37,16 +39,19 @@ class SearchRepository(private val dao: SearchDao, private val ioDispatcher: Cor
     fun search(query: String, limit: Int = DEFAULT_LIMIT): Flow<List<SearchHit>> {
         val tokens = SearchQuery.tokens(query)
         if (tokens.isEmpty()) return flowOf(emptyList())
+        val substring = SearchQuery.needsSubstringSearch(query)
         return flow {
             val indexed = hasIndex ?: (dao.countIndexTables() == INDEX_TABLES).also { hasIndex = it }
-            val statement = if (indexed) {
+            val words = indexed && !substring
+            val terms = if (words) tokens else SearchQuery.substringTerms(query)
+            val statement = if (words) {
                 SearchSql.fts(checkNotNull(SearchQuery.matchExpression(tokens)), limit)
             } else {
-                SearchSql.like(SearchQuery.likePatterns(tokens), limit)
+                SearchSql.like(SearchQuery.likePatterns(terms), limit)
             }
             emitAll(
                 dao.observe(SimpleSQLiteQuery(statement.sql, statement.args.toTypedArray()))
-                    .map { rows -> rows.mapNotNull { hitOf(it, tokens) } },
+                    .map { rows -> rows.mapNotNull { hitOf(it, terms, wholeWords = words) } },
             )
         }.catch { error ->
             // A failed query shows no results. The message is never logged:
@@ -61,11 +66,11 @@ class SearchRepository(private val dao: SearchDao, private val ioDispatcher: Cor
         private const val INDEX_TABLES = 2
 
         /** Tolerant decoding: a row whose ids are not UUIDs (another build) is skipped, never shown half-linked. */
-        internal fun hitOf(row: SearchRow, tokens: List<String>): SearchHit? {
+        internal fun hitOf(row: SearchRow, tokens: List<String>, wholeWords: Boolean = true): SearchHit? {
             val sourceId = row.sourceId.toUuidOrNull() ?: return null
             val revisionId = row.revisionId.toUuidOrNull() ?: return null
             val spanId = row.spanId?.let { it.toUuidOrNull() ?: return null }
-            val snippet = SearchSnippet.of(row.text, tokens)
+            val snippet = SearchSnippet.of(row.text, tokens, wholeWords)
             return SearchHit(sourceId, revisionId, spanId, snippet.text, row.isCorrection != 0, snippet.highlights)
         }
 

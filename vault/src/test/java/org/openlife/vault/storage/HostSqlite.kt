@@ -1,5 +1,6 @@
 package org.openlife.vault.storage
 
+import android.database.Cursor
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.io.BufferedReader
 import java.io.Closeable
@@ -18,15 +19,20 @@ import java.lang.reflect.Proxy
  * same FTS5 code; it is not device evidence (docs/decisions/0010-local-search.md).
  * Foreign keys are on, as Room turns them on; recursive triggers are on, as
  * the pinned SQLCipher build compiles them on (SQLITE_DEFAULT_RECURSIVE_TRIGGERS).
+ * Cascades fire the FTS delete triggers with recursive triggers on or off
+ * (host check, P2-08 review). `PRAGMA secure_delete` is left at its default
+ * (off), as in the pinned build. [path] null is an in-memory database; a file
+ * path lets a test close and reopen the same database.
  */
-class HostSqlite : Closeable {
+class HostSqlite(path: File? = null) : Closeable {
     class Failure(message: String) : RuntimeException(message)
 
     private val script: File = File.createTempFile("host-sqlite", ".py").apply {
         deleteOnExit()
         writeText(PROGRAM)
     }
-    private val process: Process = ProcessBuilder("python3", "-I", script.absolutePath)
+    private val command: List<String> = listOf("python3", "-I", script.absolutePath) + listOfNotNull(path?.absolutePath)
+    private val process: Process = ProcessBuilder(command)
         .redirectErrorStream(false)
         .start()
     private val input: Writer = process.outputStream.bufferedWriter()
@@ -60,17 +66,86 @@ class HostSqlite : Closeable {
 
     fun long(sql: String, vararg args: Any?): Long = query(sql, *args).single().single() as Long
 
-    /** A SupportSQLiteDatabase whose execSQL runs here, so a Room Migration runs unchanged. */
-    fun asSupportDatabase(): SupportSQLiteDatabase = Proxy.newProxyInstance(
-        SupportSQLiteDatabase::class.java.classLoader,
-        arrayOf(SupportSQLiteDatabase::class.java),
-    ) { _, method, args ->
-        require(method.name == "execSQL") { "unexpected call ${method.name}" }
-        @Suppress("UNCHECKED_CAST")
-        val bind = (args.getOrNull(1) as? Array<Any?>) ?: emptyArray()
-        exec(args[0] as String, *bind)
-        null
-    } as SupportSQLiteDatabase
+    /**
+     * A SupportSQLiteDatabase whose execSQL, query(String) and transaction
+     * calls run here, so a Room Migration or Callback runs unchanged.
+     * [statements] records every SQL text it executes, in order.
+     */
+    fun asSupportDatabase(statements: MutableList<String> = mutableListOf()): SupportSQLiteDatabase {
+        var successful = false
+        return Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "execSQL" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val bind = (args.getOrNull(1) as? Array<Any?>) ?: emptyArray()
+                    statements += args[0] as String
+                    exec(args[0] as String, *bind)
+                    null
+                }
+
+                "query" -> {
+                    val sql = requireNotNull(args.singleOrNull() as? String) { "only query(String) is supported" }
+                    statements += sql
+                    cursorOf(query(sql))
+                }
+
+                "beginTransaction" -> {
+                    successful = false
+                    exec("SAVEPOINT host_tx")
+                    null
+                }
+
+                "setTransactionSuccessful" -> {
+                    successful = true
+                    null
+                }
+
+                "endTransaction" -> {
+                    if (!successful) exec("ROLLBACK TO host_tx")
+                    exec("RELEASE host_tx")
+                    null
+                }
+
+                else -> error("unexpected call ${method.name}")
+            }
+        } as SupportSQLiteDatabase
+    }
+
+    /** A read-only Cursor over rows already fetched; enough for moveToFirst/Next and getInt/Long/String. */
+    private fun cursorOf(rows: List<List<Any?>>): Cursor {
+        var position = -1
+        return Proxy.newProxyInstance(Cursor::class.java.classLoader, arrayOf(Cursor::class.java)) { _, method, args ->
+            fun value() = rows[position][args[0] as Int]
+            when (method.name) {
+                "moveToFirst" -> {
+                    position = 0
+                    rows.isNotEmpty()
+                }
+
+                "moveToNext" -> {
+                    position++
+                    position < rows.size
+                }
+
+                "getCount" -> rows.size
+
+                "getInt" -> (value() as Number).toInt()
+
+                "getLong" -> (value() as Number).toLong()
+
+                "getString" -> value()?.toString()
+
+                "isNull" -> value() == null
+
+                "close" -> null
+
+                else -> error("unexpected cursor call ${method.name}")
+            }
+        } as Cursor
+    }
 
     override fun close() {
         runCatching { input.close() }
@@ -122,7 +197,7 @@ class HostSqlite : Closeable {
 
         private val PROGRAM = """
             import sqlite3, sys
-            con = sqlite3.connect(':memory:', isolation_level=None)
+            con = sqlite3.connect(sys.argv[1] if len(sys.argv) > 1 else ':memory:', isolation_level=None)
             con.execute('PRAGMA foreign_keys=ON')
             con.execute('PRAGMA recursive_triggers=ON')
             def dec(t):

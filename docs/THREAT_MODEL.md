@@ -257,7 +257,11 @@ it is encrypted with the vault. No plaintext index, cache or query history
 exists on disk. FTS5 term data is a derivative of the content, so it must
 leave with the content. Only triggers write it, and every row deleted from
 `ocr_spans` or `ocr_user_revisions`, including by `ON DELETE CASCADE`,
-deletes its index entry. A boundary test forbids any other writer and any
+deletes its index entry. Both tables run with FTS5 `secure-delete`, so the
+deleted terms are removed from the live FTS segments (`<table>_data`) at
+once rather than at a later merge; the index is never created without it
+(fail closed to the unindexed LIKE search), and this is re-checked at every
+open. A boundary test forbids any other writer and any
 VACUUM, which could renumber the rowids the index is keyed on. The query is
 user content too. It is typed into the content field (no Copy/Cut, no
 keyboard learning), held in memory only (no saved state, no route
@@ -267,7 +271,7 @@ echo the query.
 
 | Threat | Required defence | Residual limit |
 | --- | --- | --- |
-| Deleted content survives as index terms | Trigger-only index maintenance; cascade-only deletion test asserts zero `_docsize` rows and passes `integrity-check` | FTS5 segment pages are freed, not zeroed, inside the encrypted file until SQLite reuses them (same as any deleted row; `secure_delete` is not enabled) |
+| Deleted content survives as index terms | Trigger-only index maintenance with FTS5 `secure-delete`; host tests assert the deleted terms' bytes are absent from `_data` after a single-source delete, a cascade and an update (positive control first), zero `_docsize` rows and a passing `integrity-check`; the SQLCipher twin is a device gap | `PRAGMA secure_delete` is off (default; no `SQLITE_SECURE_DELETE` in the pinned build), so deleted base rows and freed pages, of the index and of every other table, keep their bytes inside the encrypted file until SQLite reuses the space. A superseded correction stays indexed, as it stays in `ocr_user_revisions`, until its source is deleted |
 | Query text leaks through logs, saved state or the keyboard | Content field, in-memory view model cleared on stop, no logging of queries, results or errors | The IME process sees typed text, as for every content field |
 | Crafted text or input changes the query | Input reduced to quoted letter/digit tokens and bound as an argument; FTS5 operators are literal | None known |
 

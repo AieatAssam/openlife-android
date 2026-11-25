@@ -8,7 +8,9 @@ import java.util.Locale
  * in Kotlin from the stored text, so the FTS5 and LIKE paths highlight the
  * same way. Matching folds case and diacritics like the index's tokenizer
  * (unicode61 remove_diacritics 2): earlier tokens match whole words, the last
- * one a word prefix. The excerpt is plain text; nothing in it is a link.
+ * one a word prefix. For a substring (LIKE) search, [of] with `wholeWords =
+ * false` highlights every occurrence. The excerpt is plain text; nothing in
+ * it is a link.
  */
 object SearchSnippet {
     const val MAX_LENGTH = 160
@@ -17,8 +19,8 @@ object SearchSnippet {
 
     data class Snippet(val text: String, val highlights: List<IntRange>)
 
-    fun of(text: String, tokens: List<String>): Snippet {
-        val ranges = matches(text, tokens)
+    fun of(text: String, tokens: List<String>, wholeWords: Boolean = true): Snippet {
+        val ranges = matches(text, tokens, wholeWords)
         if (text.length <= MAX_LENGTH) return Snippet(text, ranges)
         val anchor = ranges.firstOrNull()?.first ?: 0
         var start = (anchor - MAX_LENGTH / LEAD_IN_DIVISOR).coerceAtLeast(0)
@@ -35,7 +37,7 @@ object SearchSnippet {
         return Snippet(prefix + text.substring(start, cutEnd) + suffix, inside)
     }
 
-    private fun matches(text: String, tokens: List<String>): List<IntRange> {
+    private fun matches(text: String, tokens: List<String>, wholeWords: Boolean): List<IntRange> {
         if (tokens.isEmpty()) return emptyList()
         val folded = StringBuilder()
         val origin = mutableListOf<Int>()
@@ -56,7 +58,7 @@ object SearchSnippet {
                 val end = from + needle.length
                 val startsWord = from == 0 || !haystack[from - 1].isLetterOrDigit()
                 val endsWord = end == haystack.length || !haystack[end].isLetterOrDigit()
-                if (startsWord && (tokenIndex == tokens.lastIndex || endsWord)) {
+                if (!wholeWords || (startsWord && (tokenIndex == tokens.lastIndex || endsWord))) {
                     found += origin[from]..extendOverMarks(text, origin[end - 1])
                 }
                 from = haystack.indexOf(needle, from + 1)

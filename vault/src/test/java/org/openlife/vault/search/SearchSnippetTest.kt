@@ -44,6 +44,13 @@ class SearchSnippetTest {
         assertEquals("needle", snippet.text.substring(range))
     }
 
+    /** W-02: a substring search highlights the match inside a longer run of text. */
+    @Test
+    fun substringModeHighlightsInsideWords() {
+        assertEquals(listOf(4..6), SearchSnippet.of("東京都の請求書", listOf("請求書"), wholeWords = false).highlights)
+        assertEquals(emptyList<IntRange>(), SearchSnippet.of("東京都の請求書", listOf("請求書")).highlights)
+    }
+
     @Test
     fun noMatchStillGivesABoundedExcerpt() {
         val snippet = SearchSnippet.of("x".repeat(1_000), listOf("zzz"))

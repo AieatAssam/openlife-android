@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
+import org.junit.Assume.assumeTrue
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SearchDao
 import org.openlife.vault.storage.SearchRow
@@ -89,6 +90,24 @@ class SearchFixture(val host: HostSqlite) {
     /** Rows left in each FTS5 index's own storage (docsize), which a stale index would keep. */
     fun indexedDocuments(table: String): Long = host.long("SELECT COUNT(*) FROM ${table}_docsize")
 
+    /**
+     * Review W-01 oracle: whether [term]'s UTF-8 bytes occur anywhere in the
+     * live `<table>_data` segments. FTS5 prefix-compresses terms, so a test
+     * asserts presence before the delete (positive control) and uses terms
+     * with distinct first letters.
+     */
+    fun dataContains(table: String, term: String): Boolean {
+        val needle = term.toByteArray(Charsets.UTF_8)
+        return host.query("SELECT block FROM ${table}_data").any { row ->
+            val block = row.single() as? ByteArray ?: return@any false
+            (0..block.size - needle.size).any { start -> needle.indices.all { block[start + it] == needle[it] } }
+        }
+    }
+
+    /** The persisted FTS5 secure-delete option of [table] (null when unset). */
+    fun secureDelete(table: String): Long? =
+        host.query("SELECT v FROM ${table}_config WHERE k = 'secure-delete'").singleOrNull()?.single() as Long?
+
     /** Fails if an index disagrees with its content table. */
     fun integrityCheck(table: String) = host.exec("INSERT INTO $table($table) VALUES('integrity-check')")
 
@@ -96,13 +115,27 @@ class SearchFixture(val host: HostSqlite) {
         val V4: File = File("schemas/org.openlife.vault.storage.OpenLifeDatabase/4.json")
         val V5: File = File("schemas/org.openlife.vault.storage.OpenLifeDatabase/5.json")
 
-        /** A v4 vault migrated to v5 through the shipped MIGRATION_4_5. */
+        /**
+         * A v4 vault migrated to v5 through the shipped MIGRATION_4_5. The
+         * index needs FTS5 secure-delete (SQLite 3.42+); on an older host
+         * SQLite the migration correctly creates no index, and tests that
+         * need one are skipped with this message rather than run vacuously.
+         */
         fun migrated(host: HostSqlite, seed: SearchFixture.() -> Unit = {}): SearchFixture {
             host.createFromExportedSchema(V4)
             val fixture = SearchFixture(host)
             fixture.seed()
             OpenLifeDatabase.MIGRATION_4_5.migrate(host.asSupportDatabase())
+            assumeIndexed(host)
             return fixture
+        }
+
+        fun assumeIndexed(host: HostSqlite) {
+            val version = host.query("SELECT sqlite_version()").single().single()
+            val tables = host.long(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('ocr_text_fts', 'ocr_correction_fts')",
+            )
+            assumeTrue("host SQLite $version lacks FTS5 secure-delete (needs 3.42+); test skipped", tables == 2L)
         }
     }
 }

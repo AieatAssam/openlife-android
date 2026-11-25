@@ -10,11 +10,13 @@ import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.vault.repository.SearchRepository
+import org.openlife.vault.storage.NonEntityTables
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.OpenLifeDatabaseFactory
 import org.openlife.vault.storage.SearchIndex
@@ -91,12 +93,43 @@ class SearchRepositoryTest {
     fun deletingASourceRemovesItsHits() = runBlocking {
         source(A)
         revision(RA, A)
-        span(S1, RA, 0, "ferry ticket")
-        assertEquals(1, repository.search("ferry").first().size)
+        span(S1, RA, 0, "ferry kumquat")
+        correction(C1, RA, S1, "ferry jicama")
+        assertEquals(2, repository.search("ferry").first().size)
+        assertTrue("positive control", dataContains(SearchIndex.TEXT_TABLE, "kumquat"))
+        assertTrue("positive control", dataContains(SearchIndex.CORRECTION_TABLE, "jicama"))
 
         db.sourceDao().deleteById(A)
 
         assertEquals(emptyList<SearchHit>(), repository.search("ferry").first())
+        // W-01: with secure-delete the terms leave the live segments at once.
+        assertFalse(dataContains(SearchIndex.TEXT_TABLE, "kumquat"))
+        assertFalse(dataContains(SearchIndex.CORRECTION_TABLE, "jicama"))
+    }
+
+    /** W-01: both tables carry the persisted secure-delete option on a fresh SQLCipher vault. */
+    @Test
+    fun secureDeleteIsOnForBothTables() {
+        SearchIndex.tables.forEach { table ->
+            sql.query("SELECT v FROM ${table}_config WHERE k = 'secure-delete'").use {
+                assertTrue("$table has the option", it.moveToFirst())
+                assertEquals(1L, it.getLong(0))
+            }
+        }
+    }
+
+    @Test
+    fun anUpdatedCorrectionLeavesNoOldTermInTheIndex() = runBlocking {
+        source(A)
+        revision(RA, A)
+        span(S1, RA, 0, "orchard")
+        correction(C1, RA, S1, "meadow")
+        assertTrue("positive control", dataContains(SearchIndex.CORRECTION_TABLE, "meadow"))
+
+        sql.execSQL("UPDATE ocr_user_revisions SET correctedText = 'valley' WHERE id = ?", arrayOf<Any?>(C1))
+
+        assertFalse(dataContains(SearchIndex.CORRECTION_TABLE, "meadow"))
+        assertEquals(1, repository.search("valley").first().size)
     }
 
     @Test
@@ -106,9 +139,14 @@ class SearchRepositoryTest {
         span(S1, RA, 0, "lighthouse keeper")
         correction(C1, RA, S1, "lighthouse keeper corrected")
 
+        assertTrue("positive control", dataContains(SearchIndex.TEXT_TABLE, "lighthouse"))
+
         sql.execSQL("DELETE FROM sources")
 
         listOf(SearchIndex.TEXT_TABLE, SearchIndex.CORRECTION_TABLE).forEach { table ->
+            listOf("lighthouse", "keeper", "corrected").forEach {
+                assertFalse("$it left in ${table}_data", dataContains(table, it))
+            }
             sql.query("SELECT COUNT(*) FROM ${table}_docsize").use {
                 assertTrue(it.moveToFirst())
                 assertEquals("$table keeps no document after the cascade", 0, it.getInt(0))
@@ -123,8 +161,19 @@ class SearchRepositoryTest {
         source(A)
         revision(RA, A)
         span(S1, RA, 0, "parcel collection slip")
-        listOf("\"", "*", "NEAR(", "OR", "parcel OR", "NOT parcel", "text:parcel", "(", "'; DROP TABLE sources; --")
-            .forEach { input -> repository.search(input).first() }
+        span(S2, RA, 1, "zebra crossing")
+        val hostile = listOf(
+            "\"", "*", "NEAR(", "OR", "parcel OR", "NOT parcel", "text:parcel", "(", "'; DROP TABLE sources; --",
+        )
+        // W-03: the expression runs directly on SQLCipher with no catch: a syntax error fails the test.
+        hostile.forEach { input ->
+            val expression = SearchQuery.matchExpression(SearchQuery.tokens(input)) ?: return@forEach
+            sql.query("SELECT rowid FROM ocr_text_fts WHERE ocr_text_fts MATCH ?", arrayOf<Any?>(expression)).close()
+        }
+        sql.query("SELECT rowid FROM ocr_text_fts WHERE ocr_text_fts MATCH ?", arrayOf<Any?>("parcel OR zebra")).use {
+            assertEquals("raw syntax would widen", 2, it.count)
+        }
+        assertEquals(emptyList<SearchHit>(), repository.search("parcel OR zebra").first())
         assertEquals(emptyList<SearchHit>(), repository.search("parcel OR").first())
         assertEquals(1, repository.search("parcel").first().size)
     }
@@ -150,14 +199,25 @@ class SearchRepositoryTest {
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
         try {
-            migrated.query("SELECT COUNT(*) FROM sqlite_master WHERE name IN ('ocr_text_fts', 'ocr_correction_fts')").use {
-                assertTrue(it.moveToFirst())
-                assertEquals(2, it.getInt(0))
-            }
+            NonEntityTables.assertOnlySearchIndex(migrated, 5)
         } finally {
             migrated.close()
             context.deleteDatabase(migrationName)
         }
+    }
+
+    private fun dataContains(table: String, term: String): Boolean {
+        val needle = term.toByteArray(Charsets.UTF_8)
+        sql.query("SELECT block FROM ${table}_data").use { cursor ->
+            while (cursor.moveToNext()) {
+                val block = if (cursor.isNull(0)) continue else cursor.getBlob(0)
+                val found = (0..block.size - needle.size).any { start ->
+                    needle.indices.all { block[start + it] == needle[it] }
+                }
+                if (found) return true
+            }
+        }
+        return false
     }
 
     private fun source(id: String, state: String = "READY") {
