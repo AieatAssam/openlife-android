@@ -247,9 +247,12 @@ class OcrDatabaseTest {
         val migrated = cipherHelper.runMigrationsAndValidate(
             databaseName,
             currentDatabaseVersion(),
-            true,
+            // P2-08: v5's FTS5 tables are not entities, so the dropped-table scan would reject them;
+            // every entity table is still validated, and NonEntityTables checks the rest (W-04).
+            false,
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
+        NonEntityTables.assertOnlySearchIndex(migrated, currentDatabaseVersion())
         val tableExists = migrated.query(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ocr_span_reviews'",
         ).use { it.moveToFirst() }
@@ -295,9 +298,12 @@ class OcrDatabaseTest {
         val migrated = helper.runMigrationsAndValidate(
             name,
             currentDatabaseVersion(),
-            true,
+            // P2-08: v5's FTS5 tables are not entities, so the dropped-table scan would reject them;
+            // every entity table is still validated, and NonEntityTables checks the rest (W-04).
+            false,
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
+        NonEntityTables.assertOnlySearchIndex(migrated, currentDatabaseVersion())
         fun insertReady(id: String, mimeType: String?) = runCatching {
             migrated.execSQL(
                 """
@@ -341,9 +347,12 @@ class OcrDatabaseTest {
         val migrated = helper.runMigrationsAndValidate(
             name,
             currentDatabaseVersion(),
-            true,
+            // P2-08: v5's FTS5 tables are not entities, so the dropped-table scan would reject them;
+            // every entity table is still validated, and NonEntityTables checks the rest (W-04).
+            false,
             *OpenLifeDatabase.MIGRATIONS.toTypedArray(),
         )
+        NonEntityTables.assertOnlySearchIndex(migrated, currentDatabaseVersion())
         try {
             val triggers = mutableListOf<String>()
             migrated.query("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'sources' ORDER BY name")

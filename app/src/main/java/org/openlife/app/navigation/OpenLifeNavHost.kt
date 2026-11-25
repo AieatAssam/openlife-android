@@ -41,6 +41,9 @@ import org.openlife.app.ui.AboutScreen
 import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.ViewerScreen
+import org.openlife.app.ui.search.SearchScreen
+import org.openlife.app.ui.search.SearchUiState
+import org.openlife.app.ui.sourceLabel
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.repository.ReadyReadResult
@@ -73,7 +76,12 @@ private class SourceScreens(
     }
 
     @Composable
-    fun List(onOpen: (UUID) -> Unit, onOpenSettings: () -> Unit, onOpenAbout: () -> Unit) {
+    fun List(
+        onOpen: (UUID) -> Unit,
+        onOpenSettings: () -> Unit,
+        onOpenAbout: () -> Unit,
+        onOpenSearch: (() -> Unit)? = null,
+    ) {
         SourceListScreen(
             state = listState,
             loadThumbnail = loadThumbnail,
@@ -85,11 +93,12 @@ private class SourceScreens(
             onFinishReset = onFinishReset,
             onOpenSettings = onOpenSettings,
             onOpenAbout = onOpenAbout,
+            onOpenSearch = onOpenSearch,
         )
     }
 
     @Composable
-    fun Viewer(source: Source, onClose: () -> Unit) {
+    fun Viewer(source: Source, onClose: () -> Unit, initialSpanId: UUID? = null) {
         val ocr = ocrState(source.id)
         ViewerScreen(
             source = source,
@@ -107,9 +116,17 @@ private class SourceScreens(
             onRejectSpan = { span -> rejectSpan(span.id) },
             onUndoRejectSpan = { span -> undoRejectSpan(span.id) },
             onSetUserContentKind = { kind -> setUserContentKind(source.id, kind) },
+            initialSelectedSpanId = initialSpanId,
         )
     }
 }
+
+/** P2-08: what the Search route shows; the query and results live in the app's SearchViewModel. */
+class SearchHostState(
+    val query: String = "",
+    val state: SearchUiState = SearchUiState.Idle,
+    val onQueryChange: (String) -> Unit = {},
+)
 
 @Composable
 @Suppress("LongParameterList")
@@ -135,6 +152,7 @@ fun OpenLifeNavHost(
     appLock: org.openlife.app.settings.AppLockSettings,
     onResetComplete: () -> Unit,
     navController: NavHostController = rememberNavController(),
+    search: SearchHostState? = null,
 ) {
     val screens = SourceScreens(
         listState, thumbnailGeneration, ocrState, loadThumbnail, loadReadyContent, delete, extractText,
@@ -147,6 +165,9 @@ fun OpenLifeNavHost(
     BackHandler(enabled = isNested) { navController.popBackStack() }
     // P1-16-R1: the item shown in the detail pane at expanded width.
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    // P2-08: the span a search result asked for; a UUID string like selectedId, never content.
+    var selectedSpanId by rememberSaveable { mutableStateOf<String?>(null) }
+    val openSearch: (() -> Unit)? = search?.let { { navController.navigate(Routes.Search) } }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val expanded = isExpandedWidth(maxWidth, maxHeight)
@@ -157,20 +178,27 @@ fun OpenLifeNavHost(
                     ListDetail(
                         screens = screens,
                         selected = screens.find(selectedId),
-                        onSelect = { selectedId = it?.toString() },
+                        selectedSpanId = selectedSpanId.toUuidOrNull(),
+                        onSelect = {
+                            selectedId = it?.toString()
+                            selectedSpanId = null
+                        },
                         onOpenSettings = { navController.navigate(Routes.Settings) },
                         onOpenAbout = { navController.navigate(Routes.About) },
+                        onOpenSearch = openSearch,
                     )
                 } else {
                     // A selection made at expanded width continues as the full-screen viewer.
                     LaunchedEffect(selectedId) {
-                        selectedId?.let { navController.navigate(Routes.Viewer(it)) }
+                        selectedId?.let { navController.navigate(Routes.Viewer(it, selectedSpanId)) }
                         selectedId = null
+                        selectedSpanId = null
                     }
                     screens.List(
                         onOpen = { id -> navController.navigate(Routes.Viewer(id.toString())) },
                         onOpenSettings = { navController.navigate(Routes.Settings) },
                         onOpenAbout = { navController.navigate(Routes.About) },
+                        onOpenSearch = openSearch,
                     )
                 }
             }
@@ -178,14 +206,17 @@ fun OpenLifeNavHost(
                 val route = entry.toRoute<Routes.Viewer>()
                 if (expanded) {
                     // At expanded width the viewer is the list's detail pane, not a separate screen.
-                    LaunchedEffect(route.sourceId) {
+                    LaunchedEffect(route.sourceId, route.spanId) {
                         selectedId = route.sourceId
-                        navController.popBackStack()
+                        selectedSpanId = route.spanId
+                        // Back to the list itself, also when opened from Search (P2-08).
+                        navController.popBackStack<Routes.List>(inclusive = false)
                     }
                 } else {
-                    ViewerDestination(screens, route.sourceId, navController)
+                    ViewerDestination(screens, route.sourceId, route.spanId.toUuidOrNull(), navController)
                 }
             }
+            composable<Routes.Search> { SearchDestination(screens, search ?: SearchHostState(), navController) }
             composable<Routes.Settings> {
                 SettingsScreen(
                     onResetVault,
@@ -205,7 +236,26 @@ fun OpenLifeNavHost(
 }
 
 @Composable
-private fun ViewerDestination(screens: SourceScreens, sourceId: String, navController: NavHostController) {
+private fun SearchDestination(screens: SourceScreens, host: SearchHostState, navController: NavHostController) {
+    SearchScreen(
+        query = host.query,
+        state = host.state,
+        onQueryChange = host.onQueryChange,
+        onOpenResult = { hit ->
+            navController.navigate(Routes.Viewer(hit.sourceId.toString(), hit.spanId?.toString()))
+        },
+        onBack = { navController.popBackStack() },
+        labelFor = { id -> screens.find(id.toString())?.let { sourceLabel(it) } },
+    )
+}
+
+@Composable
+private fun ViewerDestination(
+    screens: SourceScreens,
+    sourceId: String,
+    spanId: UUID?,
+    navController: NavHostController,
+) {
     val source = screens.find(sourceId)
     if (screens.listState !is SourceListUiState.Loaded) {
         // Deep links wait for a loaded list before resolving the item.
@@ -217,27 +267,37 @@ private fun ViewerDestination(screens: SourceScreens, sourceId: String, navContr
     } else if (source == null) {
         LaunchedEffect(sourceId) { navController.popBackStack() }
     } else {
-        screens.Viewer(source, onClose = { navController.popBackStack() })
+        screens.Viewer(source, onClose = { navController.popBackStack() }, initialSpanId = spanId)
     }
 }
 
 @Composable
+@Suppress("LongParameterList")
 private fun ListDetail(
     screens: SourceScreens,
     selected: Source?,
+    selectedSpanId: UUID?,
     onSelect: (UUID?) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenSearch: (() -> Unit)?,
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.width(LIST_PANE_WIDTH).fillMaxHeight()) {
-            screens.List(onOpen = { onSelect(it) }, onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
+            screens.List(
+                onOpen = { onSelect(it) },
+                onOpenSettings = onOpenSettings,
+                onOpenAbout = onOpenAbout,
+                onOpenSearch = onOpenSearch,
+            )
         }
         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             if (selected != null) {
                 // key: a new selection gets a fresh viewer, never the previous item's decoded state.
-                key(selected.id) { screens.Viewer(selected, onClose = { onSelect(null) }) }
+                key(selected.id, selectedSpanId) {
+                    screens.Viewer(selected, onClose = { onSelect(null) }, initialSpanId = selectedSpanId)
+                }
             } else {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(24.dp)) {
@@ -259,6 +319,8 @@ private fun isExpandedWidth(width: Dp, height: Dp): Boolean =
         .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
 
 private val LIST_PANE_WIDTH = 360.dp
+
+private fun String?.toUuidOrNull(): UUID? = this?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
 /** Keeps this file compatible with Navigation Compose's state API across 2.9/2.10. */
 @Composable

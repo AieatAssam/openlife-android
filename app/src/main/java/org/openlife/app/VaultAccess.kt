@@ -5,6 +5,7 @@ import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryReport
 import org.openlife.vault.repository.RecoveryRepository
+import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.storage.VaultUnavailableCause
 
@@ -16,6 +17,7 @@ sealed interface VaultAccess {
         val ocrRepository: OcrRepository,
         val lastRecovery: RecoveryReport,
         val recoveryRepository: RecoveryRepository,
+        val searchRepository: SearchRepository,
     ) : VaultAccess
 
     data class Unavailable(val cause: VaultUnavailableCause) : VaultAccess

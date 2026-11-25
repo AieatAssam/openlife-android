@@ -13,6 +13,16 @@
     <string name="list_empty_title">Nothing kept yet</string>
     <string name="list_empty">Import a screenshot, receipt or letter you want to keep. OpenLife saves its own encrypted copy on this device only. You can also share an image to OpenLife from another app.</string>
     <string name="list_more_options">More options</string>
+    <string name="list_search_content_description">Search your items</string>
+    <string name="search_title">Search</string>
+    <string name="search_field_label">Words in your items</string>
+    <string name="search_idle">Type a word from an item\'s extracted text or from your corrections. Search runs only on this device.</string>
+    <string name="search_searching">Searching…</string>
+    <string name="search_no_results">Nothing matches. Only text extracted from saved items and your corrections is searched.</string>
+    <string name="search_result_extracted">Extracted text</string>
+    <string name="search_result_corrected">Corrected by you</string>
+    <string name="search_result_item">From: %1$s</string>
+    <string name="search_result_no_location">No location in the image</string>
     <string name="content_unavailable">Content unavailable</string>
     <string name="deletion_pending_retry">Deletion pending — retry</string>
     <string name="delete_content_description">Delete</string>
