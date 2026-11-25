@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "receipt-03",
   "category": "receipt",
   "image": "fixtures/receipt-03.png",
@@ -14,97 +15,295 @@
     {
       "text": "CORNER GROCER",
       "box": [206, 50, 391, 74],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CORNER GROCER",
+          "box": [206, 50, 391, 74],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "7 EXAMPLE STREET",
       "box": [55, 81, 284, 106],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "7 EXAMPLE STREET",
+          "box": [55, 81, 284, 106],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEL 0100 555 0987",
       "box": [53, 117, 296, 142],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0987",
+          "box": [53, 117, 296, 142],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "DATE 15/01/2027 08:20",
       "box": [53, 153, 353, 181],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 15/01/2027 08:20",
+          "box": [53, 153, 353, 181],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "FLAT WHITE                   10.08",
       "box": [52, 189, 539, 222],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "FLAT WHITE",
+          "box": [52, 189, 193, 211],
+          "script": "latin"
+        },
+        {
+          "text": "10.08",
+          "box": [468, 202, 539, 222],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "MILK 1L                       2.21",
       "box": [50, 225, 538, 258],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "MILK 1L",
+          "box": [50, 225, 148, 246],
+          "script": "latin"
+        },
+        {
+          "text": "2.21",
+          "box": [482, 239, 538, 258],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "PASTA 500G                    3.66",
       "box": [49, 261, 536, 294],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PASTA 500G",
+          "box": [49, 261, 191, 283],
+          "script": "latin"
+        },
+        {
+          "text": "3.66",
+          "box": [480, 275, 536, 294],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "BREAD WHOLEMEAL               1.76",
       "box": [48, 297, 535, 330],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "BREAD WHOLEMEAL",
+          "box": [48, 297, 261, 322],
+          "script": "latin"
+        },
+        {
+          "text": "1.76",
+          "box": [479, 311, 535, 330],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "LIGHT BULB                    4.61",
       "box": [48, 333, 534, 366],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "LIGHT BULB",
+          "box": [48, 333, 189, 355],
+          "script": "latin"
+        },
+        {
+          "text": "4.61",
+          "box": [478, 347, 534, 366],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SOAP BAR                      1.67",
       "box": [45, 369, 533, 402],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SOAP BAR",
+          "box": [45, 369, 159, 390],
+          "script": "latin"
+        },
+        {
+          "text": "1.67",
+          "box": [477, 383, 533, 402],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "COFFEE BEANS 250G            12.14",
       "box": [45, 405, 532, 438],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [45, 405, 287, 431],
+          "script": "latin"
+        },
+        {
+          "text": "12.14",
+          "box": [462, 418, 532, 438],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "BATTERIES AA X4              10.65",
       "box": [44, 441, 530, 474],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "BATTERIES AA X4",
+          "box": [44, 441, 258, 465],
+          "script": "latin"
+        },
+        {
+          "text": "10.65",
+          "box": [461, 454, 530, 474],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "RICE 1KG                      0.99",
       "box": [42, 477, 529, 510],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "RICE 1KG",
+          "box": [42, 477, 155, 498],
+          "script": "latin"
+        },
+        {
+          "text": "0.99",
+          "box": [474, 491, 529, 510],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEA BAGS X80                  6.26",
       "box": [40, 513, 528, 546],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEA BAGS X80",
+          "box": [40, 513, 212, 536],
+          "script": "latin"
+        },
+        {
+          "text": "6.26",
+          "box": [473, 527, 528, 546],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SUBTOTAL                     45.03",
       "box": [39, 549, 527, 582],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [39, 549, 153, 570],
+          "script": "latin"
+        },
+        {
+          "text": "45.03",
+          "box": [456, 562, 527, 582],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "VAT 20%                       9.00",
       "box": [38, 585, 526, 618],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [38, 585, 139, 606],
+          "script": "latin"
+        },
+        {
+          "text": "9.00",
+          "box": [471, 598, 526, 618],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOTAL                       €54.03",
       "box": [37, 621, 524, 654],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [37, 621, 107, 641],
+          "script": "latin"
+        },
+        {
+          "text": "€54.03",
+          "box": [441, 634, 524, 654],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CARD PAYMENT",
       "box": [37, 657, 208, 680],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [37, 657, 208, 680],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "THANK YOU",
       "box": [214, 699, 342, 720],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [214, 699, 342, 720],
+          "script": "latin"
+        }
+      ]
     }
   ]
 }

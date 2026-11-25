@@ -36,7 +36,13 @@ data class PageSpec(
     val noiseDensity: Double,
 )
 
-class RenderedPage(val image: BufferedImage, val boxes: List<Box>)
+/** The ink of one drawn column: the character range of the line text it covers, and its box. */
+class SegmentInk(val start: Int, val end: Int, val box: Box)
+
+/** The ink of one drawn line: the whole line's box and one entry per column. */
+class LineInk(val box: Box, val segments: List<SegmentInk>)
+
+class RenderedPage(val image: BufferedImage, val lines: List<LineInk>)
 
 /**
  * Draws a [PageSpec] with java.awt, headless and deterministic: glyphs are
@@ -102,12 +108,12 @@ object FixtureRenderer {
                 }
                 if (decoration.filled) graphics.fill(shape) else graphics.draw(shape)
             }
-            val boxes = page.lines.map { line ->
+            val inks = page.lines.map { line ->
                 graphics.color = line.ink
                 drawLine(graphics, line, fonts, transform, page)
             }
             addNoise(image, page, random)
-            return RenderedPage(image, boxes)
+            return RenderedPage(image, inks)
         } finally {
             graphics.dispose()
         }
@@ -139,23 +145,52 @@ object FixtureRenderer {
         return Digests.sha256(buffer.array())
     }
 
+    /**
+     * Character ranges of the columns of [text]: the parts separated by a
+     * column gap, a run of [COLUMN_GAP] or more spaces (P2-04 review X-01).
+     */
+    fun columns(text: String): List<IntRange> {
+        val ranges = mutableListOf<IntRange>()
+        var start = 0
+        for (gap in columnGap.findAll(text)) {
+            if (gap.range.first > start) ranges += start until gap.range.first
+            start = gap.range.last + 1
+        }
+        if (start < text.length) ranges += start until text.length
+        return ranges
+    }
+
+    /** Draws each column of the line at its position in the whole line, and records the ink of each. */
     private fun drawLine(
         graphics: java.awt.Graphics2D,
         line: LineSpec,
         fonts: FixtureFonts,
         transform: AffineTransform,
         page: PageSpec,
-    ): Box {
-        var x = line.x
-        var bounds: Rectangle2D? = null
-        for ((run, font) in runs(line.text, line.font, fonts)) {
-            val glyphs = font.createGlyphVector(layoutContext, run)
-            graphics.drawGlyphVector(glyphs, x.toFloat(), line.baseline.toFloat())
-            val ink = transform.createTransformedShape(glyphs.getOutline(x.toFloat(), line.baseline.toFloat())).bounds2D
-            if (!ink.isEmpty) bounds = bounds?.createUnion(ink) ?: ink
-            x += glyphs.logicalBounds.width
+    ): LineInk {
+        val segments = columns(line.text).map { range ->
+            val prefix = line.text.substring(0, range.first)
+            var x = line.x + if (prefix.isEmpty()) 0.0 else advance(prefix, line.font, fonts)
+            var bounds: Rectangle2D? = null
+            for ((run, font) in runs(line.text.substring(range.first, range.last + 1), line.font, fonts)) {
+                val glyphs = font.createGlyphVector(layoutContext, run)
+                graphics.drawGlyphVector(glyphs, x.toFloat(), line.baseline.toFloat())
+                val outline = glyphs.getOutline(x.toFloat(), line.baseline.toFloat())
+                val ink = transform.createTransformedShape(outline).bounds2D
+                if (!ink.isEmpty) bounds = bounds?.createUnion(ink) ?: ink
+                x += glyphs.logicalBounds.width
+            }
+            val ink = requireNotNull(bounds) { "column of '${line.text}' drew no ink" }
+            SegmentInk(range.first, range.last + 1, inkBox(ink, line, page))
         }
-        val ink = requireNotNull(bounds) { "line '${line.text}' drew no ink" }
+        val box = segments.map { it.box }.reduce { a, b ->
+            Box(minOf(a.left, b.left), minOf(a.top, b.top), maxOf(a.right, b.right), maxOf(a.bottom, b.bottom))
+        }
+        return LineInk(box, segments)
+    }
+
+    private fun inkBox(ink: Rectangle2D, line: LineSpec, page: PageSpec): Box {
+        require(ink.minX >= 0.0 && ink.minY >= 0.0) { "line '${line.text}' leaves the image: $ink" }
         val box = Box(floor(ink.minX).toInt(), floor(ink.minY).toInt(), ceil(ink.maxX).toInt(), ceil(ink.maxY).toInt())
         require(box.right <= page.width && box.bottom <= page.height) { "line '${line.text}' leaves the image: $box" }
         return box
@@ -197,4 +232,6 @@ object FixtureRenderer {
     }
 
     private const val NOISE_DARKEST = 110
+    private const val COLUMN_GAP = 3
+    private val columnGap = Regex(" {$COLUMN_GAP,}")
 }

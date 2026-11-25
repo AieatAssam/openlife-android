@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "receipt-14",
   "category": "receipt",
   "image": "fixtures/receipt-14.png",
@@ -14,92 +15,278 @@
     {
       "text": "PLACEHOLDER CAFE",
       "box": [168, 50, 395, 73],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLACEHOLDER CAFE",
+          "box": [168, 50, 395, 73],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "84 EXAMPLE STREET",
       "box": [39, 89, 283, 112],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "84 EXAMPLE STREET",
+          "box": [39, 89, 283, 112],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEL 0100 555 0103",
       "box": [39, 125, 282, 148],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0103",
+          "box": [39, 125, 282, 148],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "DATE 9/08/2027 08:25",
       "box": [41, 160, 327, 185],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 9/08/2027 08:25",
+          "box": [41, 160, 327, 185],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEA BAGS X80                  8.58",
       "box": [40, 191, 529, 220],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEA BAGS X80",
+          "box": [40, 198, 212, 220],
+          "script": "latin"
+        },
+        {
+          "text": "8.58",
+          "box": [473, 191, 529, 211],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SCREWS 40MM                   0.87",
       "box": [42, 228, 529, 256],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SCREWS 40MM",
+          "box": [42, 235, 199, 256],
+          "script": "latin"
+        },
+        {
+          "text": "0.87",
+          "box": [474, 228, 529, 247],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "COFFEE BEANS 250G             9.10",
       "box": [43, 263, 531, 292],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [43, 269, 285, 292],
+          "script": "latin"
+        },
+        {
+          "text": "9.10",
+          "box": [475, 263, 531, 282],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "BREAD WHOLEMEAL               9.39",
       "box": [44, 299, 531, 328],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "BREAD WHOLEMEAL",
+          "box": [44, 306, 258, 328],
+          "script": "latin"
+        },
+        {
+          "text": "9.39",
+          "box": [476, 299, 531, 318],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOMATOES TIN                  6.77",
       "box": [43, 336, 532, 363],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOMATOES TIN",
+          "box": [43, 342, 215, 363],
+          "script": "latin"
+        },
+        {
+          "text": "6.77",
+          "box": [476, 336, 532, 355],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOOTHPASTE                   10.48",
       "box": [44, 371, 533, 399],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOOTHPASTE",
+          "box": [44, 379, 187, 399],
+          "script": "latin"
+        },
+        {
+          "text": "10.48",
+          "box": [462, 371, 533, 391],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "PLASTERS                      9.42",
       "box": [46, 407, 534, 436],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLASTERS",
+          "box": [46, 415, 159, 436],
+          "script": "latin"
+        },
+        {
+          "text": "9.42",
+          "box": [478, 407, 534, 426],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CROISSANT                     6.18",
       "box": [47, 443, 534, 472],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CROISSANT",
+          "box": [47, 451, 175, 472],
+          "script": "latin"
+        },
+        {
+          "text": "6.18",
+          "box": [479, 443, 534, 463],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "FLAT WHITE                    7.88",
       "box": [48, 479, 535, 508],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "FLAT WHITE",
+          "box": [48, 487, 189, 508],
+          "script": "latin"
+        },
+        {
+          "text": "7.88",
+          "box": [479, 479, 535, 498],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SUBTOTAL                     57.23",
       "box": [48, 515, 535, 544],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [48, 524, 162, 544],
+          "script": "latin"
+        },
+        {
+          "text": "57.23",
+          "box": [466, 515, 535, 535],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "VAT 20%                      11.44",
       "box": [48, 552, 537, 579],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [48, 560, 149, 579],
+          "script": "latin"
+        },
+        {
+          "text": "11.44",
+          "box": [466, 552, 537, 571],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOTAL                       €68.67",
       "box": [49, 588, 537, 615],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [49, 597, 120, 615],
+          "script": "latin"
+        },
+        {
+          "text": "€68.67",
+          "box": [453, 588, 537, 607],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CARD PAYMENT",
       "box": [51, 630, 222, 652],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [51, 630, 222, 652],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "THANK YOU",
       "box": [229, 663, 358, 684],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [229, 663, 358, 684],
+          "script": "latin"
+        }
+      ]
     }
   ]
 }

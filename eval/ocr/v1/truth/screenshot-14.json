@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "screenshot-14",
   "category": "screenshot",
   "image": "fixtures/screenshot-14.png",
@@ -14,77 +15,182 @@
     {
       "text": "18:20",
       "box": [49, 41, 138, 67],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "18:20",
+          "box": [49, 41, 138, 67],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Inbox",
       "box": [62, 137, 179, 171],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Inbox",
+          "box": [62, 137, 179, 171],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Your order has shipped",
       "box": [60, 245, 552, 290],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Your order has shipped",
+          "box": [60, 245, 552, 290],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "From: Jo Placeholder",
       "box": [63, 333, 404, 361],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "From: Jo Placeholder",
+          "box": [63, 333, 404, 361],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "To: me",
       "box": [60, 389, 170, 416],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "To: me",
+          "box": [60, 389, 170, 416],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Date: Fri 13 Jun 2027, 07:35",
       "box": [63, 443, 525, 475],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Date: Fri 13 Jun 2027, 07:35",
+          "box": [63, 443, 525, 475],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Please pay by 30 April 2027.",
       "box": [63, 561, 546, 598],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Please pay by 30 April 2027.",
+          "box": [63, 561, 546, 598],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "You can renew it twice online.",
       "box": [60, 625, 566, 655],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "You can renew it twice online.",
+          "box": [60, 625, 566, 655],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "The invoice total is 84.20 this month.",
       "box": [60, 689, 689, 719],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "The invoice total is 84.20 this month.",
+          "box": [60, 689, 689, 719],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "It should arrive within two days.",
       "box": [62, 753, 602, 790],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "It should arrive within two days.",
+          "box": [62, 753, 602, 790],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "We look forward to seeing you.",
       "box": [60, 817, 581, 855],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "We look forward to seeing you.",
+          "box": [60, 817, 581, 855],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Thank you for your order with us.",
       "box": [60, 881, 618, 918],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Thank you for your order with us.",
+          "box": [60, 881, 618, 918],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Your booking moved to 15:30.",
       "box": [60, 945, 572, 983],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Your booking moved to 15:30.",
+          "box": [60, 945, 572, 983],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Best regards,",
       "box": [63, 1049, 284, 1087],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Best regards,",
+          "box": [63, 1049, 284, 1087],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Олег",
       "box": [61, 1115, 146, 1143],
-      "script": "non_latin"
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Олег",
+          "box": [61, 1115, 146, 1143],
+          "script": "non_latin"
+        }
+      ]
     }
   ]
 }

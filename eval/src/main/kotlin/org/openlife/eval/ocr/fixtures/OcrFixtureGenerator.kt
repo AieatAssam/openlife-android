@@ -6,9 +6,11 @@ import org.openlife.eval.ocr.core.FixtureManifest
 import org.openlife.eval.ocr.core.FixtureTruth
 import org.openlife.eval.ocr.core.ManifestCodec
 import org.openlife.eval.ocr.core.ManifestEntry
+import org.openlife.eval.ocr.core.RenderedWith
 import org.openlife.eval.ocr.core.ScriptClass
 import org.openlife.eval.ocr.core.TruthCodec
 import org.openlife.eval.ocr.core.TruthLine
+import org.openlife.eval.ocr.core.TruthSegment
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
@@ -25,7 +27,7 @@ class GeneratedFixture(val truth: FixtureTruth, val truthJson: String, val png: 
  */
 object OcrFixtureGenerator {
     const val SET = "ocr/v1"
-    const val GENERATOR_VERSION = 1
+    const val GENERATOR_VERSION = 2
     const val SET_SEED = 20_261_125L
     private const val SCREENSHOTS = 15
     private const val RECEIPTS = 15
@@ -54,8 +56,7 @@ object OcrFixtureGenerator {
             generator = OcrFixtureGenerator::class.java.name,
             generatorVersion = GENERATOR_VERSION,
             seed = seed,
-            javaVersion = System.getProperty("java.version"),
-            javaVendor = System.getProperty("java.vendor"),
+            renderedWith = RenderedWith.current(),
             fonts = fonts.entries,
             fixtures = fixtures.map {
                 ManifestEntry(
@@ -102,8 +103,12 @@ object OcrFixtureGenerator {
     ): GeneratedFixture {
         val id = String.format(Locale.ROOT, "%s-%02d", category.key, index + 1)
         val rendered = FixtureRenderer.render(page, fonts, random)
-        val lines = page.lines.zip(rendered.boxes).map { (line, box) ->
-            TruthLine(line.text, box, FixtureRenderer.scriptOf(line.text))
+        val lines = page.lines.zip(rendered.lines).map { (line, ink) ->
+            val segments = ink.segments.map {
+                val text = line.text.substring(it.start, it.end)
+                TruthSegment(text, it.box, FixtureRenderer.scriptOf(text))
+            }
+            TruthLine(line.text, ink.box, FixtureRenderer.scriptOf(line.text), segments)
         }
         val scriptClass = FixtureRenderer.scriptOf(lines.joinToString(" ") { it.text })
         val truth = FixtureTruth(

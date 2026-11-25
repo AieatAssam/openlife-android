@@ -25,9 +25,16 @@ class GateFileTest {
         assertEquals(0.10, gate.cerMeanMax.getValue(FixtureCategory.LETTER), 0.0)
         assertEquals(0.90, gate.lineMatchRateMin, 0.0)
         assertEquals(1.0, gate.abstentionCorrectRateMin, 0.0)
+        // Acting-owner ruling 2026-11-25 (review X-03): one abstention on a Latin fixture fails the engine.
+        assertEquals(0L, gate.latinAbstentionsMax)
+        assertEquals(0L, gate.timeoutsMax)
         assertEquals(6_000L, gate.durationP95MsMax)
         assertEquals("120 MiB in KiB, the unit of Debug.getPss()", 120L * 1024L, gate.peakPssDeltaKibMax)
-        assertEquals(listOf("tesseract-eng-fast", "mlkit-latin"), gate.engines)
+        // Review X-05: TesseractOcrEngine.MODEL_VERSION and MlKitOcrEngine.modelVersion (vault GatePinsTest).
+        assertEquals(
+            listOf("tesseract-eng-fast" to "t4a-4.9.0+tessdata_fast-4.1.0-7d4322bd", "mlkit-latin" to "16.0.1"),
+            gate.engines.map { it.id to it.modelVersion },
+        )
     }
 
     @Test
@@ -36,7 +43,9 @@ class GateFileTest {
         val broken = listOf(
             text.replace("\"duration_p95_ms_max\"", "\"duration_p95_ms_maximum\""),
             text.replace("\"letter\"", "\"letters\""),
-            text.replace("\"schema\": \"openlife-ocr-gate/1\"", "\"schema\": \"openlife-ocr-gate/2\""),
+            text.replace("\"schema\": \"openlife-ocr-gate/2\"", "\"schema\": \"openlife-ocr-gate/1\""),
+            text.replace("\"latin_abstentions_max\"", "\"latin_abstention_max\""),
+            text.replace("\"model_version\": \"16.0.1\"", "\"version\": \"16.0.1\""),
             text.replace("0.08", "\"0.08\""),
         )
         broken.forEachIndexed { index, candidate ->

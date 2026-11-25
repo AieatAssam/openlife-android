@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "receipt-05",
   "category": "receipt",
   "image": "fixtures/receipt-05.png",
@@ -14,82 +15,244 @@
     {
       "text": "PLACEHOLDER CAFE",
       "box": [186, 48, 414, 76],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLACEHOLDER CAFE",
+          "box": [186, 48, 414, 76],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "13 EXAMPLE STREET",
       "box": [56, 79, 300, 106],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "13 EXAMPLE STREET",
+          "box": [56, 79, 300, 106],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEL 0100 555 0649",
       "box": [54, 114, 297, 142],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0649",
+          "box": [54, 114, 297, 142],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "DATE 19/08/2027 09:55",
       "box": [53, 150, 353, 181],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 19/08/2027 09:55",
+          "box": [53, 150, 353, 181],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "COFFEE BEANS 250G            12.25",
       "box": [51, 186, 538, 225],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [51, 186, 294, 215],
+          "script": "latin"
+        },
+        {
+          "text": "12.25",
+          "box": [468, 205, 538, 225],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "PLASTERS                      8.84",
       "box": [50, 222, 537, 261],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLASTERS",
+          "box": [50, 222, 163, 245],
+          "script": "latin"
+        },
+        {
+          "text": "8.84",
+          "box": [481, 241, 537, 261],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CHEESE 200G                  11.96",
       "box": [48, 258, 535, 297],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CHEESE 200G",
+          "box": [48, 258, 204, 283],
+          "script": "latin"
+        },
+        {
+          "text": "11.96",
+          "box": [465, 277, 535, 297],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOOTHPASTE                    2.97",
       "box": [46, 294, 534, 333],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOOTHPASTE",
+          "box": [46, 294, 188, 318],
+          "script": "latin"
+        },
+        {
+          "text": "2.97",
+          "box": [478, 313, 534, 333],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "ORANGE JUICE                  0.83",
       "box": [45, 330, 531, 369],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "ORANGE JUICE",
+          "box": [45, 330, 216, 355],
+          "script": "latin"
+        },
+        {
+          "text": "0.83",
+          "box": [476, 349, 531, 369],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "RICE 1KG                      7.00",
       "box": [44, 366, 531, 405],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "RICE 1KG",
+          "box": [44, 366, 156, 389],
+          "script": "latin"
+        },
+        {
+          "text": "7.00",
+          "box": [475, 385, 531, 405],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "PASTA 500G                    5.84",
       "box": [42, 402, 529, 441],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PASTA 500G",
+          "box": [42, 402, 184, 426],
+          "script": "latin"
+        },
+        {
+          "text": "5.84",
+          "box": [473, 421, 529, 441],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SUBTOTAL                     41.41",
       "box": [40, 438, 527, 477],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [40, 438, 153, 461],
+          "script": "latin"
+        },
+        {
+          "text": "41.41",
+          "box": [457, 457, 527, 477],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "VAT 20%                       8.28",
       "box": [38, 474, 526, 513],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [38, 474, 139, 496],
+          "script": "latin"
+        },
+        {
+          "text": "8.28",
+          "box": [470, 493, 526, 513],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOTAL                        49.69",
       "box": [36, 510, 524, 549],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [36, 510, 107, 531],
+          "script": "latin"
+        },
+        {
+          "text": "49.69",
+          "box": [453, 529, 524, 549],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CARD PAYMENT",
       "box": [36, 546, 207, 571],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [36, 546, 207, 571],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "THANK YOU",
       "box": [212, 590, 340, 613],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [212, 590, 340, 613],
+          "script": "latin"
+        }
+      ]
     }
   ]
 }

@@ -62,7 +62,41 @@ enum class ScriptClass(val key: String) {
     }
 }
 
-data class TruthLine(val text: String, val box: Box, val script: ScriptClass)
+/**
+ * One column of a line: text drawn without a column gap (3+ spaces), with its
+ * own ink box and script. A line without a column gap has one segment equal
+ * to the line.
+ */
+data class TruthSegment(val text: String, val box: Box, val script: ScriptClass) {
+    fun toJson(): JsonObject = jsonObject("text" to text.json(), "box" to box.toJson(), "script" to script.key.json())
+
+    companion object {
+        fun fromJson(value: JsonValue): TruthSegment {
+            val fields = value as? JsonObject ?: jsonFail("segment is not an object")
+            return TruthSegment(
+                fields.string("text"),
+                Box.fromJson(fields.value("box")),
+                ScriptClass.of(fields.string("script")),
+            )
+        }
+    }
+}
+
+/**
+ * One truth line. [box] is the ink of the whole line; [segments] are its
+ * columns (P2-04 review X-01). Line matching accepts either one span over
+ * [box] or one span per segment; CER always uses the whole [text].
+ */
+data class TruthLine(
+    val text: String,
+    val box: Box,
+    val script: ScriptClass,
+    val segments: List<TruthSegment> = listOf(TruthSegment(text, box, script)),
+) {
+    init {
+        require(segments.isNotEmpty()) { "a line has at least one segment" }
+    }
+}
 
 /** Ground truth for one fixture image (P2-04-R1). */
 data class FixtureTruth(
@@ -81,8 +115,11 @@ data class FixtureTruth(
 )
 
 object TruthCodec {
+    const val SCHEMA = "openlife-ocr-truth/2"
+
     fun encode(truth: FixtureTruth): String = Json.write(
         jsonObject(
+            "schema" to SCHEMA.json(),
             "id" to truth.id.json(),
             "category" to truth.category.key.json(),
             "image" to truth.image.json(),
@@ -96,7 +133,12 @@ object TruthCodec {
             "expected_abstain" to truth.expectedAbstain.json(),
             "lines" to jsonArray(
                 truth.lines.map {
-                    jsonObject("text" to it.text.json(), "box" to it.box.toJson(), "script" to it.script.key.json())
+                    jsonObject(
+                        "text" to it.text.json(),
+                        "box" to it.box.toJson(),
+                        "script" to it.script.key.json(),
+                        "segments" to jsonArray(it.segments.map(TruthSegment::toJson)),
+                    )
                 },
             ),
         ),
@@ -104,6 +146,7 @@ object TruthCodec {
 
     fun decode(text: String): FixtureTruth {
         val root = Json.parseObject(text)
+        if (root.string("schema") != SCHEMA) jsonFail("unknown truth schema")
         return FixtureTruth(
             id = root.string("id"),
             category = FixtureCategory.of(root.string("category")),
@@ -118,10 +161,13 @@ object TruthCodec {
             expectedAbstain = root.bool("expected_abstain"),
             lines = root.array("lines").map { line ->
                 val fields = line as? JsonObject ?: jsonFail("line is not an object")
+                val segments = fields.array("segments").map(TruthSegment::fromJson)
+                if (segments.isEmpty()) jsonFail("line has no segments")
                 TruthLine(
                     fields.string("text"),
                     Box.fromJson(fields.value("box")),
                     ScriptClass.of(fields.string("script")),
+                    segments,
                 )
             },
         )
@@ -141,14 +187,28 @@ data class ManifestEntry(
 
 data class FontEntry(val file: String, val sha256: String)
 
+/**
+ * The JDK and platform that rasterised the set. Font rasterisation differs
+ * between JDK builds and platforms, so pixels are regenerated and compared
+ * only on an identical runtime; the committed PNGs are the source of truth.
+ */
+data class RenderedWith(val javaRuntime: String, val javaVmVendor: String, val os: String) {
+    companion object {
+        fun current(): RenderedWith = RenderedWith(
+            javaRuntime = System.getProperty("java.runtime.version").orEmpty(),
+            javaVmVendor = System.getProperty("java.vm.vendor").orEmpty(),
+            os = "${System.getProperty("os.name")} ${System.getProperty("os.arch")}",
+        )
+    }
+}
+
 /** The versioned set: what was generated, from which fonts, and the digests that bind results to it. */
 data class FixtureManifest(
     val set: String,
     val generator: String,
     val generatorVersion: Int,
     val seed: Long,
-    val javaVersion: String,
-    val javaVendor: String,
+    val renderedWith: RenderedWith,
     val fonts: List<FontEntry>,
     val fixtures: List<ManifestEntry>,
 )
@@ -161,8 +221,9 @@ object ManifestCodec {
             "generator_version" to manifest.generatorVersion.json(),
             "seed" to manifest.seed.json(),
             "rendered_with" to jsonObject(
-                "java_version" to manifest.javaVersion.json(),
-                "java_vendor" to manifest.javaVendor.json(),
+                "java_runtime_version" to manifest.renderedWith.javaRuntime.json(),
+                "java_vm_vendor" to manifest.renderedWith.javaVmVendor.json(),
+                "os" to manifest.renderedWith.os.json(),
             ),
             "fonts" to jsonArray(
                 manifest.fonts.map { jsonObject("file" to it.file.json(), "sha256" to it.sha256.json()) },
@@ -179,8 +240,11 @@ object ManifestCodec {
             generator = root.string("generator"),
             generatorVersion = root.int("generator_version"),
             seed = root.long("seed"),
-            javaVersion = renderedWith.string("java_version"),
-            javaVendor = renderedWith.string("java_vendor"),
+            renderedWith = RenderedWith(
+                javaRuntime = renderedWith.string("java_runtime_version"),
+                javaVmVendor = renderedWith.string("java_vm_vendor"),
+                os = renderedWith.string("os"),
+            ),
             fonts = root.array("fonts").map {
                 val font = it as? JsonObject ?: jsonFail("font is not an object")
                 FontEntry(font.string("file"), font.string("sha256"))

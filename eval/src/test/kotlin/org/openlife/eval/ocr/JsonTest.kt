@@ -1,6 +1,7 @@
 package org.openlife.eval.ocr
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.openlife.eval.ocr.core.Box
@@ -11,6 +12,7 @@ import org.openlife.eval.ocr.core.JsonNumber
 import org.openlife.eval.ocr.core.JsonString
 import org.openlife.eval.ocr.core.ResultsCodec
 import org.openlife.eval.ocr.core.SpanObservation
+import org.openlife.eval.ocr.core.Utf8Chunks
 import org.openlife.eval.ocr.core.jsonArray
 import org.openlife.eval.ocr.core.jsonObject
 
@@ -53,5 +55,22 @@ class JsonTest {
             )
         }
         assertEquals(results, ResultsCodec.decode(ResultsCodec.encode(results)))
+    }
+
+    @Test
+    fun logChunksStayUnderTheByteLimitAndSplitOnlyBetweenCodePoints() {
+        // 3000 characters of Cyrillic are 6000 bytes: a character-count split would overflow a 4 KB entry.
+        val text = "Привет мир 𝐀 ".repeat(250)
+        val chunks = Utf8Chunks.split(text, 3_000)
+        assertEquals(text, chunks.joinToString(""))
+        chunks.forEach { chunk ->
+            assertTrue(chunk.toByteArray(Charsets.UTF_8).size <= 3_000)
+            assertTrue(
+                "no lone surrogate",
+                chunk.codePoints().noneMatch { it in Char.MIN_SURROGATE.code..Char.MAX_SURROGATE.code },
+            )
+        }
+        // "abcd" is 4 bytes; adding the 2-byte é would make 6 > 5, so é starts the next chunk.
+        assertEquals(listOf("abcd", "é"), Utf8Chunks.split("abcdé", 5))
     }
 }

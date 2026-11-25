@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "receipt-04",
   "category": "receipt",
   "image": "fixtures/receipt-04.png",
@@ -14,97 +15,295 @@
     {
       "text": "PLACEHOLDER CAFE",
       "box": [162, 49, 390, 75],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLACEHOLDER CAFE",
+          "box": [162, 49, 390, 75],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "65 EXAMPLE STREET",
       "box": [34, 89, 277, 116],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "65 EXAMPLE STREET",
+          "box": [34, 89, 277, 116],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEL 0100 555 0931",
       "box": [34, 125, 279, 151],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0931",
+          "box": [34, 125, 279, 151],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "DATE 22/08/2027 10:40",
       "box": [37, 159, 337, 188],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 22/08/2027 10:40",
+          "box": [37, 159, 337, 188],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SCREWS 40MM                   5.42",
       "box": [38, 188, 526, 224],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SCREWS 40MM",
+          "box": [38, 200, 195, 224],
+          "script": "latin"
+        },
+        {
+          "text": "5.42",
+          "box": [470, 188, 526, 208],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TEA BAGS X80                 12.14",
       "box": [38, 224, 528, 259],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEA BAGS X80",
+          "box": [38, 235, 210, 259],
+          "script": "latin"
+        },
+        {
+          "text": "12.14",
+          "box": [456, 224, 528, 244],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "APPLES 1KG                    5.16",
       "box": [40, 260, 528, 295],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "APPLES 1KG",
+          "box": [40, 272, 183, 295],
+          "script": "latin"
+        },
+        {
+          "text": "5.16",
+          "box": [473, 260, 528, 280],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CHEESE 200G                  11.40",
       "box": [42, 296, 530, 331],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CHEESE 200G",
+          "box": [42, 308, 198, 331],
+          "script": "latin"
+        },
+        {
+          "text": "11.40",
+          "box": [459, 296, 530, 316],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "FLAT WHITE                    1.49",
       "box": [44, 332, 531, 367],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "FLAT WHITE",
+          "box": [44, 345, 185, 367],
+          "script": "latin"
+        },
+        {
+          "text": "1.49",
+          "box": [475, 332, 531, 352],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "RICE 1KG                      6.62",
       "box": [45, 368, 532, 403],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "RICE 1KG",
+          "box": [45, 381, 158, 403],
+          "script": "latin"
+        },
+        {
+          "text": "6.62",
+          "box": [477, 368, 532, 388],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CROISSANT                    11.48",
       "box": [46, 404, 534, 439],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CROISSANT",
+          "box": [46, 417, 174, 439],
+          "script": "latin"
+        },
+        {
+          "text": "11.48",
+          "box": [463, 404, 534, 424],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "COFFEE BEANS 250G            11.20",
       "box": [48, 440, 535, 475],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [48, 449, 290, 475],
+          "script": "latin"
+        },
+        {
+          "text": "11.20",
+          "box": [464, 440, 535, 460],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "PLASTERS                     12.12",
       "box": [49, 476, 536, 511],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLASTERS",
+          "box": [49, 489, 162, 511],
+          "script": "latin"
+        },
+        {
+          "text": "12.12",
+          "box": [466, 476, 536, 496],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOOTHPASTE                    3.08",
       "box": [49, 512, 538, 547],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOOTHPASTE",
+          "box": [49, 524, 192, 547],
+          "script": "latin"
+        },
+        {
+          "text": "3.08",
+          "box": [482, 512, 538, 532],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "SUBTOTAL                     66.76",
       "box": [51, 548, 539, 583],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [51, 562, 165, 583],
+          "script": "latin"
+        },
+        {
+          "text": "66.76",
+          "box": [469, 548, 539, 568],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "VAT 20%                      13.35",
       "box": [52, 584, 540, 619],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [52, 598, 153, 619],
+          "script": "latin"
+        },
+        {
+          "text": "13.35",
+          "box": [470, 584, 540, 604],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "TOTAL                        80.11",
       "box": [53, 620, 542, 655],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [53, 635, 124, 655],
+          "script": "latin"
+        },
+        {
+          "text": "80.11",
+          "box": [471, 620, 542, 640],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "CARD PAYMENT",
       "box": [55, 667, 227, 691],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [55, 667, 227, 691],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "THANK YOU",
       "box": [234, 698, 363, 720],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [234, 698, 363, 720],
+          "script": "latin"
+        }
+      ]
     }
   ]
 }

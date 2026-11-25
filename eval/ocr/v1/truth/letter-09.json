@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "letter-09",
   "category": "letter",
   "image": "fixtures/letter-09.png",
@@ -14,77 +15,182 @@
     {
       "text": "Example Water Ltd",
       "box": [103, 117, 486, 159],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Example Water Ltd",
+          "box": [103, 117, 486, 159],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "76 Example Road",
       "box": [889, 236, 1138, 267],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "76 Example Road",
+          "box": [889, 236, 1138, 267],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Testford TE1 6XX",
       "box": [889, 284, 1140, 309],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Testford TE1 6XX",
+          "box": [889, 284, 1140, 309],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "12 March 2027",
       "box": [922, 356, 1138, 381],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "12 March 2027",
+          "box": [922, 356, 1138, 381],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Sam Sample",
       "box": [101, 436, 279, 467],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Sam Sample",
+          "box": [101, 436, 279, 467],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "4 Sample Street",
       "box": [101, 484, 330, 515],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "4 Sample Street",
+          "box": [101, 484, 330, 515],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Ref: L-448564",
       "box": [102, 532, 308, 557],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Ref: L-448564",
+          "box": [102, 532, 308, 557],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Dear Sam Sample,",
       "box": [102, 626, 362, 657],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Dear Sam Sample,",
+          "box": [102, 626, 362, 657],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Your reference number is shown at the top of this page. Bring this letter",
       "box": [100, 706, 1123, 737],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Your reference number is shown at the top of this page. Bring this letter",
+          "box": [100, 706, 1123, 737],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "and a form of identification. The meeting will take place in room 4B at",
       "box": [101, 756, 1094, 787],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "and a form of identification. The meeting will take place in room 4B at",
+          "box": [101, 756, 1094, 787],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "10:00.",
       "box": [101, 807, 193, 831],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "10:00.",
+          "box": [101, 807, 193, 831],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Your next payment of 42.50 is due on 3 April 2027. A copy of this letter",
       "box": [100, 886, 1118, 917],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Your next payment of 42.50 is due on 3 April 2027. A copy of this letter",
+          "box": [100, 886, 1118, 917],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "has been sent to your address.",
       "box": [102, 936, 537, 967],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "has been sent to your address.",
+          "box": [102, 936, 537, 967],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Yours sincerely,",
       "box": [100, 1036, 326, 1067],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Yours sincerely,",
+          "box": [100, 1036, 326, 1067],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Alex Example",
       "box": [100, 1136, 294, 1167],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Alex Example",
+          "box": [100, 1136, 294, 1167],
+          "script": "latin"
+        }
+      ]
     }
   ]
 }

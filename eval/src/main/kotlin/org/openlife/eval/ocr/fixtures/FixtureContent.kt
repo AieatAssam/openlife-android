@@ -186,6 +186,7 @@ internal object ScreenshotContent {
 internal object ReceiptContent {
     private const val WIDTH = 576
     private const val COLUMNS = 34
+    private const val COLUMN_GAP = 3
     private const val LINE_HEIGHT = 36.0
 
     private val shops = listOf(
@@ -251,7 +252,8 @@ internal object ReceiptContent {
     }
 
     private fun columns(left: String, right: String): String {
-        require(left.length + right.length < COLUMNS) { "receipt row too wide: $left" }
+        // At least a column gap (3 spaces) between item and price, so truth records two columns.
+        require(left.length + right.length + COLUMN_GAP <= COLUMNS) { "receipt row too wide: $left" }
         return left + " ".repeat(COLUMNS - left.length - right.length) + right
     }
 

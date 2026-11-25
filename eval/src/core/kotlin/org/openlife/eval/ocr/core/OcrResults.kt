@@ -1,10 +1,16 @@
 package org.openlife.eval.ocr.core
 
-/** How the production `extract` call ended for one image. */
+/**
+ * How the production `extract` call ended for one image. Anything but
+ * OUTPUT produced no text: it scores CER 1.0 and no matched lines.
+ * TIMED_OUT is the harness's per-image limit, so a hung engine yields a
+ * failing result instead of a hung run.
+ */
 enum class RunOutcome(val key: String) {
     OUTPUT("output"),
     ABSTAINED("abstained"),
     FAILED("failed"),
+    TIMED_OUT("timed_out"),
     ;
 
     companion object {
@@ -38,6 +44,7 @@ data class ImageResult(
 data class EngineResults(
     val engineId: String,
     val modelVersion: String,
+    val codeCommit: String,
     val manifestSha256: String,
     val gateSha256: String,
     val runDate: String,
@@ -46,7 +53,7 @@ data class EngineResults(
 )
 
 object ResultsCodec {
-    const val SCHEMA = "openlife-ocr-eval-results/1"
+    const val SCHEMA = "openlife-ocr-eval-results/2"
 
     fun encode(results: EngineResults): String = Json.write(
         jsonObject(
@@ -55,6 +62,7 @@ object ResultsCodec {
                 "id" to results.engineId.json(),
                 "model_version" to results.modelVersion.json(),
             ),
+            "code_commit" to results.codeCommit.json(),
             "manifest_sha256" to results.manifestSha256.json(),
             "gate_sha256" to results.gateSha256.json(),
             "run_date" to results.runDate.json(),
@@ -70,6 +78,7 @@ object ResultsCodec {
         return EngineResults(
             engineId = engine.string("id"),
             modelVersion = engine.string("model_version"),
+            codeCommit = root.string("code_commit"),
             manifestSha256 = root.string("manifest_sha256"),
             gateSha256 = root.string("gate_sha256"),
             runDate = root.string("run_date"),

@@ -2,13 +2,15 @@ package org.openlife.eval.ocr
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import org.openlife.eval.ocr.core.Box
 import org.openlife.eval.ocr.core.Digests
 import org.openlife.eval.ocr.core.FixtureCategory
 import org.openlife.eval.ocr.core.ManifestCodec
+import org.openlife.eval.ocr.core.RenderedWith
 import org.openlife.eval.ocr.core.ScriptClass
 import org.openlife.eval.ocr.core.TruthCodec
 import org.openlife.eval.ocr.fixtures.FixtureFonts
@@ -117,33 +119,44 @@ class FixtureGeneratorTest {
         }
     }
 
+    /** Review X-01: receipt item and price rows carry one segment per column, inside the row. */
+    @Test
+    fun columnRowsCarryOneSegmentPerColumn() {
+        val truths = OcrFixtureGenerator.generate(fonts).map { it.truth }
+        val receiptRows = truths.filter { it.category == FixtureCategory.RECEIPT }.flatMap { it.lines }
+        assertTrue(receiptRows.count { it.segments.size == 2 } >= 100)
+        for (truth in truths) {
+            for (line in truth.lines) {
+                assertEquals(line.text.split(Regex(" {3,}")), line.segments.map { it.text })
+                line.segments.forEach {
+                    assertTrue("${truth.id}: '${it.text}' inside its line", it.box.within(line.box))
+                }
+            }
+        }
+    }
+
+    private fun Box.within(outer: Box) =
+        left >= outer.left && right <= outer.right && top >= outer.top && bottom <= outer.bottom
+
     /**
-     * The committed set is exactly what the generator produces. The raster
-     * (decoded pixels) and truth JSON are compared, so a different zlib in
-     * another JDK cannot fail this; the PNG bytes are also checked against
-     * the manifest so the committed files are the ones the digests describe.
+     * Unconditional: the committed PNGs and truth are the source of truth.
+     * Each file must be the one the manifest's digests describe, and each
+     * PNG must decode to the manifest's raster digest (PNG decoding does not
+     * depend on fonts or the JDK's rasteriser).
      */
     @Test
-    fun committedSetMatchesTheGenerator() {
+    fun committedSetMatchesItsManifest() {
         val manifestFile = File(setDir, "manifest.json")
         assertTrue("missing $manifestFile; run ./gradlew :eval:generateOcrFixtures", manifestFile.isFile)
         val committed = ManifestCodec.decode(manifestFile.readText())
-        val generated = OcrFixtureGenerator.generate(fonts, committed.seed)
-        val renderedOn = "committed under ${committed.javaVendor} ${committed.javaVersion}, " +
-            "checked under ${System.getProperty("java.vendor")} ${System.getProperty("java.version")}"
-
         assertEquals(OcrFixtureGenerator.GENERATOR_VERSION, committed.generatorVersion)
         assertEquals(fonts.entries, committed.fonts)
-        assertEquals(generated.map { it.truth.id }, committed.fixtures.map { it.id })
-        val byId: Map<String, GeneratedFixture> = generated.associateBy { it.truth.id }
+        assertEquals(40, committed.fixtures.size)
         committed.fixtures.forEach { entry ->
-            val fixture = byId.getValue(entry.id)
             val png = File(setDir, entry.image).readBytes()
             val truth = File(setDir, entry.truth).readText()
             assertEquals("${entry.id} PNG matches manifest", entry.pngSha256, Digests.sha256(png))
             assertEquals("${entry.id} truth matches manifest", entry.truthSha256, Digests.sha256(truth))
-            assertEquals("${entry.id} truth regenerates", fixture.truthJson, truth)
-            assertEquals("${entry.id} pixels regenerate ($renderedOn)", fixture.rasterSha256, entry.rasterSha256)
             assertEquals(
                 "${entry.id} committed PNG decodes to the manifest raster",
                 entry.rasterSha256,
@@ -153,6 +166,29 @@ class FixtureGeneratorTest {
             assertEquals(entry.category, decoded.category)
             assertEquals(entry.expectedAbstain, decoded.expectedAbstain)
         }
-        assertNotEquals(0, committed.fixtures.size)
+    }
+
+    /**
+     * The committed set is exactly what the generator produces, compared as
+     * decoded pixels and truth JSON. Font rasterisation differs between JDK
+     * builds and platforms, so this runs only on the runtime the manifest
+     * records (review X-06); elsewhere it is skipped, never passed.
+     */
+    @Test
+    fun committedSetRegeneratesOnTheRecordingRuntime() {
+        val committed = ManifestCodec.decode(File(setDir, "manifest.json").readText())
+        val here = RenderedWith.current()
+        assumeTrue(
+            "pixel regeneration skipped: set rendered with ${committed.renderedWith}, this runtime is $here",
+            committed.renderedWith == here,
+        )
+        val generated = OcrFixtureGenerator.generate(fonts, committed.seed)
+        assertEquals(generated.map { it.truth.id }, committed.fixtures.map { it.id })
+        val byId: Map<String, GeneratedFixture> = generated.associateBy { it.truth.id }
+        committed.fixtures.forEach { entry ->
+            val fixture = byId.getValue(entry.id)
+            assertEquals("${entry.id} truth regenerates", fixture.truthJson, File(setDir, entry.truth).readText())
+            assertEquals("${entry.id} pixels regenerate", entry.rasterSha256, fixture.rasterSha256)
+        }
     }
 }

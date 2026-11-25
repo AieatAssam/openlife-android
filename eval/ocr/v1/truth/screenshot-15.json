@@ -1,4 +1,5 @@
 {
+  "schema": "openlife-ocr-truth/2",
   "id": "screenshot-15",
   "category": "screenshot",
   "image": "fixtures/screenshot-15.png",
@@ -14,57 +15,134 @@
     {
       "text": "14:20",
       "box": [49, 41, 138, 67],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "14:20",
+          "box": [49, 41, 138, 67],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Appointment confirmed",
       "box": [97, 221, 667, 271],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Appointment confirmed",
+          "box": [97, 221, 667, 271],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Riverside Optician",
       "box": [99, 350, 419, 388],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Riverside Optician",
+          "box": [99, 350, 419, 388],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Date: Wed 19 May 2027",
       "box": [99, 460, 526, 498],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Date: Wed 19 May 2027",
+          "box": [99, 460, 526, 498],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Time: 07:00",
       "box": [96, 570, 313, 601],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Time: 07:00",
+          "box": [96, 570, 313, 601],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Reference: APT-69823",
       "box": [99, 680, 506, 711],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Reference: APT-69823",
+          "box": [99, 680, 506, 711],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "57 Example Road, Testford",
       "box": [99, 790, 580, 828],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "57 Example Road, Testford",
+          "box": [99, 790, 580, 828],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Please arrive 10 minutes early.",
       "box": [99, 900, 647, 938],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Please arrive 10 minutes early.",
+          "box": [99, 900, 647, 938],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Bring this message with you.",
       "box": [99, 1010, 606, 1049],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Bring this message with you.",
+          "box": [99, 1010, 606, 1049],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Reply CANCEL to cancel.",
       "box": [99, 1120, 535, 1158],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Reply CANCEL to cancel.",
+          "box": [99, 1120, 535, 1158],
+          "script": "latin"
+        }
+      ]
     },
     {
       "text": "Add to calendar",
       "box": [140, 1300, 434, 1331],
-      "script": "latin"
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Add to calendar",
+          "box": [140, 1300, 434, 1331],
+          "script": "latin"
+        }
+      ]
     }
   ]
 }
