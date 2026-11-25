@@ -21,12 +21,7 @@ import java.util.stream.Collectors
 class AssessmentStateBoundaryTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
 
-    private class Rule(
-        val name: String,
-        val pattern: Regex,
-        val exemptFiles: List<String>,
-        val mutation: String,
-    )
+    private class Rule(val name: String, val pattern: Regex, val exemptFiles: List<String>, val mutation: String)
 
     private val declaration = "vault/model/AssessmentState.kt"
     private val mapper = "vault/storage/SourceMapper.kt"
