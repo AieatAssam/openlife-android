@@ -15,6 +15,7 @@ import androidx.test.uiautomator.Until
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -64,6 +65,7 @@ class NavigationBackTest {
         sourceId = createReadySource()
         val intent = Intent(application, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
         }
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -81,6 +83,56 @@ class NavigationBackTest {
             var finishing = true
             scenario.onActivity { finishing = it.isFinishing }
             assertFalse("back from viewer must not finish MainActivity", finishing)
+        }
+    }
+
+    /**
+     * A-10 (P1-19-R14, suspected): after a delete from the viewer, the Room
+     * flow drops the source (ViewerDestination pops on a null source) and the
+     * delete callback also pops. With the flow forced to win (the callback is
+     * held back), the second pop must not remove the List destination.
+     */
+    @Test
+    fun deleteFromViewerKeepsListOnTheBackStack() {
+        sourceId = createReadySource()
+        val intent = Intent(application, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
+            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
+        }
+        val releaseDeleteResult = CompletableDeferred<Unit>()
+        SourceListViewModel.beforeDeleteResultForTest = { releaseDeleteResult.await() }
+        try {
+            ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+                val instrumentation = InstrumentationRegistry.getInstrumentation()
+                val device = UiDevice.getInstance(instrumentation)
+                assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), 30_000))
+                device.findObject(By.desc("Delete")).click()
+                device.wait(Until.findObject(By.res("delete_confirm")), 5_000)?.click()
+                    ?: device.wait(Until.findObject(By.text("Delete")), 5_000)!!.click()
+
+                assertTrue(
+                    "the flow-driven pop should show the list",
+                    device.wait(Until.hasObject(By.text("Import from photos")), 10_000),
+                )
+                // Release the held-back delete callback. Its continuation is
+                // posted to the main looper before the runOnMainSync below, so
+                // once that returns the callback's own pop has run.
+                releaseDeleteResult.complete(Unit)
+                instrumentation.runOnMainSync {}
+                instrumentation.waitForIdleSync()
+                device.waitForIdle()
+                assertTrue(
+                    "the list was popped off the back stack by the second pop",
+                    device.wait(Until.hasObject(By.text("Import from photos")), 2_000),
+                )
+                var finishing = true
+                scenario.onActivity { finishing = it.isFinishing }
+                assertFalse("MainActivity must stay open", finishing)
+            }
+            sourceId = null
+        } finally {
+            releaseDeleteResult.complete(Unit)
+            SourceListViewModel.beforeDeleteResultForTest = null
         }
     }
 

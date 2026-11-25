@@ -12,12 +12,8 @@ import org.openlife.vault.model.OrientationTransform
  * source pixels by [OcrCoordinateMapper].
  */
 object OcrBitmapPreparer {
-    fun prepare(input: OcrEngineInput): Bitmap {
-        val decoded = decodeBounded(input)
-        val upright = orient(decoded, input.orientation)
-        if (upright !== decoded) decoded.recycle()
-        return upright
-    }
+    fun prepare(input: OcrEngineInput): Bitmap =
+        prepareGuarded({ decodeBounded(input) }, { orient(it, input.orientation) }, Bitmap::recycle)
 
     private fun decodeBounded(input: OcrEngineInput): Bitmap {
         val bounds = checkedBounds(input)
@@ -48,5 +44,27 @@ object OcrBitmapPreparer {
     private fun orient(bitmap: Bitmap, orientation: Orientation): Bitmap {
         val matrix = OrientationTransform.matrixFor(orientation) ?: return bitmap
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
+    /**
+     * P1-18 review addition (P1-19): an OutOfMemoryError while decoding or
+     * orienting becomes [OcrDecodeException], which the run state machine
+     * records as an engine failure, and the decoded bitmap is recycled
+     * whenever it is not the one returned.
+     */
+    internal fun <B : Any> prepareGuarded(decode: () -> B, orient: (B) -> B, recycle: (B) -> Unit): B {
+        val decoded = try {
+            decode()
+        } catch (_: OutOfMemoryError) {
+            throw OcrDecodeException("OCR source could not be decoded in the memory available")
+        }
+        val upright = try {
+            orient(decoded)
+        } catch (_: OutOfMemoryError) {
+            recycle(decoded)
+            throw OcrDecodeException("OCR source could not be decoded in the memory available")
+        }
+        if (upright !== decoded) recycle(decoded)
+        return upright
     }
 }

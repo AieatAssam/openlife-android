@@ -32,15 +32,33 @@ unrecoverable, which design §10 treats as the outcome to avoid.
     `SystemClock.elapsedRealtime()`. That clock keeps counting through device
     sleep; `System.nanoTime()` and `uptimeMillis()` stop during deep sleep,
     and the wall clock can be changed.
-  - With timeout 0 the lock engages at the background transition itself, so
-    there is no frame on return in which old content can recompose.
+  - With timeout 0 the lock engages at the background transition itself:
+    when `ProcessLifecycleOwner` reports the process stopped, about 700 ms
+    after the last activity stops. Content is not exposed in that window,
+    because each activity scrubs its content in its own `onStop` and
+    `FLAG_SECURE` keeps it out of Recents. There is no frame on return in
+    which old content can recompose. (Amended by P1-19-R3: an earlier
+    wording implied the lock engaged at the activity's own stop.)
 - **Trips OpenLife starts itself.** The system credential screen and the
   Photo Picker are other apps' activities that OpenLife opens and expects to
   return from. That round trip is not a background period. Without this
   exemption, a PIN entry on API 29, or picking a photo, would relock the app
   behind the user.
-  - The accepted residual: while the picker is open, someone else could pick
-    up the phone and return to OpenLife unprompted.
+  - **Bounded (P1-19-R1, amended 2026-11-24).** The time away is still
+    measured during such a trip. On return, the lock engages if the trip
+    lasted at least the longer of the configured timeout and 60 seconds
+    (`AppLockState.EXTERNAL_GRACE_MILLIS`). Originally the exemption had no
+    bound, so a trip whose result never arrived left the lock off until the
+    process died (audit A-01, A-07).
+  - **The trip ends on return (review Q-02, 2026-11-25).** `onForeground`
+    clears the trip flag before deciding, so a picker result that never
+    arrives cannot carry the grace into later, ordinary background periods.
+    The legitimate round trip is unaffected: its background period was
+    already classified as a trip when it began.
+  - The accepted residuals: within that window, someone else could pick up
+    the phone and return to OpenLife unprompted. A return within the ~700 ms
+    process stop delay produces no foreground event, so if that trip's
+    result is also dropped, the next background period still gets the grace.
 - **Enforced twice.**
   - While locked, `AppLockGate` composes no content-bearing composable.
   - Every UI path that decrypts item bytes or opens a shared stream also

@@ -21,11 +21,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +48,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.OpenLifeButton
+import org.openlife.app.ui.brand.OpenLifeExtendedFloatingActionButton
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
@@ -90,7 +90,7 @@ fun SourceListScreen(
             if (hasItems) {
                 // The content-slot overload keeps the label a plain Text; the
                 // icon/text overload hides it from semantics while animating.
-                ExtendedFloatingActionButton(
+                OpenLifeExtendedFloatingActionButton(
                     onClick = onImportFromPhotoPicker,
                     // VISUAL_IDENTITY §7: the primary action is filled vermilion,
                     // not the tonal container M3 uses for FABs by default.
@@ -210,6 +210,7 @@ private fun SourceRow(
                                 R.string.delete_content_description
                             },
                         ),
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -257,7 +258,7 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
     ) {
         Text(
             stringResource(R.string.list_empty_title),
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.displaySmall,
             textAlign = TextAlign.Center,
         )
         Text(
@@ -265,7 +266,7 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
             modifier = Modifier.padding(top = 12.dp),
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onImportFromPhotoPicker, modifier = Modifier.padding(top = 24.dp)) {
+        OpenLifeButton(onClick = onImportFromPhotoPicker, modifier = Modifier.padding(top = 24.dp)) {
             Icon(Icons.Filled.Add, contentDescription = null)
             Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = 8.dp))
         }

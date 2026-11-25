@@ -3,15 +3,15 @@ package org.openlife.app.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
+import org.openlife.app.ui.brand.OpenLifeOutlinedButton
+import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.app.ui.brand.PerforationDivider
 
 /**
@@ -35,7 +35,7 @@ fun DeleteConfirmationDialog(itemLabel: String, onConfirm: () -> Unit, onDismiss
             }
         },
         confirmButton = {
-            OutlinedButton(
+            OpenLifeOutlinedButton(
                 onClick = onConfirm,
                 modifier = androidx.compose.ui.Modifier.testTag("delete_confirm"),
                 colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
@@ -43,6 +43,6 @@ fun DeleteConfirmationDialog(itemLabel: String, onConfirm: () -> Unit, onDismiss
                 ),
             ) { Text(stringResource(R.string.delete_action)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) } },
+        dismissButton = { OpenLifeTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_action)) } },
     )
 }

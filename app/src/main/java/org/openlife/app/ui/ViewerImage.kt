@@ -6,10 +6,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -26,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
+import org.openlife.app.ui.brand.OpenLifeButton
+import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.evidence.EvidenceColors
 import org.openlife.app.ui.evidence.EvidenceContent
 import org.openlife.app.ui.evidence.EvidenceSelection
@@ -86,7 +86,7 @@ internal fun rememberViewerContent(
 private suspend fun decodeForViewer(bytes: ByteArray, orientation: Orientation): ViewerContentState =
     withContext(Dispatchers.Default) {
         try {
-            SampledBitmapDecoder.decode(bytes, orientation)
+            SampledBitmapDecoder.decode(bytes, orientation)?.also(DecodedBitmapProbe::track)
         } finally {
             bytes.fill(0)
         }
@@ -115,7 +115,7 @@ internal fun ViewerImage(
         ViewerContentState.Unreadable -> ViewerLoadProblem(
             message = stringResource(R.string.viewer_saved_content_unreadable_explained),
         ) {
-            OutlinedButton(
+            OpenLifeOutlinedButton(
                 onClick = onDelete,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.testTag("viewer_unreadable_delete"),
@@ -125,7 +125,7 @@ internal fun ViewerImage(
         ViewerContentState.Transient -> ViewerLoadProblem(
             message = stringResource(R.string.viewer_read_transient),
         ) {
-            Button(onClick = onRetry) { Text(stringResource(R.string.viewer_try_again)) }
+            OpenLifeButton(onClick = onRetry) { Text(stringResource(R.string.viewer_try_again)) }
         }
 
         ViewerContentState.Loading, is ViewerContentState.Shown ->

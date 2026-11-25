@@ -3,9 +3,15 @@ package org.openlife.app
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.database.sqlite.SQLiteException
+import android.icu.text.ListFormatter
 import android.os.StrictMode
+import androidx.annotation.VisibleForTesting
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -56,17 +62,35 @@ class OpenLifeApp : Application() {
     private val mutationQueue = MutationQueue()
     private val vaultInitLock = Mutex()
 
+    private val mutableReadyVault = MutableStateFlow<VaultAccess.Ready?>(null)
+
+    /**
+     * The vault while it is Ready, else null (P1-19-R16). Follows late opens,
+     * retries and resets, so observers are not tied to the vault that existed
+     * when they started. Collecting it does not open the vault; [vault] does.
+     */
+    val readyVault: StateFlow<VaultAccess.Ready?> = mutableReadyVault
+
     // Read outside vaultInitLock by importHousekeeping's slot lookup, so publish it safely.
     @Volatile
     private var cachedAccess: VaultAccess? = null
+        set(value) {
+            field = value
+            mutableReadyVault.value = value as? VaultAccess.Ready
+        }
 
     private var cachedDatabase: OpenLifeDatabase? = null
     private val sensitiveContentClearers = mutableSetOf<() -> Unit>()
     private val preResetCallbacks = mutableSetOf<() -> Unit>()
     private var bootstrapOverrideForTest: ((VaultPaths, KeystoreWrapper) -> VaultBootstrapResult)? = null
 
+    @OptIn(ExperimentalFoundationApi::class)
     override fun onCreate() {
         super.onCreate()
+        // Review Q-01: smart selection sends selected text to the system
+        // TextClassifier and offers its actions (Call, Map). Content text never
+        // goes there. Read at composition time, so it is set before any UI.
+        ComposeFoundationFlags.isSmartSelectionEnabled = false
         appLock.start()
         if (BuildConfig.DEBUG) {
             // P1-13-R3: surface main-thread disk and network access during
@@ -205,6 +229,9 @@ class OpenLifeApp : Application() {
     /** One-shot proof of OpenLife's own Photo Picker forwarding (P1-02-R6). */
     val pickerNonce = org.openlife.app.intake.PickerNonce()
 
+    /** One-shot proof that an open-source request came from IntakeActivity's "Open existing" (P1-19-R17). */
+    val openSourceNonce = org.openlife.app.intake.PickerNonce()
+
     /** Import cleanup that must outlive a screen (P1-15, P1-01); owns the application scope. */
     val importHousekeeping = ImportHousekeeping(
         vault = { vault() },
@@ -255,6 +282,7 @@ class OpenLifeApp : Application() {
         }
     }
 
+    @VisibleForTesting
     internal fun setBootstrapOverrideForTest(override: ((VaultPaths, KeystoreWrapper) -> VaultBootstrapResult)?) {
         cachedDatabase?.let(OpenLifeDatabaseFactory::close)
         cachedDatabase = null
@@ -301,8 +329,37 @@ object VaultFailureDiagnostics {
         val counts = context.getSharedPreferences(PREFERENCES, android.content.Context.MODE_PRIVATE).all
             .filterValues { it is Int && it > 0 }
             .toSortedMap()
-        if (counts.isEmpty()) return context.getString(org.openlife.app.R.string.about_vault_diagnostics_empty)
-        return counts.entries.joinToString(", ") { (cause, count) -> "$cause: $count" }
+        val entries = counts.mapNotNull { (name, count) ->
+            val cause = VaultUnavailableCause.entries.firstOrNull { it.name == name } ?: return@mapNotNull null
+            context.resources.getQuantityString(
+                R.plurals.about_vault_diagnostics_entry,
+                count as Int,
+                context.getString(causeLabel(cause)),
+                count,
+            )
+        }
+        if (entries.isEmpty()) return context.getString(R.string.about_vault_diagnostics_empty)
+        // P1-19-R20: the locale decides how a list is joined.
+        return ListFormatter.getInstance(context.resources.configuration.locales[0]).format(entries)
+    }
+
+    private fun causeLabel(cause: VaultUnavailableCause): Int = when (cause) {
+        VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE ->
+            R.string.vault_cause_keystore_temporarily_unavailable
+
+        VaultUnavailableCause.KEY_FILE_CORRUPT -> R.string.vault_cause_key_file_corrupt
+
+        VaultUnavailableCause.KEY_UNWRAP_FAILED -> R.string.vault_cause_key_unwrap_failed
+
+        VaultUnavailableCause.DATABASE_WITHOUT_KEY -> R.string.vault_cause_database_without_key
+
+        VaultUnavailableCause.DATABASE_OPEN_FAILED -> R.string.vault_cause_database_open_failed
+
+        VaultUnavailableCause.STORAGE_IO_ERROR -> R.string.vault_cause_storage_io_error
+
+        VaultUnavailableCause.RESET_INCOMPLETE -> R.string.vault_cause_reset_incomplete
+
+        VaultUnavailableCause.DATABASE_MISSING -> R.string.vault_cause_database_missing
     }
 }
 

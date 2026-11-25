@@ -4,6 +4,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
@@ -15,7 +17,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -46,13 +51,26 @@ class OcrPersistenceFlowTest {
     val composeRule = createComposeRule()
 
     private val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as OpenLifeApp
+    private val viewModelStores = mutableListOf<ViewModelStore>()
+
+    /** Review Q-08: every OcrViewModel made here is cleared after the test, as a screen's would be. */
+    @After
+    fun clearViewModels() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { viewModelStores.forEach { it.clear() } }
+        viewModelStores.clear()
+    }
+
+    private suspend fun newOcrViewModel(): OcrViewModel = withContext(Dispatchers.Main) {
+        val store = ViewModelStore().also(viewModelStores::add)
+        ViewModelProvider(store, OcrViewModel.factory(app))[OcrViewModel::class.java]
+    }
 
     @Test
     fun readyRevisionIsShownAfterViewModelRecreationWithoutRerunning(): Unit = runBlocking {
         val access = app.vault() as VaultAccess.Ready
         val sourceId = saveSyntheticSource(access)
         try {
-            val first = withContext(Dispatchers.Main) { OcrViewModel(app) }
+            val first = newOcrViewModel()
             withContext(Dispatchers.Main) { first.run(sourceId) }
             val persisted = withTimeout(OCR_TIMEOUT_MS) {
                 access.ocrRepository.observeOcrView(sourceId).first { view ->
@@ -61,7 +79,7 @@ class OcrPersistenceFlowTest {
             }!!
 
             // A new ViewModel, as after process death: it must read, not re-run.
-            val second = withContext(Dispatchers.Main) { OcrViewModel(app) }
+            val second = newOcrViewModel()
             composeRule.setContent {
                 val state by second.state(sourceId).collectAsState()
                 ViewerScreen(
@@ -87,6 +105,79 @@ class OcrPersistenceFlowTest {
             assertEquals(0, after.history.size)
         } finally {
             access.deletionRepository.deleteSource(sourceId)
+        }
+    }
+
+    /**
+     * A-13 (P1-19-R16, suspected): OcrViewModel watched the visible-source
+     * list only if the vault was Ready when the ViewModel was created. Here
+     * the vault opens later (Unavailable, then Ready after a retry); a source
+     * deleted afterwards must still be forgotten (its state is dropped back
+     * to Loading by OcrPresenter.forget).
+     */
+    @Test
+    fun ocrTextIsForgottenForSourcesDeletedAfterVaultReset(): Unit = runBlocking {
+        var attempts = 0
+        val failingOnce = object : org.openlife.vault.crypto.KeystoreWrapper() {
+            private var failed = false
+
+            override fun wrap(
+                plaintext: ByteArray,
+                domain: org.openlife.vault.crypto.EnvelopeDomain,
+                sourceId: UUID?,
+            ): org.openlife.vault.crypto.Envelope {
+                if (!failed) {
+                    failed = true
+                    throw java.security.ProviderException("synthetic temporary keystore failure")
+                }
+                return super.wrap(plaintext, domain, sourceId)
+            }
+
+            override fun unwrap(
+                envelope: org.openlife.vault.crypto.Envelope,
+                domain: org.openlife.vault.crypto.EnvelopeDomain,
+                sourceId: UUID?,
+            ): ByteArray {
+                if (!failed) {
+                    failed = true
+                    throw java.security.ProviderException("synthetic temporary keystore failure")
+                }
+                return super.unwrap(envelope, domain, sourceId)
+            }
+        }
+        app.setBootstrapOverrideForTest { paths, wrapper ->
+            attempts++
+            org.openlife.vault.storage.VaultBootstrapper.bootstrap(paths, if (attempts == 1) failingOnce else wrapper)
+        }
+        var sourceId: UUID? = null
+        try {
+            val viewModel = newOcrViewModel()
+            var access = app.vault()
+            val deadline = System.currentTimeMillis() + VIEW_TIMEOUT_MS
+            while (access !is VaultAccess.Ready && System.currentTimeMillis() < deadline) {
+                app.retryVault()
+                access = app.vault()
+            }
+            assertTrue("the vault never opened: $access", access is VaultAccess.Ready)
+            val ready = access as VaultAccess.Ready
+            val id = saveSyntheticSource(ready).also { sourceId = it }
+
+            val state = withContext(Dispatchers.Main) { viewModel.state(id) }
+            val collector = launch(Dispatchers.Main) { state.collect {} }
+            withTimeout(VIEW_TIMEOUT_MS) { while (state.value is OcrUiState.Loading) delay(POLL_MS) }
+            val held = state.value
+
+            ready.deletionRepository.deleteSource(id)
+            sourceId = null
+            val forgotten = withTimeoutOrNull(VIEW_TIMEOUT_MS) {
+                while (state.value !is OcrUiState.Loading) delay(POLL_MS)
+                true
+            } ?: false
+            collector.cancel()
+            assertTrue("OCR state for a deleted source was kept ($held -> ${state.value})", forgotten)
+        } finally {
+            app.setBootstrapOverrideForTest(null)
+            sourceId?.let { id -> (app.vault() as? VaultAccess.Ready)?.deletionRepository?.deleteSource(id) }
         }
     }
 

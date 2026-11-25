@@ -82,6 +82,11 @@
     <string name="viewer_reject_span">Reject span</string>
     <string name="viewer_span_rejected">rejected</string>
     <string name="viewer_undo_reject">Undo reject</string>
+    <!-- P1-19-R11: spoken names for per-span actions; %1$s is a short preview of the span text. -->
+    <string name="viewer_show_region_for">Show region for %1$s</string>
+    <string name="viewer_correct_for">Correct %1$s</string>
+    <string name="viewer_reject_span_for">Reject span %1$s</string>
+    <string name="viewer_undo_reject_for">Undo reject for %1$s</string>
     <string name="viewer_region_rejected_description">%1$s, rejected, not used as evidence</string>
     <string name="viewer_run_again">Run again</string>
     <string name="viewer_ocr_provenance">Extracted by %1$s %2$s · %3$s</string>
@@ -214,11 +219,23 @@
     <string name="reset_vault_failed">Reset could not finish. The vault is marked for reset; try again to finish it.</string>
     <string name="about_vault_diagnostics">Vault access failure counts: %1$s</string>
     <string name="about_vault_diagnostics_empty">none recorded</string>
+    <!-- P1-19-R20: one diagnostics entry; %1$s is a cause name below, %2$d its count. -->
+    <plurals name="about_vault_diagnostics_entry">
+        <item quantity="one">%1$s: %2$d time</item>
+        <item quantity="other">%1$s: %2$d times</item>
+    </plurals>
+    <string name="vault_cause_keystore_temporarily_unavailable">key store temporarily unavailable</string>
+    <string name="vault_cause_key_file_corrupt">key file damaged</string>
+    <string name="vault_cause_key_unwrap_failed">key could not be unlocked</string>
+    <string name="vault_cause_database_without_key">database without its key</string>
+    <string name="vault_cause_database_open_failed">database could not be opened</string>
+    <string name="vault_cause_storage_io_error">storage error</string>
+    <string name="vault_cause_reset_incomplete">reset did not finish</string>
+    <string name="vault_cause_database_missing">database missing</string>
     <string name="stamp_confirmed">Confirmed</string>
     <string name="stamp_verified">Verified</string>
     <string name="stamp_stale">Stale</string>
     <string name="stamp_saved">Saved</string>
-    <string name="perforation_content_description">Section divider</string>
     <string name="about_subtitle">A private ledger for the files you choose to keep.</string>
     <string name="about_font_credits">Typeface credits: IBM Plex Sans, IBM Plex Mono, and Fraunces. These fonts are distributed under the SIL Open Font License 1.1. The complete license text is included below.</string>
 </resources>

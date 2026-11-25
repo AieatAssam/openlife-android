@@ -42,4 +42,27 @@ class BrandScreenshotTest {
             Files.readString(screenshotTest).contains("captureToImage"),
         )
     }
+
+    /**
+     * P1-19-R10: the delete-dialog golden is per render profile like the
+     * others. A profile either has both themes or neither (generation on a
+     * device is pending; see docs/verification/P1-19-app-audit-remediation.md),
+     * and the instrumented test captures it.
+     */
+    @Test
+    fun deleteDialogGoldensArePairedPerProfile() {
+        val goldenRoot = projectDir.resolve("app/src/androidTest/assets/golden")
+        val profiles = Files.list(goldenRoot).use { entries -> entries.filter(Files::isDirectory).toList() }
+        profiles.forEach { profile ->
+            val present = listOf("delete-dialog-light.png", "delete-dialog-dark.png")
+                .map { Files.isRegularFile(profile.resolve(it)) }
+            val paired = present.all { it } || present.none { it }
+            assertTrue("${profile.fileName} has only one delete-dialog theme", paired)
+        }
+        val screenshotTest = Files.readString(
+            projectDir.resolve("app/src/androidTest/java/org/openlife/app/ui/brand/BrandScreenshotInstrumentedTest.kt"),
+        )
+        assertTrue("the dialog golden test exists", screenshotTest.contains("fun deleteDialogMatchesGolden()"))
+        assertTrue("it captures the dialog window", screenshotTest.contains("isDialog()"))
+    }
 }

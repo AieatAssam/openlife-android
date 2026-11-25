@@ -18,3 +18,28 @@ fun interface BitmapSampler {
     /** Returns true if a bounded preview could be sampled from [bytes]. */
     fun canSample(bytes: ByteArray): Boolean
 }
+
+/**
+ * P1-18 review addition (P1-19): the outcome of the sampled decode that
+ * proves the platform can render an import. An OutOfMemoryError there is the
+ * existing [PrepareResult.Failed] (nothing is staged yet); a refused decode
+ * stays CORRUPT_CONTENT.
+ */
+internal enum class SampleCheck {
+    SAMPLEABLE,
+    UNDECODABLE,
+    OUT_OF_MEMORY,
+    ;
+
+    fun refusal(): PrepareResult? = when (this) {
+        SAMPLEABLE -> null
+        UNDECODABLE -> PrepareResult.Rejected(ImageRejectionReason.CORRUPT_CONTENT)
+        OUT_OF_MEMORY -> PrepareResult.Failed
+    }
+}
+
+internal fun checkSample(sampler: BitmapSampler, bytes: ByteArray): SampleCheck = try {
+    if (sampler.canSample(bytes)) SampleCheck.SAMPLEABLE else SampleCheck.UNDECODABLE
+} catch (_: OutOfMemoryError) {
+    SampleCheck.OUT_OF_MEMORY
+}
