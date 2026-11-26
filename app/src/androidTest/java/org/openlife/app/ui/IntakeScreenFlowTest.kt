@@ -48,6 +48,7 @@ class IntakeScreenFlowTest {
         override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
             reads++
             if (closed) throw IOException("closed")
+            // P1-20-R8: the delay is the behaviour under test (a slow source), not a wait.
             Thread.sleep(delayPerReadMs)
             return delegate.read(buffer, offset, minOf(length, 16))
         }

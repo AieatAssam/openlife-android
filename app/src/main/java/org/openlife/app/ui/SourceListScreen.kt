@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -72,6 +74,8 @@ fun SourceListScreen(
     onFinishReset: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenSearch: (() -> Unit)? = null,
+    // P1-20-R3: held by the list's ViewModel, so the position survives a change of selection.
+    listState: LazyListState = rememberLazyListState(),
 ) {
     var pendingDelete by remember { mutableStateOf<Source?>(null) }
 
@@ -133,7 +137,10 @@ fun SourceListScreen(
                     if (state.sources.isEmpty()) {
                         EmptyList(onImportFromPhotoPicker)
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING_FOR_FAB)) {
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING_FOR_FAB),
+                        ) {
                             items(state.sources, key = { it.id }) { source ->
                                 SourceRow(
                                     source = source,

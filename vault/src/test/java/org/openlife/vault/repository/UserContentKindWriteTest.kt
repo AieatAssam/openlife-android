@@ -105,6 +105,8 @@ class UserContentKindWriteTest {
 
         override fun observeVisibleSources(): Flow<List<SourceEntity>> = unused()
 
+        override fun observeVisibleSource(id: String): Flow<SourceEntity?> = unused()
+
         private fun unused(): Nothing = throw AssertionError("not used by the label write")
     }
 }

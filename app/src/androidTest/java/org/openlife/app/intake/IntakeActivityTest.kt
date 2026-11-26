@@ -210,6 +210,7 @@ class IntakeActivityTest {
                 text = activity.currentStatusForTest()
             }
             if (text?.contains(expected) == true) return
+            // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
             Thread.sleep(100)
         }
         throw AssertionError("status never contained '$expected'; last check did not match in time")

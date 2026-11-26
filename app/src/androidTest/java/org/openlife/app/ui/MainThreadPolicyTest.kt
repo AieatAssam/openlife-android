@@ -43,8 +43,8 @@ class MainThreadPolicyTest {
         val (intake, ocr, list) = withContext(Dispatchers.Main) {
             Triple(
                 IntakeViewModel(application, SavedStateHandle()),
-                OcrViewModel(application),
-                SourceListViewModel(application),
+                application.container.ocr,
+                SourceListViewModel(application.container),
             )
         }
         // Retry Busy from a read left over by an earlier test (F-29, fixed by P1-15).

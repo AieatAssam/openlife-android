@@ -14,5 +14,9 @@ internal object EvidenceSelection {
         spanReviews[span.id] == OcrReviewState.REJECTED
 
     fun selectableSpans(spans: List<OcrSpan>, spanReviews: Map<UUID, OcrReviewState>): List<OcrSpan> =
-        spans.filter { it.evidenceRegion != null && !isRejected(it, spanReviews) }
+        selectableSpans(spans) { isRejected(it, spanReviews) }
+
+    /** The one rule; the image ([EvidenceContent.selectable]) and the viewer's list both use it. */
+    fun selectableSpans(spans: List<OcrSpan>, rejected: (OcrSpan) -> Boolean): List<OcrSpan> =
+        spans.filter { it.evidenceRegion != null && !rejected(it) }
 }
