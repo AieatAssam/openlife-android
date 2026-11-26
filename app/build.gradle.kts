@@ -321,6 +321,38 @@ val writeReleaseRuntimeClasspath = tasks.register("writeReleaseRuntimeClasspath"
     }
 }
 
+// ADR-0017: a test-only dependency (sqlite-jdbc bundles host native libraries)
+// must reach no release, debug or instrumented classpath. This report lists the
+// resolved coordinates of those classpaths, plus the unit-test classpath as
+// the positive control; DependencyBoundaryTest (app) reads it.
+val classpathBoundaryReport = layout.buildDirectory.file("reports/classpath-boundary.txt")
+tasks.register("writeClasspathBoundaryReport") {
+    notCompatibleWithConfigurationCache("resolves Android variant configurations during task execution")
+    outputs.file(classpathBoundaryReport)
+    outputs.upToDateWhen { false }
+    doLast {
+        val text = buildString {
+            listOf(
+                "releaseRuntimeClasspath",
+                "debugRuntimeClasspath",
+                "debugAndroidTestRuntimeClasspath",
+                "debugUnitTestRuntimeClasspath",
+            ).forEach { name ->
+                appendLine("## $name")
+                configurations.getByName(name).incoming.resolutionResult.allComponents
+                    .mapNotNull { component -> component.moduleVersion?.let { "${it.group}:${it.name}:${it.version}" } }
+                    .distinct()
+                    .sorted()
+                    .forEach(::appendLine)
+            }
+        }
+        classpathBoundaryReport.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(text)
+        }
+    }
+}
+
 licenseReport {
     outputDir = rootProject.layout.projectDirectory.dir("docs/generated").asFile.absolutePath
     projects = arrayOf(project)
@@ -357,6 +389,7 @@ tasks.withType<Test>().configureEach {
     // BundledDocumentsTest compares every variant's generated copy with docs/.
     dependsOn(tasks.withType<BundleOfflineDocuments>())
     dependsOn(writeReleaseRuntimeClasspath)
+    dependsOn("writeClasspathBoundaryReport", ":vault:writeClasspathBoundaryReport")
     dependsOn("checkLicense")
     dependsOn("processReleaseMainManifest")
     dependsOn("processReleaseManifest")

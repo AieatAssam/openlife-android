@@ -59,11 +59,12 @@ class SqliteVersionFloorTest {
         override fun toString() = "$major.$minor.$patch"
     }
 
-    private companion object {
+    companion object {
+        /** Also the version of the pinned test engine (PinnedEngineTest, ADR-0017). */
         val BUNDLED_SQLITE = Version(3, 53, 4)
-        val CI_HOST_SQLITE = Version(3, 37, 2)
+        private val CI_HOST_SQLITE = Version(3, 37, 2)
 
-        val SQL_FILES = listOf(
+        private val SQL_FILES = listOf(
             "FactSchemaTriggers.kt",
             "FactMigration.kt",
             "SourceRowRemoval.kt",
@@ -75,12 +76,12 @@ class SqliteVersionFloorTest {
         )
 
         /** FTS5 secure-delete is probed on a temp table; without it SearchIndex creates no index (fail closed). */
-        val GUARDED = mapOf("FTS5 secure-delete" to "SearchIndex.kt")
+        private val GUARDED = mapOf("FTS5 secure-delete" to "SearchIndex.kt")
 
         private fun c(name: String, since: Version, pattern: String) =
             Construct(name, since, Regex(pattern, RegexOption.IGNORE_CASE))
 
-        val CONSTRUCTS = listOf(
+        private val CONSTRUCTS = listOf(
             c(
                 "UPDATE ... FROM",
                 Version(3, 33, 0),
