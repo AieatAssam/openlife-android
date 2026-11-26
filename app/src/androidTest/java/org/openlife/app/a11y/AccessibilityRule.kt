@@ -78,7 +78,8 @@ class AccessibilityRule(
             ) {
                 issues += Issue("image", node, "image without a description")
             }
-            if (config.contains(SemanticsActions.SetText) && fieldLabel(node).isBlank()) {
+            // A field's Text includes its label (Material's TextField merges it in).
+            if (config.contains(SemanticsActions.SetText) && label(node).isBlank()) {
                 issues += Issue("field-label", node, "editable field without a label")
             }
             val toggles = config.contains(SemanticsProperties.ToggleableState) || config.contains(SemanticsProperties.Selected)
@@ -144,14 +145,6 @@ class AccessibilityRule(
         )
 
         fun label(node: SemanticsNode): String {
-            val config = node.config
-            return (
-                config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
-                    config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-                ).joinToString(" ").trim()
-        }
-
-        private fun fieldLabel(node: SemanticsNode): String {
             val config = node.config
             return (
                 config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +

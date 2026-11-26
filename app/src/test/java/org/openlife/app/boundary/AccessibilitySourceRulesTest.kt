@@ -126,7 +126,7 @@ class AccessibilitySourceRulesTest {
     @Test
     fun customGesturesHaveAccessibilityActions() {
         val violations = sources.filter { source -> GESTURES.any { it.containsMatchIn(source.code) } }
-            .filterNot { source -> source.code.contains("customActions") && source.code.contains("onClick(") }
+            .filterNot { source -> GESTURE_EQUIVALENTS.all { it.containsMatchIn(source.code) } }
             .map { it.path.fileName.toString() }
         assertTrue("gesture handlers without customActions/onClick semantics: $violations", violations.isEmpty())
     }
@@ -316,6 +316,8 @@ class AccessibilitySourceRulesTest {
             Regex("""\bdetect\w*Gestures\("""),
             Regex("""\.draggable\("""),
         )
+        // Assignments, not imports: a gesture's equivalent must be set in semantics.
+        val GESTURE_EQUIVALENTS = listOf(Regex("""\bcustomActions\s*="""), Regex("""\bonClick\("""))
         val SECOND_CUE = listOf("textDecoration =", "fontWeight =", "fontStyle =")
         val SELECTED_PARAMETER = Regex("""\bselected:\s*Boolean""")
         val SELECTION_EXPOSED = listOf(Regex("""\bselected\s*=\s*selected\b"""), Regex("""\.selectable\("""))
