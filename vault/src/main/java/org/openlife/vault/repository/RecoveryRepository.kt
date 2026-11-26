@@ -1,5 +1,6 @@
 package org.openlife.vault.repository
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -7,6 +8,7 @@ import org.openlife.vault.crypto.EnvelopeCodec
 import org.openlife.vault.crypto.KeystoreWrapper
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.SourceRowRemoval
 import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.compareAndSetState
@@ -62,7 +64,7 @@ class RecoveryRepository(
                 when (source.state) {
                     SourceState.STAGED -> {
                         if (removeArtefactFiles(source.id)) {
-                            database.sourceDao().deleteById(source.id.toString())
+                            database.sourceDao().deleteStaged(source.id.toString())
                             cleanedStaged++
                         } else {
                             // Keep the STAGED row as durable retry state when a
@@ -88,7 +90,14 @@ class RecoveryRepository(
 
                     SourceState.DELETING -> {
                         if (removeArtefactFiles(source.id)) {
-                            database.sourceDao().deleteById(source.id.toString())
+                            // C2-R61 (F-70): the same routine DeletionRepository runs.
+                            database.withTransaction {
+                                SourceRowRemoval.remove(
+                                    database.sourceRowRemovalDao(),
+                                    source.id.toString(),
+                                    database.sourceDao()::deleteById,
+                                )
+                            }
                             resumedDeletions++
                         } else {
                             // DELETING is intentionally retained until both
@@ -235,7 +244,7 @@ class RecoveryRepository(
                 .forEach { row ->
                     val id = UUID.fromString(row.id)
                     if (removeArtefactFiles(id)) {
-                        database.sourceDao().deleteById(row.id)
+                        database.sourceDao().deleteStaged(row.id)
                         cleaned++
                     }
                 }

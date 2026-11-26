@@ -1,7 +1,8 @@
 id: P1-11
 title: API-29 CI evidence, physical-device and backup-transfer runbooks
 phase: P1
-status: todo
+status: in_progress
+started: 2026-11-26
 depends_on: [P0-04, P0-07, P1-02, P1-07]
 estimate: M
 owner: agent+owner

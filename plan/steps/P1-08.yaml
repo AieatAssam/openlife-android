@@ -1,7 +1,8 @@
 id: P1-08
 title: Settings and About screens
 phase: P1
-status: todo
+status: review
+started: 2026-11-26
 depends_on: [P1-06, P1-07, P0-02, P1-20]
 estimate: M
 owner: agent
@@ -71,3 +72,99 @@ notes: >
   Plan 1.3.0 (2026-11-24): depends on P1-20 so Settings and About are built
   as entry-scoped destinations on the rebuilt navigation (AS-1), using the
   SettingsViewModel introduced by P1-19-R15 if A-11 was confirmed.
+
+  P1-08 run (2026-11-26, branch plan/P1-08-settings-about from main bc3f0fc):
+  P1-06, P1-07 and P1-20 are at review, not done; the acting owner (the
+  coordinating session under the 2026-11-24 delegation) authorised starting
+  this step on them. Owner device policy: no emulator, no adb. Every
+  instrumented test below is implemented; unverified (gap — pending
+  physical-device run):
+  AboutScreenTest.showsVersionCommitFingerprintAndLicencesWithoutOpeningAnyIntent,
+  SettingsScreenTest.resetVaultRequiresTypedConfirmation, and the edited
+  CoreFlowUxTest and AdaptiveLayoutTest (import moved to settings.AboutScreen).
+  Commands: ./gradlew :app:connectedDebugAndroidTest
+  -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.settings.AboutScreenTest
+  (then ...settings.SettingsScreenTest, ...ui.CoreFlowUxTest,
+  ...ui.AdaptiveLayoutTest, ...ui.LargeFontUiTest, ...ui.RtlUiTest).
+  Gap: the uiautomator dump of About showing the key-level label (evidence_required)
+  was not captured; no About golden was generated. Prioritised device
+  checklist and deviations are in docs/verification/P1-08-settings-about.md.
+  Deviations: ActivityMonitor (catch-all, blocking) instead of
+  espresso-intents (not in the catalog or verification metadata); the
+  documents are copied into a per-variant generated res dir
+  (addGeneratedSourceDirectory) instead of a committed res/raw copy;
+  KeyInfo is read with SecretKeyFactory (the wrapping key is AES);
+  SettingsController reset gating is unchanged (UI-only exact word).
+  No committed golden captures About or Settings (checked
+  app/src/androidTest/assets/golden and BrandScreenshotInstrumentedTest),
+  so none was made stale by the restyle.
+  vault/ touches: KeystoreWrapper.wrappingKeySecurity (R3) and
+  SourceViewRepository.countSourcesByState (R4, not in files_touched);
+  neither has a JVM test (Keystore and SQLCipher need a device).
+  Ideas not implemented: an About golden in BrandScreenshotInstrumentedTest.
+
+  Review round (2026-11-26, independent reviewer: accept after fixes;
+  K-01..K-08 addressed, see docs/verification/P1-08-settings-about.md).
+  Requirement added by review (acting-owner decision 2026-11-26): reset is
+  no longer gated in the UI only. VaultResetRepository.resetVault,
+  OpenLifeApp.resetVault and SettingsPort.resetVault require a
+  ResetConfirmation (private constructor) minted only by
+  ResetConfirmation.ofTypedWord (exact, non-blank word; called only from
+  SettingsController.continueReset) or ofIncompleteReset (marker present;
+  called only from AppContainer finishVaultReset); enforced by
+  ResetConfirmationBoundaryTest with recorded mutations. Confirmation UX
+  unchanged. Owner decisions: keep the blocking ActivityMonitor; keep the
+  generated document copy; no About golden in this step (add it at the
+  tablet golden regeneration). K-06: the copy task does not dependsOn
+  generateLicenseReport (it rewrites a committed file, dirtying the tree
+  and GIT_COMMIT); DependencyBoundaryTest enforces report = release
+  classpath instead. K-01's label wording rests on review only. Device
+  checklist now starts with confirming the tablet holds no personal
+  org.openlife install or data (debug has no applicationIdSuffix), and
+  adds VaultUnavailableFlowTest and the vault VaultResetRepositoryTest.
+  Unrun (implemented; unverified, gap pending physical-device run):
+  AboutScreenTest, SettingsScreenTest, CoreFlowUxTest, AdaptiveLayoutTest,
+  LargeFontUiTest, RtlUiTest, VaultUnavailableFlowTest,
+  VaultResetRepositoryTest; uiautomator dump of the key label.
+evidence: >
+  RED 6c1b2fc: ./gradlew :app:testDebugUnitTest --tests 'org.openlife.app.settings.*'
+  --tests 'org.openlife.app.boundary.SourceEgressBoundaryTest' ran 20 tests,
+  10 failed as intended (VaultSecurityInfoTest.mapsKeyInfoSecurityLevelsToHonestLabels,
+  DiagnosticsCountsTest.containsNoUuidOrHashLikeStrings and the other new
+  pure-class tests with NotImplementedError; BundledDocumentsTest with
+  NoSuchFieldException GIT_COMMIT and "third_party_licenses.md is not
+  generated"; SourceEgressBoundaryTest.noLinkOpeningApiIsReported on the
+  LocalUriHandler mutation). Passing in RED: SettingsControllerTest (2,
+  pre-existing) and the guard VaultSecurityInfoTest.labelTextNeverOverclaims
+  (its strings were added with the test). :app:compileDebugAndroidTestKotlin
+  succeeded with the TODO() stubs. GREEN a58eff4: detekt clean;
+  :app:testDebugUnitTest 200 tests, 0 failures. REFACTOR 459ceeb:
+  AboutControllerTest (4). Final gate on the working tree that became
+  459ceeb, run in chunks with
+  --max-workers=2 because another session's gradlew --stop killed two
+  whole-gate runs ("daemon disappeared", "stop command received"): detekt
+  :vault:test :eval:test BUILD SUCCESSFUL; :app:test BUILD SUCCESSFUL; lint
+  BUILD SUCCESSFUL (after keeping R.raw.ofl_1_1); assembleDebug
+  :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+  BUILD SUCCESSFUL. After keep.xml and making every Test task depend on the
+  bundle*OfflineDocuments tasks: ./gradlew --no-daemon --max-workers=2
+  detekt lint (lint depends on test) BUILD SUCCESSFUL. JVM counts: app 204 (main 189), vault 193 (193), eval 26
+  (26); 0 failures, 0 skipped. scripts/plan-check.sh steps=82 errors=0;
+  scripts/tests/run.sh 51 passed, 0 failed. Instrumented: compiled only, not run.
+  Review round: RED 0387c19 (targeted run: vault 4/4 failed as intended
+  [ResetConfirmationTest x2, SourceStateCountsTest x2, NotImplementedError];
+  app 5/45 failed as intended [SettingsControllerTest x2,
+  AboutControllerTest.eachFactFailsIndependently,
+  SourceEgressBoundaryTest.noLinkOpeningApiIsReported on the
+  AndroidUriHandler mutation, ResetConfirmationBoundaryTest "must mint
+  through ofTypedWord("]; passing in RED by design with in-test recorded
+  mutations: noResourceOrManifestEnablesLinks,
+  aMintElsewhereIsReported, licenceReportListsExactlyTheReleaseRuntimeClasspath,
+  cancellationIsNotReportedAsAFailure; both androidTest sources compiled).
+  GREEN c2f6483. Final gate as ONE command (not chunked):
+  ./gradlew --max-workers=2 detekt lint :app:test :vault:test assembleDebug
+  :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+  :eval:test BUILD SUCCESSFUL (some tasks up-to-date from the GREEN run);
+  JVM: app 211, vault 197, eval 26, 0 failures, 0 skipped;
+  scripts/plan-check.sh steps=82 errors=0; scripts/tests/run.sh 51 passed,
+  0 failed. Instrumented: compiled only, not run.

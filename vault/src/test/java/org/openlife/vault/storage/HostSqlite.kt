@@ -17,26 +17,43 @@ import java.lang.reflect.Proxy
  * This is the host's SQLite (3.53.x), not SQLCipher. It proves the SQL —
  * DDL, triggers, cascades, MATCH syntax and the repository's queries — on the
  * same FTS5 code; it is not device evidence (docs/decisions/0010-local-search.md).
- * Foreign keys are on, as Room turns them on; recursive triggers are on, as
- * the pinned SQLCipher build compiles them on (SQLITE_DEFAULT_RECURSIVE_TRIGGERS).
- * Cascades fire the FTS delete triggers with recursive triggers on or off
- * (host check, P2-08 review). `PRAGMA secure_delete` is left at its default
- * (off), as in the pinned build. [path] null is an in-memory database; a file
- * path lets a test close and reopen the same database.
+ * Foreign keys are on, as Room turns them on. No production code sets
+ * `recursive_triggers`; its value on a device is the build default. The
+ * pinned `libsqlcipher.so` lists `DEFAULT_RECURSIVE_TRIGGERS` among its
+ * compile-option strings (read from the AAR, not observed on a device), so
+ * [recursiveTriggers] defaults to on, and the suites whose result could
+ * depend on it run in both modes (P3-02 review M-05). Cascades fire the FTS
+ * delete triggers with recursive triggers on or off (host check, P2-08
+ * review). `PRAGMA secure_delete` is left at its default (off), as in the
+ * pinned build. [path] null is an in-memory database; a file path lets a test
+ * close and reopen the same database.
  */
-class HostSqlite(path: File? = null) : Closeable {
+class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closeable {
+    /**
+     * The SQLite error text, the failing statement's kind (its leading
+     * keywords and object name, never values) and the host SQLite version,
+     * so a CI log explains a failure without row content.
+     */
     class Failure(message: String) : RuntimeException(message)
 
     private val script: File = File.createTempFile("host-sqlite", ".py").apply {
         deleteOnExit()
         writeText(PROGRAM)
     }
-    private val command: List<String> = listOf("python3", "-I", script.absolutePath) + listOfNotNull(path?.absolutePath)
+    private val command: List<String> = interpreter(script) + listOfNotNull(path?.absolutePath)
     private val process: Process = ProcessBuilder(command)
         .redirectErrorStream(false)
         .start()
     private val input: Writer = process.outputStream.bufferedWriter()
     private val output: BufferedReader = process.inputStream.bufferedReader()
+
+    init {
+        if (!recursiveTriggers) exec("PRAGMA recursive_triggers = OFF")
+        if (!versionReported) {
+            versionReported = true
+            System.err.println("HostSqlite: host SQLite ${version()}")
+        }
+    }
 
     fun exec(sql: String, vararg args: Any?) {
         query(sql, *args)
@@ -57,8 +74,21 @@ class HostSqlite(path: File? = null) : Closeable {
             if (row == "END") break
             rows += row.split(' ').map(::decode)
         }
-        if (status.startsWith("ERR ")) throw Failure(String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8))
+        if (status.startsWith("ERR ")) {
+            val error = String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8)
+            throw Failure("$error [statement: ${statementKind(sql)}; host SQLite ${version()}]")
+        }
         return rows
+    }
+
+    private var knownVersion: String? = null
+
+    /** The engine's `sqlite_version()`, read once per connection. */
+    fun version(): String = knownVersion ?: run {
+        knownVersion = "unknown" // a failing version query must not recurse through Failure
+        runCatching { query("SELECT sqlite_version()").single().single() as String }
+            .getOrDefault("unknown")
+            .also { knownVersion = it }
     }
 
     private fun nextLine(): String = output.readLine()
@@ -154,6 +184,10 @@ class HostSqlite(path: File? = null) : Closeable {
     }
 
     companion object {
+        /** The engine version is printed once per test JVM (CI log; Gradle shows standard error). */
+        @Volatile
+        private var versionReported = false
+
         /** Creates every table and index of an exported Room schema (e.g. 4.json) on this database. */
         fun HostSqlite.createFromExportedSchema(json: File) {
             val text = json.readText()
@@ -164,6 +198,30 @@ class HostSqlite(path: File? = null) : Closeable {
                 exec(raw.replace("\${TABLE_NAME}", table))
             }
         }
+
+        /**
+         * The host interpreter: `python3 -I <script>` unless the environment
+         * variable `OPENLIFE_HOST_SQLITE` names another command speaking the
+         * same line protocol (for example one over an older SQLite, to
+         * reproduce a CI runner's engine; P3-02 CI failure).
+         */
+        private fun interpreter(script: File): List<String> = System.getenv("OPENLIFE_HOST_SQLITE")
+            ?.split(' ')
+            ?.filter(String::isNotBlank)
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf("python3", "-I", script.absolutePath)
+
+        private val STATEMENT_KIND = Regex(
+            "^\\s*((?:CREATE|DROP|ALTER|INSERT|REPLACE|UPDATE|DELETE|SELECT|PRAGMA|SAVEPOINT|RELEASE|ROLLBACK)" +
+                "(?:\\s+(?:OR\\s+\\w+|TEMP|TEMPORARY|UNIQUE|VIRTUAL|TABLE|INDEX|TRIGGER|VIEW|" +
+                "INTO|FROM|IF|NOT|EXISTS))*" +
+                "(?:\\s+[\\w`\"]+)?)",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /** Leading keywords plus the object name: schema identifiers only, never literals or bound values. */
+        internal fun statementKind(sql: String): String =
+            STATEMENT_KIND.find(sql)?.groupValues?.get(1)?.replace(Regex("\\s+"), " ") ?: "other"
 
         private val CREATE_SQL = Regex("\"createSql\": \"((?:[^\"\\\\]|\\\\.)*)\"")
         private val TABLE_NAME = Regex("\"tableName\": \"([^\"]+)\"")

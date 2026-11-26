@@ -27,9 +27,10 @@ import androidx.window.core.layout.computeWindowSizeClass
 import kotlinx.coroutines.flow.first
 import org.openlife.app.AppContainer
 import org.openlife.app.intake.InternalLink
+import org.openlife.app.settings.AboutScreen
+import org.openlife.app.settings.AboutViewModel
 import org.openlife.app.settings.AppLockSettings
 import org.openlife.app.settings.SettingsScreen
-import org.openlife.app.ui.AboutScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.SourceListViewModel
 import org.openlife.app.ui.search.SearchScreen
@@ -65,11 +66,7 @@ fun OpenLifeNavHost(container: AppContainer, navController: NavHostController = 
             composable<Routes.ListDetail> { entry -> ListDetailDestination(container, navController, entry, expanded) }
             composable<Routes.Search> { entry -> SearchDestination(container, navController, entry, expanded) }
             composable<Routes.Settings> { entry -> SettingsDestination(container, navController, entry) }
-            composable<Routes.About> {
-                val context = LocalContext.current
-                val lowRam = remember { context.getSystemService(ActivityManager::class.java).isLowRamDevice }
-                AboutScreen(onBack = { navController.popBackStack() }, lowRamDevice = lowRam)
-            }
+            composable<Routes.About> { entry -> AboutDestination(container, navController, entry) }
         }
         // Review N-04: a pending internal link opens here, where the width is known, and only
         // once this host is composed (MainActivity composes it after the lock gate).
@@ -154,6 +151,20 @@ private fun SettingsDestination(container: AppContainer, navController: NavHostC
         onBack = { navController.popBackStack() },
         onVerifyAll = container.settings::verifyAll,
         appLock = AppLockSettings(policy, container.settings::lockAvailability, container.settings::updateLockPolicy),
+    )
+}
+
+@Composable
+private fun AboutDestination(container: AppContainer, navController: NavHostController, entry: NavBackStackEntry) {
+    val about: AboutViewModel = viewModel(viewModelStoreOwner = entry, factory = AboutViewModel.factory(container))
+    val state by about.controller.state.collectAsState()
+    val context = LocalContext.current
+    val lowRam = remember { context.getSystemService(ActivityManager::class.java).isLowRamDevice }
+    AboutScreen(
+        state = state,
+        onToggleDocument = about.controller::toggle,
+        onBack = { navController.popBackStack() },
+        lowRamDevice = lowRam,
     )
 }
 

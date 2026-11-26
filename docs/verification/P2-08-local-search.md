@@ -36,7 +36,11 @@ contain the compile options `ENABLE_FTS5`, `ENABLE_FTS3`/`FTS4`,
 
 `HostSqlite` (vault test sources) runs SQL through `python3 -I` with the
 stdlib `sqlite3` module (SQLite 3.53.3, FTS5 present). It turns on
-`foreign_keys` and `recursive_triggers`, as the device build does. (An
+`foreign_keys` (as Room does) and `recursive_triggers`. (Corrected
+2026-11-26, P3-02 review M-05: no production code sets
+`recursive_triggers`; the pinned `libsqlcipher.so` lists
+`DEFAULT_RECURSIVE_TRIGGERS` among its compile options, read statically
+from the AAR and not observed on a device. An
 earlier version of this record said `recursive_triggers` is what makes the
 cascade fire the FTS delete triggers. That was wrong: a host check showed
 they fire with it off too.) `SearchIndexHostTest` does

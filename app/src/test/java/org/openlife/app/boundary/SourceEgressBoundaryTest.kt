@@ -77,7 +77,12 @@ class SourceEgressBoundaryTest {
             ?: activityViolation(file, line, location)
             ?: selectableTextViolation(line, location)
             ?: shareViolation(line, location)
+            ?: linkViolation(line, location)
     }
+
+    /** P1-08-R5: no link or URI handler, HTML link parsing, Linkify or custom tab anywhere in shipped code. */
+    private fun linkViolation(line: String, location: String): String? =
+        if (LINK_OPENING.containsMatchIn(line)) "$location: link-opening API" else null
 
     /** Review U-02: platform text views (AndroidView-hosted) and SelectionContainer can copy shown text. */
     private fun selectableTextViolation(line: String, location: String): String? =
@@ -112,6 +117,73 @@ class SourceEgressBoundaryTest {
                 "\"$mutation\" in ViewerScreen must be a violation",
                 boundaryViolations(viewer, lines + mutation).isEmpty(),
             )
+        }
+    }
+
+    /**
+     * P1-08-R5: no link is ever opened. A Compose link or URI handler opens a
+     * browser without any `startActivity` in OpenLife's source, so those APIs
+     * are named here; About shows addresses as plain text.
+     */
+    @Test
+    fun noLinkOpeningApiIsReported() {
+        val viewer = projectDir.resolve("app/src/main/java/org/openlife/app/ui/ViewerScreen.kt")
+        val lines = Files.readAllLines(viewer)
+        listOf(
+            "    val uriHandler = LocalUriHandler.current",
+            "    onClick = { handler.openUri(url) }",
+            "    withLink(LinkAnnotation.Url(url)) { append(url) }",
+            "    pushUrlAnnotation(UrlAnnotation(url))",
+            "    Text(AnnotatedString.fromHtml(html))",
+            "    Linkify.addLinks(view, Linkify.WEB_URLS)",
+            "    CustomTabsIntent.Builder().build().launchUrl(context, uri)",
+            "    view.autoLinkMask = 1",
+            "    val handler = AndroidUriHandler(context)",
+        ).forEach { mutation ->
+            assertFalse(
+                "\"$mutation\" in ViewerScreen must be a violation",
+                boundaryViolations(viewer, lines + mutation).isEmpty(),
+            )
+        }
+    }
+
+    /**
+     * P1-08-R5 (review): XML can turn on links without Kotlin: `autoLink` on
+     * a TextView, or a BROWSABLE / http(s) intent filter that would make
+     * OpenLife a link target. No shipped resource or manifest may contain one.
+     */
+    @Test
+    fun noResourceOrManifestEnablesLinks() {
+        val violations = xmlFiles().flatMap { file -> xmlLinkViolations(file, Files.readAllLines(file)) }
+        assertTrue("link-enabling XML:\n${violations.joinToString("\n")}", violations.isEmpty())
+
+        val sample = projectDir.resolve("app/src/main/res/raw/keep.xml")
+        listOf(
+            """<TextView android:autoLink="web" />""",
+            """<category android:name="android.intent.category.BROWSABLE" />""",
+            """<data android:scheme="https" />""",
+        ).forEach { mutation ->
+            assertFalse(
+                "\"$mutation\" must be a violation",
+                xmlLinkViolations(sample, Files.readAllLines(sample) + mutation).isEmpty(),
+            )
+        }
+    }
+
+    private fun xmlLinkViolations(file: Path, lines: List<String>): List<String> =
+        lines.mapIndexedNotNull { index, line ->
+            val location = "${projectDir.relativize(file)}:${index + 1}"
+            if (XML_LINK.containsMatchIn(line)) "$location: link-enabling XML" else null
+        }
+
+    private fun xmlFiles(): List<Path> = listOf("main", "debug", "release").flatMap { set ->
+        val root = projectDir.resolve("app/src/$set")
+        if (!Files.isDirectory(root)) {
+            emptyList()
+        } else {
+            Files.walk(root).use { stream ->
+                stream.filter { Files.isRegularFile(it) && it.toString().endsWith(".xml") }.collect(Collectors.toList())
+            }
         }
     }
 
@@ -344,6 +416,11 @@ class SourceEgressBoundaryTest {
         val SELECTABLE_TEXT = Regex(
             """\b(EditText|TextView|AppCompatEditText|AppCompatTextView|TextInputEditText|SelectionContainer)\b|""" +
                 """TextIsSelectable|textIsSelectable""",
+        )
+        val XML_LINK = Regex("""autoLink|android\.intent\.category\.BROWSABLE|android:scheme="https?"""")
+        val LINK_OPENING = Regex(
+            """\w*UriHandler\b|\b(openUri|LinkAnnotation|UrlAnnotation|fromHtml|Linkify|launchUrl)\b|""" +
+                """\bCustomTabs\w*|\bautoLink\w*""",
         )
         val SHARE_OR_EXPORT = Regex("""\bShareCompat\b|\bCreateDocument\b|ACTION_CREATE_DOCUMENT|\bcreateChooser\b""")
         val BARE_OUTPUT = Regex(

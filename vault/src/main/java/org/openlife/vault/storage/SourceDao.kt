@@ -67,7 +67,8 @@ interface SourceDao {
     @Query("SELECT COUNT(*) FROM sources")
     suspend fun count(): Int
 
-    @Query("DELETE FROM sources WHERE id = :id")
+    /** Step 7 of [SourceRowRemoval]; nothing else removes a non-STAGED Source row (C2-R61). */
+    @Query(SourceRowRemoval.DELETE_SOURCE)
     suspend fun deleteById(id: String)
 
     /** Removes a row only while it is STAGED; returns 0 for any other state (P1-18 review R-06). */
@@ -87,6 +88,10 @@ interface SourceDao {
     /** P1-20-R2: one visible source by id (the same states as the list); null once it is gone. */
     @Query("SELECT * FROM sources WHERE id = :id AND state IN ('READY', 'CORRUPT', 'DELETING')")
     fun observeVisibleSource(id: String): Flow<SourceEntity?>
+
+    /** P1-08-R4 (review K-03): counts per stored state; reads the state column only, never row content. */
+    @Query(COUNT_SOURCES_BY_STATE)
+    suspend fun countByState(): List<StateCount>
 }
 
 /** Outcome of a compare-and-set state transition (P1-18-R13). */

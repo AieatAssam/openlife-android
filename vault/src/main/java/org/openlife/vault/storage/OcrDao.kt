@@ -59,8 +59,13 @@ interface OcrDao {
     @Query("SELECT * FROM ocr_user_revisions WHERE revisionId = :revisionId ORDER BY createdAt ASC")
     suspend fun findUserRevisions(revisionId: String): List<OcrUserRevisionEntity>
 
-    @Query("DELETE FROM ocr_revisions WHERE sourceId = :sourceId")
-    suspend fun deleteForSource(sourceId: String)
+    /** C2-R14: run in the transaction that commits [revisionId] READY; 0 when it does not become current. */
+    @Query(OcrPointerSql.MOVE_CURRENT_READING)
+    suspend fun moveCurrentReading(sourceId: String, revisionId: String): Int
+
+    /** C2-R15: the head of the correction chain of [spanId] (null: the whole reading), or null. */
+    @Query(OcrPointerSql.CURRENT_CORRECTION)
+    suspend fun currentCorrection(revisionId: String, spanId: String?): String?
 
     @Query("UPDATE ocr_revisions SET state = 'STALE', failureReason = 'PROCESS_RESTART' WHERE state = 'RUNNING'")
     suspend fun markRunningStale(): Int

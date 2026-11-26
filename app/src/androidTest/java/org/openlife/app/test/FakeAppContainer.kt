@@ -19,6 +19,7 @@ import org.openlife.app.SourceStore
 import org.openlife.app.intake.InternalLinks
 import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.LockAvailability
+import org.openlife.app.settings.AboutPort
 import org.openlife.app.ui.OcrBackend
 import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SourceListUiState
@@ -32,6 +33,7 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.DeleteResult
 import org.openlife.vault.repository.ReadyReadResult
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 import org.openlife.vault.search.SearchHit
@@ -43,7 +45,9 @@ import java.util.UUID
  * never arrive unless [readContent] provides them; OCR text is [ocrView];
  * search answers every query with [searchHits]. The list shows what [listed]
  * makes of [sourceList] (null: the list never loads); the viewer reads
- * [sourceList] by id, independently. Call [close] after the test.
+ * [sourceList] by id, independently. About reads [about] (synthetic by
+ * default; pass the production port to test the real identity). Call [close]
+ * after the test.
  */
 class FakeAppContainer(
     initialSources: List<Source>,
@@ -51,6 +55,7 @@ class FakeAppContainer(
     private val searchHits: List<SearchHit> = emptyList(),
     private val ocrView: (UUID) -> OcrView? = { null },
     private val listed: (List<Source>) -> SourceListUiState? = { SourceListUiState.Loaded(it) },
+    override val about: AboutPort = FakeAboutPort(),
 ) : AppContainer {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val sourceList = MutableStateFlow(initialSources)
@@ -109,7 +114,7 @@ class FakeAppContainer(
 
         override fun updateLockPolicy(policy: AppLockPolicy) = Unit
 
-        override suspend fun resetVault(): VaultResetResult = VaultResetResult.FAILED
+        override suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult = VaultResetResult.FAILED
 
         override suspend fun verifyAll(): VerifyReport? = null
     }

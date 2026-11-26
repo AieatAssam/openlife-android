@@ -54,7 +54,7 @@ class VaultResetRepositoryTest {
         File(paths.databaseFile.path + "-shm").writeBytes(byteArrayOf(5))
         File(paths.artefactsDir, "${UUID.randomUUID()}.blob").writeBytes(byteArrayOf(6))
 
-        val result = VaultResetRepository(paths, wrapper, MutationQueue()).resetVault()
+        val result = VaultResetRepository(paths, wrapper, MutationQueue()).resetVault(confirmed())
 
         assertEquals(VaultResetResult.COMPLETED, result)
         assertFalse(paths.databaseFile.exists())
@@ -78,12 +78,12 @@ class VaultResetRepositoryTest {
         val fileOps = FailOnceOnFile(blob)
         val reset = VaultResetRepository(paths, wrapper, MutationQueue(), fileOps = fileOps)
 
-        assertEquals(VaultResetResult.FAILED, reset.resetVault())
+        assertEquals(VaultResetResult.FAILED, reset.resetVault(confirmed()))
         assertTrue(File(paths.vaultDir, "RESET_IN_PROGRESS").exists())
         val blocked = VaultBootstrapper.bootstrap(paths, wrapper) as VaultBootstrapResult.Unavailable
         assertEquals(org.openlife.vault.storage.VaultUnavailableCause.RESET_INCOMPLETE, blocked.cause)
 
-        assertEquals(VaultResetResult.COMPLETED, reset.resetVault())
+        assertEquals(VaultResetResult.COMPLETED, reset.resetVault(confirmed()))
         assertFalse(File(paths.vaultDir, "RESET_IN_PROGRESS").exists())
         assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
     }
@@ -103,7 +103,7 @@ class VaultResetRepositoryTest {
         File(paths.vaultDir, "database.key.tmp").writeBytes(byteArrayOf(5))
         File(paths.vaultDir, "unknown-dir").apply { mkdirs() }.resolve("x").writeBytes(byteArrayOf(6))
 
-        assertEquals(VaultResetResult.COMPLETED, VaultResetRepository(paths, wrapper, MutationQueue()).resetVault())
+        assertEquals(VaultResetResult.COMPLETED, VaultResetRepository(paths, wrapper, MutationQueue()).resetVault(confirmed()))
 
         assertEquals("nothing under the vault directory survives", emptyList<String>(), paths.vaultDir.list().orEmpty().toList())
         assertTrue(VaultBootstrapper.bootstrap(paths, wrapper) is VaultBootstrapResult.Ready)
@@ -113,7 +113,7 @@ class VaultResetRepositoryTest {
     fun resetIsRefusedWhileAnImportIsInProgress(): Unit = runBlocking {
         val queue = MutationQueue()
         val result = queue.withMutation {
-            VaultResetRepository(paths, wrapper, queue).resetVault()
+            VaultResetRepository(paths, wrapper, queue).resetVault(confirmed())
         }
         assertEquals(VaultResetResult.BUSY, result)
         assertFalse(File(paths.vaultDir, "RESET_IN_PROGRESS").exists())
@@ -129,4 +129,7 @@ class VaultResetRepositoryTest {
             return ArtefactFileOps.Default.deleteIfExists(file)
         }
     }
+
+    /** The test stands in for the Settings controller, which mints this from the typed word. */
+    private fun confirmed(): ResetConfirmation = requireNotNull(ResetConfirmation.ofTypedWord("RESET", "RESET"))
 }

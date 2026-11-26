@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SourceDao
+import org.openlife.vault.storage.SourceRowRemoval
 import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.compareAndSetState
@@ -68,15 +69,13 @@ class DeletionRepository(
                     return@withMutation DeleteResult.Failed
                 }
 
-                // Delete derived OCR rows on the same serialized mutation path as the
-                // Source. The foreign keys also cascade in SQLite, but keeping this
-                // explicit makes the C1 deletion contract independent of connection
-                // pragma defaults and leaves no dependent provenance row behind.
-                // One transaction: a failure leaves both tables as they were, with
-                // the Source still DELETING for retry (P1-15-R3).
+                // C2-R43 / C2-R61 (F-70): the shared routine removes every fact,
+                // OCR and edge row of the Source in whole-set order, then the
+                // Source, independent of the foreign_keys pragma. One transaction:
+                // a failure leaves every table as it was, with the Source still
+                // DELETING for retry (P1-15-R3).
                 database.withTransaction {
-                    database.ocrDao().deleteForSource(sourceId.toString())
-                    sourceDao.deleteById(sourceId.toString())
+                    SourceRowRemoval.remove(database.sourceRowRemovalDao(), sourceId.toString(), sourceDao::deleteById)
                 }
                 DeleteResult.Deleted
             } catch (cancelled: CancellationException) {
