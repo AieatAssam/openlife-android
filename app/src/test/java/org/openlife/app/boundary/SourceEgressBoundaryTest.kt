@@ -138,11 +138,51 @@ class SourceEgressBoundaryTest {
             "    Linkify.addLinks(view, Linkify.WEB_URLS)",
             "    CustomTabsIntent.Builder().build().launchUrl(context, uri)",
             "    view.autoLinkMask = 1",
+            "    val handler = AndroidUriHandler(context)",
         ).forEach { mutation ->
             assertFalse(
                 "\"$mutation\" in ViewerScreen must be a violation",
                 boundaryViolations(viewer, lines + mutation).isEmpty(),
             )
+        }
+    }
+
+    /**
+     * P1-08-R5 (review): XML can turn on links without Kotlin: `autoLink` on
+     * a TextView, or a BROWSABLE / http(s) intent filter that would make
+     * OpenLife a link target. No shipped resource or manifest may contain one.
+     */
+    @Test
+    fun noResourceOrManifestEnablesLinks() {
+        val violations = xmlFiles().flatMap { file -> xmlLinkViolations(file, Files.readAllLines(file)) }
+        assertTrue("link-enabling XML:\n${violations.joinToString("\n")}", violations.isEmpty())
+
+        val sample = projectDir.resolve("app/src/main/res/raw/keep.xml")
+        listOf(
+            """<TextView android:autoLink="web" />""",
+            """<category android:name="android.intent.category.BROWSABLE" />""",
+            """<data android:scheme="https" />""",
+        ).forEach { mutation ->
+            assertFalse(
+                "\"$mutation\" must be a violation",
+                xmlLinkViolations(sample, Files.readAllLines(sample) + mutation).isEmpty(),
+            )
+        }
+    }
+
+    private fun xmlLinkViolations(file: Path, lines: List<String>): List<String> =
+        lines.mapIndexedNotNull { index, line ->
+            if (XML_LINK.containsMatchIn(line)) "${projectDir.relativize(file)}:${index + 1}: link-enabling XML" else null
+        }
+
+    private fun xmlFiles(): List<Path> = listOf("main", "debug", "release").flatMap { set ->
+        val root = projectDir.resolve("app/src/$set")
+        if (!Files.isDirectory(root)) {
+            emptyList()
+        } else {
+            Files.walk(root).use { stream ->
+                stream.filter { Files.isRegularFile(it) && it.toString().endsWith(".xml") }.collect(Collectors.toList())
+            }
         }
     }
 
@@ -376,6 +416,7 @@ class SourceEgressBoundaryTest {
             """\b(EditText|TextView|AppCompatEditText|AppCompatTextView|TextInputEditText|SelectionContainer)\b|""" +
                 """TextIsSelectable|textIsSelectable""",
         )
+        val XML_LINK = Regex("""autoLink|android\.intent\.category\.BROWSABLE|android:scheme="https?"""")
         val LINK_OPENING = Regex(
             """\b(LocalUriHandler|UriHandler|openUri|LinkAnnotation|UrlAnnotation|fromHtml|Linkify|launchUrl)\b|""" +
                 """\bCustomTabs\w*|\bautoLink\w*""",

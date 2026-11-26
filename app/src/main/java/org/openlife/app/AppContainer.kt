@@ -32,6 +32,7 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.DeleteResult
 import org.openlife.vault.repository.ReadyReadResult
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 import org.openlife.vault.search.SearchHit
@@ -90,7 +91,8 @@ interface SettingsPort {
 
     fun updateLockPolicy(policy: AppLockPolicy)
 
-    suspend fun resetVault(): VaultResetResult
+    /** Requires the user's [ResetConfirmation] (P1-08 review); there is no unconfirmed reset. */
+    suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult
 
     suspend fun verifyAll(): VerifyReport?
 }
@@ -118,7 +120,8 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
 
         override fun updateLockPolicy(policy: AppLockPolicy) = app.appLock.updatePolicy(policy)
 
-        override suspend fun resetVault(): VaultResetResult = app.resetVault()
+        override suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult =
+            app.resetVault(confirmation)
 
         override suspend fun verifyAll(): VerifyReport? = app.verifyAllItems()
     }
@@ -216,7 +219,7 @@ private class VaultSourceStore(private val app: OpenLifeApp, private val scope: 
 
     override suspend fun retryVault() = app.retryVault()
 
-    override suspend fun finishVaultReset(): Boolean = app.resetVault() == VaultResetResult.COMPLETED
+    override suspend fun finishVaultReset(): Boolean = app.finishIncompleteReset() == VaultResetResult.COMPLETED
 
     override suspend fun cleanAbandonedStages() {
         app.importHousekeeping.cleanAbandonedStages()

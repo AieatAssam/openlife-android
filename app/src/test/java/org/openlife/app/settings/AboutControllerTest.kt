@@ -1,5 +1,6 @@
 package org.openlife.app.settings
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,5 +70,43 @@ class AboutControllerTest {
         about.toggle(BundledDocument.THIRD_PARTY_LICENCES)
         pending.complete("late text")
         assertTrue(about.state.value.documents.isEmpty())
+    }
+
+    /** Review K-02: a fact whose read throws is "not reported"; the others still arrive and nothing crashes. */
+    @Test
+    fun eachFactFailsIndependently() {
+        val failing = object : AboutPort {
+            override suspend fun buildIdentity(): BuildIdentity = throw SecurityException("synthetic")
+
+            override suspend fun wrappingKey(): WrappingKeyReport = throw java.security.KeyStoreException("synthetic")
+
+            override suspend fun diagnostics(): DiagnosticsCounts = throw IllegalArgumentException("synthetic")
+
+            override suspend fun document(document: BundledDocument): String = throw SecurityException("synthetic")
+        }
+        val about = AboutController(failing, scope, Dispatchers.Unconfined)
+        about.load()
+        about.toggle(BundledDocument.PRIVACY_POLICY)
+        val state = about.state.value
+        assertEquals(setOf(AboutFact.BUILD_IDENTITY, AboutFact.DIAGNOSTICS), state.unavailable)
+        assertEquals(KeySecurityLevel.NOT_REPORTED, state.keyLevel)
+        assertEquals(DocumentState.Failed, state.documents[BundledDocument.PRIVACY_POLICY])
+    }
+
+    /** Cancellation is not a failure: the ViewModel going away must not mark facts unavailable. */
+    @Test
+    fun cancellationIsNotReportedAsAFailure() {
+        val cancelled = object : AboutPort {
+            override suspend fun buildIdentity(): BuildIdentity = throw CancellationException("gone")
+
+            override suspend fun wrappingKey(): WrappingKeyReport = throw CancellationException("gone")
+
+            override suspend fun diagnostics(): DiagnosticsCounts = throw CancellationException("gone")
+
+            override suspend fun document(document: BundledDocument): String = throw CancellationException("gone")
+        }
+        val about = AboutController(cancelled, scope, Dispatchers.Unconfined)
+        about.load()
+        assertEquals(AboutState(), about.state.value)
     }
 }

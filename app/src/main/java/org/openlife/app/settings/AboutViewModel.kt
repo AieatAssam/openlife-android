@@ -37,7 +37,11 @@ data class AboutState(
     val keyLevel: KeySecurityLevel? = null,
     val diagnostics: DiagnosticsCounts? = null,
     val documents: Map<BundledDocument, DocumentState> = emptyMap(),
+    val unavailable: Set<AboutFact> = emptySet(),
 )
+
+/** A fact whose read failed; About says "not reported" for it (review K-02). */
+enum class AboutFact { BUILD_IDENTITY, DIAGNOSTICS }
 
 /**
  * P1-08: loads About's facts once and opens or closes the bundled documents.

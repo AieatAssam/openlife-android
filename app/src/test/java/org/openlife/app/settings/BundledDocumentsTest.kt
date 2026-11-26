@@ -1,6 +1,7 @@
 package org.openlife.app.settings
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.app.BuildConfig
@@ -46,6 +47,10 @@ class BundledDocumentsTest {
         val value = BuildConfig::class.java.getField("GIT_COMMIT").get(null) as String
         // `git describe --tags --always --dirty`: a tag, tag-N-gHASH or a bare hash, maybe -dirty; else "unknown".
         assertTrue("GIT_COMMIT is '$value'", GIT_DESCRIBE.matches(value))
+        // Review K-05: in a checkout (`.git` is a directory, or a file in a worktree) git must have answered.
+        if (Files.exists(projectDir.resolve(".git"))) {
+            assertNotEquals("git describe ran in a checkout but GIT_COMMIT is unknown", "unknown", value)
+        }
     }
 
     private companion object {

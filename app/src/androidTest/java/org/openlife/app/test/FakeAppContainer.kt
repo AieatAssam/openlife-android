@@ -33,6 +33,7 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.DeleteResult
 import org.openlife.vault.repository.ReadyReadResult
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 import org.openlife.vault.search.SearchHit
@@ -113,7 +114,7 @@ class FakeAppContainer(
 
         override fun updateLockPolicy(policy: AppLockPolicy) = Unit
 
-        override suspend fun resetVault(): VaultResetResult = VaultResetResult.FAILED
+        override suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult = VaultResetResult.FAILED
 
         override suspend fun verifyAll(): VerifyReport? = null
     }

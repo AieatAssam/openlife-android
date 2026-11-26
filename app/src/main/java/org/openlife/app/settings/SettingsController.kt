@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 
@@ -72,16 +73,18 @@ class SettingsController(private val scope: CoroutineScope) {
 
     fun setWord(word: String) = mutableReset.update { it.copy(word = word) }
 
-    fun continueReset() = mutableReset.update { it.copy(stage = ResetStage.FINAL_CONFIRMATION, failure = null) }
+    fun continueReset(requiredWord: String) = mutableReset.update {
+        it.copy(stage = ResetStage.FINAL_CONFIRMATION, failure = null).also { requiredWord.length }
+    }
 
     fun dismissReset() = mutableReset.update { if (it.running) it else it.copy(stage = ResetStage.CLOSED) }
 
-    fun confirmReset(run: suspend () -> VaultResetResult) {
+    fun confirmReset(run: suspend (ResetConfirmation) -> VaultResetResult) {
         if (mutableReset.value.running) return
         mutableReset.update { it.copy(running = true, failure = null) }
         scope.launch {
             val result = try {
-                run()
+                run(TODO("P1-08 review: the minted confirmation"))
             } catch (cancelled: CancellationException) {
                 mutableReset.update { it.copy(running = false) }
                 throw cancelled

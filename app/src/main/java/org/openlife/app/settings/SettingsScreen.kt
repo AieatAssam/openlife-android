@@ -21,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
 import org.openlife.app.ui.brand.PerforationDivider
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 
@@ -32,7 +33,7 @@ import org.openlife.vault.repository.VerifyReport
  */
 @Composable
 fun SettingsScreen(
-    onResetVault: suspend () -> VaultResetResult,
+    onResetVault: suspend (ResetConfirmation) -> VaultResetResult,
     onResetComplete: () -> Unit,
     onBack: () -> Unit = {},
     onVerifyAll: (suspend () -> VerifyReport?)? = null,

@@ -28,6 +28,7 @@ import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryReport
 import org.openlife.vault.repository.RecoveryRepository
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.repository.VaultResetRepository
@@ -250,7 +251,12 @@ class OpenLifeApp : Application() {
         }
     }
 
-    suspend fun resetVault(): VaultResetResult = withContext(Dispatchers.IO) {
+    /** Finishes a reset the user confirmed earlier whose marker is still on disk (P1-06-R5); FAILED if none. */
+    suspend fun finishIncompleteReset(): VaultResetResult =
+        ResetConfirmation.ofIncompleteReset(paths.resetMarkerFile)?.let { resetVault(it) } ?: VaultResetResult.FAILED
+
+    /** Wipes the vault; [confirmation] proves the user confirmed it (P1-08 review). */
+    suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {
             // Reset must not wait out an import and then silently wipe the
             // user's preview: an import in progress makes reset busy.
@@ -271,7 +277,7 @@ class OpenLifeApp : Application() {
                     cachedDatabase?.let(OpenLifeDatabaseFactory::close)
                     cachedDatabase = null
                 },
-            ).resetVault()
+            ).resetVault(confirmation)
             if (result == VaultResetResult.COMPLETED) {
                 cachedAccess = null
                 getSharedPreferences(APP_LOCK_PREFERENCES, MODE_PRIVATE).edit(commit = true) { clear() }

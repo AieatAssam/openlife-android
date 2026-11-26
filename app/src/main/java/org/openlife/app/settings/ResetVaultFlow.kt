@@ -23,6 +23,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 
@@ -77,7 +78,7 @@ private fun localizedList(items: List<String>): String {
 
 @Composable
 fun ResetVaultFlow(
-    onResetVault: suspend () -> VaultResetResult,
+    onResetVault: suspend (ResetConfirmation) -> VaultResetResult,
     onResetComplete: () -> Unit = {},
     controller: SettingsController = viewModel<SettingsViewModel>().controller,
 ) {
@@ -104,7 +105,7 @@ fun ResetVaultFlow(
             word = state.word,
             requiredWord = requiredWord,
             onWordChange = controller::setWord,
-            onContinue = controller::continueReset,
+            onContinue = { controller.continueReset(requiredWord) },
             onDismiss = controller::dismissReset,
         )
     }

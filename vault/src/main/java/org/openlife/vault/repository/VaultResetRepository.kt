@@ -18,7 +18,12 @@ class VaultResetRepository(
     private val fileOps: ArtefactFileOps = ArtefactFileOps.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    suspend fun resetVault(): VaultResetResult = withContext(ioDispatcher) {
+    /**
+     * Wipes the vault. [confirmation] is the capability that proves the user
+     * confirmed it (P1-08 review); it carries no data and is not read.
+     */
+    @Suppress("UnusedParameter", "UNUSED_PARAMETER")
+    suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult = withContext(ioDispatcher) {
         mutationQueue.tryMutation { resetWhileLocked() } ?: VaultResetResult.BUSY
     }
 
