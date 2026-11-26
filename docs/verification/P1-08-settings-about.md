@@ -223,3 +223,25 @@ Run on the tablet (`U8BBB20806201256`) once no other agent is using it:
    tablet golden regeneration with `BrandScreenshotInstrumentedTest`.
 8. The K-01 label wording rests on review only. No test exercises a key
    file whose Keystore key is gone.
+
+## Fix-round verification (2026-11-26)
+
+An independent reviewer read the K-01..K-08 fixes and the reset guard and
+accepted the step for merge. Nothing in this section has run on a device.
+
+Open, low severity, recorded from that pass:
+
+- **KK-01.** The boundary check that confines who may mint a
+  `ResetConfirmation` matches the literal text `ofTypedWord(` and
+  `ofIncompleteReset(`; a function reference or a space before the bracket
+  would pass it. Match the names on word boundaries instead.
+- **KK-02.** The XML link check scans `app/src/{main,debug,release}` only, not
+  `vault/` resources (none carry links today).
+
+Added to the on-device checks:
+
+- With the app lock engaged, About's diagnostics stay on "Loading…" until
+  unlock and nothing hangs.
+- `VaultUnavailableFlowTest`: the typed-word reset and the "finish reset" path
+  still complete.
+- TalkBack reads each merged fact as label, then value.
