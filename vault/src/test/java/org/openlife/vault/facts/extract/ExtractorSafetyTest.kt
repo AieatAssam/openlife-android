@@ -43,6 +43,8 @@ class ExtractorSafetyTest {
         "markers" to fill("1 pm "),
         "uppercase" to "14:30 " + fill("A"),
         "non-ascii-digits" to fill("1\u0663"),
+        "time-ann" to fill("1:00 ("),
+        "url-many" to fill("www.a "),
         "mixed" to fill("Tel: +44 (0)20 7946 0018 3/4/26 €1,234 https://a.example/x a@b.example 2:30 pm "),
     )
 
@@ -67,13 +69,13 @@ class ExtractorSafetyTest {
     /** Ten times the input must not cost much more than ten times the time (linear scanning). */
     @Test
     fun workGrowsLinearly() {
-        for (name in listOf("digit-space", "label-run", "at", "groups", "months")) {
+        for (name in listOf("digit-space", "label-run", "at", "groups", "months", "time-ann", "url-many")) {
             val small = adversarial.getValue(name)
             val large = small.repeat(SCALE)
             val all = RuleStage.entries.toSet()
             val ratio = bestOfRuns(large, all).cpu / bestOfRuns(small, all).cpu
             println("ExtractorSafetyTest linearity $name x$SCALE ratio ${"%.1f".format(ratio)}")
-            assertTrue("$name grew by $ratio for ${SCALE}x input", ratio < SCALE * 4)
+            assertTrue("$name grew by $ratio for ${SCALE}x input", ratio < SCALE * 2)
         }
     }
 
@@ -91,6 +93,34 @@ class ExtractorSafetyTest {
             stopped = true
         }
         assertTrue(stopped)
+    }
+
+    /** The recorded rules version is the per-rule constants joined; they cannot drift apart (review E-10). */
+    @Test
+    fun rulesVersionJoinsEveryRuleConstant() {
+        val rules = listOf(
+            DateExtractor.RULE_ID to DateExtractor.RULES_VERSION,
+            TimeExtractor.RULE_ID to TimeExtractor.RULES_VERSION,
+            DateTimeExtractor.RULE_ID to DateTimeExtractor.RULES_VERSION,
+            MoneyExtractor.RULE_ID to MoneyExtractor.RULES_VERSION,
+            UrlExtractor.RULE_ID to UrlExtractor.RULES_VERSION,
+            EmailExtractor.RULE_ID to EmailExtractor.RULES_VERSION,
+            PhoneExtractor.RULE_ID to PhoneExtractor.RULES_VERSION,
+        )
+        assertEquals(rules.joinToString(",") { (id, version) -> "$id-$version" }, FactExtractor.RULES_VERSION)
+    }
+
+    /** §5.4 reads neighbours by ordinal, so two spans sharing one is a caller bug and fails loudly. */
+    @Test
+    fun duplicateSpanOrdinalsAreRejected() {
+        val spans = listOf(ExtractionSpan("a", null, 1, "USD"), ExtractionSpan("b", null, 1, "$5"))
+        var rejected = false
+        try {
+            FactExtractor.extract(spans)
+        } catch (expected: IllegalArgumentException) {
+            rejected = true
+        }
+        assertTrue("duplicate ordinals were accepted", rejected)
     }
 
     /** C2-R47: hand-written scanners only; nothing that resolves, decodes or floats. */

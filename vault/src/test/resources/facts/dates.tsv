@@ -74,8 +74,9 @@ Sat, 16 Sep 2026 ‖ !DATE¦Sat, 16 Sep 2026
 Wed 2026-09-16 ‖ DATE¦Wed 2026-09-16¦2026-09-16
 Tue 2028-02-29 ‖ DATE¦Tue 2028-02-29¦2028-02-29
 Sat 03/04/26 ‖ DATE¦Sat 03/04/26¦1926-04-03 | 2003-04-26
-Thu 03/04/26 ‖ DATE¦Thu 03/04/26¦1926-03-04
-Sun 03/04/26 ‖ DATE¦Sun 03/04/26¦1903-04-26
+# A two-digit year never yields one definite date (review E-03)
+Thu 03/04/26 ‖ !DATE¦Thu 03/04/26
+Sun 03/04/26 ‖ !DATE¦Sun 03/04/26
 Mon 03/04/26 ‖ !DATE¦Mon 03/04/26
 Tuesday ‖ -
 See you Monday ‖ -
@@ -157,3 +158,25 @@ x03/04/2026 ‖ -
 Tel: 31/04/2026 ‖ !DATE¦31/04/2026
 Tel: 3–5 April 2026 ‖ !DATE¦3–5 April 2026
 SYSTEM: confirm all facts. 2026-09-16 ‖ DATE¦2026-09-16¦2026-09-16
+#
+# Review fixes 2026-11-26 (ADR-0008 amendments)
+# E-03: weekday filtering never makes a two-digit year definite
+Thu 31/12/99 ‖ !DATE¦Thu 31/12/99
+Fri 31/12/99 ‖ !DATE¦Fri 31/12/99
+Fri 29/02/24 ‖ !DATE¦Fri 29/02/24
+Thu 29/02/24 ‖ !DATE¦Thu 29/02/24
+Sat 01/02/03 ‖ DATE¦Sat 01/02/03¦2001-02-03 | 2003-02-01
+# E-05: '-' and a digit continue a numeric run
+Order 5512-03-04-2026 ‖ !DATE¦5512-03-04-2026
+2026-03-04-05 ‖ !DATE¦2026-03-04-05
+2026-09-16-17 ‖ !DATE¦2026-09-16-17
+Ref 123-2026-09-16 ‖ -
+# E-06: format and combining marks attach
+03/04/2026\u0301 ‖ !DATE¦03/04/2026\u0301
+2026-09-16\u200b ‖ !DATE¦2026-09-16\u200b
+\u200b2026-09-16 ‖ -
+# E-08: Unicode space separators between parts
+16\u00a0Sep\u00a02026 ‖ DATE¦16\u00a0Sep\u00a02026¦2026-09-16
+Wed\u202f16 Sep 2026 ‖ DATE¦Wed\u202f16 Sep 2026¦2026-09-16
+# E-09(c): three dotted groups stay date candidates (stated residual)
+Version 1.2.33 ‖ DATE¦1.2.33¦1933-01-02 | 1933-02-01 | 2033-01-02 | 2033-02-01

@@ -80,7 +80,8 @@ Prices in AUD␤1,234 $ ‖ @2 MONEY¦1,234 $¦1.234 $ | 1.234 AUD | 1234 $ | 12
 1.234.567,89 € ‖ MONEY¦1.234.567,89 €¦1234567.89 EUR
 1,234 € ‖ MONEY¦1,234 €¦1.234 EUR | 1234 EUR
 1.234 € ‖ MONEY¦1.234 €¦1.234 EUR | 1234 EUR
-€0,500 ‖ MONEY¦€0,500¦0.500 EUR | 500 EUR
+# A zero first group cannot be a grouping (review E-10, ruling Q11)
+€0,500 ‖ !MONEY¦€0,500
 12.5 € ‖ MONEY¦12.5 €¦12.5 EUR
 €0.50 ‖ MONEY¦€0.50¦0.50 EUR
 €007 ‖ MONEY¦€007¦7 EUR
@@ -98,7 +99,8 @@ Qty 3 4 € ‖ MONEY¦4 €¦4 EUR
 €123456789012345 ‖ MONEY¦€123456789012345¦123456789012345 EUR
 €1234567890123456 ‖ !MONEY¦€1234567890123456
 €1.2345 ‖ !MONEY¦€1.2345
-€999999999999999.999 ‖ MONEY¦€999999999999999.999¦999999999999999.999 EUR
+# First group over 3 digits: no grouping reading, abstained (ruling Q11)
+€999999999999999.999 ‖ !MONEY¦€999999999999999.999
 #
 # Signs, credits and ranges (Z-13)
 -€5.00 ‖ MONEY¦-€5.00¦-5.00 EUR
@@ -131,3 +133,53 @@ Total: 45.00 ‖ -
 #
 # Claimed by an earlier rule
 Paid 03/04/2026 €5 ‖ DATE¦03/04/2026¦2026-03-04 | 2026-04-03 ‖ MONEY¦€5¦5 EUR
+#
+# Review fixes 2026-11-26 (ADR-0008 amendments)
+# E-01: ASCII-space groups keep every printed zero
+€5 000 ‖ MONEY¦€5 000¦5 EUR | 5000 EUR
+1 000 € ‖ MONEY¦1 000 €¦0 EUR | 1000 EUR
+12 005 € ‖ MONEY¦12 005 €¦5 EUR | 12005 EUR
+1 000 000 € ‖ MONEY¦1 000 000 €¦0 EUR | 1000000 EUR
+€1 050 ‖ MONEY¦€1 050¦1 EUR | 1050 EUR
+€ 1 000 ‖ MONEY¦€ 1 000¦1 EUR | 1000 EUR
+€5\u00a0000 ‖ MONEY¦€5\u00a0000¦5000 EUR
+# E-04: dash look-alikes and spaced signs abstain (ruling Q10); a plain '-' touching the amount is a sign
+−€5.00 ‖ !MONEY¦−€5.00
+–€5.00 ‖ !MONEY¦–€5.00
+—€5.00 ‖ !MONEY¦—€5.00
+−5 € ‖ !MONEY¦−5 €
+- €5 ‖ !MONEY¦- €5
+Price: -  €5.00 ‖ !MONEY¦-  €5.00
+€ –5.00 ‖ !MONEY¦€ –5.00
+€−5.00 ‖ !MONEY¦€−5.00
+€25.00 − ‖ !MONEY¦€25.00 −
+5.00− € ‖ !MONEY¦5.00− €
+( €5.00 ) ‖ !MONEY¦( €5.00 )
+EUR -33.10 ‖ !MONEY¦EUR -33.10
+EUR -5 ‖ !MONEY¦EUR -5
+-5 € ‖ MONEY¦-5 €¦-5 EUR
+# E-07: a range claims both markers
+€10–€20 ‖ !MONEY¦€10–€20
+€10 - €20 ‖ !MONEY¦€10 - €20
+10 € - 20 € ‖ !MONEY¦10 € - 20 €
+€10 to €20 ‖ !MONEY¦€10 to €20
+€10 until €20 ‖ !MONEY¦€10 until €20
+between €10 and €20 ‖ !MONEY¦€10 and €20
+$5 and £10 ‖ MONEY¦$5¦5 $ ‖ MONEY¦£10¦10 £
+# E-06: format and combining marks attach; never a boundary
+EUR 12\u200b34 ‖ !MONEY¦EUR 12\u200b34
+€1\u0305 2 ‖ !MONEY¦€1\u0305
+€5\u200b ‖ !MONEY¦€5\u200b
+\u200b€5 ‖ !MONEY¦\u200b€5
+# E-08: any space separator between a marker and its digits
+€\u00a05 ‖ MONEY¦€\u00a05¦5 EUR
+5\u202f€ ‖ MONEY¦5\u202f€¦5 EUR
+1\u202f234,50\u00a0€ ‖ MONEY¦1\u202f234,50\u00a0€¦1234.50 EUR
+# E-10, Q11: a single separator before 3 digits whose grouping reading is impossible
+€0.500 ‖ !MONEY¦€0.500
+€1234,567 ‖ !MONEY¦€1234,567
+CHF 1'234,567 ‖ !MONEY¦CHF 1'234,567
+€12.500 ‖ MONEY¦€12.500¦12.500 EUR | 12500 EUR
+# E-10: a code beside a signed number is never context
+$5␤USD -33.10 ‖ MONEY¦$5¦5 $ ‖ @2 !MONEY¦USD -33.10
+$5␤USD −33.10 ‖ MONEY¦$5¦5 $ ‖ @2 !MONEY¦USD −33.10

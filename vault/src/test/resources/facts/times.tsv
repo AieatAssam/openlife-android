@@ -115,3 +115,41 @@ Wed 16 Sep 2026 14:30 ‖ DATETIME¦Wed 16 Sep 2026 14:30¦2026-09-16 14:30
 # Claimed by a time, so no phone
 Call 2 pm ‖ TIME¦2 pm¦14:00
 Tel: 10:30 ‖ TIME¦10:30¦10:30 | 22:30
+#
+# Review fixes 2026-11-26 (ADR-0008 amendments)
+# E-02: fractional seconds abstain; no time starts after a sign; a zone word takes an offset
+14:30:00.000Z ‖ !TIME¦14:30:00.000Z
+14:30:00,5 CET ‖ !TIME¦14:30:00,5
+14:30:00.123+02:00 ‖ !TIME¦14:30:00.123+02:00
+Sent: 2026-09-16 14:30:00.000 UTC ‖ DATE¦2026-09-16¦2026-09-16 ‖ !TIME¦14:30:00.000
+2026-09-16T14:30:00.000Z ‖ !DATE¦2026-09-16 ‖ !TIME¦14:30:00.000Z
+(UTC+05:30) Chennai ‖ -
+Offset +02:00 ‖ -
+Offset −02:00 ‖ -
+±01:00 ‖ -
+14:30 GMT+01:00 ‖ !TIME¦14:30 GMT+01:00
+14:30 UTC-5 ‖ !TIME¦14:30 UTC-5
+14:30–16:30 ‖ TIME¦14:30¦14:30 ‖ TIME¦16:30¦16:30
+# E-08: up to 4 space separators or tabs before a zone or a marker
+14:30  CET ‖ !TIME¦14:30  CET
+14:30\tCET ‖ !TIME¦14:30\tCET
+14:30\u00a0CET ‖ !TIME¦14:30\u00a0CET
+14:30\u2009CET ‖ !TIME¦14:30\u2009CET
+14:30\u202fCET ‖ !TIME¦14:30\u202fCET
+14:30    CET ‖ !TIME¦14:30    CET
+14:30     CET ‖ TIME¦14:30¦14:30
+2:30\u202fPM ‖ TIME¦2:30\u202fPM¦14:30
+2:30\u00a0pm ‖ TIME¦2:30\u00a0pm¦14:30
+10:00\u2009–\u200911:00 ‖ TIME¦10:00¦10:00 | 22:00 ‖ TIME¦11:00¦11:00 | 23:00
+2026-09-16\u00a014:30 ‖ DATETIME¦2026-09-16\u00a014:30¦2026-09-16 14:30
+# E-06: format and combining marks attach
+14:30\u0301 ‖ !TIME¦14:30\u0301
+14:30\u200b ‖ !TIME¦14:30\u200b
+# Ruling Q20: any abstention in a range abstains the whole range
+10:00 - 25:00 ‖ !TIME¦10:00 - 25:00
+25:00 - 11:00 ‖ !TIME¦25:00 - 11:00
+# Ruling Q16: '.' with a marker and 'h' separators are claimed and abstained
+2.30 pm ‖ !TIME¦2.30 pm
+14h30 ‖ !TIME¦14h30
+€12.50 ‖ MONEY¦€12.50¦12.50 EUR
+12.50 EUR ‖ MONEY¦12.50 EUR¦12.50 EUR

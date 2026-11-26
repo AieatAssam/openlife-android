@@ -17,6 +17,9 @@ class ExtractorPropertyTest {
         "(", ")", "–", "to", "and", "&", "Tel: ", "Phone ", "tel:", "Wed ", "Sep ", "April ", "May", "th",
         "http://", "https://", "www.", "@", "mailto:", "example", ".org", "a", "B", "٣", "１", "T",
         "\n", "x", "é", "😀", "\uD800",
+        // Review 2026-11-26: zero-led groups, fractional seconds, sign look-alikes, Cf/Mn marks, Unicode spaces
+        "000", "05", ".000", ",5", "\u2212", "\u2014", "±", "\u200B", "\u200D", "\u0301", "\u0305", "\t",
+        "\u2009", "\u202F", "\u00A0", "GMT", "UTC", "h", "_", "xn--", "-.",
     )
 
     @Test
@@ -101,7 +104,7 @@ class ExtractorPropertyTest {
     }
 
     private fun noise(random: Random): String = buildString {
-        repeat(random.nextInt(0, 4)) { append(listOf("Total", "ref", "item", "and", "—", ";").random(random)) }
+        repeat(random.nextInt(0, 4)) { append(listOf("Total", "ref", "item", "and", "—", ";", "\u2212", "\u200B", "\u00A0", "\t").random(random)) }
     }
 
     private companion object {

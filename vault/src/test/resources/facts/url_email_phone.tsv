@@ -83,3 +83,27 @@ Tel: ٠١٢٣٤٥٦٧ ‖ -
 #
 # Several kinds on one line, precedence URL > EMAIL > DATETIME > DATE > TIME > MONEY > PHONE
 Visit https://example.org or mail ann@example.org, Tel: +44 20 7946 0018 on 2026-09-16 at 14:30, total €12.50 ‖ URL¦https://example.org¦https://example.org ‖ EMAIL¦ann@example.org¦ann@example.org ‖ PHONE¦+44 20 7946 0018¦+442079460018 ‖ DATETIME¦2026-09-16 at 14:30¦2026-09-16 14:30 ‖ MONEY¦€12.50¦12.50 EUR
+#
+# Review fixes 2026-11-26 (ADR-0008 amendments)
+# E-10: email domain labels and attached continuations
+user@xn--80ak6aa92e.com ‖ !EMAIL¦user@xn--80ak6aa92e.com
+user@-example-.com ‖ !EMAIL¦user@-example-.com
+user@example-.com ‖ !EMAIL¦user@example-.com
+user@example.com_evil ‖ !EMAIL¦user@example.com_evil
+user@example.comé ‖ !EMAIL¦user@example.comé
+user@my-example.com ‖ EMAIL¦user@my-example.com¦user@my-example.com
+# E-06: format and combining marks attach
+u\u200bser@example.com ‖ !EMAIL¦ser@example.com
+user@example.com\u200b ‖ !EMAIL¦user@example.com\u200b
+https://example.com/\u200bx ‖ !URL¦https://example.com/\u200bx
+https://example.com\u0301 ‖ !URL¦https://example.com\u0301
+Tel: 01632 960123\u200b ‖ !PHONE¦01632 960123\u200b
+# E-09: a '+'-led phone claims before money; '.' or ',' in a '+' run abstains
++1 555 123 4567 USD ‖ PHONE¦+1 555 123 4567¦+15551234567
+Tel: +44 20 7946 0018 €5 ‖ PHONE¦+44 20 7946 0018¦+442079460018 ‖ MONEY¦€5¦5 EUR
+Δ +1234567.89 ‖ !PHONE¦+1234567.89
+Change +12.345.678 ‖ !PHONE¦+12.345.678
++1,234,567 ‖ !PHONE¦+1,234,567
+Total 12.00 € +1 555 123 4567 ‖ MONEY¦12.00 €¦12.00 EUR ‖ PHONE¦+1 555 123 4567¦+15551234567
+# E-08: space separators after a label
+Tel:\u00a001632 960123 ‖ PHONE¦01632 960123¦01632960123
