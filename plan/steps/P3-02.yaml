@@ -1,7 +1,7 @@
 id: P3-02
 title: Fact model, schema, migration, cascade
 phase: P3
-status: in_progress
+status: review
 started: 2026-11-26
 depends_on: [P3-01]
 estimate: M
@@ -62,9 +62,44 @@ acceptance_criteria:
 docs_to_update: [docs/capabilities/C2.md]
 risks: []
 rollback: "Migration is additive; tables unused."
+evidence: >
+  RED 5c328bf: 22 of 30 targeted tests failed for the intended reasons (missing 6.json, TODO stubs, boundary checks, wide FTS triggers). GREEN ae4c239; REFACTOR 8acdb50. JVM counts before -> after: vault 193 -> 214, app 146 -> 146, eval 26 -> 26, all passing. Gate 2026-11-26 on 8acdb50: ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test -> BUILD SUCCESSFUL (exit 0); bash scripts/plan-check.sh -> steps=82 errors=0; bash scripts/tests/run.sh -> 51 passed, 0 failed. Schema JSON vault/schemas/org.openlife.vault.storage.OpenLifeDatabase/6.json exported and copied to androidTest assets. Host proof uses host SQLite 3.53 via HostSqlite, not SQLCipher. Instrumented tests compiled only, not run (no emulator or adb by owner instruction): FactRepositoryTest, FactDatabaseSqlCipherTest, DeletionRepositoryTest, OcrDatabaseTest - implemented; unverified (gap - pending physical-device run). See docs/verification/P3-02-fact-schema.md.
 notes: >
   Plan 1.3.0 (2026-11-24): R6 (VS-2) and R7 (VS-3) added from
   docs/reviews/2026-11-24-vault-audit.md. P3-01's specification must define
   the edge kinds and STALE reasons before this step implements them. P1-18's
   compare-and-set transitions and tolerant enum decoding (VS-1) are the
   pattern for every new state column.
+
+  P3-02 implementation notes (2026-11-26). C2.md governs; conflicts with
+  the brief, all recorded in C2.md section 19: (D-23) every C2 CHECK is a
+  RAISE(ABORT) trigger in FactSchemaTriggers because Room cannot declare
+  table CHECKs; created by the fresh-database callback and by
+  MIGRATION_5_6. (D-24) listFacts returns the revision
+  facts.currentRevisionId names under the brief's type name
+  FactWithLatestRevision; markStaleForSpan and markStaleForRevision take a
+  StaleReason; hooking them into OCR events in one transaction (C2-R40) is
+  P3-04-R5; SpanEligibility (C2 section 1) is defined here for P3-04.
+  (D-25) MIGRATION_4_5 now also creates the narrowed FTS update triggers;
+  MIGRATION_5_6 narrows a shipped v5 database first (C2-R21). (D-26) no
+  fact FTS table (P3-07). P3-02-R4's "cascade handles rows" is replaced by
+  the C2-R43 whole-set routine (SourceRowRemoval) for deletion and
+  recovery; RecoveryRepository's STAGED branches now call deleteStaged.
+  D-6: every reference out of a Source's tree is NO ACTION. The three
+  pointer columns are trigger-checked, not foreign keys. No SUPERSEDED OCR
+  failure reason is added (P3-02-R7's "superseded" STALE split is the
+  READING_REPLACED stale reason of C2 section 9). The F-70 regression
+  check in SourceRowRemovalTest now meets the C2-R20 correction guard
+  before the NO ACTION key (both refuse the pre-C2 order). Out of scope,
+  not implemented: extractors, UI, DERIVED, fact_inputs, INPUT edges,
+  timezone. Device-verification gaps (compiled only, not run; owner
+  instruction, no emulator or adb), each implemented; unverified (gap -
+  pending physical-device run):
+  ./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.repository.FactRepositoryTest ;
+  ./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.storage.FactDatabaseSqlCipherTest ;
+  ./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.repository.DeletionRepositoryTest ;
+  ./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.storage.OcrDatabaseTest ;
+  and the full ./gradlew :vault:connectedDebugAndroidTest. The acceptance
+  criterion "migration on SQLCipher passes with existing data" waits on
+  FactDatabaseSqlCipherTest. JVM proof uses host SQLite 3.53 via HostSqlite,
+  which is not SQLCipher. See docs/verification/P3-02-fact-schema.md.
