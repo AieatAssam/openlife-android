@@ -8,7 +8,7 @@ owner: agent
 summary: "Index canonical fact values and raw text in the FTS tables so a user can search '2026-10-08' or '42.50' and land on the fact and its evidence."
 requirements:
   - id: P3-07-R1
-    text: "MUST add fact_fts (external content over fact_revisions rawText and canonical display text) with triggers; hits carry factRevisionId; rejected/stale revisions excluded."
+    text: "MUST add fact_fts (external content over fact_revisions rawText and canonical display text) with triggers; hits carry factRevisionId; rejected/stale revisions excluded. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): index only current revisions in UNREVIEWED, CONFIRMED or CLARIFICATION_NEEDED of the current reading of a READY Source (C2-R49); this step also moves search and the viewer onto the single current-reading definition of C2-R14 (decision Q-6)."
   - id: P3-07-R2
     text: "MUST make search results show kind and status; tapping opens the Facts panel with the fact highlighted."
 files_touched: [vault storage migration, SearchRepository, app search UI]
