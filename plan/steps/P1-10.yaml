@@ -1,7 +1,8 @@
 id: P1-10
 title: Accessibility automation and TalkBack runbook
 phase: P1
-status: todo
+status: in_progress
+started: 2026-11-26
 depends_on: [P0-07, P1-08, P1-20]
 estimate: M
 owner: agent

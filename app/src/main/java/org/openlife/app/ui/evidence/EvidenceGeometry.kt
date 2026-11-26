@@ -163,6 +163,12 @@ object EvidenceGeometry {
     fun nextDoubleTapZoom(current: Float): Float =
         if (current < (MIN_ZOOM + DOUBLE_TAP_ZOOM) / 2f) DOUBLE_TAP_ZOOM else MIN_ZOOM
 
+    /** P1-10: the accessibility "Zoom in" step, the equivalent of a pinch. */
+    fun zoomInStep(current: Float): Float = TODO("P1-10 GREEN")
+
+    /** P1-10: the accessibility "Zoom out" step. */
+    fun zoomOutStep(current: Float): Float = TODO("P1-10 GREEN")
+
     @Suppress("LongParameterList")
     private fun placement(
         sourceW: Int,

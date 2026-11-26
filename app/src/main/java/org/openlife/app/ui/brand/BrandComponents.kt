@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
+import org.openlife.app.ui.theme.OpenLifeBrandColors
 import org.openlife.app.ui.theme.OpenLifeTheme
 
 /** A labeled state stamp; there is deliberately no unreviewed variant. */
@@ -64,11 +66,7 @@ fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Fl
             scale.animateTo(STAMP_REST_SCALE, tween(durationMillis = duration / 2))
         }
     }
-    val stampColor = when (state) {
-        StampState.Confirmed, StampState.Verified -> MaterialTheme.colorScheme.tertiary
-        StampState.Stale -> brand.attention
-        StampState.Saved -> MaterialTheme.colorScheme.primary
-    }
+    val colors = stampColors(state, MaterialTheme.colorScheme, brand)
     Box(
         modifier = modifier
             .graphicsLayer {
@@ -76,7 +74,7 @@ fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Fl
                 scaleY = scale.value
             }
             .rotate(STAMP_ROTATION_DEGREES)
-            .border(BorderStroke(1.5.dp, stampColor), MaterialTheme.shapes.small)
+            .border(BorderStroke(1.5.dp, colors.border), MaterialTheme.shapes.small)
             .padding(horizontal = 8.dp, vertical = 4.dp)
             // P1-19-R12 (A-08): one node carries the label. With plain
             // semantics the Box and its uppercase Text child both exposed it.
@@ -85,11 +83,23 @@ fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Fl
         Text(
             text = label.uppercase(),
             style = MaterialTheme.typography.labelSmall.copy(
-                color = stampColor,
+                color = colors.label,
                 textDecoration = if (state == StampState.Stale) TextDecoration.LineThrough else null,
             ),
         )
     }
+}
+
+/** A stamp's outline and label colours; the label is 12 sp text, so it needs 4.5:1 (P1-10). */
+internal data class StampColors(val border: Color, val label: Color)
+
+internal fun stampColors(state: StampState, scheme: ColorScheme, brand: OpenLifeBrandColors): StampColors {
+    val color = when (state) {
+        StampState.Confirmed, StampState.Verified -> scheme.tertiary
+        StampState.Stale -> brand.attention
+        StampState.Saved -> scheme.primary
+    }
+    return StampColors(border = color, label = color)
 }
 
 @Composable

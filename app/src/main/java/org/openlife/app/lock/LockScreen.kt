@@ -113,7 +113,7 @@ private fun LockedHost(lockState: AppLockState, authenticator: BiometricAuthenti
 
 /** Shows only fixed copy: no item count, label or other content-derived text (R7). */
 @Composable
-private fun LockScreen(title: String, body: String, note: String?, action: String, onAction: () -> Unit) {
+internal fun LockScreen(title: String, body: String, note: String?, action: String, onAction: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier

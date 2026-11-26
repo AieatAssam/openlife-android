@@ -75,19 +75,33 @@ data class OpenLifeBrandColors(
     val highlighter: Color,
 )
 
-val LocalOpenLifeBrandColors = androidx.compose.runtime.staticCompositionLocalOf {
-    OpenLifeBrandColors(
-        paper = Paper,
-        raisedPaper = RaisedPaper,
-        ink = Ink,
-        mutedInk = MutedInk,
-        rule = Rule,
-        fold = Color(0xFFE9E1D0),
-        attention = Attention,
-        attentionContainer = AttentionContainer,
-        highlighter = Highlighter,
-    )
-}
+/** The paper ("light") brand colours; top level so the JVM contrast test can read them (P1-10). */
+val OpenLifeLightBrandColors = OpenLifeBrandColors(
+    paper = Paper,
+    raisedPaper = RaisedPaper,
+    ink = Ink,
+    mutedInk = MutedInk,
+    rule = Rule,
+    fold = Color(0xFFE9E1D0),
+    attention = Attention,
+    attentionContainer = AttentionContainer,
+    highlighter = Highlighter,
+)
+
+/** The carbon ("dark") brand colours. */
+val OpenLifeDarkBrandColors = OpenLifeBrandColors(
+    paper = DarkSurface,
+    raisedPaper = DarkRaisedSurface,
+    ink = DarkInk,
+    mutedInk = DarkMutedInk,
+    rule = DarkRule,
+    fold = Color(0xFF2E2B23),
+    attention = DarkAttention,
+    attentionContainer = DarkAttentionContainer,
+    highlighter = HighlighterDark,
+)
+
+val LocalOpenLifeBrandColors = androidx.compose.runtime.staticCompositionLocalOf { OpenLifeLightBrandColors }
 
 val OpenLifeLightColors = androidx.compose.material3.lightColorScheme(
     primary = VermilionInk,
