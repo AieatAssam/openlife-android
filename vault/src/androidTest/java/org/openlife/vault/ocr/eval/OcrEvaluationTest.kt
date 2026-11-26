@@ -205,6 +205,7 @@ class OcrEvaluationTest {
         val sampler = thread {
             while (sampling.get()) {
                 peak.accumulateAndGet(Debug.getPss(), ::maxOf)
+                // P1-20-R8: the PSS sampling interval of the measurement, not a wait.
                 Thread.sleep(SAMPLE_MS)
             }
         }

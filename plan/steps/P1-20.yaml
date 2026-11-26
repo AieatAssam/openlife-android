@@ -1,7 +1,7 @@
 id: P1-20
 title: Navigation and state architecture rebuild
 phase: P1
-status: todo
+status: review
 depends_on: [P1-19, P2-06]
 estimate: L
 owner: agent
@@ -143,3 +143,7 @@ notes: >
   A-05, A-09, AS-1..AS-6 (commit 190be81). P1-08 (Settings/About) and P1-10
   (accessibility) now depend on this step so new screens and semantics work
   land on the rebuilt navigation.
+  P1-20 run 2026-11-25..26 (status review): JVM proof and compile-only
+  instrumented tests; every device test is a gap recorded in plan.yaml and
+  docs/verification/P1-20-navigation-rebuild.md. AGENTS.md layout paragraph
+  unchanged: the navigation package keeps its name and role.

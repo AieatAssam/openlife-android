@@ -53,15 +53,83 @@ them is evidence that anything is fixed.
 
 ## JVM evidence
 
-RESULTS_PLACEHOLDER
+Full gate, 2026-11-26, after merging `origin/main` (82a4188):
+`./gradlew detekt lint :app:test :vault:test :eval:test assembleDebug
+:vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin` —
+BUILD SUCCESSFUL in 7m 28s.
+
+| Suite | Before (cc7b768) | After | Failures |
+| --- | --- | --- | --- |
+| `:app` JVM (debug unit) | 146 | 175 (+31 new, −2 in the deleted unit `NavigationBackTest`) | 0 |
+| `:vault` JVM | 191 | 193 (+2 from P2-04 via the merge) | 0 |
+| `:eval` JVM (P2-04) | — | 26 | 0 |
+
+`scripts/plan-check.sh`: `steps=82 errors=0`. `bash scripts/tests/run.sh`:
+51 passed, 0 failed.
+
+New JVM proof: `ContentScrubberTest`, `ViewerSessionTest` (by-id loading,
+missing → one exit in both orders, scrub on hide/trim, late results
+released, OCR cleared, span/zoom/pan saved as ids and floats only),
+`ListDetailNavigationTest` (panes and back-stack actions for every width),
+`InternalLinksTest` (kind, id and single-use nonce), `RouteSavedStateTest`,
+`ViewModelScopingTest`, `ManifestBoundaryTest.internalLinkEntryIsNotExported`.
 
 ## Recorded mutations
 
-MUTATIONS_PLACEHOLDER
+- RED commit 9c8293f: 36 new JVM tests, 29 failing — `NotImplementedError`
+  from the stubs (`ContentScrubber` 2, `ViewerSession` 13,
+  `ListDetailNavigation` 8, `InternalLinks` 3), `ViewModelScopingTest` 2 on
+  their assertions (an activity `getViewModel` getter; a ViewModel built
+  from `OpenLifeApp`) and `ManifestBoundaryTest.internalLinkEntryIsNotExported`
+  ("the internal link entry is declared").
+- `RouteSavedStateTest` passed at RED (it guards existing routes), so its RED
+  is a mutation: adding `val label: String = ""` to `Routes.ListDetail` fails
+  `everyRouteArgumentIsAnIdString` (2 tests, 1 failed, `AssertionError` at
+  line 24); reverted.
+- Device mutations for the instrumented replacements: not run (see below).
 
 ## Tests changed
 
-CHANGED_PLACEHOLDER
+Deleted: unit `NavigationBackTest` (asserted the old viewer-redirect design
+by source grep); replaced by `ListDetailNavigationTest` (JVM) and the
+instrumented `NavigationBackTest.backFromEveryDestination`.
+
+Changed, JVM:
+- `SecureWindowTest`: the activity list now has three entries
+  (`InternalLinkActivity` added).
+- `ManifestBoundaryTest`: adds `internalLinkEntryIsNotExported`; still
+  exactly 2 exported activities.
+- `SaveCommitTest`, `UserContentKindWriteTest` (vault): their fake DAOs
+  implement the new `observeVisibleSource` as `unused()`.
+- `BoundedStreamReaderTest` (vault): a comment justifying its sleep.
+- `ViewerSessionTest` (added at RED): its `SavedValues` fake gained
+  `contains`, which GREEN added to the interface; one style fix.
+
+Changed, instrumented (compile only):
+- `MultiWindowScrubTest`: the documented R4 change — after hiding, the
+  viewer reloads instead of navigating away; adds
+  `backgroundingClearsContentButKeepsTheDestination`; polling sleeps gone.
+- `NavigationBackTest`: opens through the internal-link queue, not the
+  launcher extra; the delete test no longer uses the removed
+  `beforeDeleteResultForTest` seam (the single exit is proven on the JVM in
+  both orders); adds `backFromEveryDestination`; the destroy wait uses a
+  lifecycle callback instead of a sleep loop.
+- `AdaptiveLayoutTest`, `SearchScreenTest`: hosted on the real graph over
+  `FakeAppContainer` instead of the 17-parameter `OpenLifeNavHost`;
+  `SearchScreenTest` now types the query.
+- `AppLockFlowTest`, `IntakeAndListFlowTest`: open sources via
+  `requestOpenSource`; `SourceListViewModel(application.container)`.
+- `DeletionRetryFlowTest`, `SourceListScreenTest`, `ViewerScreenC1Test`,
+  `MainThreadPolicyTest`, `OcrPersistenceFlowTest`: construction only
+  (`application.container`, `appOcrPresenter`). R9 asked for
+  `ViewerScreenC1Test` unchanged; its assertions are, its setup line is not.
+- `BrandScreenshotInstrumentedTest`: adds `listDetailExpandedMatchesGolden`.
+- `SourceViewRepositoryTest` (vault): adds
+  `observeVisibleSourceFollowsOneSourceByIdUntilItIsGone`.
+- `IntakeActivityTest`, `IntakeScreenFlowTest`, `ScriptedAuthenticator`,
+  `OcrEngineMeasurementTest`, `OcrRepositoryTest`: sleep justifications only.
+
+`EvidenceNavigationTest` is unchanged.
 
 ## Instrumented tests awaiting the tablet
 
@@ -95,7 +163,18 @@ failing. Until then the grep unit tests `SecureWindowTest`,
 
 ## Thread.sleep (R8)
 
-SLEEP_PLACEHOLDER
+`grep -rn 'Thread.sleep' app/src/androidTest vault/src/androidTest` after
+merging main: 12 hits, each preceded by a `// P1-20-R8:` comment. Five are
+simulated slow sources or measurement sampling intervals (the delay is the
+behaviour under test: `IntakeScreenFlowTest` 52, `IntakeAndListFlowTest`
+82, `OcrRepositoryTest` 338, `OcrEngineMeasurementTest` 66,
+`OcrEvaluationTest` 209); seven are bounded polls of state with no flow or
+callback the test can await (`AppLockFlowTest` 315, `ScriptedAuthenticator`
+27, `IntakeActivityTest` 214, `IntakeAndListFlowTest` 331, 403, 565, 627).
+Removed outright: the sleeps in `MultiWindowScrubTest` and
+`NavigationBackTest`. The debug-only `TestHostileContentProvider` delays are
+simulated slow providers, documented in its KDoc. The connected-suite
+wall-clock before and after is not measured (no device).
 
 ## Not done or deviated
 
