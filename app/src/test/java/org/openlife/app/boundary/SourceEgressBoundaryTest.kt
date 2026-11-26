@@ -116,6 +116,32 @@ class SourceEgressBoundaryTest {
     }
 
     /**
+     * P1-08-R5: no link is ever opened. A Compose link or URI handler opens a
+     * browser without any `startActivity` in OpenLife's source, so those APIs
+     * are named here; About shows addresses as plain text.
+     */
+    @Test
+    fun noLinkOpeningApiIsReported() {
+        val viewer = projectDir.resolve("app/src/main/java/org/openlife/app/ui/ViewerScreen.kt")
+        val lines = Files.readAllLines(viewer)
+        listOf(
+            "    val uriHandler = LocalUriHandler.current",
+            "    onClick = { handler.openUri(url) }",
+            "    withLink(LinkAnnotation.Url(url)) { append(url) }",
+            "    pushUrlAnnotation(UrlAnnotation(url))",
+            "    Text(AnnotatedString.fromHtml(html))",
+            "    Linkify.addLinks(view, Linkify.WEB_URLS)",
+            "    CustomTabsIntent.Builder().build().launchUrl(context, uri)",
+            "    view.autoLinkMask = 1",
+        ).forEach { mutation ->
+            assertFalse(
+                "\"$mutation\" in ViewerScreen must be a violation",
+                boundaryViolations(viewer, lines + mutation).isEmpty(),
+            )
+        }
+    }
+
+    /**
      * True when a block opened by [DEBUG_GUARD] encloses line [index]. The
      * guard's `else` block has the header `} else`, so code there is not
      * accepted (S-03).

@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.openlife.app.intake.InternalLinks
 import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.LockAvailability
+import org.openlife.app.settings.AboutPort
 import org.openlife.app.ui.OcrBackend
 import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SampledBitmapDecoder
@@ -48,6 +49,9 @@ interface AppContainer {
     val scrubber: ContentScrubber
     val internalLinks: InternalLinks
     val settings: SettingsPort
+
+    /** P1-08: build identity, vault security details, diagnostics counts and bundled documents. */
+    val about: AboutPort
 
     /** Runs [callback] before a vault reset; returns the call that unregisters it. */
     fun registerPreReset(callback: () -> Unit): () -> Unit
@@ -117,6 +121,8 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
 
         override suspend fun verifyAll(): VerifyReport? = app.verifyAllItems()
     }
+
+    override val about: AboutPort get() = TODO("P1-08 RED")
 
     override fun registerPreReset(callback: () -> Unit): () -> Unit = app.registerPreResetCallback(callback)
 
