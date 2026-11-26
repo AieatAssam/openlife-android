@@ -9,10 +9,12 @@ import java.io.ByteArrayOutputStream
 import java.security.KeyStoreException
 import java.util.UUID
 import javax.crypto.SecretKey
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -141,6 +143,18 @@ class SourceViewRepositoryTest {
         assertEquals(SourceState.CORRUPT, stateOf(sourceId))
         assertTrue("blob must be retained", blobFile.exists())
         assertArrayEquals(wrappedDekBefore, db.sourceDao().findById(sourceId.toString())!!.wrappedDek)
+    }
+
+    /** P1-20-R2: a viewer follows one source by id, with no list involved, and sees it go. */
+    @Test
+    fun observeVisibleSourceFollowsOneSourceByIdUntilItIsGone(): Unit = runBlocking {
+        val (sourceId, _) = saveASource()
+
+        assertEquals(sourceId, viewRepository.observeVisibleSource(sourceId).first { it != null }!!.id)
+        assertNull(viewRepository.observeVisibleSource(UUID.randomUUID()).first())
+
+        db.sourceDao().deleteById(sourceId.toString())
+        assertNull(viewRepository.observeVisibleSource(sourceId).first())
     }
 
     private suspend fun stateOf(sourceId: UUID): SourceState =

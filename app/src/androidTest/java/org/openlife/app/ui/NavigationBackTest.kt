@@ -1,85 +1,69 @@
 package org.openlife.app.ui
 
 import android.content.Intent
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.Espresso.pressBackUnconditionally
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleCallback
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.util.UUID
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.openlife.app.test.StrictModeRule
 import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
-import org.openlife.vault.model.IntakeKind
+import org.openlife.app.test.StrictModeRule
+import org.openlife.app.test.createReadySource
+import org.openlife.app.test.deleteSyntheticSource
+import org.openlife.app.test.requestOpenSource
 
+/**
+ * P0-07-R3 and P1-20-R6 (replaces the source-grep unit NavigationBackTest):
+ * Back from every destination, exercised on the real activity. Back pops one
+ * entry; from the list root it finishes the activity.
+ */
 @RunWith(AndroidJUnit4::class)
 class NavigationBackTest {
     @get:Rule
     val strictMode = StrictModeRule()
 
-
     private val application = ApplicationProvider.getApplicationContext<OpenLifeApp>()
+    private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     private var sourceId: UUID? = null
 
     @Before
     fun acknowledgeFirstRun() {
-        FirstRunPreferences.setAcknowledged(
-            InstrumentationRegistry.getInstrumentation().targetContext,
-        )
+        FirstRunPreferences.setAcknowledged(InstrumentationRegistry.getInstrumentation().targetContext)
     }
 
     @After
-    fun deleteSyntheticSource() {
-        sourceId?.let { id ->
-            runBlocking {
-                var finished = false
-                SourceListViewModel(application).delete(id) { finished = true }
-                val deadline = System.currentTimeMillis() + 30_000
-                while (!finished && System.currentTimeMillis() < deadline) delay(50)
-                assertTrue("synthetic navigation source cleanup timed out", finished)
-            }
-        }
+    fun cleanUp() {
+        sourceId?.let(application::deleteSyntheticSource)
     }
 
     @Test
     fun backFromViewerReturnsToListInsteadOfFinishing() {
-        sourceId = createReadySource()
-        val intent = Intent(application, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
-            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
-        }
-        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-            assertTrue(
-                "viewer did not load the authenticated image",
-                device.wait(Until.hasObject(By.desc("Saved image")), 30_000),
-            )
+        sourceId = application.createReadySource().also(application::requestOpenSource)
+        ActivityScenario.launch<MainActivity>(Intent(application, MainActivity::class.java)).use { scenario ->
+            assertTrue("viewer did not load the image", device.wait(Until.hasObject(By.desc(SAVED_IMAGE)), WAIT_MS))
 
             pressBack()
 
-            assertTrue(
-                "list was not restored after viewer back",
-                device.wait(Until.hasObject(By.text("Import from photos")), 5_000),
-            )
+            assertTrue("the viewer stayed after Back", device.wait(Until.gone(By.desc(SAVED_IMAGE)), WAIT_MS))
+            assertTrue("list not shown after Back", device.wait(Until.hasObject(By.text(IMPORT)), WAIT_MS))
             var finishing = true
             scenario.onActivity { finishing = it.isFinishing }
             assertFalse("back from viewer must not finish MainActivity", finishing)
@@ -87,100 +71,84 @@ class NavigationBackTest {
     }
 
     /**
-     * A-10 (P1-19-R14, suspected): after a delete from the viewer, the Room
-     * flow drops the source (ViewerDestination pops on a null source) and the
-     * delete callback also pops. With the flow forced to win (the callback is
-     * held back), the second pop must not remove the List destination.
+     * A-10 (P1-19-R14): the delete callback and the source flow both ask the
+     * viewer to leave; it leaves once (ViewerSession.consumeExit, proven on
+     * the JVM for both orders), so the list stays and the activity stays open.
+     * P1-20 removed the beforeDeleteResultForTest seam that forced the order.
      */
     @Test
     fun deleteFromViewerKeepsListOnTheBackStack() {
-        sourceId = createReadySource()
-        val intent = Intent(application, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, sourceId.toString())
-            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
-        }
-        val releaseDeleteResult = CompletableDeferred<Unit>()
-        SourceListViewModel.beforeDeleteResultForTest = { releaseDeleteResult.await() }
-        try {
-            ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-                val instrumentation = InstrumentationRegistry.getInstrumentation()
-                val device = UiDevice.getInstance(instrumentation)
-                assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), 30_000))
-                device.findObject(By.desc("Delete")).click()
-                device.wait(Until.findObject(By.res("delete_confirm")), 5_000)?.click()
-                    ?: device.wait(Until.findObject(By.text("Delete")), 5_000)!!.click()
+        sourceId = application.createReadySource().also(application::requestOpenSource)
+        ActivityScenario.launch<MainActivity>(Intent(application, MainActivity::class.java)).use { scenario ->
+            assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc(SAVED_IMAGE)), WAIT_MS))
+            device.findObject(By.desc("Delete")).click()
+            device.wait(Until.findObject(By.res("delete_confirm")), WAIT_MS)?.click()
+                ?: device.wait(Until.findObject(By.text("Delete")), WAIT_MS)!!.click()
 
-                assertTrue(
-                    "the flow-driven pop should show the list",
-                    device.wait(Until.hasObject(By.text("Import from photos")), 10_000),
-                )
-                // Release the held-back delete callback. Its continuation is
-                // posted to the main looper before the runOnMainSync below, so
-                // once that returns the callback's own pop has run.
-                releaseDeleteResult.complete(Unit)
-                instrumentation.runOnMainSync {}
-                instrumentation.waitForIdleSync()
-                device.waitForIdle()
-                assertTrue(
-                    "the list was popped off the back stack by the second pop",
-                    device.wait(Until.hasObject(By.text("Import from photos")), 2_000),
-                )
-                var finishing = true
-                scenario.onActivity { finishing = it.isFinishing }
-                assertFalse("MainActivity must stay open", finishing)
+            assertTrue("the viewer did not leave", device.wait(Until.gone(By.desc(SAVED_IMAGE)), WAIT_MS))
+            assertTrue("the list is not shown", device.wait(Until.hasObject(By.text(IMPORT)), WAIT_MS))
+            device.waitForIdle()
+            assertTrue("the list was popped by a second exit", device.hasObject(By.text(IMPORT)))
+            var finishing = true
+            scenario.onActivity { finishing = it.isFinishing }
+            assertFalse("MainActivity must stay open", finishing)
+        }
+        sourceId = null
+    }
+
+    /** P1-20-R6: Search, Settings, About and the viewer each return to the list on Back. */
+    @Test
+    fun backFromEveryDestination() {
+        sourceId = application.createReadySource()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            assertTrue("list not shown", device.wait(Until.hasObject(By.text(IMPORT)), WAIT_MS))
+
+            device.findObject(By.desc("Search your items")).click()
+            assertTrue(device.wait(Until.hasObject(By.text("Words in your items")), WAIT_MS))
+            backToList("Search")
+
+            listOf("Settings", "About").forEach { title ->
+                device.findObject(By.desc("More options")).click()
+                device.wait(Until.findObject(By.text(title)), WAIT_MS)!!.click()
+                assertTrue("$title not shown", device.wait(Until.gone(By.text(IMPORT)), WAIT_MS))
+                backToList(title)
             }
-            sourceId = null
-        } finally {
-            releaseDeleteResult.complete(Unit)
-            SourceListViewModel.beforeDeleteResultForTest = null
+
+            device.findObject(By.desc("Saved image thumbnail")).click()
+            assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc(SAVED_IMAGE)), WAIT_MS))
+            pressBack()
+            assertTrue("viewer stayed after Back", device.wait(Until.gone(By.desc(SAVED_IMAGE)), WAIT_MS))
         }
     }
 
     @Test
     fun backFromListFinishesActivity() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            scenario.moveToState(Lifecycle.State.RESUMED)
-            // pressBack() throws NoActivityResumedException when the activity
-            // finishes, which is the P0-07-R3 list-root behaviour. Use the
-            // unconditional variant and then assert DESTROYED.
-            pressBackUnconditionally()
-            val deadline = System.currentTimeMillis() + 5_000
-            while (scenario.state != Lifecycle.State.DESTROYED &&
-                System.currentTimeMillis() < deadline
-            ) {
-                Thread.sleep(50)
+        val destroyed = CountDownLatch(1)
+        val callback = ActivityLifecycleCallback { activity, stage ->
+            if (activity is MainActivity && stage == Stage.DESTROYED) destroyed.countDown()
+        }
+        ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(callback)
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use {
+                assertTrue("list not shown", device.wait(Until.hasObject(By.text(IMPORT)), WAIT_MS))
+                // pressBack() throws NoActivityResumedException when the activity
+                // finishes, which is the P0-07-R3 list-root behaviour.
+                pressBackUnconditionally()
+                assertTrue("Back from the list must finish MainActivity", destroyed.await(WAIT_MS, TimeUnit.MILLISECONDS))
             }
-            assertEquals(Lifecycle.State.DESTROYED, scenario.state)
+        } finally {
+            ActivityLifecycleMonitorRegistry.getInstance().removeLifecycleCallback(callback)
         }
     }
 
-    private fun createReadySource(): UUID = runBlocking {
-        val viewModel = IntakeViewModel(application, SavedStateHandle())
-        viewModel.startImport(ByteArrayInputStream(syntheticJpeg()), "image/jpeg", IntakeKind.SHARE)
-        val preview = awaitState(viewModel) { it is IntakeUiState.Preview } as IntakeUiState.Preview
-        viewModel.confirmSave()
-        awaitState(viewModel) { it is IntakeUiState.Saved }
-        preview.sourceId
+    private fun backToList(from: String) {
+        pressBack()
+        assertTrue("Back from $from did not return to the list", device.wait(Until.hasObject(By.text(IMPORT)), WAIT_MS))
     }
 
-    private suspend fun awaitState(
-        viewModel: IntakeViewModel,
-        predicate: (IntakeUiState) -> Boolean,
-    ): IntakeUiState {
-        val deadline = System.currentTimeMillis() + 30_000
-        while (System.currentTimeMillis() < deadline) {
-            val state = viewModel.state.value
-            if (predicate(state)) return state
-            delay(50)
-        }
-        throw AssertionError("expected intake state was not reached")
-    }
-
-    private fun syntheticJpeg(): ByteArray {
-        val bitmap = android.graphics.Bitmap.createBitmap(64, 48, android.graphics.Bitmap.Config.ARGB_8888)
-        val output = ByteArrayOutputStream()
-        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output)
-        bitmap.recycle()
-        return output.toByteArray()
+    private companion object {
+        const val WAIT_MS = 30_000L
+        const val SAVED_IMAGE = "Saved image"
+        const val IMPORT = "Import from photos"
     }
 }

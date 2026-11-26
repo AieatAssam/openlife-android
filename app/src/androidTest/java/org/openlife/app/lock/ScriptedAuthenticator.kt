@@ -23,6 +23,7 @@ class ScriptedAuthenticator(@Volatile var available: LockAvailability = LockAvai
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         while (pending.get() == null) {
             check(System.nanoTime() < deadline) { "no authentication was requested" }
+            // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
             Thread.sleep(POLL_MS)
         }
     }

@@ -29,6 +29,7 @@ import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.evidence.EvidenceColors
 import org.openlife.app.ui.evidence.EvidenceContent
 import org.openlife.app.ui.evidence.EvidenceSelection
+import org.openlife.app.ui.evidence.EvidenceViewport
 import org.openlife.app.ui.evidence.ZoomableEvidenceImage
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.vault.model.Orientation
@@ -110,6 +111,7 @@ internal fun ViewerImage(
     onSelectSpan: (OcrSpan) -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
+    viewport: EvidenceViewport? = null,
 ) {
     when (content) {
         ViewerContentState.Unreadable -> ViewerLoadProblem(
@@ -129,7 +131,7 @@ internal fun ViewerImage(
         }
 
         ViewerContentState.Loading, is ViewerContentState.Shown ->
-            ViewerImageArea(source, content, spans, spanReviews, selectedSpanId, onSelectSpan)
+            ViewerImageArea(source, content, spans, spanReviews, selectedSpanId, onSelectSpan, viewport)
     }
 }
 
@@ -145,6 +147,7 @@ private fun ViewerLoadProblem(message: String, action: @Composable () -> Unit) {
 }
 
 @Composable
+@Suppress("LongParameterList")
 private fun ViewerImageArea(
     source: Source,
     content: ViewerContentState,
@@ -152,6 +155,7 @@ private fun ViewerImageArea(
     spanReviews: Map<UUID, OcrReviewState>,
     selectedSpanId: UUID?,
     onSelectSpan: (OcrSpan) -> Unit,
+    viewport: EvidenceViewport?,
 ) {
     val brand = LocalOpenLifeBrandColors.current
     val maxImageHeight = with(LocalDensity.current) {
@@ -185,6 +189,7 @@ private fun ViewerImageArea(
                     selectedSpanId = selectedSpanId,
                     onSelectSpan = onSelectSpan,
                     colors = EvidenceColors(highlighter = brand.highlighter, rejected = brand.mutedInk),
+                    viewport = viewport,
                 )
             }
         }

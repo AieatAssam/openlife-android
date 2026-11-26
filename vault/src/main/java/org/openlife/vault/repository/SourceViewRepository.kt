@@ -41,6 +41,13 @@ class SourceViewRepository(
     fun observeVisibleSources(): Flow<List<Source>> =
         database.sourceDao().observeVisibleSources().map { entities -> entities.map { it.toDomain() } }
 
+    /**
+     * P1-20-R2: one source by id, independent of any list; emits null when it
+     * is not (or no longer) a visible source, so a viewer can leave once.
+     */
+    fun observeVisibleSource(sourceId: UUID): Flow<Source?> =
+        database.sourceDao().observeVisibleSource(sourceId.toString()).map { it?.toDomain() }
+
     suspend fun findSource(sourceId: UUID): Source? = database.sourceDao().findById(sourceId.toString())?.toDomain()
 
     /**

@@ -139,16 +139,8 @@ class IntakeActivity : FragmentActivity() {
                             onCancel = viewModel::cancel,
                             onDone = { finish() },
                             onOpenExisting = { existingSourceId ->
-                                startActivity(
-                                    Intent(this, MainActivity::class.java).apply {
-                                        addFlags(openExistingIntentFlags())
-                                        putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, existingSourceId.toString())
-                                        putExtra(
-                                            MainActivity.EXTRA_OPEN_SOURCE_NONCE,
-                                            (application as OpenLifeApp).openSourceNonce.issue(),
-                                        )
-                                    },
-                                )
+                                // P1-20-R5: through the non-exported entry, never MainActivity's extras.
+                                startActivity(InternalLinkActivity.openSourceIntent(this, existingSourceId))
                                 finish()
                             },
                         )

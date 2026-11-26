@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -23,6 +24,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
@@ -31,16 +33,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.app.MainActivity
 import org.openlife.app.R
-import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.AppLockPolicyStore
-import org.openlife.app.lock.LockAvailability
 import org.openlife.app.navigation.OpenLifeNavHost
-import org.openlife.app.navigation.SearchHostState
-import org.openlife.app.settings.AppLockSettings
+import org.openlife.app.test.FakeAppContainer
 import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.FirstRunPreferences
-import org.openlife.app.ui.OcrUiState
-import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
@@ -49,9 +46,13 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrCoordinateSystem
 import org.openlife.vault.ocr.OcrEvidenceRegion
+import org.openlife.vault.ocr.OcrReviewState
+import org.openlife.vault.ocr.OcrRevision
+import org.openlife.vault.ocr.OcrRevisionState
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanView
+import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.ReadyReadResult
-import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.search.SearchHit
 
 /**
@@ -63,8 +64,9 @@ import org.openlife.vault.search.SearchHit
  *
  * Review W-06 (safe on a personally owned tablet): the activity test restores
  * the first-run flag it sets, in `finally`, and is skipped, not hung, when app
- * lock is on. Not exercised here: the real vault query (SearchRepositoryTest)
- * and the ViewModel's own flow (the NavHost gets a fixed [SearchHostState]).
+ * lock is on. Not exercised here: the real vault query (SearchRepositoryTest).
+ * P1-20: the host is the real graph over a [FakeAppContainer]; the query is
+ * typed into the entry-scoped SearchViewModel instead of being injected.
  *
  * Status: implemented; unverified (gap — pending physical-device run).
  */
@@ -80,6 +82,7 @@ class SearchScreenTest {
     private val revisionId = UUID.randomUUID()
     private val first = span(0, "Parcel collection slip", OcrEvidenceRegion(0, 0, 50, 20))
     private val target = span(1, "Pick up by Friday", OcrEvidenceRegion(0, 40, 80, 60))
+    private var fake: FakeAppContainer? = null
 
     @Test
     fun compactResultOpensTheViewerRouteWithTheSpanSelectedAndBackReturnsToResults() {
@@ -149,6 +152,10 @@ class SearchScreenTest {
         val searchLabel = InstrumentationRegistry.getInstrumentation().targetContext
             .getString(R.string.list_search_content_description)
         composeRule.onNodeWithContentDescription(searchLabel).performClick()
+        composeRule.onNodeWithTag("search_input").performTextInput("pick")
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.onAllNodesWithTag("search_result").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onAllNodesWithTag("search_result").assertCountEqualsOne()
         composeRule.onNodeWithTag("search_result").performClick()
         composeRule.waitUntil(WAIT_MS) {
@@ -159,32 +166,41 @@ class SearchScreenTest {
 
     private fun setHost(size: DpSize) {
         val hit = SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3))
+        val container = FakeAppContainer(
+            initialSources = listOf(readySource(sourceId)),
+            readContent = { ReadyReadResult.Loaded(jpeg()) },
+            searchHits = listOf(hit),
+            ocrView = { ocrView() },
+        ).also { fake = it }
         composeRule.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.ForcedSize(size)) {
-                OpenLifeTheme {
-                    OpenLifeNavHost(
-                        listState = SourceListUiState.Loaded(listOf(readySource(sourceId))),
-                        thumbnailGeneration = 0L,
-                        ocrState = { OcrUiState.Ready(sourceId, revisionId, listOf(first, target)) },
-                        loadThumbnail = { null },
-                        loadReadyContent = { ReadyReadResult.Loaded(jpeg()) },
-                        delete = { _, _ -> },
-                        extractText = {},
-                        cancelOcr = {},
-                        correct = { _, _, _ -> },
-                        review = { _, _ -> },
-                        onImportFromPhotoPicker = {},
-                        onRetryVault = {},
-                        onFinishReset = {},
-                        onResetVault = { VaultResetResult.FAILED },
-                        onVerifyAll = { null },
-                        appLock = AppLockSettings(AppLockPolicy(), { LockAvailability.AVAILABLE }, {}),
-                        onResetComplete = {},
-                        search = SearchHostState(query = "pick", state = SearchUiState.Results(listOf(hit))),
-                    )
-                }
+                OpenLifeTheme { OpenLifeNavHost(container) }
             }
         }
+    }
+
+    @After
+    fun closeContainer() {
+        fake?.close()
+    }
+
+    private fun ocrView(): OcrView {
+        val revision = OcrRevision(
+            id = revisionId,
+            sourceId = sourceId,
+            state = OcrRevisionState.READY,
+            engineId = "test-engine",
+            modelVersion = "1",
+            orientation = Orientation.NORMAL,
+            sourceDigest = ByteArray(32) { 1 },
+            startedAt = 1L,
+            extractedAt = 2L,
+            reviewState = OcrReviewState.UNREVIEWED,
+            failureReason = null,
+            charCount = first.text.length + target.text.length,
+            spanCount = 2,
+        )
+        return OcrView(revision, listOf(OcrSpanView(first, null), OcrSpanView(target, null)), null, emptyList())
     }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteractionCollection.assertCountEqualsOne() {

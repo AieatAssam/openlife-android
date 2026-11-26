@@ -115,7 +115,7 @@ class SourceListScreenTest {
     }
 
     private suspend fun showListWithThumbnail(sourceId: UUID): SourceListViewModel {
-        val list = withContext(Dispatchers.Main) { SourceListViewModel(application) }
+        val list = withContext(Dispatchers.Main) { SourceListViewModel(application.container) }
         composeRule.setContent {
             val state by list.state.collectAsState()
             val generation by list.sensitiveContentGeneration.collectAsState()

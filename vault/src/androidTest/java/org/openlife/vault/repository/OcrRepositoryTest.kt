@@ -334,6 +334,7 @@ class OcrRepositoryTest {
         override fun cancel() {
             events += "task cancelled"
             Thread {
+                // P1-20-R8: simulates an engine that settles late after cancel; the delay is the behaviour under test.
                 Thread.sleep(200)
                 events += "task settled"
                 listener?.invoke(Result.failure(java.util.concurrent.CancellationException("engine stopped")))
