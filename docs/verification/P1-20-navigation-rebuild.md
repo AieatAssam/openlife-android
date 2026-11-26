@@ -2,7 +2,8 @@
 
 Branch `plan/P1-20-navigation-state`, from `main` at cc7b768; `origin/main`
 (82a4188, P2-04) merged before the final gate. Dates 2026-11-25 to
-2026-11-26. Closes F-60 and F-64 on the JVM side; the device half is open.
+2026-11-26. Addresses F-60 and F-64; their closure is pending the device
+run below.
 
 ## Device policy for this run
 
@@ -60,8 +61,8 @@ BUILD SUCCESSFUL in 7m 28s.
 
 | Suite | Before (cc7b768) | After | Failures |
 | --- | --- | --- | --- |
-| `:app` JVM (debug unit) | 146 | 175 (+31 new, −2 in the deleted unit `NavigationBackTest`) | 0 |
-| `:vault` JVM | 191 | 193 (+2 from P2-04 via the merge) | 0 |
+| `:app` JVM (debug unit) | 146 (derived from the diff, 175 − 31 + 2; not run at cc7b768) | 175 (+31 new, −2 in the deleted unit `NavigationBackTest`) | 0 |
+| `:vault` JVM | 191 (run at e69ba0b, before the merge) | 193 (+2 from P2-04 via the merge) | 0 |
 | `:eval` JVM (P2-04) | — | 26 | 0 |
 
 `scripts/plan-check.sh`: `steps=82 errors=0`. `bash scripts/tests/run.sh`:
@@ -76,7 +77,8 @@ released, OCR cleared, span/zoom/pan saved as ids and floats only),
 
 ## Recorded mutations
 
-- RED commit 9c8293f: 36 new JVM tests, 29 failing — `NotImplementedError`
+- RED commit 9c8293f: the RED run of the new and touched classes executed
+  36 tests (31 new `@Test`s plus existing ones in touched classes), 29 failing — `NotImplementedError`
   from the stubs (`ContentScrubber` 2, `ViewerSession` 13,
   `ListDetailNavigation` 8, `InternalLinks` 3), `ViewModelScopingTest` 2 on
   their assertions (an activity `getViewModel` getter; a ViewModel built
@@ -133,25 +135,29 @@ Changed, instrumented (compile only):
 
 ## Instrumented tests awaiting the tablet
 
-Run each when the tablet is free:
-`./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=<class>`
-(vault: `:vault:connectedDebugAndroidTest`).
-
-| Test | Class |
+| Test | Command (run on the tablet when it is free) |
 | --- | --- |
-| `ViewerByIdTest` (3) | `org.openlife.app.ui.ViewerByIdTest` |
-| `AdaptiveLayoutTest.selectionSurvivesCompactToExpandedAndBack`, `.expandedBackClearsSelectionBeforeLeaving` (+3 existing, migrated) | `org.openlife.app.ui.AdaptiveLayoutTest` |
-| `MultiWindowScrubTest.backgroundingClearsContentButKeepsTheDestination` (+ updated existing) | `org.openlife.app.ui.MultiWindowScrubTest` |
-| `SavedStateTest.savedBundleHoldsNoContent` | `org.openlife.app.ui.SavedStateTest` |
-| `InternalLinkTest` (2) | `org.openlife.app.intake.InternalLinkTest` |
-| `SecureWindowUiTest.everyContentWindowAndDialogIsSecure` | `org.openlife.app.ui.SecureWindowUiTest` |
-| `LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640` | `org.openlife.app.ui.LargeFontUiTest` |
-| `RtlUiTest.listAndViewerMirrorInRtl` | `org.openlife.app.ui.RtlUiTest` |
-| `NavigationBackTest` (4, incl. `backFromEveryDestination`) | `org.openlife.app.ui.NavigationBackTest` |
-| `EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets` | `org.openlife.app.ui.EdgeToEdgeUiTest` |
-| `BrandScreenshotInstrumentedTest.listDetailExpandedMatchesGolden` | `org.openlife.app.ui.brand.BrandScreenshotInstrumentedTest` (add `-Pandroid.testInstrumentationRunnerArguments.generateGoldens=true` on the CI profile first; no PNG is committed) |
-| `SourceViewRepositoryTest.observeVisibleSourceFollowsOneSourceByIdUntilItIsGone` | `org.openlife.vault.repository.SourceViewRepositoryTest` (vault) |
-| Migrated, behaviour unchanged: `SearchScreenTest`, `AppLockFlowTest`, `IntakeAndListFlowTest`, `DeletionRetryFlowTest`, `SourceListScreenTest`, `ViewerScreenC1Test`, `EvidenceNavigationTest`, `MainThreadPolicyTest`, `OcrPersistenceFlowTest` | each class |
+| `ViewerByIdTest` (3) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.ViewerByIdTest` |
+| `AdaptiveLayoutTest` (2 new, 3 migrated) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.AdaptiveLayoutTest` |
+| `MultiWindowScrubTest` (1 new, R4 change) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.MultiWindowScrubTest` |
+| `SavedStateTest.savedBundleHoldsNoContent` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.SavedStateTest` |
+| `InternalLinkTest` (2) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.intake.InternalLinkTest` |
+| `SecureWindowUiTest.everyContentWindowAndDialogIsSecure` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.SecureWindowUiTest` |
+| `LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.LargeFontUiTest` |
+| `RtlUiTest.listAndViewerMirrorInRtl` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.RtlUiTest` |
+| `NavigationBackTest` (4, incl. `backFromEveryDestination`) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.NavigationBackTest` |
+| `EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.EdgeToEdgeUiTest` |
+| `BrandScreenshotInstrumentedTest.listDetailExpandedMatchesGolden` (no PNG committed: first generate on the CI profile with `-Pandroid.testInstrumentationRunnerArguments.generateGoldens=true`) | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.brand.BrandScreenshotInstrumentedTest#listDetailExpandedMatchesGolden` |
+| `SourceViewRepositoryTest.observeVisibleSourceFollowsOneSourceByIdUntilItIsGone` (vault) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.repository.SourceViewRepositoryTest` |
+| Migrated, behaviour unchanged: `SearchScreenTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.search.SearchScreenTest` |
+| Migrated, behaviour unchanged: `AppLockFlowTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.lock.AppLockFlowTest` |
+| Migrated, behaviour unchanged: `IntakeAndListFlowTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.IntakeAndListFlowTest` |
+| Migrated, behaviour unchanged: `DeletionRetryFlowTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.DeletionRetryFlowTest` |
+| Migrated, behaviour unchanged: `SourceListScreenTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.SourceListScreenTest` |
+| Migrated, behaviour unchanged: `ViewerScreenC1Test` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.ViewerScreenC1Test` |
+| Migrated, behaviour unchanged: `EvidenceNavigationTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.EvidenceNavigationTest` |
+| Migrated, behaviour unchanged: `MainThreadPolicyTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.MainThreadPolicyTest` |
+| Migrated, behaviour unchanged: `OcrPersistenceFlowTest` | `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.OcrPersistenceFlowTest` |
 
 The device mutation-RED for each replacement (R6) is also a gap: on the
 tablet, before deleting a grep test, apply its mutation (drop
