@@ -66,7 +66,7 @@ internal data class EvidenceContent(
     val rejectedSpanIds: Set<UUID>,
 ) {
     /** Spans whose regions are evidence: grounded and not rejected. */
-    val selectable: List<OcrSpan> = spans.filter { it.evidenceRegion != null && it.id !in rejectedSpanIds }
+    val selectable: List<OcrSpan> = EvidenceSelection.selectableSpans(spans) { it.id in rejectedSpanIds }
 }
 
 /**
@@ -86,20 +86,29 @@ internal fun ZoomableEvidenceImage(
     onSelectSpan: (OcrSpan) -> Unit,
     colors: EvidenceColors,
     modifier: Modifier = Modifier,
+    viewport: EvidenceViewport? = null,
 ) {
-    val zoom = remember(content.sourceWidth, content.sourceHeight, content.orientation) {
-        mutableFloatStateOf(EvidenceGeometry.MIN_ZOOM)
-    }
-    val pan = remember(content.sourceWidth, content.sourceHeight, content.orientation) { mutableStateOf(Offset.Zero) }
+    val local = remember(content.sourceWidth, content.sourceHeight, content.orientation) { EvidenceViewport() }
+    val state = viewport ?: local
     var canvas by remember { mutableStateOf(Size.Zero) }
     val bringIntoView = remember { BringIntoViewRequester() }
-    val view = EvidenceView(content, canvas, zoom, pan)
+    val view = EvidenceView(content, canvas, state.zoom, state.pan)
     Box(modifier.evidenceGestures(view, bringIntoView, onSelectSpan) { canvas = it }) {
         if (canvas != Size.Zero && content.sourceWidth > 0 && content.sourceHeight > 0) {
             EvidenceCanvas(bitmap, view, selectedSpanId, colors, onSelectSpan)
         }
     }
     RevealSelected(selectedSpanId, view, bringIntoView)
+}
+
+/**
+ * P1-20-R9: the zoom and pan, hoisted so the viewer's ViewModel can keep them
+ * across recreation as two numbers each (no content). Without one, the image
+ * keeps its own.
+ */
+internal class EvidenceViewport(initialZoom: Float = EvidenceGeometry.MIN_ZOOM, initialPan: Offset = Offset.Zero) {
+    val zoom: MutableFloatState = mutableFloatStateOf(initialZoom)
+    val pan: MutableState<Offset> = mutableStateOf(initialPan)
 }
 
 /** The image's geometry with its live zoom and pan; the one transform drawing and hit-testing share. */

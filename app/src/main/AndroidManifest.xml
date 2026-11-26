@@ -60,6 +60,15 @@
             </intent-filter>
         </activity>
 
+        <!-- P1-20-R5: the internal deep-link entry. Not exported and no intent
+             filter; it still checks a single-use nonce and a typed route. -->
+        <activity
+            android:name=".intake.InternalLinkActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <!-- ProfileInstaller's exported receiver is not part of OpenLife's
              boundary; release must expose only the two intentional activities. -->
         <receiver

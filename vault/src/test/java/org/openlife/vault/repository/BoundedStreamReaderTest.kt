@@ -169,6 +169,7 @@ class BoundedStreamReaderTest {
     fun closingTheStreamFromAnotherThreadUnblocksABlockedRead() {
         val stream = BlockUntilClosedStream()
         val closer = Thread {
+            // P1-20-R8: lets the reader block first; the close from another thread is the behaviour under test.
             Thread.sleep(200)
             stream.close()
         }

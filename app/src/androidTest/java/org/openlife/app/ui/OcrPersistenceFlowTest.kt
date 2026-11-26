@@ -4,8 +4,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelStore
+import kotlinx.coroutines.cancel
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
@@ -38,7 +37,7 @@ import org.openlife.vault.repository.PrepareResult
 import org.openlife.vault.repository.SaveResult
 
 /**
- * P2-01: OCR results live in the database, so a new ViewModel (as after a
+ * P2-01: OCR results live in the database, so a new presenter (as after a
  * process restart) shows the persisted revision instead of offering to
  * extract again.
  */
@@ -51,18 +50,20 @@ class OcrPersistenceFlowTest {
     val composeRule = createComposeRule()
 
     private val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as OpenLifeApp
-    private val viewModelStores = mutableListOf<ViewModelStore>()
+    private val presenterScopes = mutableListOf<kotlinx.coroutines.CoroutineScope>()
 
-    /** Review Q-08: every OcrViewModel made here is cleared after the test, as a screen's would be. */
+    /** Review Q-08: every presenter made here is stopped after the test, as the app's never is mid-test. */
     @After
-    fun clearViewModels() {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync { viewModelStores.forEach { it.clear() } }
-        viewModelStores.clear()
+    fun stopPresenters() {
+        presenterScopes.forEach { it.cancel() }
+        presenterScopes.clear()
     }
 
-    private suspend fun newOcrViewModel(): OcrViewModel = withContext(Dispatchers.Main) {
-        val store = ViewModelStore().also(viewModelStores::add)
-        ViewModelProvider(store, OcrViewModel.factory(app))[OcrViewModel::class.java]
+    /** A fresh app OCR presenter (P1-20: the app holds one per process), as after process death. */
+    private suspend fun newOcrPresenter(): OcrPresenter = withContext(Dispatchers.Main) {
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main.immediate)
+        presenterScopes += scope
+        org.openlife.app.appOcrPresenter(app, scope)
     }
 
     @Test
@@ -70,7 +71,7 @@ class OcrPersistenceFlowTest {
         val access = app.vault() as VaultAccess.Ready
         val sourceId = saveSyntheticSource(access)
         try {
-            val first = newOcrViewModel()
+            val first = newOcrPresenter()
             withContext(Dispatchers.Main) { first.run(sourceId) }
             val persisted = withTimeout(OCR_TIMEOUT_MS) {
                 access.ocrRepository.observeOcrView(sourceId).first { view ->
@@ -79,7 +80,7 @@ class OcrPersistenceFlowTest {
             }!!
 
             // A new ViewModel, as after process death: it must read, not re-run.
-            val second = newOcrViewModel()
+            val second = newOcrPresenter()
             composeRule.setContent {
                 val state by second.state(sourceId).collectAsState()
                 ViewerScreen(
@@ -109,7 +110,7 @@ class OcrPersistenceFlowTest {
     }
 
     /**
-     * A-13 (P1-19-R16, suspected): OcrViewModel watched the visible-source
+     * A-13 (P1-19-R16, suspected): the OCR presenter watched the visible-source
      * list only if the vault was Ready when the ViewModel was created. Here
      * the vault opens later (Unavailable, then Ready after a retry); a source
      * deleted afterwards must still be forgotten (its state is dropped back
@@ -151,7 +152,7 @@ class OcrPersistenceFlowTest {
         }
         var sourceId: UUID? = null
         try {
-            val viewModel = newOcrViewModel()
+            val presenter = newOcrPresenter()
             var access = app.vault()
             val deadline = System.currentTimeMillis() + VIEW_TIMEOUT_MS
             while (access !is VaultAccess.Ready && System.currentTimeMillis() < deadline) {
@@ -162,7 +163,7 @@ class OcrPersistenceFlowTest {
             val ready = access as VaultAccess.Ready
             val id = saveSyntheticSource(ready).also { sourceId = it }
 
-            val state = withContext(Dispatchers.Main) { viewModel.state(id) }
+            val state = withContext(Dispatchers.Main) { presenter.state(id) }
             val collector = launch(Dispatchers.Main) { state.collect {} }
             withTimeout(VIEW_TIMEOUT_MS) { while (state.value is OcrUiState.Loading) delay(POLL_MS) }
             val held = state.value

@@ -40,6 +40,7 @@ import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
 import org.openlife.app.ui.evidence.EvidenceSelection
+import org.openlife.app.ui.evidence.EvidenceViewport
 import org.openlife.app.ui.evidence.evidenceSpanPreview
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
@@ -56,7 +57,6 @@ import org.openlife.vault.repository.ReadyReadResult
  * have already authenticated (design §9); every other result is explained,
  * never left on "Verifying…" (P1-13-R4).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewerScreen(
     source: Source,
@@ -78,38 +78,91 @@ fun ViewerScreen(
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
     var selectedSpanId by remember(source.id) { mutableStateOf(initialSelectedSpanId) }
+    ViewerBody(
+        source = source,
+        content = content,
+        ocrState = ocrState,
+        selectedSpanId = selectedSpanId,
+        onSelectSpan = { selectedSpanId = it },
+        onRetryLoad = { loadAttempt++ },
+        actions = ViewerActions(
+            onBack = onBack,
+            onDeleteRequested = onDeleteRequested,
+            onExtractText = onExtractText,
+            onCancelOcr = onCancelOcr,
+            onCorrect = onCorrect,
+            onReview = onReview,
+            onRejectSpan = onRejectSpan,
+            onUndoRejectSpan = onUndoRejectSpan,
+            onSetUserContentKind = onSetUserContentKind,
+        ),
+    )
+}
+
+/** What the viewer asks of its owner; callbacks only, no state (P1-20-R9). */
+internal class ViewerActions(
+    val onBack: () -> Unit,
+    val onDeleteRequested: () -> Unit,
+    val onExtractText: () -> Unit = {},
+    val onCancelOcr: () -> Unit = {},
+    val onCorrect: (OcrSpan, String) -> Unit = { _, _ -> },
+    val onReview: (OcrReviewState) -> Unit = {},
+    val onRejectSpan: (OcrSpan) -> Unit = {},
+    val onUndoRejectSpan: (OcrSpan) -> Unit = {},
+    val onSetUserContentKind: (UserContentKind?) -> Unit = {},
+)
+
+/**
+ * The viewer drawn from state its owner holds (P1-20-R9): the decoded
+ * [content], the OCR state, the selected span and, optionally, the zoom and
+ * pan. Only the open dialogs are kept here; they hold no saved content.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("LongParameterList")
+internal fun ViewerBody(
+    source: Source,
+    content: ViewerContentState,
+    ocrState: OcrUiState,
+    selectedSpanId: java.util.UUID?,
+    onSelectSpan: (java.util.UUID?) -> Unit,
+    onRetryLoad: () -> Unit,
+    actions: ViewerActions,
+    viewport: EvidenceViewport? = null,
+) {
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }
     var correctionText by remember(source.id) { mutableStateOf("") }
     var confirmingDelete by remember(source.id) { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { ViewerTopBar(source, onBack, onDelete = { confirmingDelete = true }) },
+        topBar = { ViewerTopBar(source, actions.onBack, onDelete = { confirmingDelete = true }) },
     ) { padding ->
         ViewerContent(
             modifier = Modifier.fillMaxSize().padding(padding),
             source = source,
             content = content,
             selectedSpanId = selectedSpanId,
-            onRetryLoad = { loadAttempt++ },
+            onRetryLoad = onRetryLoad,
             onDeleteRequested = { confirmingDelete = true },
             ocrState = ocrState,
-            onExtractText = onExtractText,
-            onCancelOcr = onCancelOcr,
-            onSelectSpan = { selectedSpanId = it.id },
+            onExtractText = actions.onExtractText,
+            onCancelOcr = actions.onCancelOcr,
+            onSelectSpan = { onSelectSpan(it.id) },
             onCorrect = { span ->
                 correctingSpan = span
                 correctionText = span.text
             },
-            onReview = onReview,
+            onReview = actions.onReview,
             onRejectSpan = { span ->
                 // S-02: a rejected span stops being the selection here, so Undo
                 // does not re-reveal it (scroll jump) or re-announce it.
-                if (span.id == selectedSpanId) selectedSpanId = null
-                onRejectSpan(span)
+                if (span.id == selectedSpanId) onSelectSpan(null)
+                actions.onRejectSpan(span)
             },
-            onUndoRejectSpan = onUndoRejectSpan,
-            onSetUserContentKind = onSetUserContentKind,
+            onUndoRejectSpan = actions.onUndoRejectSpan,
+            onSetUserContentKind = actions.onSetUserContentKind,
+            viewport = viewport,
         )
     }
 
@@ -118,7 +171,7 @@ fun ViewerScreen(
         correctionText = correctionText,
         onCorrectionTextChange = { correctionText = it },
         onDismiss = { correctingSpan = null },
-        onSave = onCorrect,
+        onSave = actions.onCorrect,
     )
 
     // Design §8 step 5: delete names the item and is confirmed from every
@@ -128,7 +181,7 @@ fun ViewerScreen(
             itemLabel = sourceLabel(source),
             onConfirm = {
                 confirmingDelete = false
-                onDeleteRequested()
+                actions.onDeleteRequested()
             },
             onDismiss = { confirmingDelete = false },
         )
@@ -178,6 +231,7 @@ private fun ViewerContent(
     onRejectSpan: (OcrSpan) -> Unit,
     onUndoRejectSpan: (OcrSpan) -> Unit,
     onSetUserContentKind: (UserContentKind?) -> Unit,
+    viewport: EvidenceViewport?,
 ) {
     val ready = ocrState as? OcrUiState.Ready
     val spans = ready?.spans.orEmpty()
@@ -195,6 +249,7 @@ private fun ViewerContent(
                 onSelectSpan = onSelectSpan,
                 onRetry = onRetryLoad,
                 onDelete = onDeleteRequested,
+                viewport = viewport,
             )
             if (selectedSpan != null) {
                 // TalkBack does not receive visual Canvas changes by itself.

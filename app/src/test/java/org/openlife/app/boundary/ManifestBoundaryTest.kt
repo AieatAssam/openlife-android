@@ -74,6 +74,18 @@ class ManifestBoundaryTest {
         )
     }
 
+    /** P1-20-R5 (AS-5): internal links enter through one activity no other app can start. */
+    @Test
+    fun internalLinkEntryIsNotExported() {
+        val entry = elements(readReleaseManifest()).singleOrNull { element ->
+            element.localName == "activity" &&
+                element.getAttributeNS(androidNamespace, "name") == "org.openlife.app.intake.InternalLinkActivity"
+        }
+        assertTrue("the internal link entry is declared", entry != null)
+        assertEquals("false", entry!!.getAttributeNS(androidNamespace, "exported"))
+        assertTrue("no intent filter can match it", entry.childElements("intent-filter").isEmpty())
+    }
+
     @Test
     fun mainActivityIsSingleTaskSoOpenExistingReusesIt() {
         // P1-13-R9 / F-44: with FLAG_ACTIVITY_NEW_TASK from intake, singleTask
