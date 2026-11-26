@@ -1,7 +1,8 @@
 id: P3-01
 title: C2 specification and ADR-0008
 phase: P3
-status: todo
+status: review
+started: 2026-11-25
 depends_on: [P2-09]
 estimate: M
 owner: agent+owner
