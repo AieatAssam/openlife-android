@@ -90,7 +90,7 @@ object EmailExtractor {
             top.all(LineScan::isAsciiLetter)
     }
 
-    /** ASCII letters, digits and inner hyphens; never an IDNA `xn--` label (amendment E-10). */
+    /** ASCII letters, digits and inner hyphens; never an IDNA `xn--` label (finding E-10). */
     private fun validLabel(label: String): Boolean =
         label.isNotEmpty() && label.all(::isLabelChar) && !label.startsWith('-') && !label.endsWith('-') &&
             !label.startsWith(PUNYCODE, ignoreCase = true)

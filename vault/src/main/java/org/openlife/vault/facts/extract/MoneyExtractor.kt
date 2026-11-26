@@ -80,7 +80,7 @@ internal class MoneyScene(val line: LineScan, markers: List<Marker>, val numbers
     /**
      * A marker before [number]: directly or one space separator before it,
      * or across a dash-like sign and up to 4 space separators (§5.1 signs,
-     * amendment E-04; [MoneyShapes] judges the sign).
+     * finding E-04; [MoneyShapes] judges the sign).
      */
     fun prefixOf(number: Dense): Marker? {
         val signed = LineScan.isDashLike(line.raw(number.start - 1))

@@ -42,7 +42,7 @@ object TimeExtractor {
         return TimeRanges.apply(line, tokens)
     }
 
-    /** Never right after a sign, unless the sign joins this time to the one before (`9am-5pm`; amendment E-02). */
+    /** Never right after a sign, unless the sign joins this time to the one before (`9am-5pm`; finding E-02). */
     private fun canStart(line: LineScan, index: Int, previousEnd: Int?): Boolean {
         if (!LineScan.isAsciiDigit(line.ch(index))) return false
         val afterSign = LineScan.isSignLike(line.raw(index - 1)) && previousEnd != index - 1
@@ -78,7 +78,7 @@ object TimeExtractor {
     private fun attached(line: LineScan, end: Int): Boolean =
         !line.boundaryAfter(end) || (line.raw(end) == ':' && LineScan.isAsciiDigit(line.raw(end + 1)))
 
-    /** Fractional seconds (`14:30:00.000`): a dot or comma and a digit after the time (amendment E-02). */
+    /** Fractional seconds (`14:30:00.000`): a dot or comma and a digit after the time (finding E-02). */
     private fun fraction(line: LineScan, at: Int): Boolean =
         (line.raw(at) == '.' || line.raw(at) == ',') && LineScan.isAsciiDigit(line.raw(at + 1))
 
@@ -154,7 +154,7 @@ internal object TimeZones {
     private const val MAX_ANNOTATION = 32
     private val NOT_ZONES = setOf("TO", "TILL", "UNTIL", "AND", "OR", "AT", "ON")
 
-    /** The end of a zone token after [end] and at most 4 space separators or tabs, or null (amendment E-08). */
+    /** The end of a zone token after [end] and at most 4 space separators or tabs, or null (finding E-08). */
     fun after(line: LineScan, end: Int): Int? {
         val gap = line.spaceRun(end)
         if (gap > LineScan.MAX_SPACE_RUN) return null
@@ -189,7 +189,7 @@ internal object TimeZones {
         return if (zone) wordOffset(line, end) ?: end else null
     }
 
-    /** A zone word takes a directly following offset of 1-2 or 4 digits (`GMT+01:00`, `UTC-5`; amendment E-02). */
+    /** A zone word takes a directly following offset of 1-2 or 4 digits (`GMT+01:00`, `UTC-5`; finding E-02). */
     private fun wordOffset(line: LineScan, sign: Int): Int? {
         if (!LineScan.isOffsetSign(line.ch(sign))) return null
         val digits = line.digits(sign + 1, LONG_OFFSET)

@@ -91,7 +91,7 @@ internal object MoneyNumbers {
     /**
      * Joins ASCII-space-separated digit groups read as one grouped number
      * (§5.2). The printed digits are joined first and leading zeros removed
-     * after, so `5 000` is 5000 (amendment E-01).
+     * after, so `5 000` is 5000 (finding E-01).
      */
     fun joined(groups: List<String>): Readings {
         if (!groups.all { group -> group.isNotEmpty() && group.all(LineScan::isAsciiDigit) }) {

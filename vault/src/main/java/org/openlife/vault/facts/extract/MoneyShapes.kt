@@ -69,7 +69,7 @@ internal object MoneyShapes {
 internal data class Sign(val start: Int, val negative: Boolean, val problem: Boolean)
 
 /**
- * ADR-0008 §5.1 signs (amendment E-04). Only a lone ASCII `-` touching the
+ * ADR-0008 §5.1 signs (finding E-04). Only a lone ASCII `-` touching the
  * marker or the digits is read (`-€5`, `€-5`, `-5 €`). Any other hyphen,
  * dash or minus look-alike, a sign with spaces beside it (`- €5`, `EUR -5`),
  * a dash between the digits and a marker after them, or two signs abstain.

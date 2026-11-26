@@ -83,22 +83,22 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
 
         fun isAsciiUpper(char: Char): Boolean = char in 'A'..'Z'
 
-        /** The longest run of space separators or tabs read as one gap (amendment E-08). */
+        /** The longest run of space separators or tabs read as one gap (finding E-08). */
         const val MAX_SPACE_RUN = 4
 
-        /** A Unicode space separator (Zs) or a tab (amendment E-08). */
+        /** A Unicode space separator (Zs) or a tab (finding E-08). */
         fun isSpace(char: Char): Boolean = char == '\t' || Character.getType(char) == Character.SPACE_SEPARATOR.toInt()
 
-        /** `-` or a hyphen, dash or minus look-alike (amendment E-04). */
+        /** `-` or a hyphen, dash or minus look-alike (finding E-04). */
         fun isDashLike(char: Char): Boolean = char == '-' || char in DASH_LIKE
 
         /** A plus or minus sign as an offset writes it: `+`, `-`, `−`, `±` and their fullwidth forms. */
         fun isOffsetSign(char: Char): Boolean = char in OFFSET_SIGNS
 
-        /** A sign that could start an offset or an amount: dash-like, `+` or `±` (amendment E-02). */
+        /** A sign that could start an offset or an amount: dash-like, `+` or `±` (finding E-02). */
         fun isSignLike(char: Char): Boolean = isDashLike(char) || char == '+' || char == '\u00B1' || char == '\uFF0B'
 
-        /** Format (Cf) and mark (Mn, Mc, Me) code points attach to their neighbours (amendment E-06). */
+        /** Format (Cf) and mark (Mn, Mc, Me) code points attach to their neighbours (finding E-06). */
         fun isAttachedMark(codePoint: Int): Boolean = Character.getType(codePoint) in ATTACHED_TYPES
 
         private fun isWordPart(codePoint: Int): Boolean =

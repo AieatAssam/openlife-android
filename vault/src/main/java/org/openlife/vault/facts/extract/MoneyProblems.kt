@@ -24,7 +24,7 @@ internal object MoneyProblems {
     /**
      * A partner amount before this one, joined by a dash-like character or
      * `to`/`until`/`till`/`and` with up to 4 space separators each side; the
-     * partner's own markers join the range (amendment E-07). `and` joins
+     * partner's own markers join the range (finding E-07). `and` joins
      * only two amounts with the same marker (`between €10 and €20`), so
      * `$5 and £10` stays two amounts.
      */
@@ -157,7 +157,7 @@ internal object MoneyEnclosed {
     private fun attached(line: LineScan, amount: Amount) =
         Triple(amount.start, line.tokenEnd(amount.end), AbstentionReason.ATTACHED_CHARACTERS)
 
-    /** A format or combining mark directly before the amount (`​€5`; amendment E-06). */
+    /** A format or combining mark directly before the amount (`​€5`; finding E-06). */
     private fun markBefore(line: LineScan, at: Int): Boolean =
         at > 0 && !line.isClaimed(at - 1) && LineScan.isAttachedMark(line.text.codePointBefore(at))
 

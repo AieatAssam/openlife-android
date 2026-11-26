@@ -6,7 +6,7 @@ package org.openlife.vault.facts.extract
  * only whitespace, a comma, `at`, `@`, `-` or a joining `T` lies between them.
  * Otherwise each is emitted on its own. A zone after the time abstains the
  * time; a date joined to it by `T` abstains with it, with the same reason,
- * whatever made the time abstain (amendment E-02).
+ * whatever made the time abstain (finding E-02).
  */
 object DateTimeExtractor {
     const val RULE_ID = "rules-datetime"

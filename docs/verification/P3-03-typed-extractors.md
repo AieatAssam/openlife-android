@@ -1,7 +1,7 @@
 # P3-03 Typed extractors (ADR-0008 `rules-*-v1`)
 
 Branch `plan/P3-03-conservative-interpreters`, based on `main` at 31cc2eb
-(P3-01 merged). Date 2026-11-26. Pure Kotlin in
+(P3-01 merged), later merged with `main` at f46ea30 (PR #34). Date 2026-11-26. Pure Kotlin in
 `vault/src/main/java/org/openlife/vault/facts/extract/`; JVM tests only.
 No Android API, database, schema or UI is touched, so this step has no
 instrumented test and no device gap.
@@ -71,7 +71,8 @@ time, lint and `:app:test` ran in parallel on this shared 4-core host
 (load average 18–52). Every stage slowed by about 2x at once, and
 `markers/ALL` 58 ms and `mixed/ALL` 63 ms failed the bound. The same code
 measured 22–33 ms alone. The 50 ms bound and the ratio limit of 40 are
-unchanged.
+unchanged at that time; the review fix later lowered the ratio limit to
+20 (see Review fixes).
 
 Final gate run (best of 5 after 3 warm-ups; CPU ms / wall ms), slowest:
 
@@ -84,8 +85,9 @@ Final gate run (best of 5 after 3 warm-ups; CPU ms / wall ms), slowest:
 Every other input and stage was lower. Linearity ratios at 10x: digit-space
 9.5, label-run 15.2, at 5.6, groups 7.2, months 7.1.
 
-`workGrowsLinearly` runs five inputs at 10x size and requires a ratio
-below 40.
+`workGrowsLinearly` ran five inputs at 10x size and required a ratio
+below 40. Since the review fix it runs seven (adding `time-ann` and
+`url-many`) and requires a ratio below 20.
 
 ## Deviations and decisions
 
@@ -123,7 +125,7 @@ below stands; "v2" means deferred to rules v2 (a follow-up in the P3-03
 | 4 | a two-digit year with one remaining valid reading is abstained | keep; now normative (E-03, A-3), and `Thu 03/04/26` fixtures corrected |
 | 5 | the range prefix rule (ZZ-06) also applied to numeric dates and to `to`/`and` | keep |
 | 6 | `09:00-17:00` reads `-17:00` as an offset and abstains | v2 |
-| 7 | spaces before a zone token | changed (E-08, A-8): at most 4 Unicode space separators or tabs are skipped, so `14:30  CET` (two spaces) and `14:30\tCET` abstain; 5 or more do not. The earlier entry ("two spaces ... still treated as a zone") was wrong for other space characters: it held only for ASCII spaces |
+| 7 | spaces before a zone token | changed (E-08, A-8): at most 4 Unicode space separators or tabs are skipped, so `14:30  CET` (two spaces), `14:30    CET` (four), tab, U+00A0, U+2009 and U+202F gaps abstain; five spaces do not (times.tsv rows 134-140). The earlier entry ("two spaces ... still treated as a zone") was wrong: before the fix the code skipped one space only, so `14:30  CET` gave `14:30` (reviewer corpus baseline) |
 | 8 | `1 234,50 €` with ASCII spaces is abstained | keep |
 | 9 | a marker with numbers on both sides abstains both | keep |
 | 10 | `- €5` with a space before the marker | changed (E-04, A-4): abstained as `SIGN_OR_CREDIT` |
@@ -153,7 +155,7 @@ ADR-0008 amendment:
 | E-01 | A-1 | `€5 000` gives `5 \| 5000 EUR`; `1 000 €` gives `0 \| 1000 EUR` |
 | E-02 | A-2 | `14:30:00.000Z`, `UTC+05:30`, `14:30 GMT+01:00` abstain or give nothing |
 | E-03 | A-3 | `Thu 03/04/26` abstains (was a single date) |
-| E-04 | A-4 | `−€5.00`, `- €5`, `( €5.00 )`, `EUR -33.10` abstain `SIGN_OR_CREDIT`; `EUR -33.10` is not context |
+| E-04 | A-4 | `−€5.00`, `- €5`, `( €5.00 )`, `EUR -33.10` abstain `SIGN_OR_CREDIT`; `USD -33.10` on the next span does not resolve `$5` (money.tsv row 184) |
 | E-05 | A-5 | `2026-09-16-17` abstains; `Ref 123-2026-09-16` gives nothing |
 | E-06 | A-6 | a zero-width or combining mark inside or beside a token abstains it |
 | E-07 | A-7 | `€10–€20`, `€10 to €20`, `between €10 and €20` abstain as one range |

@@ -103,7 +103,7 @@ object DateExtractor {
 
 /**
  * Where a numeric token may start: a token boundary, and not inside a run
- * such as `x03/04`, `1:14:30` or `123-2026-09-16` (amendment E-05). After
+ * such as `x03/04`, `1:14:30` or `123-2026-09-16` (finding E-05). After
  * `-`, only a standalone 1-2 digit day may come before (`3-5 April 2026`,
  * a range of ADR-0008 §4.1).
  */

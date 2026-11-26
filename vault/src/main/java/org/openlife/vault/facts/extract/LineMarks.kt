@@ -10,7 +10,7 @@ internal fun LineScan.letterBefore(index: Int): Boolean =
 internal fun LineScan.letterAt(index: Int): Boolean =
     index in 0 until length && LineScan.isLetterLike(text.codePointAt(index))
 
-/** Unclaimed space separators or tabs from [start], counting at most `MAX_SPACE_RUN` + 1 (amendment E-08). */
+/** Unclaimed space separators or tabs from [start], counting at most `MAX_SPACE_RUN` + 1 (finding E-08). */
 internal fun LineScan.spaceRun(start: Int): Int {
     var end = start
     while (end - start <= LineScan.MAX_SPACE_RUN && LineScan.isSpace(ch(end))) end++
@@ -24,7 +24,7 @@ internal fun LineScan.spaceRunBefore(end: Int): Int {
     return end - start
 }
 
-/** End of the unclaimed run of format and combining marks from [start] (amendment E-06). */
+/** End of the unclaimed run of format and combining marks from [start] (finding E-06). */
 internal fun LineScan.marksEnd(start: Int): Int {
     var end = start
     while (end < length && !isClaimed(end) && LineScan.isAttachedMark(text.codePointAt(end))) {
