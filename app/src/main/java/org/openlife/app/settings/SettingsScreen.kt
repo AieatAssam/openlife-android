@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,9 +41,11 @@ fun SettingsScreen(
     appLock: AppLockSettings? = null,
 ) {
     val controller = viewModel<SettingsViewModel>().controller
+    val pane = stringResource(R.string.settings_title)
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { BackTopAppBar(title = stringResource(R.string.settings_title), onBack = onBack) },
+        topBar = { BackTopAppBar(title = pane, onBack = onBack) },
     ) { padding ->
         Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(

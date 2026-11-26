@@ -41,7 +41,11 @@ fun VaultUnavailableScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(stringResource(R.string.vault_unavailable_title), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stringResource(R.string.vault_unavailable_title),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.asHeading(),
+            )
             Text(
                 stringResource(cause.explanationString()),
                 style = MaterialTheme.typography.bodyLarge,

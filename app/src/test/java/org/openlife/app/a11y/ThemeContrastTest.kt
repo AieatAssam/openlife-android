@@ -58,7 +58,11 @@ class ThemeContrastTest {
         val failures = themes.flatMap { theme ->
             val roles = materialRoles(theme.scheme)
             onPairs(roles.keys).map { (foreground, background) ->
-                Check("${theme.name} $foreground on $background", roles.getValue(foreground), roles.getValue(background))
+                Check(
+                    "${theme.name} $foreground on $background",
+                    roles.getValue(foreground),
+                    roles.getValue(background),
+                )
             }.mapNotNull { it.failure(TEXT) }
         }
         assertTrue("on-role pairs below 4.5:1: $failures", failures.isEmpty())
@@ -90,7 +94,13 @@ class ThemeContrastTest {
             val surfaces = brandSurfaces(theme)
             surfaces.flatMap { (surface, background) ->
                 BRAND_TEXT.map { Check("${theme.name} $it on $surface", brand.getValue(it), background) to TEXT } +
-                    BRAND_NON_TEXT.map { Check("${theme.name} $it on $surface", brand.getValue(it), background) to NON_TEXT }
+                    BRAND_NON_TEXT.map {
+                        Check(
+                            "${theme.name} $it on $surface",
+                            brand.getValue(it),
+                            background,
+                        ) to NON_TEXT
+                    }
             }.mapNotNull { (check, minimum) -> check.failure(minimum) } +
                 // Search draws matched words in Ink on the highlighter (SearchScreen.highlighted).
                 listOfNotNull(Check("${theme.name} Ink on highlighter", INK, theme.brand.highlighter).failure(TEXT))
@@ -120,17 +130,26 @@ class ThemeContrastTest {
         val sources = appSources()
         val materialUses = sources.flatMap { MATERIAL_USE.findAll(it).map { match -> match.groupValues[1] }.toList() }
         val brandUses = sources.flatMap { BRAND_USE.findAll(it).map { match -> match.groupValues[1] }.toList() }
-        val constantUses = sources.flatMap { THEME_CONSTANT_IMPORT.findAll(it).map { match -> match.groupValues[1] }.toList() }
+        val constantUses = sources.flatMap {
+            THEME_CONSTANT_IMPORT.findAll(
+                it,
+            ).map { match -> match.groupValues[1] }.toList()
+        }
         val roles = materialRoles(OpenLifeLightColors).keys
         // An on-role is checked on its own container (everyOnRoleReachesTextContrastOnItsContainer).
         val onRoles = onPairs(roles).map { it.first }
         val coveredMaterial = roles.filter(::isSurface) + TEXT_ROLES + NON_TEXT_ROLES + onRoles + MATERIAL_EXEMPT.keys
         val brand = brandProperties(OpenLifeLightBrandColors).keys
         val uncovered = materialUses.filter { it in roles && it !in coveredMaterial } +
-            brandUses.filter { it in brand && it !in BRAND_TEXT + BRAND_NON_TEXT + BRAND_SURFACES + BRAND_EXEMPT.keys } +
+            brandUses.filter {
+                it in brand && it !in BRAND_TEXT + BRAND_NON_TEXT + BRAND_SURFACES + BRAND_EXEMPT.keys
+            } +
             constantUses.filter { it in COLOR_CONSTANTS && it !in CONSTANT_USES }
         assertTrue("colour uses not covered by a contrast rule: ${uncovered.distinct()}", uncovered.isEmpty())
-        assertTrue("self-check: the scan sees app colour uses", materialUses.contains("error") && brandUses.isNotEmpty())
+        assertTrue(
+            "self-check: the scan sees app colour uses",
+            materialUses.contains("error") && brandUses.isNotEmpty(),
+        )
         // Brand colours are checked on page and card surfaces only; none is used inside a dialog or menu.
         val inDialogs = KotlinSource.app(projectDir).flatMap { source ->
             (source.calls("AlertDialog") + source.calls("DropdownMenu"))
@@ -169,8 +188,8 @@ class ThemeContrastTest {
                 else -> listOf(base)
             }.filter { it in roles }.map { foreground to it }
         } + listOf("inverseOnSurface" to "inverseSurface", "inversePrimary" to "inverseSurface").filter { (a, b) ->
-            a in roles && b in roles
-        }
+        a in roles && b in roles
+    }
 
     private fun isSurface(role: String) = role == "background" || SURFACE_ROLE.matches(role)
 
@@ -208,7 +227,15 @@ class ThemeContrastTest {
         val SURFACE_ROLE = Regex("surface(Bright|Dim|Variant|Container\\w*)?")
 
         /** Material roles app text and icons are drawn in. */
-        val TEXT_ROLES = listOf("onSurface", "onSurfaceVariant", "onBackground", "primary", "secondary", "tertiary", "error")
+        val TEXT_ROLES = listOf(
+            "onSurface",
+            "onSurfaceVariant",
+            "onBackground",
+            "primary",
+            "secondary",
+            "tertiary",
+            "error",
+        )
 
         /** Boundaries a user must perceive: text-field and outlined-button borders. */
         val NON_TEXT_ROLES = listOf("outline")
@@ -223,13 +250,14 @@ class ThemeContrastTest {
         /** Surfaces app content (cards, rows, stamps, notices) is drawn on. */
         val CONTENT_SURFACES = listOf("background", "surface", "surfaceVariant")
 
-        val BRAND_TEXT = setOf("ink", "mutedInk")
+        val BRAND_TEXT = setOf("ink", "mutedInk", "attentionInk")
         val BRAND_NON_TEXT = setOf("attention")
         val BRAND_SURFACES = setOf("paper", "raisedPaper")
         val BRAND_EXEMPT = mapOf(
             "rule" to "perforation and fold lines are decorative (WCAG 1.4.11)",
             "fold" to "the folded-corner face is decorative",
-            "attentionContainer" to "a container with its own on-colour (ink), checked by the on-pair rule in PaletteContrastTest",
+            "attentionContainer" to
+                "a container with its own on-colour (ink), checked by the on-pair rule in PaletteContrastTest",
             "highlighter" to "drawn over the user's image (contrast unknowable) or behind Ink text (checked below)",
         )
 

@@ -9,6 +9,8 @@ import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.OrientationTransform
 import org.openlife.vault.ocr.OcrEvidenceRegion
 import org.openlife.vault.ocr.OcrSpan
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -22,6 +24,9 @@ object EvidenceGeometry {
     const val MIN_ZOOM = 1f
     const val MAX_ZOOM = 8f
     const val DOUBLE_TAP_ZOOM = 3f
+
+    /** Each accessibility zoom action doubles or halves the zoom (P1-10). */
+    const val ZOOM_STEP = 2f
 
     @Suppress("LongParameterList")
     fun regionToCanvas(
@@ -164,10 +169,10 @@ object EvidenceGeometry {
         if (current < (MIN_ZOOM + DOUBLE_TAP_ZOOM) / 2f) DOUBLE_TAP_ZOOM else MIN_ZOOM
 
     /** P1-10: the accessibility "Zoom in" step, the equivalent of a pinch. */
-    fun zoomInStep(current: Float): Float = TODO("P1-10 GREEN")
+    fun zoomInStep(current: Float): Float = min(MAX_ZOOM, current * ZOOM_STEP)
 
     /** P1-10: the accessibility "Zoom out" step. */
-    fun zoomOutStep(current: Float): Float = TODO("P1-10 GREEN")
+    fun zoomOutStep(current: Float): Float = max(MIN_ZOOM, current / ZOOM_STEP)
 
     @Suppress("LongParameterList")
     private fun placement(

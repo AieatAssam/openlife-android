@@ -21,11 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.theme.OpenLifeMono
 
@@ -42,9 +44,11 @@ fun AboutScreen(
     onBack: () -> Unit = {},
     lowRamDevice: Boolean = false,
 ) {
+    val pane = stringResource(R.string.about_title)
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { BackTopAppBar(title = stringResource(R.string.about_title), onBack = onBack) },
+        topBar = { BackTopAppBar(title = pane, onBack = onBack) },
     ) { padding ->
         Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
@@ -72,7 +76,11 @@ fun AboutScreen(
 private fun AboutHeader(lowRamDevice: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // The wordmark: Fraunces through the display role (VISUAL_IDENTITY §2 allows it on About).
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
+        Text(
+            stringResource(R.string.app_name),
+            style = MaterialTheme.typography.displaySmall,
+            modifier = Modifier.asHeading(),
+        )
         Text(stringResource(R.string.about_subtitle), style = MaterialTheme.typography.bodyLarge)
         if (lowRamDevice) {
             // P1-16-R4: the supported RAM floor is 2 GB; say so where it applies.

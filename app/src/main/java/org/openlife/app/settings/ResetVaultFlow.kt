@@ -21,6 +21,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
+import org.openlife.app.ui.announceStatus
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.vault.repository.ResetConfirmation
@@ -53,15 +55,18 @@ internal fun VerifyAllSection(controller: SettingsController, onVerifyAll: suspe
                             pluralStringResource(R.plurals.verify_all_unchecked, report.transient, report.transient),
                         ),
                     ),
+                    modifier = Modifier.announceStatus(),
                 )
                 if (report.transient > 0) Text(stringResource(R.string.verify_all_transient_hint))
             }
 
-            VerifyOutcome.Unavailable -> Text(stringResource(R.string.verify_all_unavailable))
+            VerifyOutcome.Unavailable ->
+                Text(stringResource(R.string.verify_all_unavailable), modifier = Modifier.announceStatus())
 
             VerifyOutcome.Failed -> Text(
                 stringResource(R.string.verify_all_failed),
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.announceStatus(),
             )
 
             null -> Unit
@@ -137,7 +142,7 @@ private fun TypeWordDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.reset_vault_title)) },
+        title = { Text(stringResource(R.string.reset_vault_title), modifier = Modifier.asHeading()) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.reset_vault_explanation))
@@ -168,11 +173,11 @@ private fun TypeWordDialog(
 private fun FinalConfirmationDialog(running: Boolean, failure: String?, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = { if (!running) onDismiss() },
-        title = { Text(stringResource(R.string.reset_vault_final_title)) },
+        title = { Text(stringResource(R.string.reset_vault_final_title), modifier = Modifier.asHeading()) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.reset_vault_final_explanation))
-                failure?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                failure?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.announceStatus()) }
             }
         },
         confirmButton = {

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -44,7 +47,8 @@ fun IntakeScreen(
     onDone: () -> Unit,
     onOpenExisting: (UUID) -> Unit = {},
 ) {
-    Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+    val pane = stringResource(R.string.intake_pane_title)
+    Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding().semantics { paneTitle = pane }) {
         when (state) {
             IntakeUiState.Preparing -> PreparingContent(onCancel)
 
@@ -103,7 +107,7 @@ private fun PreparingContent(onCancel: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.intake_preparing))
+            Text(stringResource(R.string.intake_preparing), modifier = Modifier.announceStatus())
             OpenLifeOutlinedButton(onClick = onCancel, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(R.string.cancel_action))
             }
@@ -118,7 +122,7 @@ private fun DuplicateContent(existingSourceId: UUID, onOpenExisting: (UUID) -> U
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.intake_duplicate))
+            Text(stringResource(R.string.intake_duplicate), modifier = Modifier.announceStatus())
             Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
                 OpenLifeButton(onClick = { onOpenExisting(existingSourceId) }) {
                     Text(stringResource(R.string.intake_open_existing))
@@ -163,14 +167,17 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
                 .padding(start = 24.dp, top = 24.dp, end = 24.dp),
         ) {
             FoldedCornerCard {
-                Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
+                // The image keeps its fixed frame; the text states may grow with the font (P1-10).
+                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp), contentAlignment = Alignment.Center) {
                     when {
                         bitmap != null -> Image(
                             bitmap = bitmap.asImageBitmap(),
                             contentDescription = stringResource(R.string.intake_selected_image_content_description),
+                            modifier = Modifier.fillMaxWidth().height(320.dp),
                         )
 
-                        current == PreviewImage.Loading -> Text(stringResource(R.string.intake_preparing))
+                        current == PreviewImage.Loading ->
+                            Text(stringResource(R.string.intake_preparing), modifier = Modifier.announceStatus())
 
                         else -> Text(stringResource(R.string.intake_preview_unavailable))
                     }
@@ -221,7 +228,7 @@ private fun CenteredMessage(text: String, stampState: StampState? = null, onDone
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             stampState?.let { StampBadge(it, modifier = Modifier.padding(bottom = 16.dp)) }
-            Text(text)
+            Text(text, modifier = Modifier.announceStatus())
             onDone?.let {
                 OpenLifeButton(onClick = it, modifier = Modifier.padding(top = 16.dp)) {
                     Text(stringResource(R.string.intake_done))
@@ -238,7 +245,7 @@ private fun TerminalMessage(text: String, onDone: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text)
+            Text(text, modifier = Modifier.announceStatus())
             OpenLifeButton(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(R.string.intake_done))
             }

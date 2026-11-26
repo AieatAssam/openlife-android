@@ -97,7 +97,9 @@ internal class KotlinSource(val path: Path, val text: String) {
         fun load(path: Path): KotlinSource = KotlinSource(path, Files.readString(path))
 
         /** Every shipped Kotlin file under app/src/main/java. */
-        fun app(projectDir: Path): List<KotlinSource> = Files.walk(projectDir.resolve("app/src/main/java")).use { paths ->
+        fun app(projectDir: Path): List<KotlinSource> = Files.walk(
+            projectDir.resolve("app/src/main/java"),
+        ).use { paths ->
             paths.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }
                 .sorted()
                 .map(::load)
@@ -118,27 +120,34 @@ internal class KotlinSource(val path: Path, val text: String) {
                         blank(index, end)
                         index = end
                     }
+
                     text.startsWith("/*", index) -> {
                         val end = text.indexOf("*/", index + 2).let { if (it < 0) text.length else it + 2 }
                         blank(index, end)
                         index = end
                     }
+
                     text.startsWith("\"\"\"", index) -> {
                         val end = text.indexOf("\"\"\"", index + 3).let { if (it < 0) text.length else it + 3 }
                         blank(index + 3, end - 3)
                         index = end
                     }
+
                     text[index] == '"' -> {
                         var end = index + 1
-                        while (end < text.length && text[end] != '"' && text[end] != '\n') end += if (text[end] == '\\') 2 else 1
+                        while (end < text.length && text[end] != '"' && text[end] != '\n') {
+                            end += if (text[end] == '\\') 2 else 1
+                        }
                         blank(index + 1, end)
                         index = end + 1
                     }
+
                     text[index] == '\'' && index + 2 < text.length -> {
                         val end = if (text[index + 1] == '\\') text.indexOf('\'', index + 2) else index + 2
                         if (end > index && end < text.length && text[end] == '\'') blank(index + 1, end)
                         index = if (end > index) end + 1 else index + 1
                     }
+
                     else -> index++
                 }
             }
@@ -148,7 +157,13 @@ internal class KotlinSource(val path: Path, val text: String) {
 }
 
 /** One call: its [name], the original text of its [args] and of its trailing lambda [body], if any. */
-internal class SourceCall(val source: KotlinSource, val name: String, val start: Int, val args: String, val body: String?) {
+internal class SourceCall(
+    val source: KotlinSource,
+    val name: String,
+    val start: Int,
+    val args: String,
+    val body: String?,
+) {
     val all: String get() = args + body.orEmpty()
 
     fun location(): String = "${source.path.fileName}:${source.lineOf(start)}"

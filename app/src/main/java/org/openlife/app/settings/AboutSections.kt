@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
+import org.openlife.app.ui.announceStatus
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.PerforationDivider
 
@@ -89,7 +90,11 @@ internal fun LazyListScope.documentSection(
         DocumentState.Loading -> item { Text(stringResource(R.string.about_document_loading)) }
 
         DocumentState.Failed -> item {
-            Text(stringResource(R.string.about_document_failed), color = MaterialTheme.colorScheme.error)
+            Text(
+                stringResource(R.string.about_document_failed),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.announceStatus(),
+            )
         }
 
         is DocumentState.Shown -> items(open.lines) { line -> DocumentLineText(line) }

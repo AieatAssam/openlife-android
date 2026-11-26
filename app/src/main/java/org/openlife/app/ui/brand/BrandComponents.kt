@@ -93,14 +93,15 @@ fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Fl
 /** A stamp's outline and label colours; the label is 12 sp text, so it needs 4.5:1 (P1-10). */
 internal data class StampColors(val border: Color, val label: Color)
 
-internal fun stampColors(state: StampState, scheme: ColorScheme, brand: OpenLifeBrandColors): StampColors {
-    val color = when (state) {
-        StampState.Confirmed, StampState.Verified -> scheme.tertiary
-        StampState.Stale -> brand.attention
-        StampState.Saved -> scheme.primary
+internal fun stampColors(state: StampState, scheme: ColorScheme, brand: OpenLifeBrandColors): StampColors =
+    when (state) {
+        StampState.Confirmed, StampState.Verified -> StampColors(border = scheme.tertiary, label = scheme.tertiary)
+
+        // The amber outline is a mark (3:1); its words need the darker ink (4.5:1).
+        StampState.Stale -> StampColors(border = brand.attention, label = brand.attentionInk)
+
+        StampState.Saved -> StampColors(border = scheme.primary, label = scheme.primary)
     }
-    return StampColors(border = color, label = color)
-}
 
 @Composable
 fun FoldedCornerCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {

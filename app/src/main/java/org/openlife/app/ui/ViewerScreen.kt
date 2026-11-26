@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -134,7 +135,9 @@ internal fun ViewerBody(
     var correctionText by remember(source.id) { mutableStateOf("") }
     var confirmingDelete by remember(source.id) { mutableStateOf(false) }
 
+    val pane = stringResource(R.string.viewer_pane_title)
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = { ViewerTopBar(source, actions.onBack, onDelete = { confirmingDelete = true }) },
     ) { padding ->
@@ -192,7 +195,7 @@ internal fun ViewerBody(
 @Composable
 private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Unit) {
     TopAppBar(
-        title = { Text(sourceLabel(source)) },
+        title = { Text(sourceLabel(source), modifier = Modifier.asHeading()) },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
@@ -299,7 +302,7 @@ private fun ViewerCorrectionDialog(
     span?.let { currentSpan ->
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.viewer_correct_title)) },
+            title = { Text(stringResource(R.string.viewer_correct_title), modifier = Modifier.asHeading()) },
             text = {
                 val correctionLabel = stringResource(R.string.viewer_correction_label)
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -335,7 +338,11 @@ private fun ViewerCorrectionDialog(
 private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKind: (UserContentKind?) -> Unit) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.viewer_details_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.asHeading(),
+            )
             DetailRow(stringResource(R.string.viewer_imported_label), importedTime(source), valueIsData = true)
             DetailRow(
                 stringResource(R.string.viewer_route_label),

@@ -313,4 +313,14 @@
     <string name="about_document_loading">Loading…</string>
     <string name="about_document_failed">This text could not be read.</string>
     <string name="settings_section_vault">Vault</string>
+    <!-- P1-10: accessibility-only text. Generic by design: never document content. -->
+    <string name="list_open_action">Open</string>
+    <string name="search_open_action">Open in viewer</string>
+    <string name="viewer_pane_title">Saved image</string>
+    <string name="intake_pane_title">Import an image</string>
+    <string name="viewer_select_text_action">Show in image</string>
+    <string name="viewer_zoom_in">Zoom in</string>
+    <string name="viewer_zoom_out">Zoom out</string>
+    <string name="viewer_zoom_reset">Fit to screen</string>
+    <string name="viewer_zoom_state">Zoom: %1$d%%</string>
 </resources>

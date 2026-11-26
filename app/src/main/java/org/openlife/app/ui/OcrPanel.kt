@@ -2,6 +2,7 @@ package org.openlife.app.ui
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
@@ -57,7 +60,11 @@ internal fun OcrSection(
 ) {
     val spanActions = SpanActions(onSelectSpan, onCorrect, onRejectSpan, onUndoRejectSpan)
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.viewer_extracted_text_title), style = MaterialTheme.typography.titleMedium)
+        Text(
+            stringResource(R.string.viewer_extracted_text_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.asHeading(),
+        )
         val runAgain = @Composable {
             OpenLifeTextButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
                 Text(stringResource(R.string.viewer_run_again))
@@ -73,7 +80,7 @@ internal fun OcrSection(
 
             is OcrUiState.Running -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.viewer_extracting))
+                    Text(stringResource(R.string.viewer_extracting), modifier = Modifier.announceStatus())
                     Spacer(Modifier.width(8.dp))
                     OpenLifeTextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
                 }
@@ -154,7 +161,7 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
         Text(
             stringResource(R.string.viewer_text_without_location),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 8.dp).asHeading(),
         )
         Text(
             stringResource(R.string.viewer_text_without_location_explanation),
@@ -185,10 +192,19 @@ private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions
     val rejected = EvidenceSelection.isRejected(span, state.spanReviews)
     val selectable = span.evidenceRegion != null && !rejected
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        val selectLabel = stringResource(R.string.viewer_select_text_action)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (selectable) Modifier.clickable { actions.onSelect(span) } else Modifier),
+                .heightIn(min = 48.dp)
+                .then(
+                    if (selectable) {
+                        Modifier.clickable(onClickLabel = selectLabel, role = Role.Button) { actions.onSelect(span) }
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalArrangement = Arrangement.Center,
         ) {
             val value = if (rejected) {
                 buildAnnotatedString {
@@ -254,6 +270,7 @@ private fun StaleOutcome(history: List<OcrHistoryItem>, runAgain: @Composable ()
         stringResource(R.string.viewer_extraction_stale),
         color = muted,
         style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.announceStatus(),
     )
     runAgain()
     OcrHistory(history)
@@ -261,7 +278,7 @@ private fun StaleOutcome(history: List<OcrHistoryItem>, runAgain: @Composable ()
 
 @Composable
 private fun OcrOutcome(explanation: String, history: List<OcrHistoryItem>, runAgain: @Composable () -> Unit) {
-    Text(explanation)
+    Text(explanation, modifier = Modifier.announceStatus())
     runAgain()
     OcrHistory(history)
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -47,7 +48,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
@@ -81,11 +86,13 @@ fun SourceListScreen(
 
     val hasItems = state is SourceListUiState.Loaded && state.sources.isNotEmpty()
 
+    val pane = stringResource(R.string.list_title)
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.list_title)) },
+                title = { Text(stringResource(R.string.list_title), modifier = Modifier.asHeading()) },
                 actions = {
                     // P2-08: local search; an empty vault simply finds nothing.
                     if (onOpenSearch != null) {
@@ -113,17 +120,14 @@ fun SourceListScreen(
                     // not the tonal container M3 uses for FABs by default.
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = 12.dp))
-                }
+                ) { ImportActionContent(gap = 12.dp) }
             }
         },
     ) { padding ->
         Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (state) {
                 SourceListUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.list_loading))
+                    Text(stringResource(R.string.list_loading), modifier = Modifier.announceStatus())
                 }
 
                 is SourceListUiState.VaultUnavailable -> VaultUnavailableScreen(
@@ -182,10 +186,18 @@ private fun SourceRow(
     // bounds would otherwise sit flush against the delete control.
     Column(modifier = Modifier.fillMaxWidth()) {
         FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            val openLabel = stringResource(R.string.list_open_action)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (deletionPending) Modifier else Modifier.clickable(onClick = onOpen))
+                    .heightIn(min = 48.dp)
+                    .then(
+                        if (deletionPending) {
+                            Modifier
+                        } else {
+                            Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
+                        },
+                    )
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -280,6 +292,7 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
             stringResource(R.string.list_empty_title),
             style = MaterialTheme.typography.displaySmall,
             textAlign = TextAlign.Center,
+            modifier = Modifier.asHeading(),
         )
         Text(
             stringResource(R.string.list_empty),
@@ -287,10 +300,17 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         OpenLifeButton(onClick = onImportFromPhotoPicker, modifier = Modifier.padding(top = 24.dp)) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = 8.dp))
+            ImportActionContent(gap = 8.dp)
         }
     }
+}
+
+/** The import action's icon and label, for the FAB and the empty-list button. */
+@Composable
+private fun ImportActionContent(gap: Dp) {
+    // Decorative: the text beside it names the action.
+    Icon(Icons.Filled.Add, contentDescription = null)
+    Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = gap))
 }
 
 private val LIST_BOTTOM_PADDING_FOR_FAB = 96.dp

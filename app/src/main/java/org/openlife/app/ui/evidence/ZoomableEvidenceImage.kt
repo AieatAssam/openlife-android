@@ -40,11 +40,15 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
@@ -53,6 +57,7 @@ import org.openlife.app.R
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.ocr.OcrSpan
 import java.util.UUID
+import kotlin.math.roundToInt
 
 /** Colours for the evidence overlay: the highlighter for evidence, muted ink for rejected spans. */
 internal data class EvidenceColors(val highlighter: Color, val rejected: Color)
@@ -143,6 +148,31 @@ private class EvidenceView(
                 pan.value,
             ),
         )
+    }
+
+    /** Sets zoom and pan as a pinch does: zoom within its limits, pan kept over the image. */
+    fun zoomTo(next: Float, nextPan: Offset = pan.value) {
+        val nextZoom = next.coerceIn(EvidenceGeometry.MIN_ZOOM, EvidenceGeometry.MAX_ZOOM)
+        zoom.floatValue = nextZoom
+        pan.value = if (nextZoom == EvidenceGeometry.MIN_ZOOM || canvas == Size.Zero) {
+            Offset.Zero
+        } else {
+            EvidenceGeometry.clampPan(
+                nextPan,
+                content.sourceWidth,
+                content.sourceHeight,
+                content.orientation,
+                canvas,
+                ContentScale.Fit,
+                nextZoom,
+            )
+        }
+    }
+
+    /** An accessibility action that zooms to [target], the equivalent of a pinch (P1-10). */
+    fun zoomAction(label: String, target: Float) = CustomAccessibilityAction(label) {
+        zoomTo(target)
+        true
     }
 
     /** The selectable span under [point], or null; rejected and ungrounded spans are never hit (R13). */
@@ -239,23 +269,7 @@ private fun PointerEvent.samples(): List<PointerSample> =
 @Composable
 private fun rememberZoomTransform(view: EvidenceView): TransformableState =
     rememberTransformableState { _, zoomChange, panChange, _ ->
-        val content = view.content
-        val nextZoom = (view.zoom.floatValue * zoomChange)
-            .coerceIn(EvidenceGeometry.MIN_ZOOM, EvidenceGeometry.MAX_ZOOM)
-        view.zoom.floatValue = nextZoom
-        view.pan.value = if (nextZoom == EvidenceGeometry.MIN_ZOOM || view.canvas == Size.Zero) {
-            Offset.Zero
-        } else {
-            EvidenceGeometry.clampPan(
-                view.pan.value + panChange,
-                content.sourceWidth,
-                content.sourceHeight,
-                content.orientation,
-                view.canvas,
-                ContentScale.Fit,
-                nextZoom,
-            )
-        }
+        view.zoomTo(view.zoom.floatValue * zoomChange, view.pan.value + panChange)
     }
 
 @Composable
@@ -287,7 +301,7 @@ private fun EvidenceCanvas(
     onSelectSpan: (OcrSpan) -> Unit,
 ) {
     val imageBox = view.imageBox()
-    PlacedImage(bitmap, imageBox)
+    PlacedImage(bitmap, imageBox, view)
     // Larger regions first, so a smaller region inside one is drawn, and reached, on top.
     val grounded = view.content.spans.mapNotNull { span -> view.regionBox(span)?.let { span to it } }
         .sortedByDescending { (_, box) -> box.width.toLong() * box.height }
@@ -320,14 +334,32 @@ private fun Modifier.placeAt(box: IntRect): Modifier = layout { measurable, cons
 }
 
 @Composable
-private fun PlacedImage(bitmap: Bitmap, box: IntRect) {
+private fun PlacedImage(bitmap: Bitmap, box: IntRect, view: EvidenceView) {
     if (box.width <= 0 || box.height <= 0) return
+    // P1-10: pinch and double tap have TalkBack and switch-access equivalents.
+    val zoom = view.zoom.floatValue
+    val zoomState = stringResource(R.string.viewer_zoom_state, (zoom * PERCENT).roundToInt())
+    val zoomIn = stringResource(R.string.viewer_zoom_in)
+    val zoomOut = stringResource(R.string.viewer_zoom_out)
+    val zoomReset = stringResource(R.string.viewer_zoom_reset)
     Image(
         bitmap = bitmap.asImageBitmap(),
         contentDescription = stringResource(R.string.viewer_saved_image_content_description),
         modifier = Modifier
             .placeAt(box)
-            .testTag("viewer_evidence_image"),
+            .testTag("viewer_evidence_image")
+            .semantics {
+                stateDescription = zoomState
+                customActions = buildList {
+                    if (zoom < EvidenceGeometry.MAX_ZOOM) {
+                        add(view.zoomAction(zoomIn, EvidenceGeometry.zoomInStep(zoom)))
+                    }
+                    if (zoom > EvidenceGeometry.MIN_ZOOM) {
+                        add(view.zoomAction(zoomOut, EvidenceGeometry.zoomOutStep(zoom)))
+                        add(view.zoomAction(zoomReset, EvidenceGeometry.MIN_ZOOM))
+                    }
+                }
+            },
         contentScale = ContentScale.FillBounds,
     )
 }
@@ -355,6 +387,8 @@ private fun RegionNode(
                 } else {
                     role = Role.Button
                     contentDescription = preview
+                    // The highlight fill is not the only cue: TalkBack says "selected" (P1-10).
+                    this.selected = selected
                     onClick(label = preview) {
                         onSelect()
                         true
@@ -382,6 +416,7 @@ private fun boundsMessage(image: IntRect, overlay: IntRect?): String {
 }
 
 private const val HIGHLIGHT_ALPHA = 0.30f
+private const val PERCENT = 100
 
 // As android.view.ViewConfiguration's double-tap slop.
 private val DOUBLE_TAP_SLOP = 100.dp

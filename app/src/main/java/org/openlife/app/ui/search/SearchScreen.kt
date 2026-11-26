@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.ContentTextField
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.theme.Ink
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
@@ -63,11 +65,13 @@ fun SearchScreen(
     onBack: () -> Unit,
     labelFor: @Composable (UUID) -> String? = { null },
 ) {
+    val pane = stringResource(R.string.search_title)
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.search_title)) },
+                title = { Text(pane, modifier = Modifier.asHeading()) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -136,11 +140,12 @@ private fun Message(text: String) {
 
 @Composable
 private fun ResultRow(hit: SearchHit, itemLabel: String?, onOpen: () -> Unit) {
+    val openLabel = stringResource(R.string.search_open_action)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clickable(role = Role.Button, onClick = onOpen)
+            .clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("search_result"),
     ) {

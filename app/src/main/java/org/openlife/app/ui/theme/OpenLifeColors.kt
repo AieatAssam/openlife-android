@@ -14,6 +14,9 @@ internal val VermilionDarkContainer = Color(0xFF4A1F17)
 internal val StampGreen = Color(0xFF2F6B4F)
 internal val StampGreenDark = Color(0xFF7FC39B)
 internal val Attention = Color(0xFFB7791F)
+
+/** Amber for text: Attention is 3.2:1 on Paper, too light for words (P1-10, VISUAL_IDENTITY §4). */
+internal val AttentionInk = Color(0xFF8A5A10)
 internal val AttentionContainer = Color(0xFFFFE7B0)
 internal val DarkAttention = Color(0xFFE3B04B)
 internal val DarkAttentionContainer = Color(0xFF4A320F)
@@ -71,6 +74,8 @@ data class OpenLifeBrandColors(
     val rule: Color,
     val fold: Color,
     val attention: Color,
+    /** Amber text (e.g. the Stale stamp label); [attention] stays for borders and marks. */
+    val attentionInk: Color,
     val attentionContainer: Color,
     val highlighter: Color,
 )
@@ -84,6 +89,7 @@ val OpenLifeLightBrandColors = OpenLifeBrandColors(
     rule = Rule,
     fold = Color(0xFFE9E1D0),
     attention = Attention,
+    attentionInk = AttentionInk,
     attentionContainer = AttentionContainer,
     highlighter = Highlighter,
 )
@@ -97,6 +103,7 @@ val OpenLifeDarkBrandColors = OpenLifeBrandColors(
     rule = DarkRule,
     fold = Color(0xFF2E2B23),
     attention = DarkAttention,
+    attentionInk = DarkAttention,
     attentionContainer = DarkAttentionContainer,
     highlighter = HighlighterDark,
 )

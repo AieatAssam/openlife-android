@@ -29,13 +29,17 @@ class AccessibilitySourceRulesTest {
                 .map { "${it.location()}: IconButton with a null icon description" }
         }
         assertTrue("icons/images without a description or decorative reason: $violations", violations.isEmpty())
-        val unjustified = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Icon(Icons.Filled.Add, contentDescription = null)\n}")
+        val unjustified = KotlinSource(
+            Path.of("Self.kt"),
+            "fun a() {\n    Icon(Icons.Filled.Add, contentDescription = null)\n}",
+        )
         assertTrue("self-check", descriptionViolation(unjustified.calls("Icon").single()) != null)
         val positional = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Icon(Icons.Filled.Add, label)\n}")
         assertTrue("self-check: positional", descriptionViolation(positional.calls("Icon").single()) != null)
         val justified = KotlinSource(
             Path.of("Self.kt"),
-            "fun a() {\n    // Decorative: the button's text names the action.\n    Icon(Icons.Filled.Add, contentDescription = null)\n}",
+            "fun a() {\n    // Decorative: the button's text names the action.\n" +
+                "    Icon(Icons.Filled.Add, contentDescription = null)\n}",
         )
         assertTrue("self-check: justified", descriptionViolation(justified.calls("Icon").single()) == null)
     }
@@ -47,11 +51,15 @@ class AccessibilitySourceRulesTest {
             CLICK_MODIFIERS.flatMap { modifier -> source.calls(modifier).mapNotNull { clickViolation(source, it) } }
         }
         assertTrue("clickable modifiers missing role, label or 48 dp target: $violations", violations.isEmpty())
-        val bare = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Column(Modifier.clickable { open() }) { Text(x) }\n}")
+        val bare = KotlinSource(
+            Path.of("Self.kt"),
+            "fun a() {\n    Column(Modifier.clickable { open() }) { Text(x) }\n}",
+        )
         assertTrue("self-check", clickViolation(bare, bare.calls(".clickable").single()) != null)
         val good = KotlinSource(
             Path.of("Self.kt"),
-            "fun a() {\n    Row(Modifier.heightIn(min = 48.dp).clickable(onClickLabel = l, role = Role.Button) { o() }) {}\n}",
+            "fun a() {\n    Row(Modifier.heightIn(min = 48.dp)" +
+                ".clickable(onClickLabel = l, role = Role.Button) { o() }) {}\n}",
         )
         assertTrue("self-check: good", clickViolation(good, good.calls(".clickable").single()) == null)
     }
@@ -65,12 +73,15 @@ class AccessibilitySourceRulesTest {
         } + sources.flatMap { source ->
             TITLE_SLOT.findAll(source.code).mapNotNull { match ->
                 source.calls("Text").firstOrNull { it.start > match.range.last }
-                    ?.takeUnless { it.args.contains("heading()") }
+                    ?.takeUnless { HEADING.containsMatchIn(it.args) }
                     ?.let { "${it.location()}: title slot without heading()" }
             }.toList()
         }
         assertTrue("titles not marked as headings: $violations", violations.isEmpty())
-        val plain = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Text(x, style = MaterialTheme.typography.titleLarge)\n}")
+        val plain = KotlinSource(
+            Path.of("Self.kt"),
+            "fun a() {\n    Text(x, style = MaterialTheme.typography.titleLarge)\n}",
+        )
         assertFalse("self-check", isHeadingOrExempt(plain.calls("Text").single()))
     }
 
@@ -79,12 +90,19 @@ class AccessibilitySourceRulesTest {
     fun textSizesFollowTheUserFontScale() {
         val violations = sources.flatMap { source ->
             FIXED_TEXT_SIZE.flatMap { pattern ->
-                pattern.findAll(source.code).map { "${source.path.fileName}:${source.lineOf(it.range.first)}: ${it.value}" }
+                pattern.findAll(
+                    source.code,
+                ).map { "${source.path.fileName}:${source.lineOf(it.range.first)}: ${it.value}" }
             }
         }
         assertTrue("text sizes that ignore font scale: $violations", violations.isEmpty())
         listOf("fontSize = 14.dp", "with(density) { 14.dp.toSp() }", "fontScale = 1f", "TextUnit(14f, TextUnitType.Sp)")
-            .forEach { mutation -> assertTrue("self-check: $mutation", FIXED_TEXT_SIZE.any { it.containsMatchIn(mutation) }) }
+            .forEach { mutation ->
+                assertTrue(
+                    "self-check: $mutation",
+                    FIXED_TEXT_SIZE.any { it.containsMatchIn(mutation) },
+                )
+            }
     }
 
     /** No fixed height on a container that holds text: at 200 % font it would clip. */
@@ -92,9 +110,15 @@ class AccessibilitySourceRulesTest {
     fun textContainersHaveNoFixedHeight() {
         val violations = sources.flatMap { source -> fixedHeightTextViolations(source) }
         assertTrue("fixed-height containers holding Text: $violations", violations.isEmpty())
-        val clipped = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Box(Modifier.fillMaxWidth().height(320.dp)) { Text(x) }\n}")
+        val clipped = KotlinSource(
+            Path.of("Self.kt"),
+            "fun a() {\n    Box(Modifier.fillMaxWidth().height(320.dp)) { Text(x) }\n}",
+        )
         assertTrue("self-check", fixedHeightTextViolations(clipped).isNotEmpty())
-        val icon = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Box(Modifier.size(56.dp)) { Icon(i, contentDescription = d) }\n}")
+        val icon = KotlinSource(
+            Path.of("Self.kt"),
+            "fun a() {\n    Box(Modifier.size(56.dp)) { Icon(i, contentDescription = d) }\n}",
+        )
         assertTrue("self-check: icon box", fixedHeightTextViolations(icon).isEmpty())
     }
 
@@ -119,7 +143,10 @@ class AccessibilitySourceRulesTest {
         val violations = spanStyles + hiddenSelection
         assertTrue("state conveyed by colour alone: $violations", violations.isEmpty())
         assertTrue("self-check", colourOnly("background = highlighter, color = Ink"))
-        assertFalse("self-check: underlined", colourOnly("background = h, color = Ink, textDecoration = TextDecoration.Underline"))
+        assertFalse(
+            "self-check: underlined",
+            colourOnly("background = h, color = Ink, textDecoration = TextDecoration.Underline"),
+        )
     }
 
     /** Status changes and errors are announced: a polite live region on each listed status text. */
@@ -138,10 +165,16 @@ class AccessibilitySourceRulesTest {
         val found = STATUS_RESOURCES.filter { resource ->
             sources.any { Regex("""R\.(string|plurals)\.$resource\b""").containsMatchIn(it.code) }
         }
-        assertTrue("status resources no longer used (update the list): ${STATUS_RESOURCES - found.toSet()}", found == STATUS_RESOURCES)
+        assertTrue(
+            "status resources no longer used (update the list): ${STATUS_RESOURCES - found.toSet()}",
+            found == STATUS_RESOURCES,
+        )
         val violations = errors + statuses
         assertTrue("status changes not announced: $violations", violations.isEmpty())
-        val silent = KotlinSource(Path.of("Self.kt"), "fun a() {\n    Text(stringResource(R.string.viewer_extracting))\n}")
+        val silent = KotlinSource(
+            Path.of("Self.kt"),
+            "fun a() {\n    Text(stringResource(R.string.viewer_extracting))\n}",
+        )
         assertTrue("self-check", statusViolation(silent, silent.code.indexOf("R.string"), "viewer_extracting") != null)
     }
 
@@ -151,7 +184,9 @@ class AccessibilitySourceRulesTest {
         val violations = SCREENS.mapNotNull { (file, function) ->
             val source = sources.single { it.path.endsWith(file) }
             val body = source.functionBody(function) ?: return@mapNotNull "$file: $function not found"
-            val value = PANE_TITLE.find(body)?.groupValues?.get(1) ?: return@mapNotNull "$file: $function has no paneTitle"
+            val value = PANE_TITLE.find(
+                body,
+            )?.groupValues?.get(1) ?: return@mapNotNull "$file: $function has no paneTitle"
             val fromResources = value.startsWith("stringResource(R.string.") ||
                 Regex("""val\s+$value\s*=\s*stringResource\(R\.string\.""").containsMatchIn(body)
             if (fromResources) null else "$file: $function paneTitle is not a string resource ($value)"
@@ -173,11 +208,18 @@ class AccessibilitySourceRulesTest {
             """semantics { stateDescription = "On" }""",
             """CustomAccessibilityAction("Zoom in") { true }""",
             """onClick(label = "Show") { true }""",
-        ).forEach { mutation -> assertTrue("self-check: $mutation", HARDCODED_A11Y_TEXT.any { it.containsMatchIn(mutation) }) }
+        ).forEach { mutation ->
+            assertTrue(
+                "self-check: $mutation",
+                HARDCODED_A11Y_TEXT.any { it.containsMatchIn(mutation) },
+            )
+        }
     }
 
     private fun descriptionViolation(call: SourceCall): String? {
-        val description = DESCRIPTION.find(call.args) ?: return "${call.location()}: ${call.name} without a named contentDescription"
+        val description = DESCRIPTION.find(
+            call.args,
+        ) ?: return "${call.location()}: ${call.name} without a named contentDescription"
         val value = description.groupValues[1]
         val justified = DECORATIVE.containsMatchIn(call.args) || DECORATIVE.containsMatchIn(call.preceding(2))
         return when {
@@ -191,22 +233,26 @@ class AccessibilitySourceRulesTest {
         val missing = buildList {
             if (!call.args.contains("role =")) add("role")
             if (call.name == "clickable" && !call.args.contains("onClickLabel =")) add("onClickLabel")
-            val owner = source.enclosingCall(call.start)
+            // Climb out of `.then(...)`, which only wraps a conditional modifier.
+            var owner = source.enclosingCall(call.start)
+            while (owner?.name == "then") owner = source.enclosingCall(owner.start)
             if (owner == null || MIN_TARGET.none { it.containsMatchIn(owner.args) }) add("48 dp minimum")
         }
         return if (missing.isEmpty()) null else "${call.location()}: .${call.name} missing $missing"
     }
 
     private fun isHeadingOrExempt(call: SourceCall): Boolean =
-        call.args.contains("heading()") || HEADING_EXEMPT.any { (file, snippet) ->
+        HEADING.containsMatchIn(call.args) || HEADING_EXEMPT.any { (file, snippet) ->
             call.source.path.endsWith(file) && call.args.contains(snippet)
         }
 
     private fun fixedHeightTextViolations(source: KotlinSource): List<String> = FIXED_SIZE.findAll(source.code)
         .mapNotNull { match ->
             val owner = source.enclosingCall(match.range.first) ?: return@mapNotNull null
-            val holdsText = owner.name == "Text" || TEXT_CALL.containsMatchIn(KotlinSource(source.path, owner.body.orEmpty()).code)
-            if (holdsText) "${source.path.fileName}:${source.lineOf(match.range.first)}: ${owner.name}${match.value}" else null
+            val body = KotlinSource(source.path, owner.body.orEmpty()).code
+            val holdsText = owner.name == "Text" || TEXT_CALL.containsMatchIn(body)
+            val line = source.lineOf(match.range.first)
+            if (holdsText) "${source.path.fileName}:$line: ${owner.name}${match.value}" else null
         }.toList()
 
     private fun colourOnly(args: String): Boolean =
@@ -225,8 +271,11 @@ class AccessibilitySourceRulesTest {
         return when {
             // An enum entry holds the resource as data; the composable that shows it is checked where it is called.
             call != null && call.name.isNotEmpty() && call.name.all { it.isUpperCase() || it == '_' } -> null
+
             call == null -> "$where is not shown by a call"
+
             call.name == "Text" -> if (announces(call.args)) null else "$where in a Text without a live region"
+
             else -> {
                 val body = source.functionBody(call.name) ?: return "$where passed to ${call.name}, not found here"
                 if (announces(body)) null else "$where passed to ${call.name}, which does not announce"
@@ -245,6 +294,7 @@ class AccessibilitySourceRulesTest {
             Regex("""minimumInteractiveComponentSize\(\)"""),
         )
         val HEADING_STYLE = Regex("""typography\.(display|headline|title)(Large|Medium|Small)""")
+        val HEADING = Regex("""\b(heading|asHeading)\(\)""")
         val TITLE_SLOT = Regex("""\btitle\s*=\s*\{""")
 
         /** Title-styled text that is a label, not a heading; each with its reason. */
