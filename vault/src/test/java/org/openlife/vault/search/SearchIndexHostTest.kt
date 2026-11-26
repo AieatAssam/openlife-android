@@ -22,8 +22,10 @@ import java.util.UUID
  * through [HostSqlite]): the shipped MIGRATION_4_5, the index triggers, the
  * cascades and the repository's own queries. Not SQLCipher and not a device;
  * the same names run on SQLCipher in the instrumented SearchRepositoryTest.
- * Tests that need the index skip on a host SQLite older than 3.42 (no FTS5
- * secure-delete; see [SearchFixture.assumeIndexed]).
+ * Tests that need the index skip on a host SQLite older than
+ * SearchIndex.MIN_SQLITE_VERSION (3.46.1: no FTS5 secure-delete before 3.42,
+ * a corrupting secure-delete from 3.42.0 to 3.46.0; see
+ * [SearchFixture.assumeIndexed]).
  */
 class SearchIndexHostTest {
     private val host = HostSqlite()

@@ -289,3 +289,118 @@ review-fix head:
   that scan `<table>_data`; reverted.
 
 This is host SQLite, not SQLCipher; the on-device checks above still stand.
+
+## Engine floor: FTS5 secure-delete corruption on SQLite 3.42.0-3.46.0 (PR #36, 2026-11-26)
+
+PR #36 moved the CI build job to ubuntu-24.04, whose `python3` SQLite is
+3.45.1 (printed by the job). Three `SearchIndexHostTest` cases failed there:
+- `deletingASourceRemovesItsHits`
+- `cascadeOnlyDeletionLeavesNoFtsRows`
+- `updatesAndRevisionDeletionKeepTheIndexConsistent`
+
+Each failed at its FTS5 `'integrity-check'` with "database disk image is
+malformed".
+
+**Reproduction** (scratchpad, not committed). A Java harness speaks
+`HostSqlite`'s line protocol over `org.xerial:sqlite-jdbc`. The JARs were
+downloaded from Maven Central and each checked against its published
+`.sha1`. `OPENLIFE_HOST_SQLITE` selects the harness.
+
+**Minimal sequence** (table and trigger SQL as in `SearchIndex`):
+
+```sql
+CREATE TABLE spans(id TEXT PRIMARY KEY NOT NULL, text TEXT NOT NULL);
+CREATE VIRTUAL TABLE fts USING fts5(text, content='spans', content_rowid='rowid',
+  tokenize='unicode61 remove_diacritics 2');
+INSERT INTO fts(fts, rank) VALUES('secure-delete', 1);
+-- AFTER INSERT / AFTER DELETE triggers as in SearchIndex
+INSERT INTO spans VALUES('s1', 'orchard');
+DELETE FROM spans WHERE id = 's1';
+INSERT INTO fts(fts) VALUES('integrity-check');   -- SQLITE_CORRUPT_VTAB on <= 3.46.0
+```
+
+| SQLite | integrity-check after one insert and its delete |
+|---|---|
+| 3.42.0, 3.43.2, 3.44.1, 3.45.1, 3.45.3, 3.46.0 | corrupt (plain and rank 1) |
+| 3.46.1, 3.47.0, 3.49.1, 3.50.3, 3.53.3 | ok |
+| any of the above, without secure-delete | ok |
+| internal-content FTS5 with secure-delete, any of the above | ok |
+
+**Writer versus checker.** The database file was written by one engine and
+checked by another:
+- written by 3.45.1 or 3.46.0, checked by 3.46.1 or 3.53.3: corrupt;
+- written by 3.46.1 or 3.53.3, checked by 3.45.1 or 3.46.0: ok.
+
+So the older engines write a corrupt index; it is not a false alarm from
+their checker. MATCH queries still returned correct rowids, so the
+corruption is silent unless the check runs.
+
+**Classification: an engine defect fixed by 3.46.1.**
+- The `'delete'` commands pass exactly the indexed values.
+- No path issues a `'delete'` for an unindexed rowid: no `REPLACE` or
+  upsert touches `ocr_spans` or `ocr_user_revisions`.
+- The same statements are clean from 3.46.1 on.
+- No release note or check-in reference was available offline.
+
+**3.53 is not silently affected.**
+- `everyTriggerPathLeavesAnIndexThatPassesIntegrityCheck` passes on
+  3.53.3 for v5, fresh v6 and migrated v6, checking after every step.
+- So does every other mutation sequence in `SearchIndexHostTest`, which
+  now ends with the check.
+
+**Change.** `SearchIndex.MIN_SQLITE_VERSION` = 3.46.1:
+- `create` probes `sqlite_version()`, and `isComplete` re-checks it at
+  every open. On an older engine, or when the version is unreadable, no
+  index is created or kept, and search uses the LIKE fallback.
+- `SearchIndexEngineGateTest` presents chosen versions through
+  `sqlite_version()`.
+- RED commit: 3 failures on 3.53.3, 7 on 3.45.1.
+- Device: SQLCipher 4.19.0 bundles SQLite 3.53.4 (static read, not
+  observed). SQLCipher has been pinned at 4.19.0 since the first commit,
+  so no existing index was written by an affected engine and no rebuild
+  is needed.
+
+**CI.** No GitHub-hosted Ubuntu image's system `python3` links SQLite
+3.46.1 or later (22.04 has 3.37.2, expected; 24.04 has 3.45.1, printed).
+- On ubuntu-24.04 the index cases are skipped again, with a message naming
+  the version.
+- The "Require a host SQLite that runs the search-index tests" step still
+  checks for 3.42. It is not raised here: on 24.04 that would fail the
+  job, and every option for a newer engine adds a build input, which needs
+  an owner or coordinator decision.
+- Options, smallest first. None is implemented.
+  1. Add `org.xerial:sqlite-jdbc` (3.46.1 or later, with `slf4j-api`) as a
+     `testImplementation` dependency, with verification metadata. A
+     test-only `HostSqlite` engine over JDBC would replace the `python3`
+     bridge, pinning the engine in Gradle on every host. This adds a test
+     dependency and needs a decision record.
+  2. In the CI job, download a pinned SQLite amalgamation (checked by
+     SHA3-256), compile `libsqlite3.so` with FTS5, and run Gradle with
+     `LD_LIBRARY_PATH` pointing at it, so the system `python3` loads it.
+     There is no Gradle dependency, but the build downloads a tool.
+  3. Run the build job on a runner whose `python3` links a newer SQLite
+     (for example a macOS image with Homebrew Python). That is a larger and
+     costlier change to the job.
+
+**Results after the change.** Each line is `./gradlew :vault:testDebugUnitTest --rerun`:
+
+| Host SQLite | Tests | Failed | Skipped |
+|---|---|---|---|
+| 3.53.3 | 237 | 0 | 0 |
+| 3.46.1 (harness) | 237 | 0 | 0 |
+| 3.45.1 (harness) | 237 | 0 | 14 (index cases, with the version-naming message) |
+
+The full gate on 3.53.3 was BUILD SUCCESSFUL:
+`detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`,
+with vault 237, app 211 and eval 26 tests.
+
+`FtsAvailabilityTest.bundledSqliteKeepsASecureDeleteExternalContentIndexIntact`
+was added and compiled, but not run (no device).
+
+**Device checks added.**
+- Run `FtsAvailabilityTest.bundledSqliteKeepsASecureDeleteExternalContentIndexIntact`.
+- After the delete and update sequences on SQLCipher, run
+  `INSERT INTO <t>(<t>) VALUES('integrity-check')` and
+  `INSERT INTO <t>(<t>, rank) VALUES('integrity-check', 1)` on both index
+  tables.
+- Read `sqlite_version()` on an opened vault and record it.

@@ -58,6 +58,16 @@ class SearchIndexEngineGateTest {
     }
 
     @Test
+    fun versionsCompareNumerically() {
+        listOf("3.46.1", "3.46.10", "3.47.0", "3.53.4", "3.100.0", "4.0.0").forEach {
+            assertTrue(it, SearchIndex.isSupportedVersion(it))
+        }
+        listOf("3.46.0", "3.45.99", "3.9.9", "2.99.99", "3.46", "3.46.1.0", "3.46.1-beta").forEach {
+            assertFalse(it, SearchIndex.isSupportedVersion(it))
+        }
+    }
+
+    @Test
     fun noIndexIsCreatedOnAnAffectedEngine() {
         v5()
         listOf("3.42.0", "3.45.1", "3.46.0").forEach { version ->
@@ -69,7 +79,7 @@ class SearchIndexEngineGateTest {
     @Test
     fun anExistingIndexIsDroppedAtOpenOnAnAffectedEngineAndKeptOtherwise() {
         v5()
-        assertTrue("index on the host engine", SearchIndex.create(host.asSupportDatabase()))
+        assertTrue("index created as on the bundled engine", SearchIndex.create(reporting("3.53.4")))
         assertTrue("kept on 3.46.1", SearchIndex.ensure(reporting("3.46.1")))
         assertEquals(2L, ftsTables())
         assertTrue("kept on 3.53.4", SearchIndex.ensure(reporting("3.53.4")))

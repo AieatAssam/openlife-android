@@ -18,7 +18,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * writes these tables (SearchIndexBoundaryTest).
  *
  * Review W-01: both tables run with the FTS5 `secure-delete` option
- * (SQLite >= 3.42; persisted in `<table>_config`), so a deleted row's terms
+ * (SQLite >= 3.42, used only from [MIN_SQLITE_VERSION]; persisted in
+ * `<table>_config`), so a deleted row's terms
  * are removed from the live `<table>_data` segments at once instead of
  * waiting for a merge. The index is never created without it: if the option
  * cannot be set, no index exists and search uses the LIKE fallback.
@@ -39,8 +40,19 @@ object SearchIndex {
 
     const val SECURE_DELETE = "secure-delete"
 
-    /** The oldest engine the index is created or kept on (PR #36 finding; see [capable]). */
+    /**
+     * PR #36 finding: SQLite 3.42.0 to 3.46.0 write a corrupt FTS5
+     * external-content index when a row is removed with the 'delete' command
+     * while secure-delete is on (host reproduction: one insert and its delete
+     * fail `integrity-check`, and an index written there fails it on every
+     * later engine; 3.46.1 and later write a clean index, and the same
+     * statements pass on 3.53). The index is created, and kept at open, only
+     * on this version or later; otherwise search uses the LIKE fallback. The
+     * pinned SQLCipher bundles 3.53.4 (static read of the AAR), above it.
+     */
     const val MIN_SQLITE_VERSION = "3.46.1"
+
+    private val minimumVersion: List<Int> = MIN_SQLITE_VERSION.split('.').map(String::toInt)
 
     val tables: List<String> = listOf(TEXT_TABLE, CORRECTION_TABLE)
 
@@ -159,6 +171,7 @@ object SearchIndex {
     }
 
     internal fun isComplete(db: SupportSQLiteDatabase): Boolean {
+        if (!isSupportedEngine(db)) return false
         if (count(db, "name IN (${quoted(tables + triggerNames)})") != tables.size + triggerNames.size) return false
         val narrowed = count(
             db,
@@ -184,8 +197,30 @@ object SearchIndex {
         tables.forEach { db.execSQL("DROP TABLE IF EXISTS $it") }
     }
 
-    /** FTS5 and its secure-delete option, tried on a temp table that is always removed. */
-    private fun capable(db: SupportSQLiteDatabase): Boolean = attempt {
+    /**
+     * True when this engine's `sqlite_version()` is at least
+     * [MIN_SQLITE_VERSION]. An unreadable version is unsupported (fail closed).
+     */
+    internal fun isSupportedEngine(db: SupportSQLiteDatabase): Boolean {
+        var version: String? = null
+        attempt {
+            db.query("SELECT sqlite_version()").use { cursor ->
+                if (cursor.moveToFirst()) version = cursor.getString(0)
+            }
+        }
+        return version?.let(::isSupportedVersion) ?: false
+    }
+
+    /** "major.minor.patch" at least [MIN_SQLITE_VERSION]; anything else is false. */
+    internal fun isSupportedVersion(version: String): Boolean {
+        val parts = version.split('.').map { it.toIntOrNull() ?: return false }
+        if (parts.size != minimumVersion.size) return false
+        val difference = parts.zip(minimumVersion).firstOrNull { (have, need) -> have != need }
+        return difference == null || difference.first > difference.second
+    }
+
+    /** A supported engine with FTS5 and its secure-delete option, tried on a temp table that is always removed. */
+    private fun capable(db: SupportSQLiteDatabase): Boolean = isSupportedEngine(db) && attempt {
         db.execSQL("DROP TABLE IF EXISTS temp.fts5_probe")
         db.execSQL("CREATE VIRTUAL TABLE temp.fts5_probe USING fts5(x)")
         try {

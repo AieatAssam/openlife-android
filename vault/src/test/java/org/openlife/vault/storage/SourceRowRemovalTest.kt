@@ -3,6 +3,7 @@ package org.openlife.vault.storage
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -129,14 +130,16 @@ class SourceRowRemovalTest {
     private companion object {
         /**
          * True when the FTS index exists. Its absence is accepted only on a
-         * host SQLite older than 3.42 (no FTS5 secure-delete), so a broken
+         * host SQLite older than SearchIndex.MIN_SQLITE_VERSION, so a broken
          * index on a newer engine still fails.
          */
         fun hasSearchIndex(host: HostSqlite): Boolean {
             val present = host.long("SELECT COUNT(*) FROM sqlite_master WHERE name = 'ocr_text_fts_docsize'") == 1L
             if (!present) {
-                val (major, minor) = host.version().split('.').map(String::toInt)
-                assertTrue("FTS index missing on SQLite ${host.version()}", major == 3 && minor < 42)
+                assertFalse(
+                    "FTS index missing on SQLite ${host.version()}",
+                    SearchIndex.isSupportedVersion(host.version()),
+                )
             }
             return present
         }

@@ -134,7 +134,8 @@ class SearchFixture(val host: HostSqlite) {
 
         /**
          * A v4 vault migrated to v5 through the shipped MIGRATION_4_5. The
-         * index needs FTS5 secure-delete (SQLite 3.42+); on an older host
+         * index needs SQLite [SearchIndex.MIN_SQLITE_VERSION] (FTS5
+         * secure-delete without the 3.42.0-3.46.0 corruption); on an older host
          * SQLite the migration correctly creates no index, and tests that
          * need one are skipped with this message rather than run vacuously.
          */
@@ -152,7 +153,11 @@ class SearchFixture(val host: HostSqlite) {
             val tables = host.long(
                 "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('ocr_text_fts', 'ocr_correction_fts')",
             )
-            assumeTrue("host SQLite $version lacks FTS5 secure-delete (needs 3.42+); test skipped", tables == 2L)
+            assumeTrue(
+                "host SQLite $version is older than ${SearchIndex.MIN_SQLITE_VERSION}: no index is created " +
+                    "(FTS5 secure-delete missing before 3.42, corrupting from 3.42.0 to 3.46.0); test skipped",
+                tables == 2L,
+            )
         }
     }
 }

@@ -97,6 +97,38 @@ fallback below).
   failure costs one session its index, not the vault forever. The cause
   of a failure is never logged or kept, because SQLite messages can quote
   SQL.
+- **Engine floor 3.46.1 (PR #36 finding, 2026-11-26).**
+  - SQLite 3.42.0 through 3.46.0 write a corrupt FTS5 external-content index
+    when a row is removed with the `'delete'` command while secure-delete
+    is on.
+    - Host reproduction via `org.xerial:sqlite-jdbc`: create the table,
+      set secure-delete, insert one row through the insert trigger and
+      remove it through the delete trigger, then run `'integrity-check'`.
+      It reports `SQLITE_CORRUPT_VTAB` on 3.42.0, 3.43.2, 3.44.1, 3.45.1,
+      3.45.3 and 3.46.0, and passes on 3.46.1, 3.47.0, 3.49.1, 3.50.3 and
+      3.53.3.
+    - An index written by 3.45.1 or 3.46.0 also fails the check on 3.46.1
+      and 3.53.3, so the file itself is corrupt, not just reported as
+      corrupt. An index written by 3.46.1 or 3.53.3 passes the check on
+      3.45.1.
+    - Queries still returned correct hits, so the corruption is silent
+      without the check.
+    - A regular (internal-content) FTS5 table with secure-delete passes on
+      every version tested.
+    - The `'delete'` values are exactly the indexed ones, and the same
+      statements are clean from 3.46.1 on, so this is an engine defect,
+      not our SQL. No release note or check-in was available offline to
+      cite.
+  - `SearchIndex` therefore creates the index, and keeps it at open, only
+    when `sqlite_version()` is at least `MIN_SQLITE_VERSION` = 3.46.1.
+    Otherwise, or when the version cannot be read, no index exists and
+    search uses the LIKE fallback.
+  - The pinned SQLCipher 4.19.0 bundles SQLite 3.53.4 (static read of the
+    AAR, not observed on a device), and it has been the only SQLCipher
+    pinned since the first commit. No install has therefore written this
+    index on an affected engine, and no rebuild is needed. A vault opened
+    on an affected engine would lose its index at open (fail closed)
+    rather than keep it.
 - **No VACUUM.** External-content tables are keyed on the content tables'
   implicit rowid, which VACUUM may renumber. OpenLife never runs VACUUM,
   and a boundary test enforces this. Any future VACUUM must be followed by
@@ -213,10 +245,17 @@ an engine that supports it (`SearchIndex.ensure`).
     with it on and off (P3-02 review M-05; corrected 2026-11-26). Cascades fire the index's delete triggers with
     `recursive_triggers` on or off (host check); the setting is not what
     makes deletion reach the index.
-  - The index needs SQLite 3.42 or later on the host (secure-delete).
-    On an older host SQLite the index tests are skipped with a message
-    naming the version, not run vacuously; the fail-closed test runs on
-    any version.
+  - The index needs SQLite 3.46.1 or later on the host (see "Engine
+    floor"). On an older host SQLite the index tests are skipped with a
+    message naming the version, not run vacuously. The fail-closed tests
+    and `SearchIndexEngineGateTest` (which reports a chosen version
+    through `sqlite_version()`) run on any version.
+  - Every mutation sequence in `SearchIndexHostTest` ends with FTS5
+    `'integrity-check'`, both plain and with rank 1.
+    `everyTriggerPathLeavesAnIndexThatPassesIntegrityCheck` runs it after
+    each trigger path (insert, narrowed update, same-text update,
+    column-only update, delete, cascade) on spans and corrections, on v5,
+    fresh v6 and migrated v6 databases.
   - This proves the SQL and the trigger behaviour, but not SQLCipher.
   - The same cases are written for SQLCipher in `SearchRepositoryTest`
     (instrumented, device gap).
