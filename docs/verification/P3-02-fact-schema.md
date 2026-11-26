@@ -105,3 +105,30 @@ issues found".
 ## Deviations recorded in the step notes
 
 See `plan/steps/P3-02.yaml` notes and C2.md §19 (D-23..D-26).
+
+## Fix-round verification (2026-11-26)
+
+An independent reviewer re-ran the production trigger SQL on host SQLite (not
+SQLCipher) after the M-01..M-09 fixes and accepted the step for merge. Nothing
+in this section has run on a device.
+
+Recorded from that pass:
+
+- **MM-01 (low, open).** `SourceRowRemovalBoundaryTest` also reads `../app`
+  sources, which Gradle does not track as inputs of `:vault:test`; after an
+  `app`-only change the test can be skipped as up to date. Run it with
+  `--rerun` until the source directories are declared as test inputs.
+- **MM-02 (note for future migrations).** With foreign keys on,
+  `DROP TABLE sources` is refused: the drop cascades and fires the delete
+  guards. A migration that rebuilds `sources` must drop the guard triggers
+  first and recreate them afterwards.
+- User-entered MONEY, URL, EMAIL and PHONE values are checked by prefix shape
+  only; full validation is assigned to P3-05.
+
+Added to the on-device checks:
+
+- Read `PRAGMA recursive_triggers` on an opened vault in an instrumented test
+  and record the value (the host suites run both modes; the device value has
+  not been observed).
+- On SQLCipher, deleting a fact, an evidence row or a review event of a READY
+  Source is refused.
