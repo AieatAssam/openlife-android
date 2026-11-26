@@ -63,7 +63,7 @@ docs_to_update: [docs/capabilities/C2.md]
 risks: []
 rollback: "Migration is additive; tables unused."
 evidence: >
-  RED 5c328bf: 22 of 30 targeted tests failed for the intended reasons (missing 6.json, TODO stubs, boundary checks, wide FTS triggers). GREEN ae4c239; REFACTOR 8acdb50. JVM counts before -> after: vault 193 -> 214, app 146 -> 146, eval 26 -> 26, all passing. Gate 2026-11-26 on 8acdb50: ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test -> BUILD SUCCESSFUL (exit 0); bash scripts/plan-check.sh -> steps=82 errors=0; bash scripts/tests/run.sh -> 51 passed, 0 failed. The gate log also holds a 'daemon disappeared' dump from an earlier concurrent client; the build still ended BUILD SUCCESSFUL, and :vault:lint re-run alone -> No issues found. Boundary RED by mutation: '// MUTATION: DELETE FROM dependency_edges' appended to FactDao.kt -> DependencyEdgeTest.noKotlinStatementWritesEdges FAILED (with --rerun), reverted -> passes. Schema JSON vault/schemas/org.openlife.vault.storage.OpenLifeDatabase/6.json exported and copied to androidTest assets. Host proof uses host SQLite 3.53 via HostSqlite, not SQLCipher. Instrumented tests compiled only, not run (no emulator or adb by owner instruction): FactRepositoryTest, FactDatabaseSqlCipherTest, DeletionRepositoryTest, OcrDatabaseTest - implemented; unverified (gap - pending physical-device run). See docs/verification/P3-02-fact-schema.md. Review round 2026-11-26 (M-01..M-09): RED f4a0c1a, 10 of 70 targeted tests failed for the intended reasons, androidTest compiled; GREEN in the commit 'P3-02: address review findings M-01..M-09'. JVM counts on the merged head: vault 214 -> 224, app 189 (146 before merge 7dd52e1 of main brought P1-20), eval 26, all passing. The first-round gate above ran on 8acdb50, before merge 7dd52e1. Gate on the merged head with the review fixes: ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test --continue -> BUILD SUCCESSFUL (exit 0); two earlier attempts ended 'Gradle build daemon disappeared' while another project's build shared the 8 GB host, and one reported detekt formatting findings, fixed before the passing run. bash scripts/plan-check.sh -> steps=82 errors=0; bash scripts/tests/run.sh -> 51 passed, 0 failed. Schema 6.json unchanged (triggers are not in the Room schema). FactDatabaseSqlCipherTest (M-04 seeding and FTS _data comparison) compiled only, not run: implemented; unverified (gap - pending physical-device run).
+  RED 5c328bf: 22 of 30 targeted tests failed for the intended reasons (missing 6.json, TODO stubs, boundary checks, wide FTS triggers). GREEN ae4c239; REFACTOR 8acdb50. JVM counts before -> after: vault 193 -> 214, app 146 -> 146, eval 26 -> 26, all passing. Gate 2026-11-26 on 8acdb50: ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test -> BUILD SUCCESSFUL (exit 0); bash scripts/plan-check.sh -> steps=82 errors=0; bash scripts/tests/run.sh -> 51 passed, 0 failed. The gate log also holds a 'daemon disappeared' dump from an earlier concurrent client; the build still ended BUILD SUCCESSFUL, and :vault:lint re-run alone -> No issues found. Boundary RED by mutation: '// MUTATION: DELETE FROM dependency_edges' appended to FactDao.kt -> DependencyEdgeTest.noKotlinStatementWritesEdges FAILED (with --rerun), reverted -> passes. Schema JSON vault/schemas/org.openlife.vault.storage.OpenLifeDatabase/6.json exported and copied to androidTest assets. Host proof uses host SQLite 3.53 via HostSqlite, not SQLCipher. Instrumented tests compiled only, not run (no emulator or adb by owner instruction): FactRepositoryTest, FactDatabaseSqlCipherTest, DeletionRepositoryTest, OcrDatabaseTest - implemented; unverified (gap - pending physical-device run). See docs/verification/P3-02-fact-schema.md. Review round 2026-11-26 (M-01..M-09): RED f4a0c1a, 10 of 70 targeted tests failed for the intended reasons, androidTest compiled; GREEN in the commit 'P3-02: address review findings M-01..M-09'. JVM counts on the merged head: vault 214 -> 224, app 189 (146 before merge 7dd52e1 of main brought P1-20), eval 26, all passing. The first-round gate above ran on 8acdb50, before merge 7dd52e1. Gate on the merged head with the review fixes: ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test --continue -> BUILD SUCCESSFUL (exit 0); two earlier attempts ended 'Gradle build daemon disappeared' while another project's build shared the 8 GB host, and one reported detekt formatting findings, fixed before the passing run. bash scripts/plan-check.sh -> steps=82 errors=0; bash scripts/tests/run.sh -> 51 passed, 0 failed. Schema 6.json unchanged (triggers are not in the Room schema). FactDatabaseSqlCipherTest (M-04 seeding and FTS _data comparison) compiled only, not run: implemented; unverified (gap - pending physical-device run). CI failure fix 2026-11-26 (PR #32 run 45899006333): RED reproduced locally on SQLite 3.41.2 (OPENLIFE_HOST_SQLITE over sqlite-jdbc 3.41.2.2): SourceRowRemovalTest failed 'no such table: ocr_text_fts_docsize' at line 83 (fixture, not production). Diagnostics commit dace296; fix in the commit 'P3-02: make the C2 SQL valid on the oldest supported SQLite' (the fixture fix; production SQL unchanged). Vault JVM suite on 3.41.2 -> 227 tests, 0 failed, 13 skipped (as CI); on 3.53.3 -> 227, 0 failed, 0 skipped. SqliteVersionFloorTest RED by mutation: '// MUTATION: SELECT concat(a, b)' appended to FactSchemaTriggers.kt -> constructsNewerThanTheCiHostAreOnlyBehindAFailClosedCheck FAILED (concat 3.44.0), reverted -> passes. Full gate on the final tree -> BUILD SUCCESSFUL (exit 0); counts vault 227, app 189, eval 26, 0 failures; bash scripts/plan-check.sh -> steps=82 errors=0; bash scripts/tests/run.sh -> 51 passed, 0 failed. CI runner SQLite (3.37.2 expected) not observed; device SQLite 3.53.4 is a static read of the AAR, not observed.
 notes: >
   Plan 1.3.0 (2026-11-24): R6 (VS-2) and R7 (VS-3) added from
   docs/reviews/2026-11-24-vault-audit.md. P3-01's specification must define
@@ -144,3 +144,32 @@ notes: >
   Device gaps unchanged plus the M-04 seeding in FactDatabaseSqlCipherTest
   (same command as above); implemented; unverified (gap - pending
   physical-device run).
+
+  CI failure on PR #32 (run 45899006333, 2026-11-26).
+  - Failing test: SourceRowRemovalTest's 8-combination removal test, with
+    HostSqlite$Failure.
+  - Reproduced locally on SQLite 3.41.2 through OPENLIFE_HOST_SQLITE and a
+    scratchpad harness over the cached sqlite-jdbc 3.41.2.2:
+    "no such table: ocr_text_fts_docsize" at SourceRowRemovalTest.kt:83.
+    Line 51 in CI's short trace is the runBlocking frame.
+  - Root cause is in the test fixture, not production. On SQLite older than
+    3.42 (no FTS5 secure-delete), SearchIndex fails closed and creates no
+    FTS tables, and the fixture counted FTS rows unconditionally. The
+    removal routine itself succeeded.
+  - Fixed: the count runs only when the index exists, and a missing index
+    is accepted only below 3.42.
+  - The 13 CI skips are SearchFixture.assumeIndexed on the same condition:
+    12 in SearchIndexHostTest plus FactDatabaseTest's FTS trigger-order test.
+  - SQLite versions:
+    - local python3: 3.53.3 (observed);
+    - reproduction: 3.41.2 (observed);
+    - CI ubuntu-22.04 system python3: 3.37.2 expected from the distribution
+      package, not observed; the next run prints it;
+    - sqlcipher-android 4.19.0 libsqlcipher.so: 3.53.4 (static read of the
+      AAR, not observed on a device).
+  - Production SQL needs nothing newer than 3.37.2 except secure-delete,
+    which is behind SearchIndex's fail-closed probe.
+    SqliteVersionFloorTest asserts this against BUNDLED_SQLITE = 3.53.4 and
+    CI_HOST_SQLITE = 3.37.2.
+  - Added device check: read sqlite_version() on an opened vault in an
+    instrumented test and record it.

@@ -205,12 +205,11 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
          * same line protocol (for example one over an older SQLite, to
          * reproduce a CI runner's engine; P3-02 CI failure).
          */
-        private fun interpreter(script: File): List<String> =
-            System.getenv("OPENLIFE_HOST_SQLITE")
-                ?.split(' ')
-                ?.filter(String::isNotBlank)
-                ?.takeIf { it.isNotEmpty() }
-                ?: listOf("python3", "-I", script.absolutePath)
+        private fun interpreter(script: File): List<String> = System.getenv("OPENLIFE_HOST_SQLITE")
+            ?.split(' ')
+            ?.filter(String::isNotBlank)
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf("python3", "-I", script.absolutePath)
 
         private val STATEMENT_KIND = Regex(
             "^\\s*((?:CREATE|DROP|ALTER|INSERT|REPLACE|UPDATE|DELETE|SELECT|PRAGMA|SAVEPOINT|RELEASE|ROLLBACK)" +

@@ -77,11 +77,16 @@ class SourceRowRemovalTest {
                     "SELECT COUNT(*) FROM dependency_edges WHERE dependentSourceId = 'a' OR dependencySourceId = 'a'",
                 ),
             )
-            assertEquals(
-                "source b's two spans stay indexed",
-                2L,
-                host.long("SELECT COUNT(*) FROM ocr_text_fts_docsize"),
-            )
+            // SearchIndex fails closed (no FTS tables) on an engine without
+            // FTS5 secure-delete, as on a CI runner's older SQLite; the
+            // removal result is still checked there.
+            if (hasSearchIndex(host)) {
+                assertEquals(
+                    "source b's two spans stay indexed",
+                    2L,
+                    host.long("SELECT COUNT(*) FROM ocr_text_fts_docsize"),
+                )
+            }
             snapshot(rows)
         }
         results.forEachIndexed { i, result ->
@@ -122,6 +127,20 @@ class SourceRowRemovalTest {
     }
 
     private companion object {
+        /**
+         * True when the FTS index exists. Its absence is accepted only on a
+         * host SQLite older than 3.42 (no FTS5 secure-delete), so a broken
+         * index on a newer engine still fails.
+         */
+        fun hasSearchIndex(host: HostSqlite): Boolean {
+            val present = host.long("SELECT COUNT(*) FROM sqlite_master WHERE name = 'ocr_text_fts_docsize'") == 1L
+            if (!present) {
+                val (major, minor) = host.version().split('.').map(String::toInt)
+                assertTrue("FTS index missing on SQLite ${host.version()}", major == 3 && minor < 42)
+            }
+            return present
+        }
+
         val TABLES = listOf(
             "sources", "ocr_revisions", "ocr_spans", "ocr_user_revisions", "ocr_span_reviews", "facts",
             "fact_revisions", "fact_evidence", "review_events", "fact_extraction_runs", "dependency_edges",

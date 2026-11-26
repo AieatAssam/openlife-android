@@ -132,3 +132,62 @@ Added to the on-device checks:
   not been observed).
 - On SQLCipher, deleting a fact, an evidence row or a review event of a READY
   Source is refused.
+- Read `SELECT sqlite_version()` on an opened vault in an instrumented test
+  and record it. The 3.53.4 below is a static read of the AAR; the device
+  value has not been observed.
+
+## CI failure on PR #32 and SQLite versions (2026-11-26)
+
+Hosted CI run 45899006333 failed
+`SourceRowRemovalTest.deletionAndRecoveryShareOneRoutineWithTheSameResultWithForeignKeysOnAndOff`
+with `HostSqlite$Failure`. Line 51 in the short trace is the test method's
+`runBlocking` frame, not the failing statement.
+
+**Reproduced locally.** `OPENLIFE_HOST_SQLITE` (new) lets HostSqlite use another
+command that speaks its line protocol. A scratchpad Java harness over the
+cached `org.xerial:sqlite-jdbc:3.41.2.2` gives SQLite 3.41.2, which has FTS5
+but not secure-delete. On 3.41.2 the test failed with:
+`no such table: ocr_text_fts_docsize [statement: SELECT COUNT; host SQLite 3.41.2]`
+at `SourceRowRemovalTest.kt:83`, the fixture's FTS row count.
+
+**Root cause: test fixture, not production.**
+- On an engine without FTS5 secure-delete (added in 3.42), `SearchIndex`
+  fails closed by design and creates no FTS tables.
+- The removal routine succeeded. Only the fixture's unconditional count of
+  `ocr_text_fts_docsize` failed.
+- The same condition already skips 13 tests on CI: 12 in
+  `SearchIndexHostTest` and `FactDatabaseTest.ftsUpdateTriggersAreNarrowedBeforeBackfill`.
+  Each is skipped through `SearchFixture.assumeIndexed`, whose message names
+  the host version.
+
+**Fix.** The count now runs only when the index exists. The index may be
+missing only on a host SQLite older than 3.42; on a newer engine a missing
+index still fails the test.
+
+**Results after the fix.** The whole vault JVM suite passes on SQLite 3.41.2,
+with the same 13 skips as CI, and on 3.53.3.
+
+| Engine | SQLite | How known |
+|---|---|---|
+| Local host (`python3` `sqlite3`) | 3.53.3 | Observed (`sqlite3.sqlite_version`) |
+| Local reproduction (`sqlite-jdbc` 3.41.2.2) | 3.41.2 | Observed (`sqlite_version()`) |
+| CI runner (ubuntu-22.04 system `python3`) | 3.37.2 expected (Ubuntu 22.04 `libsqlite3` package) | Not observed in run 45899006333; the next run prints it (`HostSqlite: host SQLite ...` on stderr, and in each skip message) |
+| Device (sqlcipher-android 4.19.0 `libsqlcipher.so`, arm64-v8a and x86_64) | 3.53.4 (source id 2026-07-24 19:02:57 bf7c7f30...) | Static read of the AAR, not observed |
+
+**Production SQL check.**
+- Production SQL uses nothing newer than SQLite 3.37.2 except FTS5
+  secure-delete (3.42). That is in `SearchIndex` only, behind a probe on a
+  temp table that fails closed.
+- `SqliteVersionFloorTest` covers `FactSchemaTriggers`, `FactMigration`,
+  `SourceRowRemoval`, `SearchIndex`, `OcrPointerSql` and the three DAOs. It
+  asserts two things:
+  - every listed construct is no newer than `BUNDLED_SQLITE` = 3.53.4;
+  - every construct newer than `CI_HOST_SQLITE` = 3.37.2 is in the
+    fail-closed allowlist.
+- RED by mutation: see the step evidence.
+
+**Diagnostics.**
+- `HostSqlite.Failure` now carries the SQLite error text, the statement kind
+  (leading keywords and object name, no values) and the host version.
+- The `:vault` test tasks print failed tests with full exceptions and causes,
+  skipped tests, and standard error.
