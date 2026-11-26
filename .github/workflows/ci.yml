@@ -31,7 +31,7 @@ jobs:
         run: scripts/plan-check.sh
 
       - name: Static analysis, lint, JVM tests, and debug build
-        run: ./gradlew detekt lint :app:test :vault:test assembleDebug
+        run: ./gradlew detekt lint :app:test :vault:test assembleDebug :eval:test
 
       # No emulator leg runs on pull requests (owner instruction 2026-11-24),
       # so at least prove the instrumented sources still compile.

@@ -1,0 +1,29 @@
+{
+  "schema": "openlife-ocr-gate/2",
+  "set": "ocr/v1",
+  "requirement": "P2-04-R3; latin_abstentions_max and timeouts_max by acting-owner ruling 2026-11-25 (review X-03); changing a threshold or a pinned model is a reviewed diff here and in eval GateFileTest (R4)",
+  "line_match_iou": 0.5,
+  "thresholds": {
+    "cer_mean_max": {
+      "screenshot": 0.08,
+      "receipt": 0.15,
+      "letter": 0.10
+    },
+    "line_match_rate_min": 0.90,
+    "abstention_correct_rate_min": 1.0,
+    "latin_abstentions_max": 0,
+    "timeouts_max": 0,
+    "duration_p95_ms_max": 6000,
+    "peak_pss_delta_kib_max": 122880
+  },
+  "engines": [
+    {
+      "id": "tesseract-eng-fast",
+      "model_version": "t4a-4.9.0+tessdata_fast-4.1.0-7d4322bd"
+    },
+    {
+      "id": "mlkit-latin",
+      "model_version": "16.0.1"
+    }
+  ]
+}

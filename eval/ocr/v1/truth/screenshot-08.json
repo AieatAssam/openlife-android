@@ -1,0 +1,220 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "screenshot-08",
+  "category": "screenshot",
+  "image": "fixtures/screenshot-08.png",
+  "width": 1080,
+  "height": 2400,
+  "seed": 20261125007,
+  "style": "phone-screenshot",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "12:55",
+      "box": [49, 41, 138, 67],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "12:55",
+          "box": [49, 41, 138, 67],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Inbox",
+      "box": [62, 137, 179, 171],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Inbox",
+          "box": [62, 137, 179, 171],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Change to your booking",
+      "box": [62, 245, 561, 290],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Change to your booking",
+          "box": [62, 245, 561, 290],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "From: Kim Fixture",
+      "box": [63, 333, 348, 361],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "From: Kim Fixture",
+          "box": [63, 333, 348, 361],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "To: me",
+      "box": [60, 389, 170, 416],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "To: me",
+          "box": [60, 389, 170, 416],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Date: Mon 7 May 2027, 09:30",
+      "box": [63, 444, 538, 478],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Date: Mon 7 May 2027, 09:30",
+          "box": [63, 444, 538, 478],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Thank you for your order with us.",
+      "box": [60, 561, 618, 598],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Thank you for your order with us.",
+          "box": [60, 561, 618, 598],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "You can renew it twice online.",
+      "box": [60, 625, 566, 655],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "You can renew it twice online.",
+          "box": [60, 625, 566, 655],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Please pay by 30 April 2027.",
+      "box": [63, 689, 546, 726],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Please pay by 30 April 2027.",
+          "box": [63, 689, 546, 726],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Bring your reference number with you.",
+      "box": [63, 753, 711, 791],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Bring your reference number with you.",
+          "box": [63, 753, 711, 791],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "The invoice total is 84.20 this month.",
+      "box": [60, 817, 689, 847],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "The invoice total is 84.20 this month.",
+          "box": [60, 817, 689, 847],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "It should arrive within two days.",
+      "box": [62, 881, 602, 918],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "It should arrive within two days.",
+          "box": [62, 881, 602, 918],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Your parcel is on its way today.",
+      "box": [60, 945, 584, 982],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Your parcel is on its way today.",
+          "box": [60, 945, 584, 982],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Reply to this email with any questions.",
+      "box": [63, 1009, 712, 1046],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Reply to this email with any questions.",
+          "box": [63, 1009, 712, 1046],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "The book is due back on 12 May.",
+      "box": [60, 1073, 612, 1110],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "The book is due back on 12 May.",
+          "box": [60, 1073, 612, 1110],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Best regards,",
+      "box": [63, 1177, 284, 1215],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Best regards,",
+          "box": [63, 1177, 284, 1215],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Kim",
+      "box": [63, 1241, 124, 1270],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "Kim",
+          "box": [63, 1241, 124, 1270],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

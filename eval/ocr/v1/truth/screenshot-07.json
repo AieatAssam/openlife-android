@@ -1,0 +1,148 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "screenshot-07",
+  "category": "screenshot",
+  "image": "fixtures/screenshot-07.png",
+  "width": 1080,
+  "height": 2400,
+  "seed": 20261125006,
+  "style": "phone-screenshot",
+  "skew_degrees": 0.0,
+  "noise_density": 0.0,
+  "script_class": "non_latin",
+  "expected_abstain": true,
+  "lines": [
+    {
+      "text": "15:15",
+      "box": [49, 42, 138, 67],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "15:15",
+          "box": [49, 42, 138, 67],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "Анна Пример",
+      "box": [60, 153, 344, 195],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Анна Пример",
+          "box": [60, 153, 344, 195],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Сегодня",
+      "box": [479, 287, 600, 317],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Сегодня",
+          "box": [479, 287, 600, 317],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Ничего страшного",
+      "box": [83, 395, 432, 433],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Ничего страшного",
+          "box": [83, 395, 432, 433],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Где ты сейчас?",
+      "box": [709, 536, 999, 577],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Где ты сейчас?",
+          "box": [709, 536, 999, 577],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Во сколько?",
+      "box": [83, 678, 311, 709],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Во сколько?",
+          "box": [83, 678, 311, 709],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "В семь вечера",
+      "box": [722, 809, 1001, 847],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "В семь вечера",
+          "box": [722, 809, 1001, 847],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Спасибо!",
+      "box": [82, 940, 257, 972],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Спасибо!",
+          "box": [82, 940, 257, 972],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Хорошо, до встречи",
+      "box": [612, 1080, 998, 1118],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Хорошо, до встречи",
+          "box": [612, 1080, 998, 1118],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Уже иду",
+      "box": [81, 1214, 237, 1252],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Уже иду",
+          "box": [81, 1214, 237, 1252],
+          "script": "non_latin"
+        }
+      ]
+    },
+    {
+      "text": "Я опоздаю на десять минут",
+      "box": [468, 1372, 1000, 1410],
+      "script": "non_latin",
+      "segments": [
+        {
+          "text": "Я опоздаю на десять минут",
+          "box": [468, 1372, 1000, 1410],
+          "script": "non_latin"
+        }
+      ]
+    }
+  ]
+}

@@ -102,6 +102,12 @@ if [[ "$actual_components" != "$expected_components" ]]; then
   exit 1
 fi
 
+# P2-04: evaluation fixtures never ship.
+bash "$(dirname "$0")/check-no-eval-fixtures.sh" "$apk" >/dev/null || {
+  echo "release APK carries OCR evaluation fixtures" >&2
+  exit 1
+}
+
 apk_size_bytes="$(stat -c '%s' "$apk")"
 printf 'APK_PATH=%s\n' "$apk"
 printf 'APK_SIZE_BYTES=%s\n' "$apk_size_bytes"

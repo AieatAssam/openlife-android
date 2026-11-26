@@ -1,0 +1,309 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "receipt-07",
+  "category": "receipt",
+  "image": "fixtures/receipt-07.png",
+  "width": 576,
+  "height": 794,
+  "seed": 20261125021,
+  "style": "thermal-receipt",
+  "skew_degrees": -1.5,
+  "noise_density": 0.0041,
+  "script_class": "mixed",
+  "expected_abstain": true,
+  "lines": [
+    {
+      "text": "SAMPLE PHARMACY",
+      "box": [172, 50, 387, 74],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SAMPLE PHARMACY",
+          "box": [172, 50, 387, 74],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "5 EXAMPLE STREET",
+      "box": [38, 89, 266, 113],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "5 EXAMPLE STREET",
+          "box": [38, 89, 266, 113],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEL 0100 555 0813",
+      "box": [37, 125, 281, 149],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0813",
+          "box": [37, 125, 281, 149],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "DATE 22/05/2027 08:00",
+      "box": [40, 159, 340, 186],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 22/05/2027 08:00",
+          "box": [40, 159, 340, 186],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SCREWS 40MM                   4.73",
+      "box": [40, 190, 527, 221],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SCREWS 40MM",
+          "box": [40, 199, 197, 221],
+          "script": "latin"
+        },
+        {
+          "text": "4.73",
+          "box": [471, 190, 527, 209],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "ORANGE JUICE                 12.29",
+      "box": [41, 226, 528, 257],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "ORANGE JUICE",
+          "box": [41, 235, 212, 257],
+          "script": "latin"
+        },
+        {
+          "text": "12.29",
+          "box": [458, 226, 528, 246],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "ПЛЯЖ TOWEL                    9.99",
+      "box": [42, 262, 544, 293],
+      "script": "mixed",
+      "segments": [
+        {
+          "text": "ПЛЯЖ TOWEL",
+          "box": [42, 271, 199, 293],
+          "script": "mixed"
+        },
+        {
+          "text": "9.99",
+          "box": [489, 262, 544, 281],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CHEESE 200G                  12.00",
+      "box": [43, 298, 531, 329],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CHEESE 200G",
+          "box": [43, 307, 199, 329],
+          "script": "latin"
+        },
+        {
+          "text": "12.00",
+          "box": [460, 298, 531, 318],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "RICE 1KG                      8.98",
+      "box": [44, 334, 532, 365],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "RICE 1KG",
+          "box": [44, 344, 157, 365],
+          "script": "latin"
+        },
+        {
+          "text": "8.98",
+          "box": [476, 334, 532, 354],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "MILK 1L                      10.57",
+      "box": [45, 370, 532, 401],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "MILK 1L",
+          "box": [45, 381, 144, 401],
+          "script": "latin"
+        },
+        {
+          "text": "10.57",
+          "box": [462, 370, 532, 390],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "APPLES 1KG                   11.59",
+      "box": [45, 406, 533, 437],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "APPLES 1KG",
+          "box": [45, 415, 188, 437],
+          "script": "latin"
+        },
+        {
+          "text": "11.59",
+          "box": [463, 406, 533, 426],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOMATOES TIN                 11.75",
+      "box": [46, 442, 534, 473],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOMATOES TIN",
+          "box": [46, 451, 217, 473],
+          "script": "latin"
+        },
+        {
+          "text": "11.75",
+          "box": [464, 442, 534, 462],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SOAP BAR                      0.53",
+      "box": [47, 478, 535, 509],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SOAP BAR",
+          "box": [47, 488, 161, 509],
+          "script": "latin"
+        },
+        {
+          "text": "0.53",
+          "box": [479, 478, 535, 498],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CROISSANT                     3.08",
+      "box": [49, 514, 536, 545],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CROISSANT",
+          "box": [49, 524, 177, 545],
+          "script": "latin"
+        },
+        {
+          "text": "3.08",
+          "box": [480, 514, 536, 534],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SUBTOTAL                     71.26",
+      "box": [49, 550, 537, 581],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [49, 560, 163, 581],
+          "script": "latin"
+        },
+        {
+          "text": "71.26",
+          "box": [467, 550, 537, 570],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "VAT 20%                      14.25",
+      "box": [50, 586, 538, 617],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [50, 596, 150, 617],
+          "script": "latin"
+        },
+        {
+          "text": "14.25",
+          "box": [468, 586, 538, 606],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOTAL                        85.51",
+      "box": [50, 622, 539, 653],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [50, 633, 122, 653],
+          "script": "latin"
+        },
+        {
+          "text": "85.51",
+          "box": [469, 622, 539, 642],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [53, 667, 224, 689],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [53, 667, 224, 689],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "THANK YOU",
+      "box": [231, 699, 360, 720],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [231, 699, 360, 720],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

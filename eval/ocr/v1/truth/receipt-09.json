@@ -1,0 +1,258 @@
+{
+  "schema": "openlife-ocr-truth/2",
+  "id": "receipt-09",
+  "category": "receipt",
+  "image": "fixtures/receipt-09.png",
+  "width": 576,
+  "height": 686,
+  "seed": 20261125023,
+  "style": "thermal-receipt",
+  "skew_degrees": -1.7,
+  "noise_density": 0.0031,
+  "script_class": "latin",
+  "expected_abstain": false,
+  "lines": [
+    {
+      "text": "TESTFORD MARKET",
+      "box": [172, 50, 387, 74],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TESTFORD MARKET",
+          "box": [172, 50, 387, 74],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "55 EXAMPLE STREET",
+      "box": [38, 89, 281, 114],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "55 EXAMPLE STREET",
+          "box": [38, 89, 281, 114],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TEL 0100 555 0476",
+      "box": [38, 125, 282, 150],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TEL 0100 555 0476",
+          "box": [38, 125, 282, 150],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "DATE 27/03/2027 14:30",
+      "box": [40, 159, 340, 186],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "DATE 27/03/2027 14:30",
+          "box": [40, 159, 340, 186],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "COFFEE BEANS 250G             4.81",
+      "box": [41, 190, 529, 222],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "COFFEE BEANS 250G",
+          "box": [41, 197, 284, 222],
+          "script": "latin"
+        },
+        {
+          "text": "4.81",
+          "box": [472, 190, 529, 209],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "MILK 1L                       5.18",
+      "box": [42, 225, 530, 258],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "MILK 1L",
+          "box": [42, 237, 141, 258],
+          "script": "latin"
+        },
+        {
+          "text": "5.18",
+          "box": [474, 225, 530, 245],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "PLASTERS                      1.97",
+      "box": [44, 262, 530, 294],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "PLASTERS",
+          "box": [44, 273, 157, 294],
+          "script": "latin"
+        },
+        {
+          "text": "1.97",
+          "box": [475, 262, 530, 281],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "LIGHT BULB                    5.18",
+      "box": [45, 297, 532, 330],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "LIGHT BULB",
+          "box": [45, 308, 186, 330],
+          "script": "latin"
+        },
+        {
+          "text": "5.18",
+          "box": [476, 297, 532, 317],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SCREWS 40MM                   7.10",
+      "box": [45, 333, 533, 366],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SCREWS 40MM",
+          "box": [45, 343, 202, 366],
+          "script": "latin"
+        },
+        {
+          "text": "7.10",
+          "box": [477, 333, 533, 353],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "BREAD WHOLEMEAL              12.32",
+      "box": [47, 369, 534, 402],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "BREAD WHOLEMEAL",
+          "box": [47, 378, 260, 402],
+          "script": "latin"
+        },
+        {
+          "text": "12.32",
+          "box": [463, 369, 534, 389],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOMATOES TIN                  6.17",
+      "box": [46, 405, 534, 438],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOMATOES TIN",
+          "box": [46, 415, 218, 438],
+          "script": "latin"
+        },
+        {
+          "text": "6.17",
+          "box": [479, 405, 534, 425],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "SUBTOTAL                     35.61",
+      "box": [48, 442, 537, 474],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "SUBTOTAL",
+          "box": [48, 453, 162, 474],
+          "script": "latin"
+        },
+        {
+          "text": "35.61",
+          "box": [466, 442, 537, 461],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "VAT 20%                       7.12",
+      "box": [49, 477, 537, 509],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "VAT 20%",
+          "box": [49, 489, 149, 509],
+          "script": "latin"
+        },
+        {
+          "text": "7.12",
+          "box": [481, 477, 537, 497],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "TOTAL                        42.73",
+      "box": [49, 513, 538, 545],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "TOTAL",
+          "box": [49, 526, 121, 545],
+          "script": "latin"
+        },
+        {
+          "text": "42.73",
+          "box": [467, 513, 538, 533],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "CARD PAYMENT",
+      "box": [52, 559, 223, 582],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "CARD PAYMENT",
+          "box": [52, 559, 223, 582],
+          "script": "latin"
+        }
+      ]
+    },
+    {
+      "text": "THANK YOU",
+      "box": [231, 591, 359, 612],
+      "script": "latin",
+      "segments": [
+        {
+          "text": "THANK YOU",
+          "box": [231, 591, 359, 612],
+          "script": "latin"
+        }
+      ]
+    }
+  ]
+}

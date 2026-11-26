@@ -287,5 +287,26 @@ else
   fail=$((fail + 1))
 fi
 
+# P2-04: the release APK must not carry the OCR evaluation set.
+python3 -I - "$TMP/clean.apk" "$TMP/fixtures.apk" <<'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr("AndroidManifest.xml", b"x")
+    z.writestr("assets/tessdata/eng.traineddata", b"x")
+    z.writestr("res/font/ibm_plex_sans_regular.ttf", b"x")
+with zipfile.ZipFile(sys.argv[2], "w") as z:
+    z.writestr("AndroidManifest.xml", b"x")
+    z.writestr("assets/v1/fixtures/receipt-07.png", b"x")
+PY
+clean_fixture_output="$(bash "$ROOT/scripts/check-no-eval-fixtures.sh" "$TMP/clean.apk" 2>&1)"
+assert_contains "an APK without the evaluation set passes" "EVAL_FIXTURES_RESULT=absent" "$clean_fixture_output"
+set +e
+bash "$ROOT/scripts/check-no-eval-fixtures.sh" "$TMP/fixtures.apk" >"$TMP/fixtures.out" 2>&1
+fixtures_status=$?
+set -e
+assert_nonzero "an APK carrying the evaluation set fails" "$TMP/fixtures.out" "$fixtures_status"
+assert_contains "the failure names the fixture" "assets/v1/fixtures/receipt-07.png" "$(<"$TMP/fixtures.out")"
+assert_contains "release inspection runs the fixture check" "check-no-eval-fixtures.sh" "$(<"$ROOT/scripts/inspect-release-apk.sh")"
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
