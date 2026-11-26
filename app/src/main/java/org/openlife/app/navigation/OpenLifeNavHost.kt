@@ -6,9 +6,11 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,7 +24,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import androidx.window.core.layout.computeWindowSizeClass
+import kotlinx.coroutines.flow.first
 import org.openlife.app.AppContainer
+import org.openlife.app.intake.InternalLink
 import org.openlife.app.settings.AppLockSettings
 import org.openlife.app.settings.SettingsScreen
 import org.openlife.app.ui.AboutScreen
@@ -67,6 +71,19 @@ fun OpenLifeNavHost(container: AppContainer, navController: NavHostController = 
                 AboutScreen(onBack = { navController.popBackStack() }, lowRamDevice = lowRam)
             }
         }
+        // Review N-04: a pending internal link opens here, where the width is known, and only
+        // once this host is composed (MainActivity composes it after the lock gate).
+        val currentExpanded by rememberUpdatedState(expanded)
+        val pendingLink by container.internalLinks.pending.collectAsState()
+        LaunchedEffect(pendingLink) {
+            if (pendingLink == null) return@LaunchedEffect
+            // The NavHost sets its graph during layout (P1-16 BoxWithConstraints); wait for it.
+            navController.currentBackStackEntryFlow.first()
+            when (val link = container.internalLinks.take()) {
+                is InternalLink.OpenSource -> navController.openSource(link.sourceId, null, currentExpanded)
+                null -> Unit
+            }
+        }
     }
 }
 
@@ -106,7 +123,7 @@ private fun SearchDestination(
     entry: NavBackStackEntry,
     expanded: Boolean,
 ) {
-    val search: SearchViewModel = viewModel(factory = SearchViewModel.factory(container))
+    val search: SearchViewModel = viewModel(viewModelStoreOwner = entry, factory = SearchViewModel.factory(container))
     val list = listViewModel(container, navController, entry)
     val query by search.query.collectAsState()
     val state by search.state.collectAsState()

@@ -3,6 +3,7 @@ package org.openlife.app.lock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 
 /** Whether content may be shown. UNKNOWN (policy not read yet) is treated as locked. */
 enum class LockStatus { UNKNOWN, LOCKED, UNLOCKED }
@@ -86,8 +87,35 @@ class AppLockState(private val clock: () -> Long) {
         // result callback that arrives later finds the flag already clear, and
         // one that never arrives cannot leave it set (fails closed).
         externalActivity = false
-        val since = backgroundedAt ?: return
+        if (backgroundedAt == null) return
+        lockIfAwayTooLong()
         backgroundedAt = null
+        backgroundedOnExternalTrip = false
+    }
+
+    /**
+     * Review N-01: the lock decision at the moment of a content read. The
+     * time away is measured here too, so a read that runs before the process
+     * foreground callback (an entry's ON_START can come first) is refused
+     * once the timeout or grace has passed, whatever the callback order.
+     */
+    @Synchronized
+    fun statusForAccess(): LockStatus {
+        if (backgroundedAt != null && lockIfAwayTooLong()) {
+            backgroundedAt = null
+            backgroundedOnExternalTrip = false
+        }
+        return mutableStatus.value
+    }
+
+    /** Review N-01: suspends until [statusForAccess] allows a content read. */
+    suspend fun awaitAccess() {
+        mutableStatus.first { statusForAccess() == LockStatus.UNLOCKED }
+    }
+
+    /** Locks if the measured absence reached the allowance; true if it did. */
+    private fun lockIfAwayTooLong(): Boolean {
+        val since = backgroundedAt ?: return false
         val current = mutablePolicy.value
         val timeoutMillis = current.timeoutSeconds * MILLIS_PER_SECOND
         val allowedMillis = if (backgroundedOnExternalTrip) {
@@ -95,18 +123,10 @@ class AppLockState(private val clock: () -> Long) {
         } else {
             timeoutMillis
         }
-        backgroundedOnExternalTrip = false
-        if (current.enabled && clock() - since >= allowedMillis) {
-            mutableStatus.value = LockStatus.LOCKED
-        }
+        val expired = current.enabled && clock() - since >= allowedMillis
+        if (expired) mutableStatus.value = LockStatus.LOCKED
+        return expired
     }
-
-    /** Review N-01: the lock decision at the moment of a content read. */
-    @Synchronized
-    fun statusForAccess(): LockStatus = TODO("N-01")
-
-    /** Review N-01: suspends until a content read is allowed by [statusForAccess]. */
-    suspend fun awaitAccess(): Unit = TODO("N-01")
 
     /** OpenLife is about to start another app's activity and expects to come straight back. */
     @Synchronized

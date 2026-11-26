@@ -8,7 +8,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -51,7 +50,8 @@ class AppLockController(private val context: Context, private val scope: Corouti
      * screen were composed by mistake.
      */
     suspend fun awaitContentAccess() {
-        status.first { it == LockStatus.UNLOCKED }
+        // Review N-01: decided against the time away now, not a status a later callback updates.
+        state.awaitAccess()
         contentReadsForTest.incrementAndGet()
     }
 

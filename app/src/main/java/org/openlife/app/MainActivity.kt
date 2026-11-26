@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,10 +21,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.openlife.app.intake.IntakeActivity
-import org.openlife.app.intake.InternalLink
 import org.openlife.app.lock.AppLockGate
 import org.openlife.app.lock.AppLockOfferScreen
 import org.openlife.app.lock.AppLockPolicy
@@ -33,7 +30,6 @@ import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.LockStatus
 import org.openlife.app.navigation.LocalPhotoPickerLauncher
 import org.openlife.app.navigation.OpenLifeNavHost
-import org.openlife.app.navigation.openSource
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.applySecureWindow
@@ -56,6 +52,9 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onStart() {
+        // Review N-01: apply the time away before any destination starts and reads; the
+        // process callback that also does this may run after the entries' ON_START. Idempotent.
+        (application as OpenLifeApp).appLock.state.onForeground()
         super.onStart()
         // P1-01-R3: on foreground, remove stages no screen owns; a busy vault is retried next time.
         lifecycleScope.launch { container.sources.cleanAbandonedStages() }
@@ -148,17 +147,7 @@ class MainActivity : FragmentActivity() {
     /** Everything content-bearing. Composed only while unlocked (P1-07-R2). */
     @Composable
     private fun UnlockedContent(navController: NavHostController) {
-        val pendingLink by container.internalLinks.pending.collectAsState()
-        LaunchedEffect(pendingLink) {
-            if (pendingLink != null) {
-                // The NavHost sets its graph during layout (P1-16 BoxWithConstraints); wait for it.
-                navController.currentBackStackEntryFlow.first()
-                when (val link = container.internalLinks.take()) {
-                    is InternalLink.OpenSource -> navController.openSource(link.sourceId, null, expanded = false)
-                    null -> Unit
-                }
-            }
-        }
+        // Pending internal links are opened inside OpenLifeNavHost, which knows the width (review N-04).
         CompositionLocalProvider(LocalPhotoPickerLauncher provides rememberPhotoPickerLauncher()) {
             OpenLifeNavHost(container, navController)
         }

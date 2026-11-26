@@ -14,7 +14,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import java.util.UUID
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,6 +40,7 @@ import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.ReadyReadResult
+import java.util.UUID
 
 /**
  * P1-20 (search query never in saved state; routes carry ids only): with a

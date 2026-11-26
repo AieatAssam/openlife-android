@@ -11,5 +11,8 @@ class ListScrollPosition {
     var offset: Int = 0
         private set
 
-    fun save(index: Int, offset: Int): Unit = TODO("N-02")
+    fun save(index: Int, offset: Int) {
+        this.index = index.coerceAtLeast(0)
+        this.offset = offset.coerceAtLeast(0)
+    }
 }

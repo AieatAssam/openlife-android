@@ -93,4 +93,3 @@ class ViewModelScopingTest {
         val OWNER = Regex("""^viewModel\(\s*viewModelStoreOwner = (entry|owner)\b""")
     }
 }
-

@@ -128,13 +128,17 @@ class ViewerSession<T : Any>(
     @Synchronized
     fun onHidden() {
         visible = false
-        drop()
+        drop(release = true)
     }
 
-    /** Drops held content now; a visible entry reads it again (memory trim). */
+    /**
+     * Drops held content now; a visible entry reads it again (memory trim).
+     * Review N-03: while visible the composition may still draw the image,
+     * so the reference is dropped and never released (recycled) here.
+     */
     @Synchronized
     fun scrub() {
-        drop()
+        drop(release = !visible)
         if (visible) startLoading()
     }
 
@@ -164,7 +168,7 @@ class ViewerSession<T : Any>(
     fun close() {
         sourceJob.cancel()
         visible = false
-        drop()
+        drop(release = true)
     }
 
     private fun startLoading() {
@@ -183,12 +187,12 @@ class ViewerSession<T : Any>(
         }
     }
 
-    private fun drop() {
+    private fun drop(release: Boolean) {
         contentJob?.cancel()
         ocrJob?.cancel()
         contentJob = null
         ocrJob = null
-        slot.clear()
+        slot.clear(release)
         mutableOcr.value = OcrUiState.Loading
     }
 
@@ -202,8 +206,11 @@ class ViewerSession<T : Any>(
 }
 
 /**
- * Holds the decoded content. A replaced or dropped value is released at once;
- * a result older than the last [clear] is never shown.
+ * Holds the decoded content. A result older than the last [clear] is never
+ * shown and is released at once. Review N-03: a value that was shown is
+ * released only by a [clear] made while the window is hidden; a replacement
+ * while visible only drops the reference, because the composition may still
+ * draw it, and the garbage collector frees it (as F-28 was fixed).
  */
 private class ContentSlot<T : Any>(private val release: (T) -> Unit) {
     private val mutable = MutableStateFlow<DecodedContent<T>>(DecodedContent.Loading)
@@ -219,17 +226,15 @@ private class ContentSlot<T : Any>(private val release: (T) -> Unit) {
             (next as? DecodedContent.Shown)?.let { release(it.value) }
             return
         }
-        val previous = mutable.value
         mutable.value = next
-        if (previous is DecodedContent.Shown && previous != next) release(previous.value)
     }
 
     @Synchronized
-    fun clear() {
+    fun clear(releaseShown: Boolean) {
         epoch++
         val previous = mutable.value
         mutable.value = DecodedContent.Loading
-        (previous as? DecodedContent.Shown)?.let { release(it.value) }
+        if (releaseShown) (previous as? DecodedContent.Shown)?.let { release(it.value) }
     }
 }
 

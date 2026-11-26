@@ -1,11 +1,11 @@
 package org.openlife.app.navigation
 
-import java.nio.file.Paths
-import kotlin.io.path.readText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Paths
+import kotlin.io.path.readText
 
 /**
  * Review N-04: an internal link is opened where the window width is known,

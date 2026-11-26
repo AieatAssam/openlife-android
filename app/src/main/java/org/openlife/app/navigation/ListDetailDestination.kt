@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,6 +84,12 @@ private fun TwoPanes(list: SourceListViewModel, navController: NavHostController
 private fun ListPane(list: SourceListViewModel, navController: NavHostController, expanded: Boolean) {
     val state by list.state.collectAsState()
     val generation by list.sensitiveContentGeneration.collectAsState()
+    val position = list.listPosition
+    val listState = rememberLazyListState(position.index, position.offset)
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> position.save(index, offset) }
+    }
     SourceListScreen(
         state = state,
         loadThumbnail = list::loadThumbnail,
@@ -95,7 +102,7 @@ private fun ListPane(list: SourceListViewModel, navController: NavHostController
         onFinishReset = list::finishVaultReset,
         onOpenAbout = { navController.navigate(Routes.About) },
         onOpenSearch = { navController.navigate(Routes.Search) },
-        listState = list.listPosition,
+        listState = listState,
     )
 }
 

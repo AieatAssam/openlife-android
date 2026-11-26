@@ -91,7 +91,8 @@ private class BitmapViewerPorts(private val container: AppContainer) : ViewerPor
             SampledBitmapDecoder.decode(bytes, orientation)?.also(DecodedBitmapProbe::track)
         }
 
-    // The session has already replaced the state that showed it, so no new frame draws this bitmap.
+    // Review N-03: called only for a bitmap never shown, or once the entry has stopped or left
+    // composition (onHidden), or when this ViewModel is cleared; never during a visible scrub.
     override fun release(value: Bitmap) {
         if (!value.isRecycled) value.recycle()
     }

@@ -1,11 +1,11 @@
 package org.openlife.app.boundary
 
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.readText
-import org.junit.Assert.assertTrue
-import org.junit.Test
 
 /**
  * Review N-02: no ViewModel or app container holds Compose UI state. A
@@ -30,12 +30,11 @@ class ComposeStateBoundaryTest {
         assertTrue("Compose UI state held by a ViewModel or container: $offending", offending.isEmpty())
     }
 
-    private fun kotlinSources(): List<Pair<Path, String>> =
-        Files.walk(Paths.get("src/main/java")).use { paths ->
-            paths.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }
-                .map { it to it.readText() }
-                .toList()
-        }
+    private fun kotlinSources(): List<Pair<Path, String>> = Files.walk(Paths.get("src/main/java")).use { paths ->
+        paths.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }
+            .map { it to it.readText() }
+            .toList()
+    }
 
     private companion object {
         const val MIN_HOLDERS = 4

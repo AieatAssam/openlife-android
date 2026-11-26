@@ -1,7 +1,6 @@
 package org.openlife.app.ui
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -49,8 +48,11 @@ class SourceListViewModel(private val container: AppContainer) : ViewModel() {
     val sensitiveContentGeneration: StateFlow<Long> = _sensitiveContentGeneration.asStateFlow()
     private var vaultObservation: Job? = null
 
-    /** The list's scroll position (indices only, no content); shared by the list pane in every entry. */
-    val listPosition = LazyListState()
+    /**
+     * The list's scroll position, shared by the list pane in every entry. Review N-02: two
+     * ints, never a LazyListState (its layout result reaches row bitmaps and the activity).
+     */
+    val listPosition = ListScrollPosition()
 
     init {
         observeVault()

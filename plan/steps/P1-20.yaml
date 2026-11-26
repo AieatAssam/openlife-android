@@ -147,3 +147,9 @@ notes: >
   instrumented tests; every device test is a gap recorded in plan.yaml and
   docs/verification/P1-20-navigation-rebuild.md. AGENTS.md layout paragraph
   unchanged: the navigation package keeps its name and role.
+  Review round 2026-11-26 ("accept after fixes"): N-01..N-05 addressed on
+  the JVM (lock decided at read time in AppLockState.statusForAccess; list
+  scroll kept as two ints; no recycle under a visible frame; internal links
+  opened inside OpenLifeNavHost at the real width; ViewModel owner scan and
+  saved-state viewer/OCR test). The reviewer's on-device checks (1)-(6) are
+  listed, open, in docs/verification/P1-20-navigation-rebuild.md.
