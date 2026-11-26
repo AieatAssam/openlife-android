@@ -10,8 +10,10 @@ One line is provided for every tracked documentation file under `docs/`.
 - [`dependency-policy.md`](dependency-policy.md) — dependency and licence boundary policy.
 - [`capabilities/C0.md`](capabilities/C0.md) — Trusted Core capability specification.
 - [`capabilities/C1.md`](capabilities/C1.md) — local OCR capability specification.
+- [`capabilities/C2.md`](capabilities/C2.md) — typed facts capability specification (approval pending).
 - [`decisions/0001-c0-defaults.md`](decisions/0001-c0-defaults.md) — Trusted Core implementation decisions.
 - [`decisions/0002-c1-ocr-engine-proposal.md`](decisions/0002-c1-ocr-engine-proposal.md) — local OCR engine proposal.
+- [`decisions/0008-conservative-interpretation.md`](decisions/0008-conservative-interpretation.md) — conservative interpretation rules and value encodings for typed facts (proposed).
 - [`decisions/0006-ui-foundation.md`](decisions/0006-ui-foundation.md) — fixed UI foundation, navigation, inset, and secure-window decisions.
 - [`decisions/0007-release-engineering.md`](decisions/0007-release-engineering.md) — dependency, release, and static-analysis decisions.
 - [`decisions/0015-local-vision-model-ocr-tier.md`](decisions/0015-local-vision-model-ocr-tier.md) — local vision-model OCR tier decision.
