@@ -1,6 +1,8 @@
 package org.openlife.vault.crypto
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import java.security.GeneralSecurityException
 import java.security.KeyStore
@@ -9,6 +11,7 @@ import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 
 /**
@@ -63,6 +66,22 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
     open fun existingWrappingKey(): SecretKey? = keyStore.getKey(alias, null) as? SecretKey
 
     private fun requireWrappingKey(): SecretKey = existingWrappingKey() ?: throw MissingWrappingKeyException()
+
+    /**
+     * P1-08-R3: where Keystore reports the wrapping key is held, from its
+     * KeyInfo; null when there is no key. Never creates one. The level is
+     * `KeyInfo.getSecurityLevel()` on API 31+ and null below, where only
+     * `isInsideSecureHardware` exists.
+     *
+     * @throws java.security.GeneralSecurityException or [ProviderException] when Keystore cannot answer.
+     */
+    fun wrappingKeySecurity(): WrappingKeySecurity? {
+        val key = existingWrappingKey() ?: return null
+        val info = SecretKeyFactory.getInstance(key.algorithm, PROVIDER).getKeySpec(key, KeyInfo::class.java) as KeyInfo
+        val level = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) info.securityLevel else null
+        @Suppress("DEPRECATION")
+        return WrappingKeySecurity(securityLevel = level, insideSecureHardware = info.isInsideSecureHardware)
+    }
 
     /** True if a wrapping key already exists for this alias, without creating one. */
     fun hasWrappingKey(): Boolean = keyStore.containsAlias(alias)
@@ -124,3 +143,6 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
     private fun aadFor(domain: EnvelopeDomain, sourceId: UUID?): ByteArray =
         if (sourceId != null) EnvelopeAad.forSource(domain, sourceId) else EnvelopeAad.forDomain(domain)
 }
+
+/** KeyInfo values only, never key material (P1-08-R3). */
+data class WrappingKeySecurity(val securityLevel: Int?, val insideSecureHardware: Boolean)

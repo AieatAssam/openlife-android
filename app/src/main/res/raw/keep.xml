@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  P1-08: About now shows the OFL through the bundled licence report, so no
+  code reads R.raw.ofl_1_1. Keep it: it ships the font licence verbatim next
+  to the bundled fonts, and generateLicenseReport appends it to the report.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@raw/ofl_1_1" />

@@ -4,17 +4,10 @@ import android.icu.text.ListFormatter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScaffoldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,37 +21,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
-import org.openlife.app.ui.BackTopAppBar
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
-
-@Composable
-fun SettingsScreen(
-    onResetVault: suspend () -> VaultResetResult,
-    onResetComplete: () -> Unit,
-    onBack: () -> Unit = {},
-    onVerifyAll: (suspend () -> VerifyReport?)? = null,
-    appLock: AppLockSettings? = null,
-) {
-    val controller = viewModel<SettingsViewModel>().controller
-    Scaffold(
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { BackTopAppBar(title = stringResource(R.string.settings_title), onBack = onBack) },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                appLock?.let { AppLockSettingsSection(it) }
-                onVerifyAll?.let { VerifyAllSection(controller, it) }
-                ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete, controller = controller)
-            }
-        }
-    }
-}
 
 /**
  * P1-14-R3: deep verification is explicit. [onVerifyAll] returns null when
@@ -66,7 +33,7 @@ fun SettingsScreen(
  * The pass and its result live in [SettingsController] (P1-19-R15).
  */
 @Composable
-private fun VerifyAllSection(controller: SettingsController, onVerifyAll: suspend () -> VerifyReport?) {
+internal fun VerifyAllSection(controller: SettingsController, onVerifyAll: suspend () -> VerifyReport?) {
     val state by controller.verify.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -111,7 +78,7 @@ private fun localizedList(items: List<String>): String {
 
 @Composable
 fun ResetVaultFlow(
-    onResetVault: suspend () -> VaultResetResult,
+    onResetVault: suspend (ResetConfirmation) -> VaultResetResult,
     onResetComplete: () -> Unit = {},
     controller: SettingsController = viewModel<SettingsViewModel>().controller,
 ) {
@@ -138,7 +105,7 @@ fun ResetVaultFlow(
             word = state.word,
             requiredWord = requiredWord,
             onWordChange = controller::setWord,
-            onContinue = controller::continueReset,
+            onContinue = { controller.continueReset(requiredWord) },
             onDismiss = controller::dismissReset,
         )
     }

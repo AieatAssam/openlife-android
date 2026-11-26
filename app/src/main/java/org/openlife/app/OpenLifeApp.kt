@@ -3,7 +3,6 @@ package org.openlife.app
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.database.sqlite.SQLiteException
-import android.icu.text.ListFormatter
 import android.os.StrictMode
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.ComposeFoundationFlags
@@ -29,6 +28,7 @@ import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryReport
 import org.openlife.vault.repository.RecoveryRepository
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.repository.SourceViewRepository
 import org.openlife.vault.repository.VaultResetRepository
@@ -58,8 +58,10 @@ import java.io.IOException
  */
 class OpenLifeApp : Application() {
 
-    private val paths by lazy { VaultPaths(this) }
-    private val keystoreWrapper by lazy { KeystoreWrapper() }
+    internal val paths by lazy { VaultPaths(this) }
+
+    /** Also read by About's security details (P1-08-R3), which only query KeyInfo and never create a key. */
+    internal val keystoreWrapper by lazy { KeystoreWrapper() }
     private val mutationQueue = MutationQueue()
     private val vaultInitLock = Mutex()
 
@@ -249,7 +251,8 @@ class OpenLifeApp : Application() {
         }
     }
 
-    suspend fun resetVault(): VaultResetResult = withContext(Dispatchers.IO) {
+    /** Wipes the vault; [confirmation] proves the user confirmed it (P1-08 review). */
+    suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult = withContext(Dispatchers.IO) {
         vaultInitLock.withLock {
             // Reset must not wait out an import and then silently wipe the
             // user's preview: an import in progress makes reset busy.
@@ -270,7 +273,7 @@ class OpenLifeApp : Application() {
                     cachedDatabase?.let(OpenLifeDatabaseFactory::close)
                     cachedDatabase = null
                 },
-            ).resetVault()
+            ).resetVault(confirmation)
             if (result == VaultResetResult.COMPLETED) {
                 cachedAccess = null
                 getSharedPreferences(APP_LOCK_PREFERENCES, MODE_PRIVATE).edit(commit = true) { clear() }
@@ -327,25 +330,16 @@ object VaultFailureDiagnostics {
         preferences.edit { putInt(cause.name, preferences.getInt(cause.name, 0) + 1) }
     }
 
-    fun summary(context: android.content.Context): String {
-        val counts = context.getSharedPreferences(PREFERENCES, android.content.Context.MODE_PRIVATE).all
-            .filterValues { it is Int && it > 0 }
-            .toSortedMap()
-        val entries = counts.mapNotNull { (name, count) ->
-            val cause = VaultUnavailableCause.entries.firstOrNull { it.name == name } ?: return@mapNotNull null
-            context.resources.getQuantityString(
-                R.plurals.about_vault_diagnostics_entry,
-                count as Int,
-                context.getString(causeLabel(cause)),
-                count,
-            )
-        }
-        if (entries.isEmpty()) return context.getString(R.string.about_vault_diagnostics_empty)
-        // P1-19-R20: the locale decides how a list is joined.
-        return ListFormatter.getInstance(context.resources.configuration.locales[0]).format(entries)
+    /** P1-08-R4: the recorded count for each cause; causes this build does not know are left out. */
+    fun counts(context: android.content.Context): Map<VaultUnavailableCause, Int> {
+        val stored = context.getSharedPreferences(PREFERENCES, android.content.Context.MODE_PRIVATE).all
+        return VaultUnavailableCause.entries.mapNotNull { cause ->
+            (stored[cause.name] as? Int)?.takeIf { it > 0 }?.let { cause to it }
+        }.toMap()
     }
 
-    private fun causeLabel(cause: VaultUnavailableCause): Int = when (cause) {
+    @androidx.annotation.StringRes
+    internal fun causeLabel(cause: VaultUnavailableCause): Int = when (cause) {
         VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE ->
             R.string.vault_cause_keystore_temporarily_unavailable
 
