@@ -1,0 +1,1230 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 6,
+    "identityHash": "6a8eb891012b4bc291e4d7c08a1045aa",
+    "entities": [
+      {
+        "tableName": "sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `state` TEXT NOT NULL, `importedAt` INTEGER NOT NULL, `intakeKind` TEXT NOT NULL, `mimeType` TEXT, `byteCount` INTEGER, `sha256` BLOB, `width` INTEGER, `height` INTEGER, `orientation` TEXT, `wrappedDek` BLOB, `artefactVersion` INTEGER, `assessmentState` TEXT NOT NULL DEFAULT 'NOT_ASSESSED', `userContentKind` TEXT, `userContentKindAt` INTEGER, `assessmentMethodVersion` TEXT, `currentOcrRevisionId` TEXT, `factInputEpoch` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importedAt",
+            "columnName": "importedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intakeKind",
+            "columnName": "intakeKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "byteCount",
+            "columnName": "byteCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "orientation",
+            "columnName": "orientation",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "wrappedDek",
+            "columnName": "wrappedDek",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "artefactVersion",
+            "columnName": "artefactVersion",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "assessmentState",
+            "columnName": "assessmentState",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'NOT_ASSESSED'"
+          },
+          {
+            "fieldPath": "userContentKind",
+            "columnName": "userContentKind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userContentKindAt",
+            "columnName": "userContentKindAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "assessmentMethodVersion",
+            "columnName": "assessmentMethodVersion",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "currentOcrRevisionId",
+            "columnName": "currentOcrRevisionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "factInputEpoch",
+            "columnName": "factInputEpoch",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "ocr_revisions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `state` TEXT NOT NULL, `engineId` TEXT NOT NULL, `modelVersion` TEXT NOT NULL, `orientation` TEXT NOT NULL, `sourceDigest` BLOB NOT NULL, `startedAt` INTEGER NOT NULL, `extractedAt` INTEGER, `reviewState` TEXT NOT NULL, `failureReason` TEXT, `charCount` INTEGER NOT NULL, `spanCount` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "engineId",
+            "columnName": "engineId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelVersion",
+            "columnName": "modelVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orientation",
+            "columnName": "orientation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceDigest",
+            "columnName": "sourceDigest",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extractedAt",
+            "columnName": "extractedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "reviewState",
+            "columnName": "reviewState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failureReason",
+            "columnName": "failureReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "charCount",
+            "columnName": "charCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spanCount",
+            "columnName": "spanCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ocr_revisions_sourceId",
+            "unique": false,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ocr_revisions_sourceId` ON `${TABLE_NAME}` (`sourceId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sources",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sourceId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ocr_spans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `revisionId` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `text` TEXT NOT NULL, `confidence` REAL, `coordinateSystem` TEXT NOT NULL, `left` INTEGER, `top` INTEGER, `right` INTEGER, `bottom` INTEGER, `hasEvidenceRegion` INTEGER NOT NULL DEFAULT 0, `scriptStatus` TEXT NOT NULL DEFAULT 'UNKNOWN', PRIMARY KEY(`id`), FOREIGN KEY(`revisionId`) REFERENCES `ocr_revisions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "coordinateSystem",
+            "columnName": "coordinateSystem",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "left",
+            "columnName": "left",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "top",
+            "columnName": "top",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "right",
+            "columnName": "right",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "bottom",
+            "columnName": "bottom",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "hasEvidenceRegion",
+            "columnName": "hasEvidenceRegion",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "scriptStatus",
+            "columnName": "scriptStatus",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'UNKNOWN'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ocr_spans_revisionId",
+            "unique": false,
+            "columnNames": [
+              "revisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ocr_spans_revisionId` ON `${TABLE_NAME}` (`revisionId`)"
+          },
+          {
+            "name": "index_ocr_spans_revisionId_ordinal",
+            "unique": true,
+            "columnNames": [
+              "revisionId",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_ocr_spans_revisionId_ordinal` ON `${TABLE_NAME}` (`revisionId`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ocr_revisions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "revisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ocr_user_revisions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `revisionId` TEXT NOT NULL, `spanId` TEXT, `correctedText` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `actor` TEXT NOT NULL, `supersedesId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`revisionId`) REFERENCES `ocr_revisions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`spanId`) REFERENCES `ocr_spans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spanId",
+            "columnName": "spanId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "correctedText",
+            "columnName": "correctedText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actor",
+            "columnName": "actor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supersedesId",
+            "columnName": "supersedesId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ocr_user_revisions_revisionId",
+            "unique": false,
+            "columnNames": [
+              "revisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_revisionId` ON `${TABLE_NAME}` (`revisionId`)"
+          },
+          {
+            "name": "index_ocr_user_revisions_spanId",
+            "unique": false,
+            "columnNames": [
+              "spanId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ocr_user_revisions_spanId` ON `${TABLE_NAME}` (`spanId`)"
+          },
+          {
+            "name": "index_ocr_user_revisions_supersedesId",
+            "unique": true,
+            "columnNames": [
+              "supersedesId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_ocr_user_revisions_supersedesId` ON `${TABLE_NAME}` (`supersedesId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ocr_revisions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "revisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ocr_spans",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "spanId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ocr_span_reviews",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `spanId` TEXT NOT NULL, `reviewState` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`spanId`) REFERENCES `ocr_spans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spanId",
+            "columnName": "spanId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reviewState",
+            "columnName": "reviewState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequence",
+            "columnName": "sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ocr_span_reviews_spanId_sequence",
+            "unique": true,
+            "columnNames": [
+              "spanId",
+              "sequence"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_ocr_span_reviews_spanId_sequence` ON `${TABLE_NAME}` (`spanId`, `sequence`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ocr_spans",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "spanId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "facts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `kind` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `currentRevisionId` TEXT, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentRevisionId",
+            "columnName": "currentRevisionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_facts_sourceId_kind_ordinal",
+            "unique": true,
+            "columnNames": [
+              "sourceId",
+              "kind",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_facts_sourceId_kind_ordinal` ON `${TABLE_NAME}` (`sourceId`, `kind`, `ordinal`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sources",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sourceId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "fact_revisions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `factId` TEXT NOT NULL, `revisionNo` INTEGER NOT NULL, `origin` TEXT NOT NULL, `kind` TEXT NOT NULL, `valueJson` TEXT NOT NULL, `canonicalText` TEXT NOT NULL, `rawText` TEXT, `status` TEXT NOT NULL, `staleReason` TEXT, `staleAt` INTEGER, `confidence` REAL, `methodId` TEXT NOT NULL, `methodVersion` TEXT, `locale` TEXT, `createdAt` INTEGER NOT NULL, `supersedesRevisionId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`factId`) REFERENCES `facts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`supersedesRevisionId`) REFERENCES `fact_revisions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "factId",
+            "columnName": "factId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionNo",
+            "columnName": "revisionNo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valueJson",
+            "columnName": "valueJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalText",
+            "columnName": "canonicalText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawText",
+            "columnName": "rawText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "staleReason",
+            "columnName": "staleReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "staleAt",
+            "columnName": "staleAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "methodId",
+            "columnName": "methodId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "methodVersion",
+            "columnName": "methodVersion",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supersedesRevisionId",
+            "columnName": "supersedesRevisionId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_fact_revisions_factId_revisionNo",
+            "unique": true,
+            "columnNames": [
+              "factId",
+              "revisionNo"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_fact_revisions_factId_revisionNo` ON `${TABLE_NAME}` (`factId`, `revisionNo`)"
+          },
+          {
+            "name": "index_fact_revisions_supersedesRevisionId",
+            "unique": false,
+            "columnNames": [
+              "supersedesRevisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_revisions_supersedesRevisionId` ON `${TABLE_NAME}` (`supersedesRevisionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "facts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "factId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "fact_revisions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "supersedesRevisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "fact_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `revisionId` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `role` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `ocrRevisionId` TEXT NOT NULL, `ocrSpanId` TEXT NOT NULL, `ocrUserRevisionId` TEXT, `textStart` INTEGER, `textEnd` INTEGER, `regionLeft` INTEGER, `regionTop` INTEGER, `regionRight` INTEGER, `regionBottom` INTEGER, `regionCoordinateSystem` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`revisionId`) REFERENCES `fact_revisions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ocrRevisionId`) REFERENCES `ocr_revisions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`ocrSpanId`) REFERENCES `ocr_spans`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`ocrUserRevisionId`) REFERENCES `ocr_user_revisions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ocrRevisionId",
+            "columnName": "ocrRevisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ocrSpanId",
+            "columnName": "ocrSpanId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ocrUserRevisionId",
+            "columnName": "ocrUserRevisionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "textStart",
+            "columnName": "textStart",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "textEnd",
+            "columnName": "textEnd",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "regionLeft",
+            "columnName": "regionLeft",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "regionTop",
+            "columnName": "regionTop",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "regionRight",
+            "columnName": "regionRight",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "regionBottom",
+            "columnName": "regionBottom",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "regionCoordinateSystem",
+            "columnName": "regionCoordinateSystem",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_fact_evidence_revisionId_ordinal",
+            "unique": true,
+            "columnNames": [
+              "revisionId",
+              "ordinal"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_fact_evidence_revisionId_ordinal` ON `${TABLE_NAME}` (`revisionId`, `ordinal`)"
+          },
+          {
+            "name": "index_fact_evidence_sourceId",
+            "unique": false,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_evidence_sourceId` ON `${TABLE_NAME}` (`sourceId`)"
+          },
+          {
+            "name": "index_fact_evidence_ocrRevisionId",
+            "unique": false,
+            "columnNames": [
+              "ocrRevisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_evidence_ocrRevisionId` ON `${TABLE_NAME}` (`ocrRevisionId`)"
+          },
+          {
+            "name": "index_fact_evidence_ocrSpanId",
+            "unique": false,
+            "columnNames": [
+              "ocrSpanId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_evidence_ocrSpanId` ON `${TABLE_NAME}` (`ocrSpanId`)"
+          },
+          {
+            "name": "index_fact_evidence_ocrUserRevisionId",
+            "unique": false,
+            "columnNames": [
+              "ocrUserRevisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_evidence_ocrUserRevisionId` ON `${TABLE_NAME}` (`ocrUserRevisionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "fact_revisions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "revisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ocr_revisions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ocrRevisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ocr_spans",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ocrSpanId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ocr_user_revisions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ocrUserRevisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "review_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `revisionId` TEXT NOT NULL, `sequence` INTEGER NOT NULL, `decision` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`revisionId`) REFERENCES `fact_revisions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequence",
+            "columnName": "sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decision",
+            "columnName": "decision",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_review_events_revisionId_sequence",
+            "unique": true,
+            "columnNames": [
+              "revisionId",
+              "sequence"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_review_events_revisionId_sequence` ON `${TABLE_NAME}` (`revisionId`, `sequence`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "fact_revisions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "revisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "fact_extraction_runs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `ocrRevisionId` TEXT NOT NULL, `trigger` TEXT NOT NULL, `rulesVersion` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `finishedAt` INTEGER NOT NULL, `outcome` TEXT NOT NULL, `skippedKinds` TEXT, `candidateCount` INTEGER, `createdRevisionCount` INTEGER, `skippedLineCount` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ocrRevisionId`) REFERENCES `ocr_revisions`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ocrRevisionId",
+            "columnName": "ocrRevisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trigger",
+            "columnName": "trigger",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rulesVersion",
+            "columnName": "rulesVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finishedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skippedKinds",
+            "columnName": "skippedKinds",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "candidateCount",
+            "columnName": "candidateCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdRevisionCount",
+            "columnName": "createdRevisionCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "skippedLineCount",
+            "columnName": "skippedLineCount",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_fact_extraction_runs_sourceId",
+            "unique": false,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_extraction_runs_sourceId` ON `${TABLE_NAME}` (`sourceId`)"
+          },
+          {
+            "name": "index_fact_extraction_runs_ocrRevisionId",
+            "unique": false,
+            "columnNames": [
+              "ocrRevisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fact_extraction_runs_ocrRevisionId` ON `${TABLE_NAME}` (`ocrRevisionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sources",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sourceId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ocr_revisions",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ocrRevisionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "dependency_edges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `edgeKind` TEXT NOT NULL, `dependentKind` TEXT NOT NULL, `dependentId` TEXT NOT NULL, `dependentSourceId` TEXT NOT NULL, `dependencyKind` TEXT NOT NULL, `dependencyId` TEXT NOT NULL, `dependencySourceId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "edgeKind",
+            "columnName": "edgeKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependentKind",
+            "columnName": "dependentKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependentId",
+            "columnName": "dependentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependentSourceId",
+            "columnName": "dependentSourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependencyKind",
+            "columnName": "dependencyKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependencyId",
+            "columnName": "dependencyId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dependencySourceId",
+            "columnName": "dependencySourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_dependency_edges_edgeKind_dependentKind_dependentId_dependencyKind_dependencyId",
+            "unique": true,
+            "columnNames": [
+              "edgeKind",
+              "dependentKind",
+              "dependentId",
+              "dependencyKind",
+              "dependencyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_dependency_edges_edgeKind_dependentKind_dependentId_dependencyKind_dependencyId` ON `${TABLE_NAME}` (`edgeKind`, `dependentKind`, `dependentId`, `dependencyKind`, `dependencyId`)"
+          },
+          {
+            "name": "index_dependency_edges_dependencyKind_dependencyId",
+            "unique": false,
+            "columnNames": [
+              "dependencyKind",
+              "dependencyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dependency_edges_dependencyKind_dependencyId` ON `${TABLE_NAME}` (`dependencyKind`, `dependencyId`)"
+          },
+          {
+            "name": "index_dependency_edges_dependentKind_dependentId",
+            "unique": false,
+            "columnNames": [
+              "dependentKind",
+              "dependentId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dependency_edges_dependentKind_dependentId` ON `${TABLE_NAME}` (`dependentKind`, `dependentId`)"
+          },
+          {
+            "name": "index_dependency_edges_dependencySourceId",
+            "unique": false,
+            "columnNames": [
+              "dependencySourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dependency_edges_dependencySourceId` ON `${TABLE_NAME}` (`dependencySourceId`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6a8eb891012b4bc291e4d7c08a1045aa')"
+    ]
+  }
+}

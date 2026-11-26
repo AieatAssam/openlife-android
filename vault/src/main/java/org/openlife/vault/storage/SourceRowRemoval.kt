@@ -67,8 +67,20 @@ object SourceRowRemoval {
      * Source is DELETING.
      */
     suspend fun remove(rows: SourceRowRemovalDao, sourceId: String, deleteSource: suspend (String) -> Unit) {
-        TODO("P3-02 GREEN")
+        check(rows.sourceState(sourceId) == DELETING) { "only a DELETING Source loses its rows" }
+        rows.deleteReviewEvents(sourceId)
+        rows.deleteFactEvidence(sourceId)
+        rows.deleteFactRevisions(sourceId)
+        rows.deleteFacts(sourceId)
+        rows.deleteExtractionRuns(sourceId)
+        rows.deleteSpanReviews(sourceId)
+        rows.deleteCorrections(sourceId)
+        rows.deleteSpans(sourceId)
+        rows.deleteReadings(sourceId)
+        deleteSource(sourceId)
     }
+
+    private const val DELETING = "DELETING"
 }
 
 /** The statements of [SourceRowRemoval], in the order it runs them. */

@@ -50,6 +50,36 @@ object SearchIndex {
         listOf("${table}_data", "${table}_idx", "${table}_docsize", "${table}_config")
     }
 
+    /**
+     * C2-R64 (P3-02): the update triggers fire only when the indexed column
+     * changes, so a column-only update (a backfill, `hasEvidenceRegion`,
+     * `supersedesId`) never deletes and re-inserts an index row.
+     */
+    private const val TEXT_UPDATE_TRIGGER = "CREATE TRIGGER ocr_text_fts_au AFTER UPDATE OF text ON ocr_spans BEGIN " +
+        "INSERT INTO ocr_text_fts(ocr_text_fts, rowid, text) VALUES ('delete', old.rowid, old.text); " +
+        "INSERT INTO ocr_text_fts(rowid, text) VALUES (new.rowid, new.text); END"
+
+    private const val CORRECTION_UPDATE_TRIGGER =
+        "CREATE TRIGGER ocr_correction_fts_au AFTER UPDATE OF correctedText ON ocr_user_revisions BEGIN " +
+            "INSERT INTO ocr_correction_fts(ocr_correction_fts, rowid, correctedText) " +
+            "VALUES ('delete', old.rowid, old.correctedText); " +
+            "INSERT INTO ocr_correction_fts(rowid, correctedText) VALUES (new.rowid, new.correctedText); END"
+
+    private val updateTriggerNames = tables.map { "${it}_au" }
+
+    /**
+     * C2-R21 step 1: recreates only the two update triggers in their narrowed
+     * form, on an existing index, before any backfill UPDATE runs. Without an
+     * index there is nothing to narrow; [ensure] creates the whole index later.
+     */
+    fun narrowUpdateTriggers(db: SupportSQLiteDatabase) {
+        if (count(db, "type = 'table' AND name IN (${quoted(tables)})") != tables.size) return
+        db.execSQL("DROP TRIGGER IF EXISTS ocr_text_fts_au")
+        db.execSQL(TEXT_UPDATE_TRIGGER)
+        db.execSQL("DROP TRIGGER IF EXISTS ocr_correction_fts_au")
+        db.execSQL(CORRECTION_UPDATE_TRIGGER)
+    }
+
     /** Every statement that creates the index and its triggers and indexes existing rows, in order. */
     fun statements(): List<String> = listOf(
         "CREATE VIRTUAL TABLE IF NOT EXISTS ocr_text_fts USING fts5(text, content='ocr_spans', " +
@@ -62,9 +92,7 @@ object SearchIndex {
         "CREATE TRIGGER ocr_text_fts_ad AFTER DELETE ON ocr_spans BEGIN " +
             "INSERT INTO ocr_text_fts(ocr_text_fts, rowid, text) VALUES ('delete', old.rowid, old.text); END",
         "DROP TRIGGER IF EXISTS ocr_text_fts_au",
-        "CREATE TRIGGER ocr_text_fts_au AFTER UPDATE ON ocr_spans BEGIN " +
-            "INSERT INTO ocr_text_fts(ocr_text_fts, rowid, text) VALUES ('delete', old.rowid, old.text); " +
-            "INSERT INTO ocr_text_fts(rowid, text) VALUES (new.rowid, new.text); END",
+        TEXT_UPDATE_TRIGGER,
         "INSERT INTO ocr_text_fts(ocr_text_fts) VALUES('rebuild')",
         "CREATE VIRTUAL TABLE IF NOT EXISTS ocr_correction_fts USING fts5(correctedText, " +
             "content='ocr_user_revisions', content_rowid='rowid', tokenize='$TOKENIZER')",
@@ -77,10 +105,7 @@ object SearchIndex {
             "INSERT INTO ocr_correction_fts(ocr_correction_fts, rowid, correctedText) " +
             "VALUES ('delete', old.rowid, old.correctedText); END",
         "DROP TRIGGER IF EXISTS ocr_correction_fts_au",
-        "CREATE TRIGGER ocr_correction_fts_au AFTER UPDATE ON ocr_user_revisions BEGIN " +
-            "INSERT INTO ocr_correction_fts(ocr_correction_fts, rowid, correctedText) " +
-            "VALUES ('delete', old.rowid, old.correctedText); " +
-            "INSERT INTO ocr_correction_fts(rowid, correctedText) VALUES (new.rowid, new.correctedText); END",
+        CORRECTION_UPDATE_TRIGGER,
         "INSERT INTO ocr_correction_fts(ocr_correction_fts) VALUES('rebuild')",
     )
 
@@ -131,17 +156,22 @@ object SearchIndex {
     }
 
     internal fun isComplete(db: SupportSQLiteDatabase): Boolean {
-        val names = (tables + triggerNames).joinToString(", ") { "'$it'" }
-        val present = db.query("SELECT COUNT(*) FROM sqlite_master WHERE name IN ($names)").use { cursor ->
-            if (cursor.moveToFirst()) cursor.getInt(0) else 0
-        }
-        if (present != tables.size + triggerNames.size) return false
+        if (count(db, "name IN (${quoted(tables + triggerNames)})") != tables.size + triggerNames.size) return false
+        val narrowed = count(db, "type = 'trigger' AND name IN (${quoted(updateTriggerNames)}) AND sql LIKE '%UPDATE OF%'")
+        if (narrowed != updateTriggerNames.size) return false
         return tables.all { table ->
             db.query("SELECT v FROM ${table}_config WHERE k = '$SECURE_DELETE'").use { cursor ->
                 cursor.moveToFirst() && cursor.getLong(0) == 1L
             }
         }
     }
+
+    private fun quoted(names: List<String>): String = names.joinToString(", ") { "'$it'" }
+
+    private fun count(db: SupportSQLiteDatabase, where: String): Int =
+        db.query("SELECT COUNT(*) FROM sqlite_master WHERE $where").use { cursor ->
+            if (cursor.moveToFirst()) cursor.getInt(0) else 0
+        }
 
     private fun drop(db: SupportSQLiteDatabase) {
         triggerNames.forEach { db.execSQL("DROP TRIGGER IF EXISTS $it") }

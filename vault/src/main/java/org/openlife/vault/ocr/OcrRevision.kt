@@ -107,6 +107,8 @@ data class OcrUserRevision(
     val correctedText: String,
     val createdAt: Long,
     val actor: String = "USER",
+    /** C2-R15: the correction this one supersedes; null for the first of its span (or reading). */
+    val supersedesId: UUID? = null,
 ) {
     init {
         require(correctedText.isNotEmpty()) { "A correction cannot be empty" }

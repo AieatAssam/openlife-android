@@ -82,14 +82,24 @@ class SourceRowRemovalTest {
         } catch (expected: IllegalStateException) {
             assertEquals(emptyList<String>(), dao.executed)
         }
-        // F-70 regression: the pre-C2 order (readings, then the Source) fails
-        // on the NO ACTION evidence -> span reference.
-        FactRows(host).setState("a", "DELETING")
-        try {
-            host.exec("DELETE FROM ocr_revisions WHERE sourceId = 'a'")
-            fail("NO ACTION from fact_evidence must refuse the pre-C2 order")
-        } catch (expected: HostSqlite.Failure) {
-            assertTrue(expected.message.orEmpty(), expected.message.orEmpty().contains("FOREIGN KEY"))
+        // F-70 regression: the pre-C2 order (readings by cascade, then the
+        // Source) is refused even on a DELETING Source: by the C2-R20 guard
+        // when the cascade reaches a superseded correction whose reading is
+        // already gone, and otherwise by the NO ACTION evidence -> span key.
+        val rows = FactRows(host)
+        rows.setState("a", "DELETING")
+        listOf(
+            "DELETE FROM ocr_revisions WHERE sourceId = 'a'" to "C2-R20",
+            "DELETE FROM ocr_user_revisions WHERE id = 'a-c2'" to null,
+            "DELETE FROM ocr_user_revisions WHERE id = 'a-c1'" to null,
+            "DELETE FROM ocr_revisions WHERE sourceId = 'a'" to "FOREIGN KEY",
+        ).forEach { (sql, refusal) ->
+            val failure = runCatching { host.exec(sql) }.exceptionOrNull()
+            if (refusal == null) {
+                assertEquals(null, failure)
+            } else {
+                assertTrue("$sql: $failure", failure?.message.orEmpty().contains(refusal))
+            }
         }
     }
 
