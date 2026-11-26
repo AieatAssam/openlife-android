@@ -335,7 +335,7 @@ phases:
     goal: "Dates, times, money, URLs, emails and phone numbers with evidence, uncertainty, review, and conservative interpretation."
     exit_gate: "P3-08 done."
     steps:
-      - {id: P3-01, title: C2 specification and ADR-0008, file: steps/P3-01.yaml, status: todo, depends_on: [P2-09], estimate: M, owner: agent+owner}
+      - {id: P3-01, title: C2 specification and ADR-0008, file: steps/P3-01.yaml, status: in_progress, started: 2026-11-25, depends_on: [P2-09], estimate: M, owner: agent+owner, notes: "Started before P2-09 is done: the coordinator (acting owner, 2026-11-25) authorised writing the C2 specification while P2-09 waits on device evidence and an owner-run release. Documents only."}
       - {id: P3-02, title: Fact model, schema, migration, cascade, file: steps/P3-02.yaml, status: todo, depends_on: [P3-01], estimate: M, owner: agent}
       - {id: P3-03, title: Typed extractors (pure Kotlin, versioned rules), file: steps/P3-03.yaml, status: todo, depends_on: [P3-01], estimate: L, owner: agent}
       - {id: P3-04, title: Extraction pipeline from OCR revisions with evidence links and staleness, file: steps/P3-04.yaml, status: todo, depends_on: [P3-02, P3-03], estimate: M, owner: agent}
