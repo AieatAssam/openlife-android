@@ -9,7 +9,9 @@ import java.io.File
  * Bounded work and untrusted text (P3-03-R3/R4, C2-R29, C2-R47). Every rule
  * stage runs alone, and all stages together, over 10,000-character
  * adversarial strings; the best of several warmed-up runs must be under
- * 50 ms. The timings are printed for the verification record.
+ * 50 ms. Time is the test thread's CPU time, so load from other processes
+ * on a shared host does not count (wall time when the JVM cannot measure
+ * it). CPU and wall times are printed for the verification record.
  */
 class ExtractorSafetyTest {
     private val adversarial: Map<String, String> = linkedMapOf(
@@ -51,9 +53,11 @@ class ExtractorSafetyTest {
         for ((name, text) in adversarial) {
             assertTrue(name, text.length >= LENGTH)
             for (stages in stagesToTime) {
-                val millis = bestOfRuns(text, stages)
+                val timing = bestOfRuns(text, stages)
+                val millis = timing.cpu
                 val label = if (stages.size == 1) stages.single().name else "ALL"
-                println("ExtractorSafetyTest $name $label ${"%.2f".format(millis)} ms")
+                val printed = "cpu ${"%.2f".format(millis)} ms wall ${"%.2f".format(timing.wall)} ms"
+                println("ExtractorSafetyTest $name $label $printed")
                 if (millis >= LIMIT_MILLIS) slowest += "$name/$label=${"%.2f".format(millis)}ms"
             }
         }
@@ -66,7 +70,8 @@ class ExtractorSafetyTest {
         for (name in listOf("digit-space", "label-run", "at", "groups", "months")) {
             val small = adversarial.getValue(name)
             val large = small.repeat(SCALE)
-            val ratio = bestOfRuns(large, RuleStage.entries.toSet()) / bestOfRuns(small, RuleStage.entries.toSet())
+            val all = RuleStage.entries.toSet()
+            val ratio = bestOfRuns(large, all).cpu / bestOfRuns(small, all).cpu
             println("ExtractorSafetyTest linearity $name x$SCALE ratio ${"%.1f".format(ratio)}")
             assertTrue("$name grew by $ratio for ${SCALE}x input", ratio < SCALE * 4)
         }
@@ -107,15 +112,29 @@ class ExtractorSafetyTest {
 
     private fun fill(piece: String): String = piece.repeat(LENGTH / piece.length + 1).take(LENGTH)
 
-    private fun bestOfRuns(text: String, stages: Set<RuleStage>): Double {
+    /** Best (minimum) CPU and wall milliseconds over [RUNS] warmed-up runs. */
+    private fun bestOfRuns(text: String, stages: Set<RuleStage>): Timing {
         val spans = listOf(ExtractionSpan("s", null, 1, text))
         repeat(WARMUP) { FactExtractor.extract(spans, ExtractionDeadline.NONE, stages) }
-        return (1..RUNS).minOf {
-            val start = System.nanoTime()
+        val runs = (1..RUNS).map {
+            val cpuStart = cpuNanos()
+            val wallStart = System.nanoTime()
             FactExtractor.extract(spans, ExtractionDeadline.NONE, stages)
-            (System.nanoTime() - start) / NANOS_PER_MILLI
+            val wall = System.nanoTime() - wallStart
+            val cpu = if (cpuStart < 0) wall else cpuNanos() - cpuStart
+            Timing(cpu / NANOS_PER_MILLI, wall / NANOS_PER_MILLI)
         }
+        return Timing(runs.minOf { it.cpu }, runs.minOf { it.wall })
     }
+
+    /**
+     * The test thread's CPU time in nanoseconds, or -1 when the JVM cannot
+     * measure it. Read through reflection: unit tests compile against
+     * android.jar, which has no java.lang.management, but run on the host JVM.
+     */
+    private fun cpuNanos(): Long = THREAD_CPU?.let { (bean, method) -> method.invoke(bean) as Long } ?: -1
+
+    private data class Timing(val cpu: Double, val wall: Double)
 
     private fun codeOnly(text: String): String = text.lines().filterNot { line ->
         val trimmed = line.trim()
@@ -125,6 +144,12 @@ class ExtractorSafetyTest {
     private class DeadlineExpired : RuntimeException()
 
     private companion object {
+        val THREAD_CPU = runCatching {
+            val bean = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+            val type = Class.forName("java.lang.management.ThreadMXBean")
+            val supported = type.getMethod("isCurrentThreadCpuTimeSupported").invoke(bean) as Boolean
+            if (supported) bean to type.getMethod("getCurrentThreadCpuTime") else null
+        }.getOrNull()
         const val LENGTH = 10_000
         const val LIMIT_MILLIS = 50.0
         const val WARMUP = 3
