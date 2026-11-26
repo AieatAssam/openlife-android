@@ -14,7 +14,8 @@ instrumented test and no device gap.
 | RED | e4337aa | 29 tests and the four fixture tables; a stub `FactExtractor` that returns nothing |
 | GREEN | 29c1661 | The seven scanners over a shared claim mask; vault detekt clean |
 | REFACTOR | d1edb6d | The shared tokenizer (`LineScan`, `LineReads`) came out of GREEN while splitting for detekt. REFACTOR changed only the timing tests to measure thread CPU time (see Timing) |
-| VERIFY/DOCUMENT | this commit | Evidence, this file, C2.md §7.1 versions table |
+| Coverage fix | 0780f08 | §5.3 symbol rows; `C$` no longer read as `$` |
+| VERIFY/DOCUMENT | 8772560 and this commit | Evidence, this file, C2.md §7.1 versions table |
 
 ## RED
 
@@ -41,19 +42,24 @@ assembleDebug :vault:compileDebugAndroidTestKotlin
 
 | Module | Before P3-03 | After | Failures |
 | --- | --- | --- | --- |
-| vault | 193 | 222 (+29 extractor tests) | 0 |
+| vault | 193 (computed: 222 − 29) | 222 (+29 extractor tests) | 0 |
 | app | 146 | 146 | 0 |
 | eval | 26 | 26 | 0 |
 
 `scripts/plan-check.sh`: steps=82 errors=0. `bash scripts/tests/run.sh`:
-51 passed, 0 failed.
+51 passed, 0 failed (run alone on the final tree).
 
 Fixtures (hand-written from ADR-0008; synthetic data only):
 `vault/src/test/resources/facts/dates.tsv`, `times.tsv`, `money.tsv`,
-`url_email_phone.tsv`. Every ADR-0008 normative example is a row,
-including the hostile ones (userinfo URLs, dotted quads, card-like
-groups, non-ASCII digits, `$` with two codes in context, English-word
-codes).
+`url_email_phone.tsv`. A script extracted the 271 backticked strings in
+ADR-0008 §4–§7 and searched the fixtures and test sources for each. Every
+example value is covered, including the hostile ones (userinfo URLs,
+dotted quads, card-like groups, non-ASCII digits, `$` with two codes in
+context, English-word codes). The 81 strings not found verbatim are
+notations (`D Month YYYY`, `±HH:MM`, `T1–T2`), enum or column names,
+outputs written in another notation (`3.50 $ \| 3.50 CUP`), or
+symbol-table entries. Commit 0780f08 then added rows for every §5.3
+symbol and for the non-markers `C$`, `Rs` and `¢`.
 
 ## Timing (bound 50 ms per 10,000-character input, best of runs)
 
@@ -84,6 +90,10 @@ below 40.
 ## Deviations and decisions
 
 - The timing bound is measured as thread CPU time (see Timing).
+- `C$5` was read as `$5` with currency null. Since 0780f08, a `$` with
+  another letter attached before it is not a marker, so nothing is
+  emitted (§5.3 excludes `C$`). `rules-money-v1` is unreleased, so the
+  version stays `v1`.
 - Residual: `workGrowsLinearly` allows a ratio below 40 for 10x input, so
   a mild superlinear regression (an O(n) scan every 64 characters) passes
   it. One every 16 characters fails it. An O(n) `indexOf` on every claim
@@ -125,4 +135,5 @@ to settle in an ADR-0008 revision (also in the P3-03 `notes` in
 - a non-zone abstention of the second time in a range does not propagate to the first
 - XXX and XTS excluded from List One markers, BGN kept
 - an English-word code alone counts only when every reading has fraction digits
+- `C$` is not a marker at all, so `C$5` gives nothing rather than `5` with currency null
 
