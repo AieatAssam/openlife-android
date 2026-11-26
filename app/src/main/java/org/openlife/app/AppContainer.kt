@@ -219,7 +219,11 @@ private class VaultSourceStore(private val app: OpenLifeApp, private val scope: 
 
     override suspend fun retryVault() = app.retryVault()
 
-    override suspend fun finishVaultReset(): Boolean = app.finishIncompleteReset() == VaultResetResult.COMPLETED
+    /** Finishes a reset the user confirmed earlier, only while its marker is still on disk (P1-06-R5). */
+    override suspend fun finishVaultReset(): Boolean {
+        val confirmation = ResetConfirmation.ofIncompleteReset(app.paths.resetMarkerFile) ?: return false
+        return app.resetVault(confirmation) == VaultResetResult.COMPLETED
+    }
 
     override suspend fun cleanAbandonedStages() {
         app.importHousekeeping.cleanAbandonedStages()

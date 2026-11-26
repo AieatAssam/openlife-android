@@ -30,17 +30,23 @@ class SourceStateCountsTest {
         host.createFromExportedSchema(File("schemas/org.openlife.vault.storage.OpenLifeDatabase/5.json"))
         listOf("READY", "READY", "STAGED", "CORRUPT", "FROM_A_NEWER_BUILD").forEachIndexed { index, state ->
             host.exec(
-                "INSERT INTO sources(id, state, importedAt, intakeKind, wrappedDek, sha256) VALUES (?, ?, ?, 'SHARE', X'02', X'01')",
+                "INSERT INTO sources(id, state, importedAt, intakeKind, wrappedDek, sha256) " +
+                    "VALUES (?, ?, ?, 'SHARE', X'02', X'01')",
                 "00000000-0000-0000-0000-00000000000$index",
                 state,
                 index.toLong(),
             )
         }
-        val rows = host.query(COUNT_SOURCES_BY_STATE).map { (state, n) -> StateCount(state as String, (n as Long).toInt()) }
-        assertEquals(
-            mapOf(SourceState.READY to 2, SourceState.STAGED to 1, SourceState.CORRUPT to 1, SourceState.UNRECOGNISED to 1),
-            stateCounts(rows),
+        val rows = host.query(COUNT_SOURCES_BY_STATE).map { (state, n) ->
+            StateCount(state as String, (n as Long).toInt())
+        }
+        val expected = mapOf(
+            SourceState.READY to 2,
+            SourceState.STAGED to 1,
+            SourceState.CORRUPT to 1,
+            SourceState.UNRECOGNISED to 1,
         )
+        assertEquals(expected, stateCounts(rows))
         val selected = COUNT_SOURCES_BY_STATE.substringAfter("SELECT ").substringBefore(" FROM")
         assertEquals("the query reads the state column only", "state, COUNT(*) AS n", selected)
     }

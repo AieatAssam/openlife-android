@@ -117,28 +117,109 @@ None was started or run. Instrumented tests were **compiled**
 the font licence verbatim next to the fonts, and `generateLicenseReport`
 appends it to the licence report that About shows.
 
+## Review round (K-01..K-08, acting-owner decisions)
+
+An independent review returned "accept after fixes". What changed:
+
+- **K-01.** The no-key label now reads "No vault key is present in Android
+  Keystore." It no longer promises that a key will be created: if the key
+  file outlives its Keystore key, bootstrap returns `KEY_UNWRAP_FAILED` and
+  creates none. The other About and Settings strings were checked and make
+  no promise about future behaviour. The wording rests on the review alone;
+  no device test covers it.
+- **K-02.** `AboutController` loads each fact separately. If a read throws
+  anything other than cancellation, that fact shows "Could not be read."
+  (build identity, diagnostics) or "not reported" (key level). The other
+  facts still load. Nothing is logged. `AboutControllerTest` uses throwing
+  fakes.
+- **K-03.** `SourceDao.countByState()` runs
+  `SELECT state, COUNT(*) AS n FROM sources GROUP BY state`. It is placed as
+  the last member of the interface, after the lines PR #32 edits. The result
+  is decoded with the tolerant state decoding: any unknown text counts
+  towards UNRECOGNISED. `SourceStateCountsTest` runs the query on host
+  SQLite against the exported v5 schema.
+- **K-04.** `AboutScreenTest` builds `AppAboutPort(application)` directly,
+  so it never reads `application.container`, opens no vault and creates no
+  key. It computes the expected key label itself from `KeyInfo`.
+- **K-05.**
+  - The version code is matched together with its own label; `Fact` nodes
+    now merge their label and value.
+  - `BundledDocumentsTest` requires `GIT_COMMIT` to differ from "unknown"
+    whenever `.git` exists.
+  - The address check asserts that the address node has no click action,
+    then taps it and asserts that no activity started. This proves only
+    that this text is not a link.
+- **K-06.**
+  - `DependencyBoundaryTest.licenceReportListsExactlyTheReleaseRuntimeClasspath`
+    compares the release classpath coordinates with the report rows.
+    Project modules (version "unspecified") are excluded. Two recorded
+    mutations are part of the test: a shipped dependency with no report
+    row, and a report row for a dependency no longer shipped.
+  - The copy task still does not `dependsOn` `generateLicenseReport`. That
+    task rewrites the committed `docs/generated/THIRD_PARTY_LICENSES.md`,
+    so every build would dirty the tree and stamp `GIT_COMMIT` with
+    `-dirty`. The boundary test is the enforcement instead.
+- **K-07.** The expected device label is corrected (below). StrongBox is
+  impossible because `ensureWrappingKey` never requests it.
+- **K-08.** `AppAboutPort.diagnostics` awaits
+  `appLock.awaitContentAccess()` first.
+- **Boundary.**
+  - `AndroidUriHandler` and any other `*UriHandler` now match.
+  - `noResourceOrManifestEnablesLinks` scans the XML of the app's main,
+    debug and release source sets for `autoLink`, BROWSABLE and http(s)
+    `android:scheme`. It has recorded mutations.
+- **Reset guard (requirement added by review; acting owner, 2026-11-26).**
+  - `VaultResetRepository.resetVault`, `OpenLifeApp.resetVault` and
+    `SettingsPort.resetVault` all require a `ResetConfirmation`. Its
+    constructor is private.
+  - `ofTypedWord` mints one only for the exact, non-blank word. It is
+    called only by `SettingsController.continueReset`.
+  - `ofIncompleteReset` mints one only while the reset marker exists. It
+    is called only by `OpenLifeApp.finishIncompleteReset`.
+  - `ResetConfirmationBoundaryTest` enforces both rules with mutations.
+  - A completed reset spends the confirmation; dismissing the flow clears
+    it. The confirmation UX is unchanged.
+- **Owner decisions.** Keep the blocking ActivityMonitor (no
+  espresso-intents) and the generated document copy. No About golden in
+  this step; it is listed below for the tablet golden regeneration.
+
 ## Awaiting a physical device (prioritised checklist)
 
 Run on the tablet (`U8BBB20806201256`) once no other agent is using it:
 
+0. **First**, confirm that the tablet holds no personal `org.openlife`
+   install or data (`adb shell pm list packages org.openlife`). The debug
+   build has no `applicationIdSuffix`, so installing it replaces any
+   OpenLife on the device, and the tests would act on that vault.
 1. `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.settings.AboutScreenTest`
-   — version, commit, fingerprint, security label, licences and policy
-   render, and no activity starts.
+   checks:
+   - version, commit and fingerprint are shown;
+   - the key label matches what the test computes from KeyInfo;
+   - the licences and the policy render;
+   - no activity starts.
 2. `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.settings.SettingsScreenTest`
-   — reset requires the exact word.
+   checks that reset requires the exact word.
 3. `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.CoreFlowUxTest`
-   and `...class=org.openlife.app.ui.AdaptiveLayoutTest`. These now use
-   `org.openlife.app.settings.AboutScreen`.
+   and `...class=org.openlife.app.ui.AdaptiveLayoutTest`. Both now use
+   `org.openlife.app.settings.AboutScreen`. Also run
+   `...class=org.openlife.app.ui.VaultUnavailableFlowTest`, since the reset
+   now needs the confirmation.
 4. `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.ui.LargeFontUiTest`
    and `...class=org.openlife.app.ui.RtlUiTest`. Both reach About through
    `FakeAppContainer`, now with a `FakeAboutPort`.
-5. Manual check:
+5. `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.repository.VaultResetRepositoryTest`
+   (it now passes a minted confirmation).
+6. Manual check:
    - Install the debug APK and open About.
-   - Record `adb shell uiautomator dump` showing the key-level label
-     (expected on the tablet: trusted execution environment or StrongBox).
+   - Record `adb shell uiautomator dump` showing the key-level label.
+     Expected: "trusted execution environment" on API 31+. On API 29-30,
+     expect "secure hardware, type not reported". StrongBox is never
+     requested, so it cannot appear.
    - Compare the fingerprint with `apksigner verify --print-certs` for the
      same APK.
    - Open the licences and scroll to the end to check for jank or ANR.
-6. Golden: no committed golden captures About or Settings, so none went
-   stale. Decide whether About joins `BrandScreenshotInstrumentedTest`.
-   It was not added here.
+7. Golden: no committed golden captures About or Settings, so none went
+   stale. Per the owner, About gets no golden in this step. Add it to the
+   tablet golden regeneration with `BrandScreenshotInstrumentedTest`.
+8. The K-01 label wording rests on review only. No test exercises a key
+   file whose Keystore key is gone.

@@ -13,8 +13,8 @@ import java.util.stream.Collectors
  * `ResetConfirmation`, whose constructor is private. Each way to mint one
  * has exactly one caller in shipped code:
  * - `ofTypedWord` in SettingsController, when the exact word was typed;
- * - `ofIncompleteReset` in OpenLifeApp, to finish a reset the user already
- *   confirmed whose marker is still on disk.
+ * - `ofIncompleteReset` in AppContainer (finishVaultReset), to finish a reset
+ *   the user already confirmed whose marker is still on disk.
  * Tests may mint one; shipped code elsewhere may not.
  */
 class ResetConfirmationBoundaryTest {
@@ -34,13 +34,13 @@ class ResetConfirmationBoundaryTest {
     @Test
     fun aMintElsewhereIsReported() {
         val files = sourceFiles().associateWith { Files.readAllLines(it) }
-        val elsewhere = files.keys.single { it.endsWith("app/src/main/java/org/openlife/app/AppContainer.kt") }
+        val elsewhere = files.keys.single { it.endsWith("app/src/main/java/org/openlife/app/OpenLifeApp.kt") }
         listOf(
             "    val token = ResetConfirmation.ofTypedWord(\"RESET\", \"RESET\")",
             "    val token = ResetConfirmation.ofIncompleteReset(marker)",
         ).forEach { mutation ->
             val mutated = files + (elsewhere to files.getValue(elsewhere) + mutation)
-            assertFalse("\"$mutation\" in AppContainer must be a violation", violations(mutated).isEmpty())
+            assertFalse("\"$mutation\" in OpenLifeApp must be a violation", violations(mutated).isEmpty())
         }
     }
 
@@ -60,7 +60,7 @@ class ResetConfirmationBoundaryTest {
     private companion object {
         val MINTERS = mapOf(
             "ofTypedWord(" to "app/src/main/java/org/openlife/app/settings/SettingsController.kt",
-            "ofIncompleteReset(" to "app/src/main/java/org/openlife/app/OpenLifeApp.kt",
+            "ofIncompleteReset(" to "app/src/main/java/org/openlife/app/AppContainer.kt",
         )
     }
 }

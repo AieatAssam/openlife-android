@@ -53,10 +53,14 @@ fun AboutScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item { AboutHeader(lowRamDevice) }
-                section(R.string.about_section_build) { BuildSection(state.identity) }
+                section(R.string.about_section_build) {
+                    BuildSection(state.identity, AboutFact.BUILD_IDENTITY in state.unavailable)
+                }
                 section(R.string.about_section_security) { SecuritySection(state.keyLevel) }
                 section(R.string.about_section_will_not_do) { WillNotDoSection() }
-                section(R.string.about_section_diagnostics) { DiagnosticsSection(state.diagnostics) }
+                section(R.string.about_section_diagnostics) {
+                    DiagnosticsSection(state.diagnostics, AboutFact.DIAGNOSTICS in state.unavailable)
+                }
                 documentSection(BundledDocument.PRIVACY_POLICY, state.documents, onToggleDocument)
                 documentSection(BundledDocument.THIRD_PARTY_LICENCES, state.documents, onToggleDocument)
             }
@@ -93,8 +97,12 @@ internal fun SectionHeading(title: Int) {
 }
 
 @Composable
-private fun BuildSection(identity: BuildIdentity?) {
+private fun BuildSection(identity: BuildIdentity?, unavailable: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (unavailable) {
+            Text(stringResource(R.string.about_fact_not_reported))
+            return@Column
+        }
         if (identity == null) {
             Text(stringResource(R.string.about_document_loading))
             return@Column
@@ -144,10 +152,14 @@ private fun WillNotDoSection() {
     }
 }
 
-/** A labelled fact; [data] values are set in Plex Mono (VISUAL_IDENTITY §5). */
+/**
+ * A labelled fact; [data] values are set in Plex Mono (VISUAL_IDENTITY §5).
+ * Label and value merge into one node, so TalkBack reads them together and a
+ * test can match a value by its own label.
+ */
 @Composable
 private fun Fact(label: Int, value: String, data: Boolean = false) {
-    Column {
+    Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
         Text(
             stringResource(label),
             style = MaterialTheme.typography.titleSmall,

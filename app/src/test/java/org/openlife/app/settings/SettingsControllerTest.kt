@@ -86,7 +86,10 @@ class SettingsControllerTest {
             controller.continueReset(WORD)
             assertEquals("'$typed' must not pass", ResetStage.TYPE_WORD, controller.reset.value.stage)
         }
-        controller.confirmReset { runs++; VaultResetResult.COMPLETED }
+        controller.confirmReset {
+            runs++
+            VaultResetResult.COMPLETED
+        }
         assertEquals("no confirmation, no reset", 0, runs)
 
         controller.setWord(WORD)
@@ -101,7 +104,10 @@ class SettingsControllerTest {
         assertNotNull(received)
 
         // The confirmation is spent: a dismissed or completed flow cannot reset again without the word.
-        controller.confirmReset { runs++; VaultResetResult.COMPLETED }
+        controller.confirmReset {
+            runs++
+            VaultResetResult.COMPLETED
+        }
         assertEquals(1, runs)
     }
 

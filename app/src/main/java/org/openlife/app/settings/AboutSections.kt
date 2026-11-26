@@ -24,9 +24,13 @@ import org.openlife.app.ui.brand.PerforationDivider
 // P1-08: About's diagnostics counts and its bundled documents (privacy policy, licence report).
 
 @Composable
-internal fun DiagnosticsSection(diagnostics: DiagnosticsCounts?) {
+internal fun DiagnosticsSection(diagnostics: DiagnosticsCounts?, unavailable: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.about_diagnostics_explanation), style = MaterialTheme.typography.bodyMedium)
+        if (unavailable) {
+            Text(stringResource(R.string.about_fact_not_reported))
+            return@Column
+        }
         if (diagnostics == null) {
             Text(stringResource(R.string.about_document_loading))
             return@Column

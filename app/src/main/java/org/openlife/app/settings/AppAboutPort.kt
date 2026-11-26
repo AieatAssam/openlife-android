@@ -17,7 +17,9 @@ import java.security.ProviderException
  * P1-08: the production About port. Reads the build, the package's signing
  * certificate, Keystore's KeyInfo, counts and raw resources, all on IO.
  * Diagnostics never open the vault: item and recovery counts come from a
- * vault that is already Ready.
+ * vault that is already Ready, read after the app lock allows content reads
+ * (review K-08). A failing read is reported by [AboutController] as "could
+ * not be read" (review K-02); nothing here logs.
  */
 internal class AppAboutPort(private val app: OpenLifeApp) : AboutPort {
     override suspend fun buildIdentity(): BuildIdentity = withContext(Dispatchers.IO) {
@@ -60,17 +62,20 @@ internal class AppAboutPort(private val app: OpenLifeApp) : AboutPort {
         }
     }
 
-    override suspend fun diagnostics(): DiagnosticsCounts = withContext(Dispatchers.IO) {
-        val ready = app.readyVault.value
-        val byState = try {
-            ready?.viewRepository?.countSourcesByState()
-        } catch (_: SQLiteException) {
-            // A reset closed the database between the check and the read; report no item counts.
-            null
-        } catch (_: IllegalStateException) {
-            null
+    override suspend fun diagnostics(): DiagnosticsCounts {
+        app.appLock.awaitContentAccess()
+        return withContext(Dispatchers.IO) {
+            val ready = app.readyVault.value
+            val byState = try {
+                ready?.viewRepository?.countSourcesByState()
+            } catch (_: SQLiteException) {
+                // A reset closed the database between the check and the read; report no item counts.
+                null
+            } catch (_: IllegalStateException) {
+                null
+            }
+            DiagnosticsCounts(byState, ready?.lastRecovery, VaultFailureDiagnostics.counts(app))
         }
-        DiagnosticsCounts(byState, ready?.lastRecovery, VaultFailureDiagnostics.counts(app))
     }
 
     override suspend fun document(document: BundledDocument): String = withContext(Dispatchers.IO) {

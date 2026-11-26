@@ -58,7 +58,7 @@ import java.io.IOException
  */
 class OpenLifeApp : Application() {
 
-    private val paths by lazy { VaultPaths(this) }
+    internal val paths by lazy { VaultPaths(this) }
 
     /** Also read by About's security details (P1-08-R3), which only query KeyInfo and never create a key. */
     internal val keystoreWrapper by lazy { KeystoreWrapper() }
@@ -250,10 +250,6 @@ class OpenLifeApp : Application() {
             if (cachedAccess is VaultAccess.Unavailable) cachedAccess = null
         }
     }
-
-    /** Finishes a reset the user confirmed earlier whose marker is still on disk (P1-06-R5); FAILED if none. */
-    suspend fun finishIncompleteReset(): VaultResetResult =
-        ResetConfirmation.ofIncompleteReset(paths.resetMarkerFile)?.let { resetVault(it) } ?: VaultResetResult.FAILED
 
     /** Wipes the vault; [confirmation] proves the user confirmed it (P1-08 review). */
     suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult = withContext(Dispatchers.IO) {

@@ -273,7 +273,7 @@
     <string name="vault_key_level_secure_unspecified">Secure hardware, as reported by Android Keystore. Android does not say which kind on this device.</string>
     <string name="vault_key_level_software">Software only. Android Keystore reports that this key is not kept in secure hardware.</string>
     <string name="vault_key_level_not_reported">Not reported. Android Keystore did not say where this key is kept.</string>
-    <string name="vault_key_level_no_key">No vault key exists yet. It is created the first time the vault opens.</string>
+    <string name="vault_key_level_no_key">No vault key is present in Android Keystore.</string>
     <string name="about_section_will_not_do">What OpenLife will not do</string>
     <string name="about_will_not_export">Export your items to a file</string>
     <string name="about_will_not_share">Share them with another app</string>
@@ -288,6 +288,7 @@
     <string name="about_diagnostics_failures">Times the vault could not open</string>
     <string name="about_diagnostics_vault_closed">The vault is not open, so there are no item counts.</string>
     <string name="about_diagnostics_no_failures">None recorded</string>
+    <string name="about_fact_not_reported">Could not be read.</string>
     <string name="diagnostics_state_staged">Being imported</string>
     <string name="diagnostics_state_ready">Saved</string>
     <string name="diagnostics_state_deleting">Being deleted</string>

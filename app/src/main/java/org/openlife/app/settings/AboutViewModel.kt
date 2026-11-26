@@ -1,11 +1,11 @@
 package org.openlife.app.settings
 
-import android.content.res.Resources
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.openlife.app.AppContainer
-import java.io.IOException
 
 /** A bundled document while it is open on About. */
 sealed interface DocumentState {
@@ -56,14 +55,31 @@ class AboutController(
     private val mutableState = MutableStateFlow(AboutState())
     val state: StateFlow<AboutState> = mutableState.asStateFlow()
 
+    /**
+     * Each fact loads on its own and fails on its own (review K-02): a read
+     * that throws leaves that fact "not reported" and the others unaffected.
+     * Cancellation is rethrown, never reported as a failure. Nothing is logged.
+     */
     fun load() {
-        scope.launch { port.buildIdentity().let { identity -> mutableState.update { it.copy(identity = identity) } } }
         scope.launch {
-            val level = VaultSecurityInfo.levelOf(port.wrappingKey())
-            mutableState.update { it.copy(keyLevel = level) }
+            val identity = attempt { port.buildIdentity() }
+            mutableState.update {
+                if (identity == null) it.unavailable(AboutFact.BUILD_IDENTITY) else it.copy(identity = identity)
+            }
         }
-        scope.launch { port.diagnostics().let { counts -> mutableState.update { it.copy(diagnostics = counts) } } }
+        scope.launch {
+            val report = attempt { port.wrappingKey() } ?: WrappingKeyReport.QueryFailed
+            mutableState.update { it.copy(keyLevel = VaultSecurityInfo.levelOf(report)) }
+        }
+        scope.launch {
+            val counts = attempt { port.diagnostics() }
+            mutableState.update {
+                if (counts == null) it.unavailable(AboutFact.DIAGNOSTICS) else it.copy(diagnostics = counts)
+            }
+        }
     }
+
+    private fun AboutState.unavailable(fact: AboutFact) = copy(unavailable = unavailable + fact)
 
     fun toggle(document: BundledDocument) {
         if (document in mutableState.value.documents) {
@@ -81,14 +97,20 @@ class AboutController(
         }
     }
 
-    private suspend fun read(document: BundledDocument): DocumentState = try {
+    private suspend fun read(document: BundledDocument): DocumentState = attempt {
         val text = port.document(document)
         DocumentState.Shown(withContext(parseDispatcher) { DocumentLines.parse(text) })
-    } catch (_: IOException) {
-        DocumentState.Failed
-    } catch (_: Resources.NotFoundException) {
-        DocumentState.Failed
-    }
+    } ?: DocumentState.Failed
+}
+
+/** [read]'s value, or null when it throws anything but cancellation (a crash on About helps no one). */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+private suspend fun <T : Any> attempt(read: suspend () -> T): T? = try {
+    read()
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    null
 }
 
 /** Entry-scoped holder of the [AboutController], built from the container (P1-20-R1). */

@@ -12,4 +12,6 @@ internal const val COUNT_SOURCES_BY_STATE = "SELECT state, COUNT(*) AS n FROM so
  * Decodes [rows] with the tolerant state decoding: every text that is not a
  * known state adds to [SourceState.UNRECOGNISED]. States with no rows are absent.
  */
-internal fun stateCounts(rows: List<StateCount>): Map<SourceState, Int> = TODO("P1-08 review: ${rows.size}")
+internal fun stateCounts(rows: List<StateCount>): Map<SourceState, Int> = rows
+    .groupingBy { decodeStored(it.state, SourceState.UNRECOGNISED) }
+    .fold(0) { total, row -> total + row.n }

@@ -13,10 +13,12 @@ import java.io.File
  */
 class ResetConfirmation private constructor() {
     companion object {
-        /** A confirmation only when [typed] is exactly [required] (case, spaces and all) and [required] is not blank. */
-        fun ofTypedWord(typed: String, required: String): ResetConfirmation? = TODO("P1-08 review: $typed $required")
+        /** A confirmation only when [typed] is exactly [required] (case and spaces too) and [required] is not blank. */
+        fun ofTypedWord(typed: String, required: String): ResetConfirmation? =
+            if (required.isNotBlank() && typed == required) ResetConfirmation() else null
 
         /** A confirmation only while [resetMarker] exists: a reset the user confirmed earlier is still unfinished. */
-        fun ofIncompleteReset(resetMarker: File): ResetConfirmation? = TODO("P1-08 review: $resetMarker")
+        fun ofIncompleteReset(resetMarker: File): ResetConfirmation? =
+            if (resetMarker.isFile) ResetConfirmation() else null
     }
 }

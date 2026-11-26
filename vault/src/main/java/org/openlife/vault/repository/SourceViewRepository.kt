@@ -16,6 +16,7 @@ import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.StateTransition
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.storage.compareAndSetState
+import org.openlife.vault.storage.stateCounts
 import org.openlife.vault.storage.toDomain
 import java.util.UUID
 
@@ -48,9 +49,9 @@ class SourceViewRepository(
     fun observeVisibleSource(sourceId: UUID): Flow<Source?> =
         database.sourceDao().observeVisibleSource(sourceId.toString()).map { it?.toDomain() }
 
-    /** P1-08-R4: how many sources are in each state, every state included; counts only. */
+    /** P1-08-R4: how many sources are in each state (unknown stored states as UNRECOGNISED); counts only. */
     suspend fun countSourcesByState(): Map<SourceState, Int> = withContext(ioDispatcher) {
-        database.sourceDao().findAll().groupingBy { it.toDomain().state }.eachCount()
+        stateCounts(database.sourceDao().countByState())
     }
 
     suspend fun findSource(sourceId: UUID): Source? = database.sourceDao().findById(sourceId.toString())?.toDomain()

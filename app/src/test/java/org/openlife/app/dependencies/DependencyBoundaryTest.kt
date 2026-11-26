@@ -155,6 +155,8 @@ class DependencyBoundaryTest {
     }
 
     private companion object {
-        val REPORT_ROW = Regex("\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`")
+        val REPORT_ROW = Regex(
+            "\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`",
+        )
     }
 }

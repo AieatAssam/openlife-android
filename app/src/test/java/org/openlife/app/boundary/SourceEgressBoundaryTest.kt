@@ -172,7 +172,8 @@ class SourceEgressBoundaryTest {
 
     private fun xmlLinkViolations(file: Path, lines: List<String>): List<String> =
         lines.mapIndexedNotNull { index, line ->
-            if (XML_LINK.containsMatchIn(line)) "${projectDir.relativize(file)}:${index + 1}: link-enabling XML" else null
+            val location = "${projectDir.relativize(file)}:${index + 1}"
+            if (XML_LINK.containsMatchIn(line)) "$location: link-enabling XML" else null
         }
 
     private fun xmlFiles(): List<Path> = listOf("main", "debug", "release").flatMap { set ->
@@ -418,7 +419,7 @@ class SourceEgressBoundaryTest {
         )
         val XML_LINK = Regex("""autoLink|android\.intent\.category\.BROWSABLE|android:scheme="https?"""")
         val LINK_OPENING = Regex(
-            """\b(LocalUriHandler|UriHandler|openUri|LinkAnnotation|UrlAnnotation|fromHtml|Linkify|launchUrl)\b|""" +
+            """\w*UriHandler\b|\b(openUri|LinkAnnotation|UrlAnnotation|fromHtml|Linkify|launchUrl)\b|""" +
                 """\bCustomTabs\w*|\bautoLink\w*""",
         )
         val SHARE_OR_EXPORT = Regex("""\bShareCompat\b|\bCreateDocument\b|ACTION_CREATE_DOCUMENT|\bcreateChooser\b""")
