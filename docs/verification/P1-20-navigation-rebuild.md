@@ -305,3 +305,19 @@ All open; none has run.
   observed here.
 - Release smoke, CI API 29/36 legs, the connected suite and its wall-clock
   duration: not run (owner policy for this run).
+
+## Added by the fix-round verification (2026-11-26)
+
+An independent reviewer read the N-01..N-05 fixes and accepted them for
+merge; nothing below has run on a device. Open on-device checks added to the
+list above:
+
+- After a successful unlock following a background period longer than the
+  timeout, the app does not lock again immediately.
+- Back and predictive back from the viewer at compact and expanded width, and
+  replacing the selection at expanded width: no "recycled bitmap" crash. The
+  viewer bitmap is recycled when its back-stack entry stops; that this happens
+  only after the old content has left composition was read from Navigation
+  Compose, not observed.
+- An OCR run started just before the app is backgrounded past the timeout
+  finishes; one started after the timeout waits for unlock.
