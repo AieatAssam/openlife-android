@@ -1,7 +1,7 @@
 id: P3-03
 title: Typed extractors (pure Kotlin, versioned rules)
 phase: P3
-status: todo
+status: in_progress
 depends_on: [P3-01]
 estimate: L
 owner: agent
