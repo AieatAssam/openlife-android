@@ -128,14 +128,17 @@ evidence: >
   rule tightened after the mutation run found an import satisfied it) and
   2dfc505. Recorded mutations (8 real violations in shipped code, run
   together, reverted with git checkout): AccessibilitySourceRulesTest 10/10
-  failed (decorative comment dropped; search onClickLabel dropped;
-  VaultUnavailable heading dropped; OCR text fontSize pinned (TextUnit 14
-  sp); Intake height(320.dp); customActions renamed; this.selected dropped;
-  About paneTitle hard-coded). VERIFY 2dfc505: ./gradlew detekt lint
-  :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
-  :app:compileDebugAndroidTestKotlin :eval:test => BUILD SUCCESSFUL; app JVM
-  231/231 (baseline 211), vault JVM 197/197, eval 26/26, 0 failures;
-  scripts/plan-check.sh steps=82 errors=0; scripts/tests/run.sh 51 passed, 0
-  failed. Connected: none run (owner instruction: no emulator, no device).
-  ScreenSemanticsTest: implemented; unverified (gap - pending physical-device
-  run). See docs/verification/P1-10-accessibility.md.
+  failed, each naming its mutation (icons: SourceListScreen decorative
+  comment; clickables: search onClickLabel; headings: VaultUnavailable
+  asHeading; font scale + status: OCR Extracting text given 14.dp.toSp() in
+  place of announceStatus; fixed height: intake height(320.dp); gestures:
+  customActions renamed; colour alone: this.selected dropped; pane title +
+  hard-coded text: About paneTitle = "About"). VERIFY 2dfc505: ./gradlew
+  detekt lint :app:test :vault:test assembleDebug
+  :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+  :eval:test => BUILD SUCCESSFUL; app JVM 231/231 (baseline 211), vault JVM
+  197/197, eval 26/26, 0 failures; scripts/plan-check.sh steps=82 errors=0;
+  scripts/tests/run.sh 51 passed, 0 failed. Connected: none run (owner
+  instruction: no emulator, no device). ScreenSemanticsTest: implemented;
+  unverified (gap - pending physical-device run). See
+  docs/verification/P1-10-accessibility.md.

@@ -117,30 +117,46 @@ Final gate at 2dfc505: `./gradlew detekt lint :app:test :vault:test assembleDebu
 | `EvidenceGeometryTest.accessibilityZoomStepsDoubleAndHalveWithinTheLimits` | The zoom actions' steps | That TalkBack offers them (runbook A15–A17) |
 
 RED: 12 of 29 targeted tests failed at commit 00d0dad (listed in the step's
-`evidence`). Mutation run (after GREEN): eight real violations were put into shipped
-code at once: decorative-icon comment dropped (SourceListScreen); search
-`onClickLabel` dropped; VaultUnavailable `asHeading()` dropped; a pinned
-14 sp font size on OCR text; `height(320.dp)` back on the intake box;
-`customActions` renamed; `this.selected` dropped; About `paneTitle = "About"`.
-`AccessibilitySourceRulesTest` then failed 10/10, and the sources were
-restored with `git checkout`. An earlier, partly applied run showed that
-an import of `customActions` alone satisfied the gesture rule, so the rule
-now requires an assignment (commit 6c926eb).
+`evidence`).
 
-## Defects found and fixed
+Mutation run (after GREEN): eight real
+violations were put into shipped code at once, `AccessibilitySourceRulesTest`
+ran, and the sources were restored with `git checkout`. All 10 rules failed,
+each naming its mutation:
 
-| Defect | Fix |
+| Mutation | Rule(s) that failed, with the reported location |
 | --- | --- |
-| Stale stamp label `#B7791F` 3.23:1 on paper (needs 4.5) | `attentionInk` `#8A5A10` (5.25:1); outline stays amber (VISUAL_IDENTITY §4 amended) |
-| No pane titles: TalkBack did not announce screen changes | fixed `paneTitle` from resources on 9 screen roots |
-| Titles not headings (bars, dialogs, display/headline/title text; 19 places) | `Modifier.asHeading()` |
-| Status and error text not announced (OCR running/failed/cancelled/stale, every intake state, verify-all, reset failure, lock note and refusals, About document failure, list loading) | `Modifier.announceStatus()` (polite) |
-| List row and OCR span row clickable had no role, label or minimum height | `Role.Button`, "Open" / "Show in image", `heightIn(min = 48.dp)` |
-| Search result had no click label | "Open in viewer" |
-| Pinch and double-tap zoom had no accessible equivalent | "Zoom in", "Zoom out", "Fit to screen" custom actions and a "Zoom: N%" state on the image (read as "percent") |
-| Selected evidence region shown by fill colour only | `selected` semantics |
-| Intake preview text in a fixed 320 dp box (clips at 2x) | fixed height only on the image; the box is `heightIn(min = 320.dp)` |
-| Two decorative `+` icons had no stated reason | comment; shared `ImportActionContent` |
+| Decorative-icon comment dropped (`ImportActionContent`) | icons/images: `SourceListScreen.kt:311` |
+| Search result `onClickLabel` dropped | clickables: `SearchScreen.kt:148` |
+| `VaultUnavailableScreen` `asHeading()` dropped | headings: `VaultUnavailableScreen.kt:44` |
+| OCR "Extracting" text: `announceStatus()` replaced by `fontSize = with(LocalDensity.current) { 14.dp.toSp() }` | font scale: `OcrPanel.kt:83 .toSp()`; status: `OcrPanel.kt:83` without a live region |
+| `height(320.dp)` back on the intake preview box | fixed height: `IntakeScreen.kt:171` |
+| `customActions =` renamed to an unused local | gestures: `ZoomableEvidenceImage.kt` |
+| `this.selected = selected` dropped | colour alone: `ZoomableEvidenceImage.kt` selected flag never reaches semantics |
+| About `paneTitle = "About"` (hard-coded) | pane title: `AboutScreen` has no resource paneTitle; hard-coded text: `AboutScreen.kt:49` |
+
+An earlier, partly applied run showed that an import of `customActions`
+alone satisfied the gesture rule, so the rule now requires an assignment
+(commit 6c926eb).
+
+## Defects found and changed
+
+"Proof" says what has actually run. A source rule proves that the code is
+present, not what TalkBack does. Everything marked as a gap waits for
+`ScreenSemanticsTest` and the runbook on a device.
+
+| Defect | Change | Proof |
+| --- | --- | --- |
+| Stale stamp label `#B7791F` 3.23:1 on paper (needs 4.5) | `attentionInk` `#8A5A10` (5.25:1); outline stays amber (VISUAL_IDENTITY §4 amended) | `ThemeContrastTest` passes (JVM); rendering: implemented; unverified (gap — pending physical-device run) |
+| No pane titles: TalkBack did not announce screen changes | `paneTitle` from resources on 9 screen roots | source rule passes; behaviour: implemented; unverified (gap — pending physical-device run) |
+| Titles not headings (bars, dialogs, display/headline/title text; 19 places) | `Modifier.asHeading()` | source rule passes; behaviour: implemented; unverified (gap — pending physical-device run) |
+| Status and error text not announced (OCR running/failed/cancelled/stale, every intake state, verify-all, reset failure, lock note and refusals, About document failure, list loading) | `Modifier.announceStatus()` (polite) | source rule passes; behaviour: implemented; unverified (gap — pending physical-device run) |
+| List row and OCR span row clickable had no role, label or minimum height | `Role.Button`, "Open" / "Show in image", `heightIn(min = 48.dp)` | source rule passes; size: implemented; unverified (gap — pending physical-device run) |
+| Search result had no click label | "Open in viewer" | source rule passes; behaviour: implemented; unverified (gap — pending physical-device run) |
+| Pinch and double-tap zoom had no accessible equivalent | "Zoom in", "Zoom out", "Fit to screen" custom actions and a "Zoom: N%" state on the image (read as "percent") | step arithmetic: `EvidenceGeometryTest` passes (JVM); actions: implemented; unverified (gap — pending physical-device run) |
+| Selected evidence region shown by fill colour only | `selected` semantics | source rule passes; behaviour: implemented; unverified (gap — pending physical-device run) |
+| Intake preview text in a fixed 320 dp box (clips at 2x) | the fixed height is only on the image; the box is `heightIn(min = 320.dp)` | source rule passes; layout at 2x: implemented; unverified (gap — pending physical-device run) |
+| Two decorative `+` icons had no stated reason | comment; shared `ImportActionContent` | source rule passes |
 
 Found and not fixed (owner decisions or out of scope, in the step's
 `notes`): the list's Delete buttons say "Delete" without the item name;
