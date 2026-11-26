@@ -145,5 +145,16 @@ else
   fail=$((fail + 1))
 fi
 
+# The build job must run on an image whose python3 SQLite is new enough for
+# the vault search-index host tests, and must fail rather than skip them.
+if grep -A8 '^  build-lint-unit-test:' "$WORKFLOW" | grep -Eq 'runs-on: ubuntu-24.04' \
+  && grep -q 'Require a host SQLite that runs the search-index tests' "$WORKFLOW"; then
+  printf 'ok - build job requires a host SQLite of 3.42 or newer\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - build job requires a host SQLite of 3.42 or newer\n' >&2
+  fail=$((fail + 1))
+fi
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
