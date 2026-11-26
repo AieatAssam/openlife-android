@@ -204,8 +204,13 @@ an engine that supports it (`SearchIndex.ensure`).
   therefore run the real migration, triggers and query SQL against the
   host's Python `sqlite3` module (SQLite 3.53.3 with FTS5) through
   `HostSqlite`, a stdlib-only subprocess bridge.
-  - The bridge enables `foreign_keys` and `recursive_triggers`, matching
-    the device build. Cascades fire the index's delete triggers with
+  - The bridge enables `foreign_keys` (Room turns it on) and, by
+    default, `recursive_triggers`. No production code sets
+    `recursive_triggers`; on a device it has the build default. The
+    pinned `libsqlcipher.so` lists `DEFAULT_RECURSIVE_TRIGGERS` among its
+    compile-option strings (a static read of the AAR, not observed on a
+    device), and the P3-02 suites whose result could depend on it run
+    with it on and off (P3-02 review M-05; corrected 2026-11-26). Cascades fire the index's delete triggers with
     `recursive_triggers` on or off (host check); the setting is not what
     makes deletion reach the index.
   - The index needs SQLite 3.42 or later on the host (secure-delete).

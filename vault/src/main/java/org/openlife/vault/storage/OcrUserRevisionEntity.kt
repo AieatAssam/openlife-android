@@ -20,7 +20,7 @@ import androidx.room.Index
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("revisionId"), Index("spanId")],
+    indices = [Index("revisionId"), Index("spanId"), Index(value = ["supersedesId"], unique = true)],
 )
 data class OcrUserRevisionEntity(
     @androidx.room.PrimaryKey val id: String,
@@ -29,4 +29,6 @@ data class OcrUserRevisionEntity(
     val correctedText: String,
     val createdAt: Long,
     val actor: String,
+    /** C2-R15: the correction this one supersedes (same reading, same span); not a foreign key. */
+    val supersedesId: String? = null,
 )

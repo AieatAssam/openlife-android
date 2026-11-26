@@ -103,6 +103,29 @@ class DeletionRepositoryTest {
         assertTrue(!paths.blobFile(id).exists())
     }
 
+    /** P3-02-R4 / C2-R43 / C2-R61 (F-70): the shared routine leaves no C2 row of the Source behind. */
+    @Test
+    fun deletingASourceRemovesFactsEvidenceRunsEdgesAndReviewEvents(): Unit = runBlocking {
+        val id = prepareAndSave()
+        val rows = org.openlife.vault.storage.FactDeviceRows(db.openHelper.writableDatabase)
+        rows.readySourceWithReading(id.toString(), insertSource = false)
+        val revision = UUID.randomUUID().toString()
+        rows.extractedFact(id.toString(), UUID.randomUUID().toString(), revision)
+        rows.run(id.toString())
+        db.openHelper.writableDatabase.execSQL(
+            "INSERT INTO review_events(id, revisionId, sequence, decision, createdAt) VALUES (?, ?, 1, 'REJECT', 1)",
+            arrayOf<Any?>(UUID.randomUUID().toString(), revision),
+        )
+        assertEquals(1, rows.count("dependency_edges"))
+
+        assertEquals(DeleteResult.Deleted, deletionRepository.deleteSource(id))
+
+        listOf(
+            "sources", "ocr_revisions", "ocr_spans", "facts", "fact_revisions", "fact_evidence", "review_events",
+            "fact_extraction_runs", "dependency_edges",
+        ).forEach { table -> assertEquals(table, 0, rows.count(table)) }
+    }
+
     @Test
     fun deletingASourceRemovesItsDependentOcrRevision(): Unit = runBlocking {
         val id = prepareAndSave()

@@ -3,6 +3,16 @@ package org.openlife.vault.storage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.openlife.vault.facts.DependencyEdgeKind
+import org.openlife.vault.facts.DependencyNodeKind
+import org.openlife.vault.facts.EvidenceRole
+import org.openlife.vault.facts.ExtractionOutcome
+import org.openlife.vault.facts.ExtractionTrigger
+import org.openlife.vault.facts.FactKind
+import org.openlife.vault.facts.FactOrigin
+import org.openlife.vault.facts.FactStatus
+import org.openlife.vault.facts.ReviewDecision
+import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -47,6 +57,42 @@ class EnumDecodingTest {
 
         val span = spanEntity(coordinateSystem = "DISPLAY_POINTS").toDomain()
         assertEquals(OcrCoordinateSystem.UNRECOGNISED, span.coordinateSystem)
+    }
+
+    @Test
+    fun unknownFactEnumsDecodeToUnrecognisedAndAreReadOnly() {
+        val revision = FactRevisionEntity(
+            id = UUID.randomUUID().toString(),
+            factId = UUID.randomUUID().toString(),
+            revisionNo = 1,
+            origin = "DERIVED",
+            kind = "MERCHANT",
+            valueJson = "{}",
+            canonicalText = "t",
+            rawText = null,
+            status = "DISPUTED",
+            staleReason = "INPUT_DELETED",
+            staleAt = 1,
+            confidence = null,
+            methodId = "m",
+            methodVersion = null,
+            locale = null,
+            createdAt = 1,
+            supersedesRevisionId = null,
+        ).toDomain()
+        assertEquals(FactOrigin.UNRECOGNISED, revision.origin)
+        assertEquals(FactKind.UNRECOGNISED, revision.kind)
+        assertEquals(FactStatus.UNRECOGNISED, revision.status)
+        assertEquals(StaleReason.UNRECOGNISED, revision.staleReason)
+        assertEquals(false, revision.isRecognised)
+        assertEquals(ReviewDecision.UNRECOGNISED, decodeStored("ESCALATE", ReviewDecision.UNRECOGNISED))
+        assertEquals(EvidenceRole.UNRECOGNISED, decodeStored("CONTEXT", EvidenceRole.UNRECOGNISED))
+        assertEquals(DependencyEdgeKind.UNRECOGNISED, decodeStored("INPUT", DependencyEdgeKind.UNRECOGNISED))
+        assertEquals(DependencyNodeKind.UNRECOGNISED, decodeStored("RECORD", DependencyNodeKind.UNRECOGNISED))
+        assertEquals(ExtractionTrigger.UNRECOGNISED, decodeStored("SCHEDULED", ExtractionTrigger.UNRECOGNISED))
+        assertEquals(ExtractionOutcome.UNRECOGNISED, decodeStored("CANCELLED", ExtractionOutcome.UNRECOGNISED))
+        assertEquals(SpanScriptStatus.UNRECOGNISED, decodeStored("CYRILLIC", SpanScriptStatus.UNRECOGNISED))
+        assertEquals(FactStatus.CLARIFICATION_NEEDED, decodeStored("CLARIFICATION_NEEDED", FactStatus.UNRECOGNISED))
     }
 
     @Test

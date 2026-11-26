@@ -39,6 +39,11 @@ data class SourceEntity(
     val userContentKind: String? = null,
     val userContentKindAt: Long? = null,
     val assessmentMethodVersion: String? = null,
+    /** C2-R14: the current reading; trigger-checked, not a foreign key. */
+    val currentOcrRevisionId: String? = null,
+    /** C2-R63: bumped by every event that can change the Source's fact inputs. */
+    @ColumnInfo(defaultValue = "0")
+    val factInputEpoch: Long = 0,
 ) {
     @Suppress("CyclomaticComplexMethod") // one comparison per column
     override fun equals(other: Any?): Boolean {
@@ -59,7 +64,9 @@ data class SourceEntity(
             assessmentState == other.assessmentState &&
             userContentKind == other.userContentKind &&
             userContentKindAt == other.userContentKindAt &&
-            assessmentMethodVersion == other.assessmentMethodVersion
+            assessmentMethodVersion == other.assessmentMethodVersion &&
+            currentOcrRevisionId == other.currentOcrRevisionId &&
+            factInputEpoch == other.factInputEpoch
     }
 
     override fun hashCode(): Int {
@@ -79,6 +86,8 @@ data class SourceEntity(
         result = 31 * result + (userContentKind?.hashCode() ?: 0)
         result = 31 * result + (userContentKindAt?.hashCode() ?: 0)
         result = 31 * result + (assessmentMethodVersion?.hashCode() ?: 0)
+        result = 31 * result + (currentOcrRevisionId?.hashCode() ?: 0)
+        result = 31 * result + factInputEpoch.hashCode()
         return result
     }
 }

@@ -355,7 +355,7 @@ class OcrDatabaseTest {
         NonEntityTables.assertOnlySearchIndex(migrated, currentDatabaseVersion())
         try {
             val triggers = mutableListOf<String>()
-            migrated.query("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'sources' ORDER BY name")
+            migrated.query(READY_TRIGGERS_QUERY)
                 .use { cursor -> while (cursor.moveToNext()) triggers += cursor.getString(0) }
             assertEquals(
                 listOf("sources_ready_requires_fields_INSERT", "sources_ready_requires_fields_UPDATE"),
@@ -437,7 +437,7 @@ class OcrDatabaseTest {
             assertEquals(1, count("ocr_user_revisions"))
             assertEquals(0, count("ocr_span_reviews"))
             val triggers = mutableListOf<String>()
-            sql.query("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'sources' ORDER BY name")
+            sql.query(READY_TRIGGERS_QUERY)
                 .use { cursor -> while (cursor.moveToNext()) triggers += cursor.getString(0) }
             assertEquals(ReadyInvariantTriggers.names.sorted(), triggers)
             val rejected = runCatching {
@@ -514,4 +514,10 @@ class OcrDatabaseTest {
 
     /** The @Database version, read from a database Room just created (not Vault.SCHEMA_VERSION). */
     private fun currentDatabaseVersion(): Int = db.openHelper.readableDatabase.version
+
+    private companion object {
+        /** The READY-invariant triggers on `sources`; C2 adds its own pointer trigger there (P3-02). */
+        const val READY_TRIGGERS_QUERY = "SELECT name FROM sqlite_master WHERE type = 'trigger' " +
+            "AND tbl_name = 'sources' AND name LIKE 'sources_ready%' ORDER BY name"
+    }
 }
