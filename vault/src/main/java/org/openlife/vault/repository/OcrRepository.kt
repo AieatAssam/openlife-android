@@ -202,7 +202,12 @@ class OcrRepository(
                             completed.charCount,
                             completed.spanCount,
                         )
-                        if (moved == 1) ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
+                        if (moved == 1) {
+                            ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
+                            // C2-R14: the pointer moves only to a later-started reading,
+                            // so a late finisher stays history (F-69).
+                            ocrDao.moveCurrentReading(sourceId.toString(), completed.id.toString())
+                        }
                         moved == 1
                     }
                     if (committed) {
@@ -254,15 +259,20 @@ class OcrRepository(
                     val span = database.ocrDao().findSpan(spanId.toString()) ?: return@withMutation false
                     if (span.revisionId != revisionId.toString()) return@withMutation false
                 }
-                database.ocrDao().insertUserRevision(
-                    OcrUserRevision(
-                        id = UUID.randomUUID(),
-                        revisionId = revisionId,
-                        spanId = spanId,
-                        correctedText = correctedText,
-                        createdAt = clock(),
-                    ).toEntity(),
-                )
+                database.withTransaction {
+                    // C2-R15: name the current head explicitly; the trigger refuses anything else.
+                    val head = database.ocrDao().currentCorrection(revisionId.toString(), spanId?.toString())
+                    database.ocrDao().insertUserRevision(
+                        OcrUserRevision(
+                            id = UUID.randomUUID(),
+                            revisionId = revisionId,
+                            spanId = spanId,
+                            correctedText = correctedText,
+                            createdAt = clock(),
+                            supersedesId = head?.let(UUID::fromString),
+                        ).toEntity(),
+                    )
+                }
                 true
             }
         }
@@ -336,9 +346,11 @@ internal fun ocrViewOf(
     corrections: List<OcrUserRevisionEntity>,
     reviews: List<OcrSpanReviewEntity>,
 ): OcrView {
-    // Corrections arrive oldest first, so the last one per span is the latest.
+    // C2-R15: a span's current correction is the head of its supersession
+    // chain (the one no other correction supersedes), never the clock.
     // A span's current review is its highest sequence, never the clock (P2-06-R12).
-    val latestBySpan = corrections.associateBy { it.spanId }
+    val superseded = corrections.mapNotNullTo(mutableSetOf()) { it.supersedesId }
+    val latestBySpan = corrections.filterNot { it.id in superseded }.associateBy { it.spanId }
     val latestReviewBySpan = reviews.groupBy { it.spanId }.mapValues { (_, rows) -> rows.maxBy { it.sequence } }
     return OcrView(
         revision = latest.toDomain(),

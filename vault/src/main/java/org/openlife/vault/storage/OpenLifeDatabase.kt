@@ -7,9 +7,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Schema v3 adds per-span review metadata; v4 adds the communication
  * assessment state and the user's content-kind label to `sources`; v5 adds
- * the FTS5 search index (virtual tables and triggers, not entities; ADR-0010). Fact,
- * Record, and Action remain absent — later capabilities add their own
- * migrations.
+ * the FTS5 search index (virtual tables and triggers, not entities; ADR-0010);
+ * v6 adds the C2 typed facts (docs/capabilities/C2.md §4). Record and Action
+ * remain absent — later capabilities add their own migrations.
  */
 @Database(
     entities = [
@@ -18,8 +18,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         OcrSpanEntity::class,
         OcrUserRevisionEntity::class,
         OcrSpanReviewEntity::class,
+        FactEntity::class,
+        FactRevisionEntity::class,
+        FactEvidenceEntity::class,
+        ReviewEventEntity::class,
+        FactExtractionRunEntity::class,
+        DependencyEdgeEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class OpenLifeDatabase : RoomDatabase() {
@@ -31,6 +37,10 @@ abstract class OpenLifeDatabase : RoomDatabase() {
     abstract fun ocrSpanReviewDao(): OcrSpanReviewDao
 
     abstract fun searchDao(): SearchDao
+
+    abstract fun factDao(): FactDao
+
+    abstract fun sourceRowRemovalDao(): SourceRowRemovalDao
 
     companion object {
         /**
@@ -47,6 +57,9 @@ abstract class OpenLifeDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 ReadyInvariantTriggers.create(db)
+                // P3-02: Room cannot declare the C2 CHECKs and triggers; a fresh
+                // database gets the same ones the migration creates.
+                FactSchemaTriggers.create(db)
                 // P2-08: a fresh database gets the same search index a migrated one has.
                 SearchIndex.create(db)
             }
@@ -54,7 +67,16 @@ abstract class OpenLifeDatabase : RoomDatabase() {
 
         /** Every migration, in order; never destructive (design §10). */
         val MIGRATIONS: List<androidx.room.migration.Migration> by lazy {
-            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        }
+
+        /**
+         * P3-02 (C2 §4, C2-R21): the C2 tables, the §4.7 OCR columns with
+         * their backfills and the C2 triggers, in the named steps of
+         * [FactMigration]. Additive only (FactDatabaseTest).
+         */
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) = FactMigration.migrate(db)
         }
 
         /**

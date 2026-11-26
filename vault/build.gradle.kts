@@ -109,6 +109,18 @@ dependencies {
 tasks.withType<Test>().configureEach {
     systemProperty("openlife.rootDir", rootProject.projectDir.absolutePath)
     inputs.files(rootProject.fileTree("eval/ocr/v1")).withPropertyName("ocrSet")
+    // A failed test prints its exception message and causes, so a CI log
+    // explains a host-SQLite failure (HostSqlite.Failure carries the SQLite
+    // error, the statement kind and the engine version); skips print their
+    // assumption message (for example a host SQLite without FTS5 secure-delete);
+    // HostSqlite prints the engine version once per test JVM on standard error.
+    testLogging {
+        events("failed", "skipped", "standard_error")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
 }
 
 detekt {

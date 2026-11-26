@@ -76,6 +76,8 @@ fun OcrSpan.toEntity() = OcrSpanEntity(
     top = evidenceRegion?.top,
     right = evidenceRegion?.right,
     bottom = evidenceRegion?.bottom,
+    hasEvidenceRegion = evidenceRegion != null,
+    scriptStatus = spanScriptStatusOf(text),
 )
 
 fun OcrSpanReviewEntity.toDomain() = OcrSpanReview(
@@ -93,6 +95,7 @@ fun OcrUserRevisionEntity.toDomain() = OcrUserRevision(
     correctedText = correctedText,
     createdAt = createdAt,
     actor = actor,
+    supersedesId = supersedesId?.let(UUID::fromString),
 )
 
 fun OcrUserRevision.toEntity() = OcrUserRevisionEntity(
@@ -102,4 +105,5 @@ fun OcrUserRevision.toEntity() = OcrUserRevisionEntity(
     correctedText = correctedText,
     createdAt = createdAt,
     actor = actor,
+    supersedesId = supersedesId?.toString(),
 )
