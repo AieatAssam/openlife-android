@@ -77,3 +77,7 @@ class FactRepository(
         }
     }
 }
+
+/** M-06: a write's storage failure as [FactWriteResult.Failed]; cancellation is rethrown. */
+internal suspend fun captureWriteFailure(block: suspend () -> FactWriteResult): FactWriteResult =
+    TODO("P3-02 review GREEN")

@@ -17,14 +17,18 @@ import java.lang.reflect.Proxy
  * This is the host's SQLite (3.53.x), not SQLCipher. It proves the SQL —
  * DDL, triggers, cascades, MATCH syntax and the repository's queries — on the
  * same FTS5 code; it is not device evidence (docs/decisions/0010-local-search.md).
- * Foreign keys are on, as Room turns them on; recursive triggers are on, as
- * the pinned SQLCipher build compiles them on (SQLITE_DEFAULT_RECURSIVE_TRIGGERS).
- * Cascades fire the FTS delete triggers with recursive triggers on or off
- * (host check, P2-08 review). `PRAGMA secure_delete` is left at its default
- * (off), as in the pinned build. [path] null is an in-memory database; a file
- * path lets a test close and reopen the same database.
+ * Foreign keys are on, as Room turns them on. No production code sets
+ * `recursive_triggers`; its value on a device is the build default. The
+ * pinned `libsqlcipher.so` lists `DEFAULT_RECURSIVE_TRIGGERS` among its
+ * compile-option strings (read from the AAR, not observed on a device), so
+ * [recursiveTriggers] defaults to on, and the suites whose result could
+ * depend on it run in both modes (P3-02 review M-05). Cascades fire the FTS
+ * delete triggers with recursive triggers on or off (host check, P2-08
+ * review). `PRAGMA secure_delete` is left at its default (off), as in the
+ * pinned build. [path] null is an in-memory database; a file path lets a test
+ * close and reopen the same database.
  */
-class HostSqlite(path: File? = null) : Closeable {
+class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closeable {
     class Failure(message: String) : RuntimeException(message)
 
     private val script: File = File.createTempFile("host-sqlite", ".py").apply {
@@ -37,6 +41,10 @@ class HostSqlite(path: File? = null) : Closeable {
         .start()
     private val input: Writer = process.outputStream.bufferedWriter()
     private val output: BufferedReader = process.inputStream.bufferedReader()
+
+    init {
+        if (!recursiveTriggers) exec("PRAGMA recursive_triggers = OFF")
+    }
 
     fun exec(sql: String, vararg args: Any?) {
         query(sql, *args)

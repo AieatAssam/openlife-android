@@ -6,13 +6,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.io.File
 
 /**
  * C2-R43 / C2-R61 (finding F-70) on host SQLite: one routine removes a
  * Source's rows for both DeletionRepository and RecoveryRepository's
  * DELETING branch, with the same result whether `PRAGMA foreign_keys` is on
- * or off, and it is the only remover of a non-STAGED Source row.
+ * or off (SourceRowRemovalBoundaryTest proves it is the only remover).
  */
 class SourceRowRemovalTest {
     private val hosts = mutableListOf<HostSqlite>()
@@ -21,9 +20,9 @@ class SourceRowRemovalTest {
     fun close() = hosts.forEach(HostSqlite::close)
 
     /** Source `a` with every C2 and OCR row kind; Source `b` alongside, which must survive untouched. */
-    private fun populated(): Pair<HostSqlite, FactRows> {
-        val host = HostSqlite().also { hosts += it }
-        val fixture = FactHost.fresh(host)
+    private fun populated(recursive: Boolean = true, migrated: Boolean = false): Pair<HostSqlite, FactRows> {
+        val host = HostSqlite(recursiveTriggers = recursive).also { hosts += it }
+        val fixture = if (migrated) FactHost.migrated(host, 5) else FactHost.fresh(host)
         val rows = FactRows(host)
         listOf("a", "b").forEach { id ->
             rows.readySourceWithReading(fixture, id)
@@ -50,8 +49,13 @@ class SourceRowRemovalTest {
 
     @Test
     fun deletionAndRecoveryShareOneRoutineWithTheSameResultWithForeignKeysOnAndOff() = runBlocking {
-        val results = listOf(true, false).map { foreignKeys ->
-            val (host, rows) = populated()
+        // M-01/M-05: every combination of foreign keys, recursive triggers and
+        // a fresh or a migrated v6 database ends with the same rows.
+        val modes = listOf(true, false).flatMap { fk ->
+            listOf(true, false).flatMap { rec -> listOf(false, true).map { mig -> Triple(fk, rec, mig) } }
+        }
+        val results = modes.map { (foreignKeys, recursive, migrated) ->
+            val (host, rows) = populated(recursive, migrated)
             host.exec("PRAGMA foreign_keys = ${if (foreignKeys) "ON" else "OFF"}")
             assertEquals(if (foreignKeys) 1L else 0L, host.long("PRAGMA foreign_keys"))
             rows.setState("a", "DELETING")
@@ -64,7 +68,7 @@ class SourceRowRemovalTest {
                 val left = host.query(
                     "SELECT * FROM $table",
                 ).flatten().filterIsInstance<String>().filter { it.startsWith("a") }
-                assertEquals("$table keeps nothing of source a (fk=$foreignKeys)", emptyList<String>(), left)
+                assertEquals("$table keeps nothing of source a (fk=$foreignKeys, rec=$recursive, mig=$migrated)", emptyList<String>(), left)
             }
             assertEquals(
                 0L,
@@ -79,7 +83,7 @@ class SourceRowRemovalTest {
             )
             snapshot(rows)
         }
-        assertEquals("foreign keys on and off give the same database", results[0], results[1])
+        results.forEachIndexed { i, result -> assertEquals("mode ${modes[i]} gives the same database", results[0], result) }
         assertTrue(results[0].getValue("sources").single()[0] == "b")
     }
 
@@ -112,32 +116,6 @@ class SourceRowRemovalTest {
                 assertTrue("$sql: $failure", failure?.message.orEmpty().contains(refusal))
             }
         }
-    }
-
-    @Test
-    fun onlyTheRoutineAndStagedCleanupRemoveSourceRows() {
-        val main = File("src/main/java/org/openlife/vault")
-        val files = main.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
-        assertEquals(
-            "nothing calls deleteById directly",
-            emptyList<String>(),
-            files.filter { it.readText().contains(".deleteById(") }.map { it.name },
-        )
-        assertEquals(
-            "deleteById is handed only to SourceRowRemoval as step 7",
-            setOf("DeletionRepository.kt", "RecoveryRepository.kt"),
-            files.filter { it.readText().contains("::deleteById") }.map { it.name }.toSet(),
-        )
-        listOf("repository/DeletionRepository.kt", "repository/RecoveryRepository.kt").forEach { path ->
-            assertTrue(
-                "$path removes rows through SourceRowRemoval",
-                File(main, path).readText().contains("SourceRowRemoval.remove("),
-            )
-        }
-        val deletes = files
-            .filter { Regex("DELETE FROM `?sources`?").containsMatchIn(it.readText()) }.map { it.name }.toSet()
-        assertEquals(setOf("SourceRowRemoval.kt", "SourceDao.kt"), deletes)
-        assertTrue(File(main, "storage/SourceDao.kt").readText().contains("state = 'STAGED'"))
     }
 
     private companion object {

@@ -271,4 +271,7 @@ sealed interface FactWriteResult {
     data class Written(val factId: UUID, val revisionId: UUID) : FactWriteResult
 
     data class Refused(val reason: FactRefusal) : FactWriteResult
+
+    /** Storage failed; nothing was written (P3-02 review M-06). */
+    data object Failed : FactWriteResult
 }

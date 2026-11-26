@@ -143,7 +143,13 @@ class FactWriterTest {
         rows.readySourceWithReading(fixture, "a")
         rows.fact("f", "a")
         val candidates = "{\"candidates\":[{\"date\":\"2026-03-04\"},{\"date\":\"2026-04-03\"}]}"
-        rows.revision("x", "f", status = "CLARIFICATION_NEEDED", valueJson = candidates)
+        rows.revision(
+            "x",
+            "f",
+            status = "CLARIFICATION_NEEDED",
+            valueJson = candidates,
+            canonicalText = "2026-03-04 | 2026-04-03",
+        )
         rows.current("f", "x")
         rows.evidence("e1", "x", "a", "a-s1")
         val x = "x"
@@ -177,5 +183,65 @@ class FactWriterTest {
         repeat(FactLimits.MAX_CURRENT_REVISIONS - 1) { writer.addUserFact("a", FactKind.DATE, date) }
         assertEquals(FactLimits.MAX_CURRENT_REVISIONS, dao.countCurrentRevisions("a"))
         assertEquals(FactWrite.Refused(FactRefusal.LIMIT_REACHED), writer.addUserFact("a", FactKind.DATE, date))
+    }
+
+    @Test
+    fun clarificationIsRefusedWhenTheCandidateTextsDoNotLineUp() = runBlocking {
+        val fixture = FactHost.fresh(host)
+        rows.readySourceWithReading(fixture, "a")
+        rows.fact("f", "a", kind = "URL")
+        val first = "{\"normalized\":\"https://a.example/x | y\",\"raw\":\"a.example/x | y\"}"
+        val second = "{\"normalized\":\"https://b.example/\",\"raw\":\"b.example\"}"
+        rows.revision(
+            "x",
+            "f",
+            kind = "URL",
+            status = "CLARIFICATION_NEEDED",
+            valueJson = "{\"candidates\":[$first,$second]}",
+            canonicalText = "https://a.example/x | y | https://b.example/",
+        )
+        rows.current("f", "x")
+        rows.evidence("e1", "x", "a", "a-s1")
+        assertEquals(
+            "three texts for two candidates: no text can be matched to its candidate (M-08)",
+            FactWrite.Refused(FactRefusal.INVALID_VALUE),
+            writer.clarify("x", FactValue(first, "anything at all")),
+        )
+        assertEquals(
+            FactWrite.Refused(FactRefusal.INVALID_VALUE),
+            writer.clarify("x", FactValue(second, "https://b.example/")),
+        )
+    }
+
+    @Test
+    fun userValuesMustHaveTheShapeOfTheirKind() = runBlocking {
+        val fixture = FactHost.fresh(host)
+        rows.readySourceWithReading(fixture, "a")
+        val invalid = FactWrite.Refused(FactRefusal.INVALID_VALUE)
+        listOf(
+            FactKind.DATE to FactValue("{\"time\":\"10:00\"}", "10:00"),
+            FactKind.DATE to FactValue("{\"date\":\"2026-02-30\"}", "2026-02-30"),
+            FactKind.DATE to FactValue("{\"date\":\"2026-11-27\"}", "2026-11-28"),
+            FactKind.DATE to FactValue("{\"date\": \"2026-11-27\"}", "2026-11-27"),
+            FactKind.TIME to FactValue("{\"time\":\"25:00\"}", "25:00"),
+            FactKind.DATETIME to FactValue("{\"date\":\"2026-11-27\"}", "2026-11-27"),
+            FactKind.MONEY to FactValue("{\"date\":\"2026-11-27\"}", "2026-11-27"),
+            FactKind.URL to FactValue("{\"amount\":\"1.00\",\"currency\":null,\"rawSymbol\":null}", "1.00"),
+        ).forEach { (kind, value) -> assertEquals("$kind", invalid, writer.addUserFact("a", kind, value)) }
+        listOf(
+            FactKind.DATE to FactValue("{\"date\":\"2026-11-27\"}", "2026-11-27"),
+            FactKind.TIME to FactValue("{\"time\":\"14:30\"}", "14:30"),
+            FactKind.TIME to FactValue("{\"time\":\"14:30:05\"}", "14:30:05"),
+            FactKind.DATETIME to FactValue("{\"date\":\"2026-11-27\",\"time\":\"14:30\"}", "2026-11-27 14:30"),
+        ).forEach { (kind, value) -> written(writer.addUserFact("a", kind, value)) }
+        extractedOn("f2")
+        assertEquals("a correction keeps the kind", invalid, writer.correct("x2", FactValue("{\"time\":\"10:00\"}", "10:00")))
+    }
+
+    private fun extractedOn(factId: String) {
+        rows.fact(factId, "a")
+        rows.revision("x2", factId)
+        rows.current(factId, "x2")
+        rows.evidence("e2", "x2", "a", "a-s2")
     }
 }

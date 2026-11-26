@@ -1,6 +1,7 @@
 package org.openlife.vault.storage
 
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -32,6 +33,11 @@ class FactDatabaseSqlCipherTest {
             SupportOpenHelperFactory(ByteArray(32) { 7 }),
         )
         val v5 = helper.createDatabase(name, 5)
+        // M-04: a v5 vault as v5 shipped it, with the search index and
+        // ADR-0010's any-column update triggers, so the C2-R21 order
+        // (narrow the triggers before any backfill UPDATE) runs on SQLCipher.
+        assertTrue("FTS5 index on SQLCipher", SearchIndex.ensure(v5))
+        V5_UPDATE_TRIGGERS.forEach(v5::execSQL)
         v5.execSQL(
             "INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height, " +
                 "orientation, wrappedDek, artefactVersion) VALUES ('s1', 'READY', 1, 'SHARE', 'image/png', 10, " +
@@ -52,6 +58,8 @@ class FactDatabaseSqlCipherTest {
             "INSERT INTO ocr_user_revisions(id, revisionId, spanId, correctedText, createdAt, actor) VALUES " +
                 "('u1', 'r2', 'sp1', 'Total 12.60', 5, 'USER'), ('u2', 'r2', 'sp1', 'Total 12.70', 6, 'USER')",
         )
+        val indexedBefore = ftsData(v5)
+        assertTrue("the seeded rows are indexed", indexedBefore.isNotEmpty())
         v5.close()
         val migrated = helper.runMigrationsAndValidate(name, 6, false, *OpenLifeDatabase.MIGRATIONS.toTypedArray())
         try {
@@ -62,6 +70,7 @@ class FactDatabaseSqlCipherTest {
             assertEquals("1|LATIN", rows.text("SELECT hasEvidenceRegion || '|' || scriptStatus FROM ocr_spans WHERE id = 'sp1'"))
             assertEquals("0|UNSUPPORTED", rows.text("SELECT hasEvidenceRegion || '|' || scriptStatus FROM ocr_spans WHERE id = 'sp2'"))
             assertEquals(0, rows.count("facts"))
+            assertEquals("the backfills leave the index byte-identical", indexedBefore, ftsData(migrated))
             assertEquals(
                 "update triggers are narrowed (C2-R64)",
                 2,
@@ -73,5 +82,27 @@ class FactDatabaseSqlCipherTest {
             migrated.close()
             InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(name)
         }
+    }
+
+    /** Every FTS `_data` block, hex-encoded, in id order. */
+    private fun ftsData(db: SupportSQLiteDatabase): List<String> = SearchIndex.tables.flatMap { table ->
+        db.query("SELECT id, hex(block) FROM ${table}_data ORDER BY id").use { cursor ->
+            buildList { while (cursor.moveToNext()) add("${cursor.getLong(0)}:${cursor.getString(1)}") }
+        }
+    }
+
+    private companion object {
+        /** The update triggers exactly as ADR-0010 shipped them in v5 (FactDatabaseTest has the host twin). */
+        val V5_UPDATE_TRIGGERS = listOf(
+            "DROP TRIGGER IF EXISTS ocr_text_fts_au",
+            "CREATE TRIGGER ocr_text_fts_au AFTER UPDATE ON ocr_spans BEGIN " +
+                "INSERT INTO ocr_text_fts(ocr_text_fts, rowid, text) VALUES ('delete', old.rowid, old.text); " +
+                "INSERT INTO ocr_text_fts(rowid, text) VALUES (new.rowid, new.text); END",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_au",
+            "CREATE TRIGGER ocr_correction_fts_au AFTER UPDATE ON ocr_user_revisions BEGIN " +
+                "INSERT INTO ocr_correction_fts(ocr_correction_fts, rowid, correctedText) " +
+                "VALUES ('delete', old.rowid, old.correctedText); " +
+                "INSERT INTO ocr_correction_fts(rowid, correctedText) VALUES (new.rowid, new.correctedText); END",
+        )
     }
 }

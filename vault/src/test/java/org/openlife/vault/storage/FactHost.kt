@@ -85,6 +85,7 @@ class FactRows(val host: HostSqlite) {
         kind: String = "DATE",
         supersedes: String? = null,
         valueJson: String = "{\"date\":\"2026-11-26\"}",
+        canonicalText: String = "2026-11-26",
     ) {
         val user = origin == "USER"
         with(FactHost) {
@@ -95,7 +96,7 @@ class FactRows(val host: HostSqlite) {
                 "origin" to origin,
                 "kind" to kind,
                 "valueJson" to valueJson,
-                "canonicalText" to "2026-11-26",
+                "canonicalText" to canonicalText,
                 "rawText" to if (user) null else "26.11.2026",
                 "status" to status,
                 "methodId" to if (user) "user:correct" else "date:numeric",
@@ -117,7 +118,16 @@ class FactRows(val host: HostSqlite) {
         host.changes()
     }
 
-    fun evidence(id: String, revisionId: String, sourceId: String, spanId: String, role: String = "VALUE") {
+    @Suppress("LongParameterList") // one column per parameter
+    fun evidence(
+        id: String,
+        revisionId: String,
+        sourceId: String,
+        spanId: String,
+        role: String = "VALUE",
+        start: Int? = 0,
+        end: Int? = 4,
+    ) {
         with(FactHost) {
             host.named(
                 FactSql.INSERT_EVIDENCE,
@@ -127,8 +137,8 @@ class FactRows(val host: HostSqlite) {
                 "sourceId" to sourceId,
                 "ocrSpanId" to spanId,
                 "ocrUserRevisionId" to null,
-                "textStart" to 0,
-                "textEnd" to 4,
+                "textStart" to start,
+                "textEnd" to end,
             )
         }
     }
