@@ -9,6 +9,7 @@ import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SearchDao
+import org.openlife.vault.storage.SearchIndex
 import org.openlife.vault.storage.SearchRow
 import java.io.File
 import java.lang.reflect.Proxy
@@ -111,8 +112,19 @@ class SearchFixture(val host: HostSqlite) {
     fun secureDelete(table: String): Long? =
         host.query("SELECT v FROM ${table}_config WHERE k = 'secure-delete'").singleOrNull()?.single() as Long?
 
-    /** Fails if an index disagrees with its content table. */
-    fun integrityCheck(table: String) = host.exec("INSERT INTO $table($table) VALUES('integrity-check')")
+    /**
+     * Fails if an index is internally inconsistent or (rank 1, external
+     * content) disagrees with its content table. PR #36: SQLite 3.42.0 to
+     * 3.46.0 write a corrupt index here, which only this check reveals;
+     * queries still answer.
+     */
+    fun integrityCheck(table: String) {
+        host.exec("INSERT INTO $table($table) VALUES('integrity-check')")
+        host.exec("INSERT INTO $table($table, rank) VALUES('integrity-check', 1)")
+    }
+
+    /** [integrityCheck] on both index tables. */
+    fun integrityCheckAll() = SearchIndex.tables.forEach(::integrityCheck)
 
     companion object {
         private const val LONG_TERM = 6

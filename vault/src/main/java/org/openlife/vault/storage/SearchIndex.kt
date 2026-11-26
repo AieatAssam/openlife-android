@@ -39,6 +39,9 @@ object SearchIndex {
 
     const val SECURE_DELETE = "secure-delete"
 
+    /** The oldest engine the index is created or kept on (PR #36 finding; see [capable]). */
+    const val MIN_SQLITE_VERSION = "3.46.1"
+
     val tables: List<String> = listOf(TEXT_TABLE, CORRECTION_TABLE)
 
     val triggerNames: List<String> = tables.flatMap { table ->
