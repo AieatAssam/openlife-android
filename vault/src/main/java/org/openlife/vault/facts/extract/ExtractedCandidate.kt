@@ -104,10 +104,12 @@ enum class AbstentionReason {
 
 /**
  * A token a rule recognised and did not emit (ADR-0008 §1). Its characters
- * are claimed: no lower-precedence rule reads them.
+ * are claimed: no lower-precedence rule reads them. [kind] is null for a
+ * numeric token holding a non-ASCII digit (Z-16), which is set aside before
+ * any numeric rule reads the line.
  */
 data class Abstention(
-    val kind: ExtractedKind,
+    val kind: ExtractedKind?,
     val spanId: String,
     val startOffset: Int,
     val endOffset: Int,

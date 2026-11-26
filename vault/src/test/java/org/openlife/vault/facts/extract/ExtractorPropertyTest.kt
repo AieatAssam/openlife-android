@@ -66,15 +66,19 @@ class ExtractorPropertyTest {
     private fun checkInvariants(spans: List<ExtractionSpan>, result: ExtractionResult) {
         for (span in spans) {
             val text = span.text
-            val ranges = result.candidates.filter { it.spanId == span.spanId }.map { it.startOffset until it.endOffset } +
-                result.abstentions.filter { it.spanId == span.spanId }.map { it.startOffset until it.endOffset }
+            val candidateRanges = result.candidates.filter { it.spanId == span.spanId }
+                .map { it.startOffset until it.endOffset }
+            val abstentionRanges = result.abstentions.filter { it.spanId == span.spanId }
+                .map { it.startOffset until it.endOffset }
+            val ranges = candidateRanges + abstentionRanges
             for (candidate in result.candidates.filter { it.spanId == span.spanId }) {
                 assertTrue(candidate.startOffset >= 0 && candidate.endOffset <= text.length)
                 assertEquals(text.substring(candidate.startOffset, candidate.endOffset), candidate.rawText)
                 checkCandidateSet(candidate)
             }
             for (abstention in result.abstentions.filter { it.spanId == span.spanId }) {
-                assertTrue(abstention.startOffset in 0 until abstention.endOffset && abstention.endOffset <= text.length)
+                assertTrue(abstention.startOffset in 0 until abstention.endOffset)
+                assertTrue(abstention.endOffset <= text.length)
             }
             val sorted = ranges.sortedBy { it.first }
             for (index in 1 until sorted.size) {
