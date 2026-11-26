@@ -69,8 +69,7 @@ None was started or run. Instrumented tests were **compiled**
    `gradle/verification-metadata.xml`. `AboutScreenTest` instead registers
    a catch-all blocking `Instrumentation.ActivityMonitor(null as IntentFilter?, null, true)`
    and asserts zero hits after clicking every button and a URL line.
-   This catches any `startActivity` from the app process, just as
-   `intended(none)` would.
+   It is designed to catch any `startActivity` from the app process.
 2. **Raw resource location.** The step names
    `app/src/main/res/raw/third_party_licenses.md`. AGP 9 refuses provider
    directories in the source-set API, and a committed copy could drift. The
@@ -105,6 +104,10 @@ None was started or run. Instrumented tests were **compiled**
   - `:app:test`
   - `lint` (after `res/raw/keep.xml` keeps `R.raw.ofl_1_1`)
   - `assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin`
+- After that, `res/raw/keep.xml` was added and every `Test` task was made
+  to depend on the `bundle*OfflineDocuments` tasks. Then
+  `./gradlew --no-daemon --max-workers=2 detekt lint` ran; `lint` depends
+  on `test`. Result: `BUILD SUCCESSFUL`.
 - JVM counts: app 204 (main: 189), vault 193, eval 26. No failures and no
   skips.
 - `scripts/plan-check.sh`: steps=82 errors=0. `scripts/tests/run.sh`: 51
@@ -136,5 +139,6 @@ Run on the tablet (`U8BBB20806201256`) once no other agent is using it:
    - Compare the fingerprint with `apksigner verify --print-certs` for the
      same APK.
    - Open the licences and scroll to the end to check for jank or ANR.
-6. Golden: decide whether About joins `BrandScreenshotInstrumentedTest`.
+6. Golden: no committed golden captures About or Settings, so none went
+   stale. Decide whether About joins `BrandScreenshotInstrumentedTest`.
    It was not added here.

@@ -95,6 +95,12 @@ notes: >
   (addGeneratedSourceDirectory) instead of a committed res/raw copy;
   KeyInfo is read with SecretKeyFactory (the wrapping key is AES);
   SettingsController reset gating is unchanged (UI-only exact word).
+  No committed golden captures About or Settings (checked
+  app/src/androidTest/assets/golden and BrandScreenshotInstrumentedTest),
+  so none was made stale by the restyle.
+  vault/ touches: KeystoreWrapper.wrappingKeySecurity (R3) and
+  SourceViewRepository.countSourcesByState (R4, not in files_touched);
+  neither has a JVM test (Keystore and SQLCipher need a device).
   Ideas not implemented: an About golden in BrandScreenshotInstrumentedTest.
 
 evidence: >
@@ -110,12 +116,15 @@ evidence: >
   (its strings were added with the test). :app:compileDebugAndroidTestKotlin
   succeeded with the TODO() stubs. GREEN a58eff4: detekt clean;
   :app:testDebugUnitTest 200 tests, 0 failures. REFACTOR 459ceeb:
-  AboutControllerTest (4). Final gate on 459ceeb, run in chunks with
+  AboutControllerTest (4). Final gate on the working tree that became
+  459ceeb, run in chunks with
   --max-workers=2 because another session's gradlew --stop killed two
   whole-gate runs ("daemon disappeared", "stop command received"): detekt
   :vault:test :eval:test BUILD SUCCESSFUL; :app:test BUILD SUCCESSFUL; lint
   BUILD SUCCESSFUL (after keeping R.raw.ofl_1_1); assembleDebug
   :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
-  BUILD SUCCESSFUL. JVM counts: app 204 (main 189), vault 193 (193), eval 26
+  BUILD SUCCESSFUL. After keep.xml and making every Test task depend on the
+  bundle*OfflineDocuments tasks: ./gradlew --no-daemon --max-workers=2
+  detekt lint (lint depends on test) BUILD SUCCESSFUL. JVM counts: app 204 (main 189), vault 193 (193), eval 26
   (26); 0 failures, 0 skipped. scripts/plan-check.sh steps=82 errors=0;
   scripts/tests/run.sh 51 passed, 0 failed. Instrumented: compiled only, not run.

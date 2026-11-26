@@ -354,6 +354,8 @@ tasks.named("generateLicenseReport") {
 }
 
 tasks.withType<Test>().configureEach {
+    // BundledDocumentsTest compares every variant's generated copy with docs/.
+    dependsOn(tasks.withType<BundleOfflineDocuments>())
     dependsOn(writeReleaseRuntimeClasspath)
     dependsOn("checkLicense")
     dependsOn("processReleaseMainManifest")
