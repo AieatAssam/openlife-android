@@ -13,7 +13,13 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,10 +28,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.app.MainActivity
+import org.openlife.app.OpenLifeApp
 import org.openlife.app.navigation.OpenLifeNavHost
 import org.openlife.app.navigation.Routes
 import org.openlife.app.test.FakeAppContainer
 import org.openlife.app.test.StrictModeRule
+import org.openlife.app.test.createReadySource
+import org.openlife.app.test.deleteSyntheticSource
+import org.openlife.app.test.requestOpenSource
 import org.openlife.app.test.syntheticJpeg
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat
@@ -40,6 +51,9 @@ import org.openlife.vault.repository.ReadyReadResult
  * observe-by-id flow behind [org.openlife.app.SourceStore.observeSource]),
  * independent of what the list has loaded. A missing id shows the
  * unavailable state and returns to the list exactly once.
+ *
+ * The first three tests host the real graph over [FakeAppContainer]; the
+ * fourth runs the real container.
  *
  * Status: implemented; unverified (gap — pending physical-device run).
  */
@@ -108,6 +122,27 @@ class ViewerByIdTest {
         assertFalse("a second exit popped the list", composeRule.activity.isFinishing)
     }
 
+    /**
+     * Review N-05: the same by-id path through the real container — Room's
+     * observeVisibleSource, the lock gate and the vault read — on the real
+     * MainActivity, opened through the internal-link queue.
+     */
+    @Test
+    fun viewerOpensASourceByIdThroughTheRealStore() {
+        val application = ApplicationProvider.getApplicationContext<OpenLifeApp>()
+        FirstRunPreferences.setAcknowledged(application)
+        val id = application.createReadySource()
+        try {
+            application.requestOpenSource(id)
+            ActivityScenario.launch(MainActivity::class.java).use {
+                val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                assertTrue("the real store did not show the source", device.wait(Until.hasObject(By.desc("Saved image")), REAL_WAIT_MS))
+            }
+        } finally {
+            application.deleteSyntheticSource(id)
+        }
+    }
+
     private fun setHost(fake: FakeAppContainer) {
         container = fake
         composeRule.setContent {
@@ -145,6 +180,7 @@ class ViewerByIdTest {
 
     private companion object {
         const val WAIT_MS = 10_000L
+        const val REAL_WAIT_MS = 30_000L
         const val MAX_FRAMES = 60
         const val IMPORT = "Import from photos"
     }

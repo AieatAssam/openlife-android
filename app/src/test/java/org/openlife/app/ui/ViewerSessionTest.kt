@@ -122,8 +122,13 @@ class ViewerSessionTest {
         assertTrue(session.ocr.value is OcrUiState.Ready)
     }
 
+    /**
+     * Review N-03: a trim while visible drops the reference and reloads, but
+     * never releases (recycles) an image the composition may still draw;
+     * the garbage collector frees it once the UI lets go (as F-28 fixed).
+     */
     @Test
-    fun aTrimWhileVisibleDropsAndReloads() {
+    fun aTrimWhileVisibleDropsAndReloadsWithoutReleasing() {
         val session = newSession()
         ports.sources.value = SourceLookup.Found(source())
         session.onVisible()
@@ -131,9 +136,26 @@ class ViewerSessionTest {
 
         session.scrub()
 
-        assertTrue(first.released)
+        assertFalse("a visible image is never recycled", first.released)
         assertEquals(2, ports.reads)
         assertTrue(session.content.value is DecodedContent.Shown)
+    }
+
+    /** Review N-03: a retry while visible replaces the image without releasing the one on screen. */
+    @Test
+    fun aVisibleReplacementNeverReleasesTheImageOnScreen() {
+        val session = newSession()
+        ports.sources.value = SourceLookup.Found(source())
+        session.onVisible()
+        val first = (session.content.value as DecodedContent.Shown).value
+
+        session.retry()
+
+        assertEquals(2, ports.reads)
+        assertFalse(first.released)
+        session.onHidden()
+        val second = ports.decoded.last()
+        assertTrue("hidden: the window is stopped, so the current image is released", second.released)
     }
 
     @Test

@@ -327,8 +327,7 @@ class IntakeAndListFlowTest {
                     !status.startsWith("Prepared") && status != "Cancelled"
                 ) {
                     // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
-                    // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
-            Thread.sleep(POLL_MS)
+                    Thread.sleep(POLL_MS)
                     status = statusOf(scenario)
                 }
                 assertTrue("rotation during Preparing stranded the import; last=$status",
@@ -399,8 +398,7 @@ class IntakeAndListFlowTest {
                     !status.startsWith("Not imported")
                 ) {
                     // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
-                    // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
-            Thread.sleep(POLL_MS)
+                    Thread.sleep(POLL_MS)
                     status = statusOf(scenario)
                 }
                 assertTrue("a share that was never started must still import; last=$status",

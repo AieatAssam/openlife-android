@@ -101,6 +101,13 @@ class AppLockState(private val clock: () -> Long) {
         }
     }
 
+    /** Review N-01: the lock decision at the moment of a content read. */
+    @Synchronized
+    fun statusForAccess(): LockStatus = TODO("N-01")
+
+    /** Review N-01: suspends until a content read is allowed by [statusForAccess]. */
+    suspend fun awaitAccess(): Unit = TODO("N-01")
+
     /** OpenLife is about to start another app's activity and expects to come straight back. */
     @Synchronized
     fun beginExternalActivity() {
