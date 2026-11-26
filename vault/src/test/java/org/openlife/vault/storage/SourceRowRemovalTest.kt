@@ -68,7 +68,8 @@ class SourceRowRemovalTest {
                 val left = host.query(
                     "SELECT * FROM $table",
                 ).flatten().filterIsInstance<String>().filter { it.startsWith("a") }
-                assertEquals("$table keeps nothing of source a (fk=$foreignKeys, rec=$recursive, mig=$migrated)", emptyList<String>(), left)
+                val mode = "fk=$foreignKeys, rec=$recursive, mig=$migrated"
+                assertEquals("$table keeps nothing of source a ($mode)", emptyList<String>(), left)
             }
             assertEquals(
                 0L,
@@ -83,7 +84,9 @@ class SourceRowRemovalTest {
             )
             snapshot(rows)
         }
-        results.forEachIndexed { i, result -> assertEquals("mode ${modes[i]} gives the same database", results[0], result) }
+        results.forEachIndexed { i, result ->
+            assertEquals("mode ${modes[i]} gives the same database", results[0], result)
+        }
         assertTrue(results[0].getValue("sources").single()[0] == "b")
     }
 

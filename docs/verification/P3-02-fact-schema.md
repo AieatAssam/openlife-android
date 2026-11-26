@@ -2,7 +2,8 @@
 
 Branch `plan/P3-02-fact-schema`, cut from `main` at 31cc2eb. Date
 2026-11-26. Implements the storage part of docs/capabilities/C2.md
-(§4, §5, §8, §9, §10). Fixes finding F-70.
+(§4, §5, §8, §9, §10). Finding F-70: proven on host SQLite; device run
+pending.
 
 ## Device policy for this run
 
@@ -16,7 +17,7 @@ pending physical-device run)**.
 | Instrumented test | Command (run on the tablet when it is free) |
 | --- | --- |
 | `FactRepositoryTest` (`basisEdgeMustPointToAnOlderRevisionOfTheSameFact`, `correctionOnSpanMarksDependentRevisionsStale`) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.repository.FactRepositoryTest` |
-| `FactDatabaseSqlCipherTest.versionFiveVaultWithRowsMigratesToTheC2SchemaOnSqlCipher` (v5 to v6 with rows, `MigrationTestHelper`, SQLCipher) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.storage.FactDatabaseSqlCipherTest` |
+| `FactDatabaseSqlCipherTest.versionFiveVaultWithRowsMigratesToTheC2SchemaOnSqlCipher` (v5 to v6 with rows, `MigrationTestHelper`, SQLCipher; from review M-04 it seeds the shipped FTS index with the v5 any-column update triggers and compares every FTS `_data` block before and after the migration) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.storage.FactDatabaseSqlCipherTest` |
 | `DeletionRepositoryTest.deletingASourceRemovesFactsEvidenceRunsEdgesAndReviewEvents` | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.repository.DeletionRepositoryTest` |
 | `OcrDatabaseTest` (now checks only the `sources_ready%` triggers) | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.storage.OcrDatabaseTest` |
 | Existing migration and repository tests that now run through v6 (`SourceDatabaseTest`, `OpenLifeDatabaseReadyInvariantTest`, `SearchRepositoryTest`, `OcrRepositoryTest`, `RecoveryRepositoryTest`) | the same command with each class |
@@ -30,8 +31,13 @@ data" stay open until that run.
 The host tests run the production SQL (`FactSchemaTriggers`,
 `FactMigration`, `FactSql`, `SourceRowRemoval`, `OcrPointerSql`) on host
 SQLite through `HostSqlite` (python3 `sqlite3`, SQLite 3.53, with
-`foreign_keys` and `recursive_triggers` on). **Host SQLite is not
-SQLCipher.** The schema DDL is taken from the exported
+`foreign_keys` on and `recursive_triggers` on by default). **Host SQLite
+is not SQLCipher.** No production code sets `recursive_triggers`; the
+pinned `libsqlcipher.so` lists `DEFAULT_RECURSIVE_TRIGGERS` among its
+compile-option strings (a static read of the AAR, not observed on a
+device). The suites whose result could depend on it (`FactGuardTest`'s
+delete guards and `SourceRowRemovalTest`'s removal) run with it on and
+off (review M-05). The schema DDL is taken from the exported
 `vault/schemas/.../6.json`, so the host database has the same tables and
 indices Room creates.
 
@@ -39,10 +45,13 @@ indices Room creates.
 | --- | --- |
 | `FactDatabaseTest` (5) | v5 to v6 migration keeps every v5 row and the FTS data byte for byte, and gives the same shape as a fresh v6 database; every C2 CHECK trigger refuses with its requirement id; the C2-R20 pointer guards; the FTS update triggers are narrowed before any backfill `UPDATE` (C2-R21, C2-R64) |
 | `DependencyEdgeTest` (4) | cross-Source edges refused (C2-R18); `BASIS` only to an older non-USER revision of the same fact; the `EVIDENCE` edge goes when the last evidence row naming the span goes; no Kotlin statement writes `dependency_edges` |
-| `SourceRowRemovalTest` (3) | F-70: one routine, whole-set order of C2-R43, same final database with `foreign_keys` on and off; refuses a non-DELETING Source before running any statement; the pre-C2 order is refused; only the routine and the STAGED cleanup remove a Source row |
+| `SourceRowRemovalTest` (2) | F-70: one routine, whole-set order of C2-R43, the same final database (no row of the Source left) for every combination of `foreign_keys` on/off, `recursive_triggers` on/off and a fresh or a migrated v6 database; refuses a non-DELETING Source before running any statement; the pre-C2 order is refused |
+| `SourceRowRemovalBoundaryTest` (2) | only the routine and the STAGED cleanup remove a Source row; no other code in `vault` or `app` deletes a fact or OCR row (`DELETE FROM` or `@Delete`); the dead `OcrDao.deleteForSource` was removed (M-09) |
+| `FactGuardTest` (5) | review M-01: `facts`, `fact_evidence` and `review_events` rows are deleted only on a DELETING Source (recursive triggers on and off); M-02: a region with any NULL column is refused (C2-R8); M-03: VALUE offsets set and `start < end`; M-07: a DELETING Source's facts are not listed; fresh and migrated v6 have identical trigger and index rows in `sqlite_master` |
 | `OcrRevisionPointerTest` (1) | `sources.currentOcrRevisionId` moves only forward to a later READY reading of the Source (C2-R14, F-69 for facts); corrections supersede the chain head explicitly (C2-R15) |
 | `OcrSpanStatusTest` (2) | `hasEvidenceRegion` and `scriptStatus` backfilled, eligibility per C2 §1 (Z-16); a classifier failure rolls the whole migration back (C2-R17) |
-| `FactWriterTest` (5) | the bodies of `FactRepository`: the §5 status table, clarify byte for byte and re-choose (C2-R36), correct refused on STALE (C2-R37), user facts (C2-R38) and the 500 cap (C2-R62), the BFS stale traversal with BASIS_STALE and the epoch bump on every call (C2-R19, C2-R63) |
+| `FactWriterTest` (7), `FactWriteFailureTest` (1), `EvidenceOffsetsTest` (1) | review M-08: candidate texts that do not line up one to one are refused; user values must have their kind's shape (DATE, TIME, DATETIME fully; other kinds by leading key, rest in P3-03/P3-05); M-06: a storage failure is `FactWriteResult.Failed`, cancellation rethrown; M-03: the UTF-16 upper bound of the offsets. Plus, from the first round: |
+| `FactWriterTest` (first round) | the bodies of `FactRepository`: the §5 status table, clarify byte for byte and re-choose (C2-R36), correct refused on STALE (C2-R37), user facts (C2-R38) and the 500 cap (C2-R62), the BFS stale traversal with BASIS_STALE and the epoch bump on every call (C2-R19, C2-R63) |
 | `SchemaV5MigrationTest`, `EnumDecodingTest` | v5 tests updated for the narrowed triggers; tolerant decoding of the new enums |
 
 ## RED and mutations
@@ -62,7 +71,30 @@ indices Room creates.
   `UPDATE OF col` trigger fires even when the value is unchanged, so the
   pointer triggers are guarded by `NEW.x IS NOT OLD.x`.
 
-## Gate log note
+## Review round (2026-11-26, findings M-01..M-09)
+
+- RED commit f4a0c1a: 10 targeted tests failed, each for its finding
+  (missing guards, NULL region accepted, NULL or empty VALUE offsets
+  accepted, DELETING facts listed, guards absent from `sqlite_master`,
+  `OcrDao.kt: DELETE FROM ocr_revisions` found by the boundary scan,
+  misaligned candidate text accepted, wrong-kind user values accepted,
+  `TODO` stubs for `captureWriteFailure` and `EvidenceOffsets.fit`).
+- The earlier gate ran on 8acdb50, before the merge of `main` (P1-20
+  navigation rebuild, 7dd52e1). The gate was re-run on the merged head
+  with the review fixes: `./gradlew detekt lint :app:test :vault:test
+  assembleDebug :vault:compileDebugAndroidTestKotlin
+  :app:compileDebugAndroidTestKotlin :eval:test --continue` -> BUILD
+  SUCCESSFUL (exit 0); JVM tests vault 224, app 189, eval 26, 0 failures.
+  Two earlier attempts ended "Gradle build daemon disappeared" while
+  another project's build shared the 8 GB host; one also reported detekt
+  formatting findings, fixed before the passing run.
+  `bash scripts/plan-check.sh` -> steps=82 errors=0;
+  `bash scripts/tests/run.sh` -> 51 passed, 0 failed.
+- The two `FactRepository` stale entry points still throw on a storage
+  failure (after their transaction rolled back); only the four user
+  writes return `Failed`. P3-04, their caller, decides.
+
+## Gate log note (first round)
 
 The final gate run (`BUILD SUCCESSFUL`, exit 0) log also contains a
 "Gradle build daemon disappeared unexpectedly" dump from an earlier,

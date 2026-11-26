@@ -1,6 +1,7 @@
 package org.openlife.vault.repository
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +21,10 @@ import java.util.UUID
 /**
  * P3-02-R5: the fact list and the user-side fact writes (C2 §5, §8, §9).
  * Every write runs under the mutation queue, on [ioDispatcher], in one
- * transaction (C2-R52); a refusal writes nothing. Nothing here logs (C2-R50).
+ * transaction (C2-R52); a refusal writes nothing. A storage failure rolls the
+ * transaction back and returns [FactWriteResult.Failed] (review M-06); the
+ * two stale entry points still throw on a storage failure, after their
+ * transaction has rolled back; P3-04, their caller, decides what that means. Nothing here logs (C2-R50).
  *
  * The stale hooks of §9 are wired into the OCR events by P3-04 (C2-R40);
  * until then [markStaleForSpan] and [markStaleForRevision] are the entry
@@ -66,18 +70,26 @@ class FactRepository(
         mutationQueue.withMutation { database.withTransaction { block() } }
     }
 
-    private suspend fun write(block: suspend (FactWriter) -> FactWrite): FactWriteResult = locked {
-        when (val result = block(FactWriter(database.factDao(), clock))) {
-            is FactWrite.Written -> FactWriteResult.Written(
-                UUID.fromString(result.factId),
-                UUID.fromString(result.revisionId),
-            )
+    private suspend fun write(block: suspend (FactWriter) -> FactWrite): FactWriteResult = captureWriteFailure {
+        locked { written(block(FactWriter(database.factDao(), clock))) }
+    }
 
-            is FactWrite.Refused -> FactWriteResult.Refused(result.reason)
-        }
+    private fun written(result: FactWrite): FactWriteResult = when (result) {
+        is FactWrite.Written -> FactWriteResult.Written(
+            UUID.fromString(result.factId),
+            UUID.fromString(result.revisionId),
+        )
+
+        is FactWrite.Refused -> FactWriteResult.Refused(result.reason)
     }
 }
 
 /** M-06: a write's storage failure as [FactWriteResult.Failed]; cancellation is rethrown. */
-internal suspend fun captureWriteFailure(block: suspend () -> FactWriteResult): FactWriteResult =
-    TODO("P3-02 review GREEN")
+@Suppress("TooGenericExceptionCaught") // any storage failure rolls back and is reported without its message
+internal suspend fun captureWriteFailure(block: suspend () -> FactWriteResult): FactWriteResult = try {
+    block()
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    FactWriteResult.Failed
+}

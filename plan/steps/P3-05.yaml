@@ -50,3 +50,12 @@ acceptance_criteria: ["A user can confirm the date on a synthetic appointment sc
 docs_to_update: [docs/capabilities/C2.md]
 risks: []
 rollback: "Hide panel."
+notes: >
+  P3-02 review M-08 (2026-11-26): FactRepository.addUserFact and correct
+  check a user value's shape per kind (UserValueShape). DATE, TIME and
+  DATETIME are checked completely (canonical JSON, a real date or time,
+  canonicalText derived from it). MONEY, URL, EMAIL and PHONE are checked
+  only for their leading key; their full validation with the extractors'
+  normalisers (C2-R38, C2-R5) belongs to this step's input screens, using
+  P3-03's normalisers, and must refuse an input they reject before calling
+  the repository.

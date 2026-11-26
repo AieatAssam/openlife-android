@@ -9,6 +9,7 @@ import org.openlife.vault.facts.FactStatusRules
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.UserMethod
+import org.openlife.vault.facts.UserValueShape
 import org.openlife.vault.storage.FactDao
 import org.openlife.vault.storage.FactRevisionEntity
 import org.openlife.vault.storage.decodeStored
@@ -35,7 +36,7 @@ internal class FactWriter(
 ) {
     /** C2-R38: a new fact with one CONFIRMED USER revision and no evidence. */
     suspend fun addUserFact(sourceId: String, kind: FactKind, value: FactValue): FactWrite {
-        if (kind == FactKind.UNRECOGNISED || !isUserValue(value)) return refused(FactRefusal.INVALID_VALUE)
+        if (!isUserValue(kind, value)) return refused(FactRefusal.INVALID_VALUE)
         if (dao.sourceState(sourceId) != READY) return refused(FactRefusal.SOURCE_NOT_READY)
         if (dao.countCurrentRevisions(sourceId) >= FactLimits.MAX_CURRENT_REVISIONS) {
             return refused(FactRefusal.LIMIT_REACHED)
@@ -73,7 +74,7 @@ internal class FactWriter(
         val target = currentTarget(revisionId) ?: return refused(FactRefusal.NOT_ALLOWED)
         if (target.sourceReady.not()) return refused(FactRefusal.SOURCE_NOT_READY)
         if (target.revision.status == FactStatus.STALE) return refused(FactRefusal.NOT_ALLOWED)
-        if (!isUserValue(value)) return refused(FactRefusal.INVALID_VALUE)
+        if (!isUserValue(target.revision.kind, value)) return refused(FactRefusal.INVALID_VALUE)
         return writeUserRevision(target.factId, target.revision.kind, value, UserMethod.CORRECT, revisionId)
     }
 
@@ -116,12 +117,16 @@ internal class FactWriter(
         val entries = candidates.candidateEntries()
         val index = entries.indexOf(chosen.valueJson)
         if (index < 0) return false
+        // M-08: a candidate's text is found by position, so the texts must
+        // line up one to one; a text containing the separator breaks that.
         val texts = candidates.candidateTexts()
-        return texts.size != entries.size || texts[index] == chosen.canonicalText
+        return texts.size == entries.size && texts[index] == chosen.canonicalText
     }
 
-    private fun isUserValue(value: FactValue): Boolean =
-        value.isWithinBounds && !value.isCandidates && value.canonicalText.length <= FactLimits.MAX_USER_TEXT_CHARS
+    private fun isUserValue(kind: FactKind, value: FactValue): Boolean = value.isWithinBounds &&
+        !value.isCandidates &&
+        value.canonicalText.length <= FactLimits.MAX_USER_TEXT_CHARS &&
+        UserValueShape.matches(kind, value)
 
     private suspend fun hasValueEvidence(revision: Revision): Boolean =
         revision.origin != FactOrigin.EXTRACTED || dao.countValueEvidence(revision.id) == 1

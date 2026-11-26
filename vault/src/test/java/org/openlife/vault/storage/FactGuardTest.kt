@@ -72,7 +72,8 @@ class FactGuardTest {
         val (host, rows) = confirmed(recursive = true)
         host.exec(
             "INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, `left`, top, " +
-                "`right`, bottom) VALUES ('a-s3', 'a-r', 2, 'Due 27.11.2026', NULL, 'SOURCE_PIXELS', NULL, NULL, NULL, NULL)",
+                "`right`, bottom) VALUES ('a-s3', 'a-r', 2, 'Due 27.11.2026', NULL, 'SOURCE_PIXELS', " +
+                "NULL, NULL, NULL, NULL)",
         )
         rows.fact("g", "a")
         rows.revision("y", "g")

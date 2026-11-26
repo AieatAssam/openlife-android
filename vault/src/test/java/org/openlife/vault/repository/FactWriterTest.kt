@@ -235,7 +235,8 @@ class FactWriterTest {
             FactKind.DATETIME to FactValue("{\"date\":\"2026-11-27\",\"time\":\"14:30\"}", "2026-11-27 14:30"),
         ).forEach { (kind, value) -> written(writer.addUserFact("a", kind, value)) }
         extractedOn("f2")
-        assertEquals("a correction keeps the kind", invalid, writer.correct("x2", FactValue("{\"time\":\"10:00\"}", "10:00")))
+        val timeValue = FactValue("{\"time\":\"10:00\"}", "10:00")
+        assertEquals("a correction keeps the kind", invalid, writer.correct("x2", timeValue))
     }
 
     private fun extractedOn(factId: String) {

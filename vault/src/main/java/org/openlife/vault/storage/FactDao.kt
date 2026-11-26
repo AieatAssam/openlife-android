@@ -100,7 +100,8 @@ object FactSql {
         SELECT r.*, f.sourceId AS factSourceId, f.ordinal AS factOrdinal, f.createdAt AS factCreatedAt,
             f.currentRevisionId AS factCurrentRevisionId
         FROM facts f JOIN fact_revisions r ON r.id = f.currentRevisionId
-        WHERE f.sourceId = :sourceId ORDER BY f.kind ASC, f.ordinal ASC
+            JOIN sources s ON s.id = f.sourceId
+        WHERE f.sourceId = :sourceId AND s.state <> 'DELETING' ORDER BY f.kind ASC, f.ordinal ASC
         """
 }
 

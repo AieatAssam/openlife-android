@@ -49,6 +49,11 @@ object FactSchemaTriggers {
             "WHEN NEW.id IS NOT OLD.id OR NEW.sourceId IS NOT OLD.sourceId OR NEW.kind IS NOT OLD.kind " +
             "OR NEW.ordinal IS NOT OLD.ordinal OR NEW.createdAt IS NOT OLD.createdAt BEGIN " +
             "SELECT RAISE(ABORT, 'C2-R3: a fact is immutable except its current revision'); END",
+        // M-01: a fact (and by cascade its revisions, evidence and events)
+        // leaves only through C2-R43 on a DELETING Source.
+        "c2_facts_delete_guard" to "BEFORE DELETE ON facts " +
+            "WHEN NOT EXISTS (SELECT 1 FROM sources WHERE id = OLD.sourceId AND state = 'DELETING') BEGIN " +
+            "SELECT RAISE(ABORT, 'C2-R20: a fact is deleted only with its Source'); END",
         "c2_facts_current_revision" to "BEFORE UPDATE OF currentRevisionId ON facts " +
             "WHEN NEW.currentRevisionId IS NOT OLD.currentRevisionId BEGIN " +
             raise("C2-R3: the current revision never returns to NULL", "NEW.currentRevisionId IS NULL") +
@@ -155,14 +160,23 @@ object FactSchemaTriggers {
                     "WHERE id = NEW.ocrUserRevisionId AND spanId = NEW.ocrSpanId AND revisionId = NEW.ocrRevisionId)",
             ) +
             raise(
+                "C2-R8: evidence is grounded: every region column is set",
+                "NEW.regionLeft IS NULL OR NEW.regionTop IS NULL OR NEW.regionRight IS NULL " +
+                    "OR NEW.regionBottom IS NULL OR NEW.regionCoordinateSystem IS NULL",
+            ) +
+            raise(
                 "C2-R8: the region is the span line box",
                 "NOT EXISTS (SELECT 1 FROM ocr_spans s WHERE s.id = NEW.ocrSpanId AND s.`left` IS NEW.regionLeft " +
                     "AND s.top IS NEW.regionTop AND s.`right` IS NEW.regionRight AND s.bottom IS NEW.regionBottom " +
                     "AND s.coordinateSystem IS NEW.regionCoordinateSystem)",
             ) +
+            // The upper bound textEnd <= length of the read text is checked in
+            // Kotlin (EvidenceOffsets.fit) by the writer: the offsets are UTF-16
+            // units and SQLite's length() counts code points (M-03).
             raise(
-                "C2 §4.3: text offsets are both set, ordered and non-negative",
-                "(NEW.textStart IS NULL) <> (NEW.textEnd IS NULL) OR NEW.textStart < 0 OR NEW.textEnd < NEW.textStart",
+                "C2 §4.3: offsets are both NULL or 0 <= start < end, and set for VALUE",
+                "(NEW.textStart IS NULL) <> (NEW.textEnd IS NULL) OR NEW.textStart < 0 " +
+                    "OR NEW.textEnd <= NEW.textStart OR (NEW.role = 'VALUE' AND NEW.textStart IS NULL)",
             ) +
             raise(
                 "C2-R10: a revision has one VALUE row",
@@ -196,6 +210,10 @@ object FactSchemaTriggers {
             "AND ocrSpanId = OLD.ocrSpanId); END",
         "c2_fact_evidence_immutable" to "BEFORE UPDATE ON fact_evidence BEGIN " +
             "SELECT RAISE(ABORT, 'C2 §4.3: evidence is immutable'); END",
+        // C2-R7: a CONFIRMED EXTRACTED revision never loses its VALUE row.
+        "c2_fact_evidence_delete_guard" to "BEFORE DELETE ON fact_evidence " +
+            "WHEN NOT EXISTS (SELECT 1 FROM sources WHERE id = OLD.sourceId AND state = 'DELETING') BEGIN " +
+            "SELECT RAISE(ABORT, 'C2-R20: evidence is deleted only with its Source'); END",
         // review_events (C2 §4.5, C2-R12)
         "c2_review_events_insert" to "BEFORE INSERT ON review_events BEGIN " +
             raise(
@@ -206,6 +224,10 @@ object FactSchemaTriggers {
             " END",
         "c2_review_events_immutable" to "BEFORE UPDATE ON review_events BEGIN " +
             "SELECT RAISE(ABORT, 'C2-R12: review events are append-only'); END",
+        "c2_review_events_delete_guard" to "BEFORE DELETE ON review_events " +
+            "WHEN NOT EXISTS (SELECT 1 FROM fact_revisions r JOIN facts f ON f.id = r.factId " +
+            "JOIN sources s ON s.id = f.sourceId WHERE r.id = OLD.revisionId AND s.state = 'DELETING') BEGIN " +
+            "SELECT RAISE(ABORT, 'C2-R20: review events are deleted only with their Source'); END",
         // fact_extraction_runs (C2 §4.6)
         "c2_fact_extraction_runs_insert" to "BEFORE INSERT ON fact_extraction_runs BEGIN " +
             raise("C2 §4.6: trigger is AUTO or USER", "NEW.`trigger` NOT IN ('AUTO', 'USER')") +

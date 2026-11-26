@@ -67,9 +67,6 @@ interface OcrDao {
     @Query(OcrPointerSql.CURRENT_CORRECTION)
     suspend fun currentCorrection(revisionId: String, spanId: String?): String?
 
-    @Query("DELETE FROM ocr_revisions WHERE sourceId = :sourceId")
-    suspend fun deleteForSource(sourceId: String)
-
     @Query("UPDATE ocr_revisions SET state = 'STALE', failureReason = 'PROCESS_RESTART' WHERE state = 'RUNNING'")
     suspend fun markRunningStale(): Int
 
