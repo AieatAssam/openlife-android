@@ -46,17 +46,27 @@ class FactDatabaseTest {
             assertEquals(1L, migrated.long("SELECT COUNT(*) FROM sources WHERE id = 'a'"))
             assertEquals(0L, migrated.long("SELECT factInputEpoch FROM sources WHERE id = 'a'"))
             if (from >= 2) {
-                assertEquals(listOf(listOf<Any?>("a-s1", 1L, "LATIN"), listOf<Any?>("a-s2", 0L, "UNSUPPORTED")),
-                    migrated.query("SELECT id, hasEvidenceRegion, scriptStatus FROM ocr_spans ORDER BY id"))
-                assertEquals("the newest READY reading is current", "a-r2",
-                    migrated.query("SELECT currentOcrRevisionId FROM sources WHERE id = 'a'").single().single())
-                assertEquals("corrections are chained by (createdAt, rowid)",
+                assertEquals(
+                    listOf(listOf<Any?>("a-s1", 1L, "LATIN"), listOf<Any?>("a-s2", 0L, "UNSUPPORTED")),
+                    migrated.query("SELECT id, hasEvidenceRegion, scriptStatus FROM ocr_spans ORDER BY id"),
+                )
+                assertEquals(
+                    "the newest READY reading is current",
+                    "a-r2",
+                    migrated.query("SELECT currentOcrRevisionId FROM sources WHERE id = 'a'").single().single(),
+                )
+                assertEquals(
+                    "corrections are chained by (createdAt, rowid)",
                     listOf(listOf<Any?>("c1", null), listOf<Any?>("c2", "c1")),
-                    migrated.query("SELECT id, supersedesId FROM ocr_user_revisions ORDER BY id"))
+                    migrated.query("SELECT id, supersedesId FROM ocr_user_revisions ORDER BY id"),
+                )
             }
             C2_TABLES.forEach { assertEquals(0L, migrated.long("SELECT COUNT(*) FROM $it")) }
         }
-        assertEquals(listOf(1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6), OpenLifeDatabase.MIGRATIONS.map { it.startVersion to it.endVersion })
+        assertEquals(
+            listOf(1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6),
+            OpenLifeDatabase.MIGRATIONS.map { it.startVersion to it.endVersion },
+        )
     }
 
     private fun SearchFixture.seed(from: Int) {
@@ -66,7 +76,8 @@ class FactDatabaseTest {
         revision("a-r2", "a")
         revision("a-r3", "a", state = "FAILED")
         host.exec(
-            "INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, `left`, top, `right`, " +
+            "INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, `left`, " +
+                "top, `right`, " +
                 "bottom) VALUES ('a-s1', 'a-r2', 0, 'Due 26.11.2026', NULL, 'SOURCE_PIXELS', 1, 1, 5, 5), " +
                 "('a-s2', 'a-r2', 1, 'Итого 5', NULL, 'SOURCE_PIXELS', NULL, NULL, NULL, NULL)",
         )
@@ -117,7 +128,8 @@ class FactDatabaseTest {
             host.exec(
                 "INSERT INTO fact_revisions(id, factId, revisionNo, origin, kind, valueJson, canonicalText, rawText, " +
                     "status, staleReason, staleAt, confidence, methodId, methodVersion, locale, createdAt, " +
-                    "supersedesRevisionId) VALUES ('u2', 'f', 9, 'USER', 'DATE', '{}', 't', 'raw', 'CONFIRMED', NULL, " +
+                    "supersedesRevisionId) VALUES ('u2', 'f', 9, 'USER', 'DATE', '{}', 't', 'raw', " +
+                    "'CONFIRMED', NULL, " +
                     "NULL, NULL, 'user:add', NULL, NULL, 1, NULL)",
             )
         }
@@ -176,8 +188,11 @@ class FactDatabaseTest {
         FactMigration.addColumns(mutantDb)
         FactMigration.backfill(mutantDb)
         FactMigration.narrowFtsUpdateTriggers(mutantDb)
-        assertNotEquals("a backfill under the v5 triggers re-indexes every row", before.map { it.toList() },
-            ftsData(mutant).map { it.toList() })
+        assertNotEquals(
+            "a backfill under the v5 triggers re-indexes every row",
+            before.map { it.toList() },
+            ftsData(mutant).map { it.toList() },
+        )
         FactMigration.createTables(db)
         FactSchemaTriggers.create(db)
         ReadyInvariantTriggers.create(db)
@@ -185,10 +200,13 @@ class FactDatabaseTest {
         assertFtsDataEqual(before, ftsData(shipped))
         val updateTriggers = shipped.query("SELECT name, sql FROM sqlite_master WHERE name LIKE '%fts_au'")
         assertEquals(2, updateTriggers.size)
-        assertTrue(updateTriggers.toString(), updateTriggers.all {
-            val sql = it[1] as String
-            sql.contains("AFTER UPDATE OF text ON ocr_spans") || sql.contains("AFTER UPDATE OF correctedText ON")
-        })
+        assertTrue(
+            updateTriggers.toString(),
+            updateTriggers.all {
+                val sql = it[1] as String
+                sql.contains("AFTER UPDATE OF text ON ocr_spans") || sql.contains("AFTER UPDATE OF correctedText ON")
+            },
+        )
         shipped.exec("UPDATE ocr_spans SET hasEvidenceRegion = 0")
         assertFtsDataEqual(before, ftsData(shipped))
         SearchFixture(shipped).integrityCheck(SearchIndex.TEXT_TABLE)
@@ -236,14 +254,21 @@ class FactDatabaseTest {
                     "SELECT \"table\", \"from\", \"to\", on_delete FROM pragma_foreign_key_list('$table') " +
                         "ORDER BY \"from\"",
                 ),
-                host.query("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = '$table' ORDER BY name"),
+                host.query(
+                    "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = '$table' ORDER BY name",
+                ),
             )
         }
     }
 
     private companion object {
         val C2_TABLES = listOf(
-            "facts", "fact_revisions", "fact_evidence", "review_events", "fact_extraction_runs", "dependency_edges",
+            "facts",
+            "fact_revisions",
+            "fact_evidence",
+            "review_events",
+            "fact_extraction_runs",
+            "dependency_edges",
         )
 
         /** The update triggers exactly as ADR-0010 shipped them in v5 (fire on any column). */

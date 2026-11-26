@@ -45,7 +45,11 @@ class OcrRevisionPointerTest {
         assertEquals("r2", current("a"))
         assertEquals("an older reading never becomes current", 0, rows.moveCurrentReading("a", "r1"))
         host.exec("UPDATE ocr_revisions SET state = 'READY' WHERE id = 'late'")
-        assertEquals("a late finisher that started earlier stays history (F-69)", 0, rows.moveCurrentReading("a", "late"))
+        assertEquals(
+            "a late finisher that started earlier stays history (F-69)",
+            0,
+            rows.moveCurrentReading("a", "late"),
+        )
         assertEquals("r2", current("a"))
         refused("C2-R14") { host.exec("UPDATE sources SET currentOcrRevisionId = 'b1' WHERE id = 'a'") }
         refused("C2-R14") { host.exec("UPDATE sources SET currentOcrRevisionId = 'f1' WHERE id = 'a'") }

@@ -35,7 +35,10 @@ class FactWriterTest {
 
     private val date = FactValue("{\"date\":\"2026-11-27\"}", "2026-11-27")
 
-    private fun status(id: String) = host.query("SELECT status, staleReason FROM fact_revisions WHERE id = ?", id).single()
+    private fun status(id: String) = host.query(
+        "SELECT status, staleReason FROM fact_revisions WHERE id = ?",
+        id,
+    ).single()
 
     private fun epoch(sourceId: String) = host.long("SELECT factInputEpoch FROM sources WHERE id = ?", sourceId)
 
@@ -66,8 +69,13 @@ class FactWriterTest {
         listOf(first, second).forEach {
             assertEquals("the basis is the extracted revision", "x", dao.basisOf(it.revisionId))
             assertEquals(listOf<Any?>("CONFIRMED", null), status(it.revisionId))
-            assertEquals(listOf(listOf<Any?>(1L, "CONFIRM")), host.query(
-                "SELECT sequence, decision FROM review_events WHERE revisionId = ?", it.revisionId))
+            assertEquals(
+                listOf(listOf<Any?>(1L, "CONFIRM")),
+                host.query(
+                    "SELECT sequence, decision FROM review_events WHERE revisionId = ?",
+                    it.revisionId,
+                ),
+            )
         }
         assertEquals(second.revisionId, dao.findFact("f")!!.currentRevisionId)
         assertEquals(
@@ -87,7 +95,11 @@ class FactWriterTest {
         assertEquals(listOf<Any?>("STALE", "BASIS_STALE"), status(corrected.revisionId))
         assertEquals(listOf<Any?>("UNREVIEWED", null), status("y"))
         assertEquals(before + 1, epoch("a"))
-        assertEquals("STALE is terminal; the epoch still moves", 0, marker.markForSpan("a-s1", StaleReason.SPAN_CORRECTED))
+        assertEquals(
+            "STALE is terminal; the epoch still moves",
+            0,
+            marker.markForSpan("a-s1", StaleReason.SPAN_CORRECTED),
+        )
         assertEquals(before + 2, epoch("a"))
         assertEquals(
             FactWrite.Refused(FactRefusal.NOT_ALLOWED),
@@ -108,11 +120,21 @@ class FactWriterTest {
         writer.review(x, ReviewDecision.REOPEN)
         assertEquals("REOPEN returns to the initial status", listOf<Any?>("UNREVIEWED", null), status("x"))
         assertEquals(FactWrite.Refused(FactRefusal.NOT_ALLOWED), writer.review(x, ReviewDecision.REOPEN))
-        assertEquals(listOf(1L, 2L, 3L), host.query("SELECT sequence FROM review_events WHERE revisionId = ? ORDER BY sequence", "x").map { it.single() })
+        assertEquals(
+            listOf(1L, 2L, 3L),
+            host.query(
+                "SELECT sequence FROM review_events WHERE revisionId = ? ORDER BY sequence",
+                "x",
+            ).map { it.single() },
+        )
         rows.fact("h", "a")
         rows.revision("z", "h")
         rows.current("h", "z")
-        assertEquals("CONFIRM needs a VALUE row", FactWrite.Refused(FactRefusal.NOT_ALLOWED), writer.review("z", ReviewDecision.CONFIRM))
+        assertEquals(
+            "CONFIRM needs a VALUE row",
+            FactWrite.Refused(FactRefusal.NOT_ALLOWED),
+            writer.review("z", ReviewDecision.CONFIRM),
+        )
     }
 
     @Test
@@ -140,11 +162,17 @@ class FactWriterTest {
         fixture.source("s", state = "STAGED")
         val added = written(writer.addUserFact("a", FactKind.DATE, date))
         val revision = dao.findRevision(added.revisionId)!!
-        assertEquals(listOf("USER", "CONFIRMED", "user:add"), listOf(revision.origin, revision.status, revision.methodId))
+        assertEquals(
+            listOf("USER", "CONFIRMED", "user:add"),
+            listOf(revision.origin, revision.status, revision.methodId),
+        )
         assertEquals(0, dao.countValueEvidence(revision.id))
         assertEquals(1L, host.long("SELECT ordinal FROM facts WHERE id = ?", added.factId))
         assertEquals(FactWrite.Refused(FactRefusal.SOURCE_NOT_READY), writer.addUserFact("s", FactKind.DATE, date))
-        assertEquals(FactWrite.Refused(FactRefusal.INVALID_VALUE), writer.addUserFact("a", FactKind.DATE, FactValue("x", "x")))
+        assertEquals(
+            FactWrite.Refused(FactRefusal.INVALID_VALUE),
+            writer.addUserFact("a", FactKind.DATE, FactValue("x", "x")),
+        )
         assertEquals(FactWrite.Refused(FactRefusal.INVALID_VALUE), writer.addUserFact("a", FactKind.UNRECOGNISED, date))
         repeat(FactLimits.MAX_CURRENT_REVISIONS - 1) { writer.addUserFact("a", FactKind.DATE, date) }
         assertEquals(FactLimits.MAX_CURRENT_REVISIONS, dao.countCurrentRevisions("a"))

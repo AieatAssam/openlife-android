@@ -41,14 +41,29 @@ class OcrSpanStatusTest {
         assertFalse("no line box", SpanEligibility.isEligible(accepted.copy(hasEvidenceRegion = false)))
         assertFalse("out of script", SpanEligibility.isEligible(accepted.copy(storedScriptStatus = "UNSUPPORTED")))
         assertFalse("never classified", SpanEligibility.isEligible(accepted.copy(storedScriptStatus = "UNKNOWN")))
-        assertFalse("a correction is classified as read", SpanEligibility.isEligible(accepted.copy(currentCorrectionText = "Итого")))
-        assertTrue(SpanEligibility.isEligible(accepted.copy(storedScriptStatus = "UNSUPPORTED", currentCorrectionText = "Total")))
+        assertFalse(
+            "a correction is classified as read",
+            SpanEligibility.isEligible(accepted.copy(currentCorrectionText = "Итого")),
+        )
+        assertTrue(
+            SpanEligibility.isEligible(
+                accepted.copy(storedScriptStatus = "UNSUPPORTED", currentCorrectionText = "Total"),
+            ),
+        )
         assertFalse(SpanEligibility.isEligible(accepted.copy(latestSpanReview = "REJECTED")))
         assertFalse(SpanEligibility.isEligible(accepted.copy(readingReviewState = "REJECTED")))
         assertFalse(SpanEligibility.isEligible(accepted.copy(readingHasWholeCorrection = true)))
         assertFalse(SpanEligibility.isEligible(accepted.copy(readingState = "RUNNING")))
 
-        val boxless = OcrSpan(UUID.randomUUID(), UUID.randomUUID(), 0, "Итого", null, OcrCoordinateSystem.SOURCE_PIXELS, null)
+        val boxless = OcrSpan(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            0,
+            "Итого",
+            null,
+            OcrCoordinateSystem.SOURCE_PIXELS,
+            null,
+        )
         val boxed = boxless.copy(text = "Total", evidenceRegion = OcrEvidenceRegion(1, 1, 5, 5))
         assertEquals("UNSUPPORTED", spanScriptStatusOf(boxless.text))
         assertEquals("LATIN", spanScriptStatusOf(boxed.text))
@@ -77,6 +92,10 @@ class OcrSpanStatusTest {
         } finally {
             db.endTransaction()
         }
-        assertEquals("nothing is half-migrated", before, host.query("SELECT name, sql FROM sqlite_master ORDER BY name"))
+        assertEquals(
+            "nothing is half-migrated",
+            before,
+            host.query("SELECT name, sql FROM sqlite_master ORDER BY name"),
+        )
     }
 }

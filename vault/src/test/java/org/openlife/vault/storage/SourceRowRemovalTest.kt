@@ -61,11 +61,22 @@ class SourceRowRemovalTest {
             host.exec("RELEASE removal")
             assertEquals("whole-set statements in C2-R43 order", ORDER, dao.executed)
             TABLES.forEach { table ->
-                val left = host.query("SELECT * FROM $table").flatten().filterIsInstance<String>().filter { it.startsWith("a") }
+                val left = host.query(
+                    "SELECT * FROM $table",
+                ).flatten().filterIsInstance<String>().filter { it.startsWith("a") }
                 assertEquals("$table keeps nothing of source a (fk=$foreignKeys)", emptyList<String>(), left)
             }
-            assertEquals(0L, host.long("SELECT COUNT(*) FROM dependency_edges WHERE dependentSourceId = 'a' OR dependencySourceId = 'a'"))
-            assertEquals("source b's two spans stay indexed", 2L, host.long("SELECT COUNT(*) FROM ocr_text_fts_docsize"))
+            assertEquals(
+                0L,
+                host.long(
+                    "SELECT COUNT(*) FROM dependency_edges WHERE dependentSourceId = 'a' OR dependencySourceId = 'a'",
+                ),
+            )
+            assertEquals(
+                "source b's two spans stay indexed",
+                2L,
+                host.long("SELECT COUNT(*) FROM ocr_text_fts_docsize"),
+            )
             snapshot(rows)
         }
         assertEquals("foreign keys on and off give the same database", results[0], results[1])
@@ -107,13 +118,21 @@ class SourceRowRemovalTest {
     fun onlyTheRoutineAndStagedCleanupRemoveSourceRows() {
         val main = File("src/main/java/org/openlife/vault")
         val files = main.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
-        assertEquals("nothing calls deleteById directly", emptyList<String>(),
-            files.filter { it.readText().contains(".deleteById(") }.map { it.name })
-        assertEquals("deleteById is handed only to SourceRowRemoval as step 7",
+        assertEquals(
+            "nothing calls deleteById directly",
+            emptyList<String>(),
+            files.filter { it.readText().contains(".deleteById(") }.map { it.name },
+        )
+        assertEquals(
+            "deleteById is handed only to SourceRowRemoval as step 7",
             setOf("DeletionRepository.kt", "RecoveryRepository.kt"),
-            files.filter { it.readText().contains("::deleteById") }.map { it.name }.toSet())
+            files.filter { it.readText().contains("::deleteById") }.map { it.name }.toSet(),
+        )
         listOf("repository/DeletionRepository.kt", "repository/RecoveryRepository.kt").forEach { path ->
-            assertTrue("$path removes rows through SourceRowRemoval", File(main, path).readText().contains("SourceRowRemoval.remove("))
+            assertTrue(
+                "$path removes rows through SourceRowRemoval",
+                File(main, path).readText().contains("SourceRowRemoval.remove("),
+            )
         }
         val deletes = files
             .filter { Regex("DELETE FROM `?sources`?").containsMatchIn(it.readText()) }.map { it.name }.toSet()

@@ -24,7 +24,7 @@ import java.util.UUID
  *
  * The stale hooks of §9 are wired into the OCR events by P3-04 (C2-R40);
  * until then [markStaleForSpan] and [markStaleForRevision] are the entry
- * points, and the `…Locked` forms run inside a caller's transaction.
+ * points. A caller already inside a mutation uses [FactStaleMarker].
  */
 class FactRepository(
     private val database: OpenLifeDatabase,
@@ -53,19 +53,12 @@ class FactRepository(
         write { it.correct(revisionId.toString(), value) }
 
     /** C2 §9 for one span; returns how many revisions became STALE. */
-    suspend fun markStaleForSpan(spanId: UUID, reason: StaleReason): Int = locked { markStaleForSpanLocked(spanId, reason) }
+    suspend fun markStaleForSpan(spanId: UUID, reason: StaleReason): Int =
+        locked { marker().markForSpan(spanId.toString(), reason) }
 
     /** C2 §9 for a whole reading; returns how many revisions became STALE. */
     suspend fun markStaleForRevision(ocrRevisionId: UUID, reason: StaleReason): Int =
-        locked { markStaleForRevisionLocked(ocrRevisionId, reason) }
-
-    /** For a caller that already holds the mutation and runs a transaction (C2-R40). */
-    internal suspend fun markStaleForSpanLocked(spanId: UUID, reason: StaleReason): Int =
-        marker().markForSpan(spanId.toString(), reason)
-
-    /** For a caller that already holds the mutation and runs a transaction (C2-R40). */
-    internal suspend fun markStaleForRevisionLocked(ocrRevisionId: UUID, reason: StaleReason): Int =
-        marker().markForReading(ocrRevisionId.toString(), reason)
+        locked { marker().markForReading(ocrRevisionId.toString(), reason) }
 
     private fun marker() = FactStaleMarker(database.factDao(), clock)
 
@@ -75,7 +68,11 @@ class FactRepository(
 
     private suspend fun write(block: suspend (FactWriter) -> FactWrite): FactWriteResult = locked {
         when (val result = block(FactWriter(database.factDao(), clock))) {
-            is FactWrite.Written -> FactWriteResult.Written(UUID.fromString(result.factId), UUID.fromString(result.revisionId))
+            is FactWrite.Written -> FactWriteResult.Written(
+                UUID.fromString(result.factId),
+                UUID.fromString(result.revisionId),
+            )
+
             is FactWrite.Refused -> FactWriteResult.Refused(result.reason)
         }
     }

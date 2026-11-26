@@ -102,8 +102,13 @@ internal class FactWriter(
     /** The extracted `candidates` revision a clarification chooses from, if [revision] offers one. */
     private suspend fun candidatesBasis(revision: Revision): Revision? = when {
         revision.status == FactStatus.STALE -> null
+
         revision.origin == FactOrigin.EXTRACTED -> revision.takeIf { it.status == FactStatus.CLARIFICATION_NEEDED }
-        revision.methodId == UserMethod.CLARIFY -> dao.basisOf(revision.id)?.let { dao.findRevision(it) }?.let(::Revision)
+
+        revision.methodId == UserMethod.CLARIFY -> dao.basisOf(
+            revision.id,
+        )?.let { dao.findRevision(it) }?.let(::Revision)
+
         else -> null
     }?.takeIf { it.value.isCandidates }
 
@@ -147,7 +152,9 @@ internal class FactWriter(
             supersedesRevisionId = current,
         )
         dao.appendReviewEvent(newId(), revisionId, ReviewDecision.CONFIRM.name, now)
-        check(dao.moveCurrentRevision(factId, current, revisionId) == 1) { "current revision changed under the mutation" }
+        check(
+            dao.moveCurrentRevision(factId, current, revisionId) == 1,
+        ) { "current revision changed under the mutation" }
         return FactWrite.Written(factId, revisionId)
     }
 

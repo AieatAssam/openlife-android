@@ -17,13 +17,17 @@ object FactStatusRules {
                 ReviewDecision.REJECT -> FactStatus.REJECTED
                 else -> null
             }
+
             FactStatus.CONFIRMED -> FactStatus.REJECTED.takeIf { decision == ReviewDecision.REJECT }
+
             FactStatus.REJECTED -> when (decision) {
                 ReviewDecision.CONFIRM -> FactStatus.CONFIRMED.takeUnless { isCandidates }
                 ReviewDecision.REOPEN -> initial
                 else -> null
             }
+
             FactStatus.CLARIFICATION_NEEDED -> FactStatus.REJECTED.takeIf { decision == ReviewDecision.REJECT }
+
             else -> null
         }
 

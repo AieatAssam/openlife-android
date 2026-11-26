@@ -63,7 +63,17 @@ class FactRows(val host: HostSqlite) {
     private var clock = 10_000L
 
     fun fact(id: String, sourceId: String, kind: String = "DATE") {
-        with(FactHost) { host.named(FactSql.INSERT_FACT, "id" to id, "sourceId" to sourceId, "kind" to kind, "createdAt" to clock++) }
+        with(
+            FactHost,
+        ) {
+            host.named(
+                FactSql.INSERT_FACT,
+                "id" to id,
+                "sourceId" to sourceId,
+                "kind" to kind,
+                "createdAt" to clock++,
+            )
+        }
     }
 
     @Suppress("LongParameterList") // one column per parameter
@@ -98,7 +108,12 @@ class FactRows(val host: HostSqlite) {
     }
 
     fun current(factId: String, revisionId: String, expected: String? = null): Int = with(FactHost) {
-        host.named(FactSql.MOVE_CURRENT_REVISION, "factId" to factId, "expectedRevisionId" to expected, "revisionId" to revisionId)
+        host.named(
+            FactSql.MOVE_CURRENT_REVISION,
+            "factId" to factId,
+            "expectedRevisionId" to expected,
+            "revisionId" to revisionId,
+        )
         host.changes()
     }
 
@@ -163,7 +178,11 @@ class FactRows(val host: HostSqlite) {
         host.changes()
     }
 
-    fun setState(sourceId: String, state: String) = host.exec("UPDATE sources SET state = ? WHERE id = ?", state, sourceId)
+    fun setState(sourceId: String, state: String) = host.exec(
+        "UPDATE sources SET state = ? WHERE id = ?",
+        state,
+        sourceId,
+    )
 
     /** A READY source with one READY reading `<s>-r` that is current and spans `<s>-s1`, `<s>-s2`. */
     fun readySourceWithReading(fixture: SearchFixture, sourceId: String) {
@@ -233,11 +252,22 @@ class HostFactDao(private val host: HostSqlite) : FactDao {
     }
 
     override suspend fun appendReviewEvent(id: String, revisionId: String, decision: String, createdAt: Long) {
-        q(FactSql.APPEND_REVIEW_EVENT, "id" to id, "revisionId" to revisionId, "decision" to decision, "createdAt" to createdAt)
+        q(
+            FactSql.APPEND_REVIEW_EVENT,
+            "id" to id,
+            "revisionId" to revisionId,
+            "decision" to decision,
+            "createdAt" to createdAt,
+        )
     }
 
     override suspend fun moveCurrentRevision(factId: String, expectedRevisionId: String?, revisionId: String): Int =
-        count(FactSql.MOVE_CURRENT_REVISION, "factId" to factId, "expectedRevisionId" to expectedRevisionId, "revisionId" to revisionId)
+        count(
+            FactSql.MOVE_CURRENT_REVISION,
+            "factId" to factId,
+            "expectedRevisionId" to expectedRevisionId,
+            "revisionId" to revisionId,
+        )
 
     override suspend fun setStatus(id: String, from: String, to: String): Int =
         count(FactSql.SET_STATUS, "id" to id, "from" to from, "to" to to)
@@ -249,7 +279,14 @@ class HostFactDao(private val host: HostSqlite) : FactDao {
         count(FactSql.BUMP_FACT_INPUT_EPOCH, "sourceId" to sourceId)
 
     override suspend fun findFact(id: String): FactEntity? = q(FactSql.FIND_FACT, "id" to id).singleOrNull()?.let {
-        FactEntity(it[0] as String, it[1] as String, it[2] as String, (it[3] as Long).toInt(), it[4] as String?, it[5] as Long)
+        FactEntity(
+            it[0] as String,
+            it[1] as String,
+            it[2] as String,
+            (it[3] as Long).toInt(),
+            it[4] as String?,
+            it[5] as Long,
+        )
     }
 
     override suspend fun findRevision(id: String): FactRevisionEntity? =
@@ -332,8 +369,9 @@ class HostSourceRowRemovalDao(private val host: HostSqlite) : SourceRowRemovalDa
         with(FactHost) { host.named(sql, "sourceId" to sourceId) }
     }
 
-    override suspend fun sourceState(sourceId: String): String? =
-        with(FactHost) { host.named(SourceRowRemoval.SOURCE_STATE, "sourceId" to sourceId) }.singleOrNull()?.single() as String?
+    override suspend fun sourceState(sourceId: String): String? = with(
+        FactHost,
+    ) { host.named(SourceRowRemoval.SOURCE_STATE, "sourceId" to sourceId) }.singleOrNull()?.single() as String?
 
     override suspend fun deleteReviewEvents(sourceId: String) = run(SourceRowRemoval.DELETE_REVIEW_EVENTS, sourceId)
 

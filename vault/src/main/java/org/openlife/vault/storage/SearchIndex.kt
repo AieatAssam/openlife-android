@@ -157,7 +157,10 @@ object SearchIndex {
 
     internal fun isComplete(db: SupportSQLiteDatabase): Boolean {
         if (count(db, "name IN (${quoted(tables + triggerNames)})") != tables.size + triggerNames.size) return false
-        val narrowed = count(db, "type = 'trigger' AND name IN (${quoted(updateTriggerNames)}) AND sql LIKE '%UPDATE OF%'")
+        val narrowed = count(
+            db,
+            "type = 'trigger' AND name IN (${quoted(updateTriggerNames)}) AND sql LIKE '%UPDATE OF%'",
+        )
         if (narrowed != updateTriggerNames.size) return false
         return tables.all { table ->
             db.query("SELECT v FROM ${table}_config WHERE k = '$SECURE_DELETE'").use { cursor ->

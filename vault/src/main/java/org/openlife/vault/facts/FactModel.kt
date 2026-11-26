@@ -167,7 +167,13 @@ class FactValue(val valueJson: String, val canonicalText: String) {
     }
 
     /** The entries' `canonicalText`, in the same order (ADR-0008 §3: joined by ` | `). */
-    fun candidateTexts(): List<String> = if (isCandidates) canonicalText.split(CANDIDATE_TEXT_SEPARATOR) else emptyList()
+    fun candidateTexts(): List<String> = if (isCandidates) {
+        canonicalText.split(
+            CANDIDATE_TEXT_SEPARATOR,
+        )
+    } else {
+        emptyList()
+    }
 
     override fun equals(other: Any?): Boolean =
         other is FactValue && other.valueJson == valueJson && other.canonicalText == canonicalText

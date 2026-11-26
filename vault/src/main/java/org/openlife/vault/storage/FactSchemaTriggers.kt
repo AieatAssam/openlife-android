@@ -33,7 +33,8 @@ object FactSchemaTriggers {
     /** The stale columns agree with the status (C2 §4.2): set iff STALE, with a known reason. */
     private fun staleColumnsAgree(rule: String) = raise(
         rule,
-        "(NEW.staleReason IS NULL) <> (NEW.staleAt IS NULL) OR (NEW.status = 'STALE') <> (NEW.staleReason IS NOT NULL) " +
+        "(NEW.staleReason IS NULL) <> (NEW.staleAt IS NULL) OR (NEW.status = 'STALE') <> " +
+            "(NEW.staleReason IS NOT NULL) " +
             "OR (NEW.staleReason IS NOT NULL AND NEW.staleReason NOT IN $STALE_REASONS)",
     )
 
@@ -197,7 +198,10 @@ object FactSchemaTriggers {
             "SELECT RAISE(ABORT, 'C2 §4.3: evidence is immutable'); END",
         // review_events (C2 §4.5, C2-R12)
         "c2_review_events_insert" to "BEFORE INSERT ON review_events BEGIN " +
-            raise("C2 §4.5: decision is CONFIRM, REJECT or REOPEN", "NEW.decision NOT IN ('CONFIRM', 'REJECT', 'REOPEN')") +
+            raise(
+                "C2 §4.5: decision is CONFIRM, REJECT or REOPEN",
+                "NEW.decision NOT IN ('CONFIRM', 'REJECT', 'REOPEN')",
+            ) +
             raise("C2 §4.5: sequence starts at 1", "NEW.sequence < 1") +
             " END",
         "c2_review_events_immutable" to "BEFORE UPDATE ON review_events BEGIN " +

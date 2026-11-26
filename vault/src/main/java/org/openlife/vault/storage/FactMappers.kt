@@ -10,16 +10,6 @@ import org.openlife.vault.facts.FactWithLatestRevision
 import org.openlife.vault.facts.StaleReason
 import java.util.UUID
 
-/** C2-R17: the stored values of `ocr_spans.scriptStatus`; UNKNOWN is the column default only. */
-enum class SpanScriptStatus {
-    LATIN,
-    UNSUPPORTED,
-    UNKNOWN,
-
-    /** Stored by a build this one does not understand; never written (C2-R51). */
-    UNRECOGNISED,
-}
-
 /* Read-only mappers: fact rows are written by statement (FactSql), never from these models. */
 
 fun FactEntity.toDomain(): Fact = Fact(

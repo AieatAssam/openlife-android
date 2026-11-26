@@ -24,15 +24,27 @@ class DependencyEdgeTest {
         }
     }
 
-    private fun edge(kind: String, dependent: String, dependentSource: String, dependencyKind: String, dependency: String, dependencySource: String) =
-        host.exec(
-            "INSERT INTO dependency_edges(edgeKind, dependentKind, dependentId, dependentSourceId, dependencyKind, " +
-                "dependencyId, dependencySourceId) VALUES (?, 'FACT_REVISION', ?, ?, ?, ?, ?)",
-            kind, dependent, dependentSource, dependencyKind, dependency, dependencySource,
-        )
+    private fun edge(
+        kind: String,
+        dependent: String,
+        dependentSource: String,
+        dependencyKind: String,
+        dependency: String,
+        dependencySource: String,
+    ) = host.exec(
+        "INSERT INTO dependency_edges(edgeKind, dependentKind, dependentId, dependentSourceId, dependencyKind, " +
+            "dependencyId, dependencySourceId) VALUES (?, 'FACT_REVISION', ?, ?, ?, ?, ?)",
+        kind,
+        dependent,
+        dependentSource,
+        dependencyKind,
+        dependency,
+        dependencySource,
+    )
 
     private fun edges(): List<List<Any?>> = host.query(
-        "SELECT edgeKind, dependentId, dependencyKind, dependencyId FROM dependency_edges ORDER BY edgeKind, dependentId",
+        "SELECT edgeKind, dependentId, dependencyKind, dependencyId FROM dependency_edges ORDER BY " +
+            "edgeKind, dependentId",
     )
 
     @Test
@@ -47,7 +59,11 @@ class DependencyEdgeTest {
         refused("C2-R18") { rows.evidence("e0", "x", "a", "b-s1") }
         assertEquals(0L, host.long("SELECT COUNT(*) FROM dependency_edges"))
         rows.evidence("e1", "x", "a", "a-s1")
-        assertEquals("evidence insert writes its edge", listOf(listOf<Any?>("EVIDENCE", "x", "OCR_SPAN", "a-s1")), edges())
+        assertEquals(
+            "evidence insert writes its edge",
+            listOf(listOf<Any?>("EVIDENCE", "x", "OCR_SPAN", "a-s1")),
+            edges(),
+        )
         refused("C2-R18") { host.exec("UPDATE dependency_edges SET dependencyId = 'a-s2'") }
     }
 
@@ -65,7 +81,10 @@ class DependencyEdgeTest {
         rows.revision("u2", "f", origin = "USER", status = "CONFIRMED", supersedes = "u1")
         assertEquals(
             "a USER revision's basis is the nearest non-USER revision of its chain",
-            listOf(listOf<Any?>("BASIS", "u1", "FACT_REVISION", "x"), listOf<Any?>("BASIS", "u2", "FACT_REVISION", "x")),
+            listOf(
+                listOf<Any?>("BASIS", "u1", "FACT_REVISION", "x"),
+                listOf<Any?>("BASIS", "u2", "FACT_REVISION", "x"),
+            ),
             edges(),
         )
         refused("C2-R18") { edge("BASIS", "x", "a", "FACT_REVISION", "u1", "a") }
@@ -96,7 +115,11 @@ class DependencyEdgeTest {
     fun noKotlinStatementWritesEdges() {
         val writers = File("src/main/java/org/openlife/vault").walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
-            .filter { Regex("(INSERT( OR IGNORE)? INTO|DELETE FROM|UPDATE) `?dependency_edges").containsMatchIn(it.readText()) }
+            .filter {
+                Regex(
+                    "(INSERT( OR IGNORE)? INTO|DELETE FROM|UPDATE) `?dependency_edges",
+                ).containsMatchIn(it.readText())
+            }
             .map { it.name }.toSet()
         assertEquals("only triggers write dependency_edges (C2-R18)", setOf("FactSchemaTriggers.kt"), writers)
     }

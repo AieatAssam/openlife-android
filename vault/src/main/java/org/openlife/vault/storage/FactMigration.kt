@@ -86,7 +86,8 @@ object FactMigration {
         "CREATE TABLE IF NOT EXISTS `facts` (`id` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
             "`ordinal` INTEGER NOT NULL, `currentRevisionId` TEXT, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), " +
             "FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
-        "CREATE UNIQUE INDEX IF NOT EXISTS `index_facts_sourceId_kind_ordinal` ON `facts` (`sourceId`, `kind`, `ordinal`)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_facts_sourceId_kind_ordinal` ON `facts` (`sourceId`, " +
+            "`kind`, `ordinal`)",
         "CREATE TABLE IF NOT EXISTS `fact_revisions` (`id` TEXT NOT NULL, `factId` TEXT NOT NULL, " +
             "`revisionNo` INTEGER NOT NULL, `origin` TEXT NOT NULL, `kind` TEXT NOT NULL, `valueJson` TEXT NOT NULL, " +
             "`canonicalText` TEXT NOT NULL, `rawText` TEXT, `status` TEXT NOT NULL, `staleReason` TEXT, " +
