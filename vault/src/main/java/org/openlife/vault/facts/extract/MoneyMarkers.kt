@@ -35,14 +35,19 @@ internal object MoneyMarkers {
         return out
     }
 
-    private fun dollar(line: LineScan, at: Int): Marker {
+    /**
+     * `$`, or a §5.3 prefixed dollar. A `$` with any other letter attached
+     * before it (`C$`, excluded in §5.3) is not a marker: the attached
+     * letters could name a currency v1 does not read.
+     */
+    private fun dollar(line: LineScan, at: Int): Marker? {
         for (prefix in DOLLAR_PREFIXES) {
             val start = at - prefix.length
             val whole = start >= 0 && line.text.startsWith(prefix, start) && !line.anyClaimed(start, at) &&
                 !Character.isLetter(line.raw(start - 1).code)
             if (whole) return Marker(start, at + 1, prefix + "$", null)
         }
-        return Marker(at, at + 1, "$", null)
+        return if (Character.isLetter(line.raw(at - 1).code)) null else Marker(at, at + 1, "$", null)
     }
 
     private fun word(line: LineScan, start: Int): Marker? {

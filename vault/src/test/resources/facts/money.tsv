@@ -18,6 +18,20 @@ S$3 ‖ MONEY¦S$3¦3 SGD
 HK$1 ‖ MONEY¦HK$1¦1 HKD
 1'234.50 CHF ‖ MONEY¦1'234.50 CHF¦1234.50 CHF
 JPY 500 ‖ MONEY¦JPY 500¦500 JPY
+₽100 ‖ MONEY¦₽100¦100 RUB
+₪100 ‖ MONEY¦₪100¦100 ILS
+₴100 ‖ MONEY¦₴100¦100 UAH
+₫100 ‖ MONEY¦₫100¦100 VND
+₦100 ‖ MONEY¦₦100¦100 NGN
+₸100 ‖ MONEY¦₸100¦100 KZT
+₼100 ‖ MONEY¦₼100¦100 AZN
+₾100 ‖ MONEY¦₾100¦100 GEL
+AU$5 ‖ MONEY¦AU$5¦5 AUD
+NZ$5 ‖ MONEY¦NZ$5¦5 NZD
+# Not markers in v1 (ADR-0008 §5.3): C$, Rs, ¢
+C$5 ‖ -
+Rs 100 ‖ -
+50¢ ‖ -
 #
 # Multi-code symbols without context: currency null, the symbol as printed
 $12.00 ‖ MONEY¦$12.00¦12.00 $
