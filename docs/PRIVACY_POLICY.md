@@ -7,6 +7,11 @@ Android device. This policy describes the current local-only implementation;
 the repository warning still applies because the application is work in
 progress and not ready for real use.
 
+This text is also readable inside the app, offline, under **About > Privacy
+policy**. The build copies this file into the app unchanged, so the in-app
+copy always matches the version of the policy the app was built with. Web
+addresses in it are shown as text; the app does not open them.
+
 ## What OpenLife stores
 
 When you confirm an import, OpenLife stores the original supported image bytes

@@ -86,6 +86,13 @@ apksigner verify --verbose --print-certs app-release.apk
 sha256sum --check SHA-256SUMS
 ```
 
+On the device, **About > This build** shows the version, the source revision
+(`git describe`) and the SHA-256 fingerprint of the certificate that signed
+the installed APK, read from the package manager. An official release
+installed from the GitHub Release shows the fingerprint above. A debug build
+or your own build shows a different one, which is expected; it does not mean
+that build is tampered with, only that it is not an official release.
+
 ## Licence
 
 Apache License 2.0 — see `LICENSE`. That covers the source code here; it
