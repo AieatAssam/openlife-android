@@ -43,29 +43,80 @@ class ExtractorPropertyTest {
         }
     }
 
-    /** Guards against a vacuous pass: known positives embedded in noise are still found. */
+    /**
+     * Guards against a vacuous pass: known positives embedded in noise are
+     * found, or abstained where the rules say. Only the amount is fenced
+     * with `;`: a dash or mark beside an amount abstains it (E-04, Q10). The
+     * other positives touch the noise directly through one character, and
+     * the expectation follows the rules: a space separator or tab (A-8)
+     * still reads; a mark abstains, covering the mark (A-6); a dash or minus
+     * before a time stops it (A-2); before any other kind it does not.
+     */
     @Test
     fun knownPositivesSurviveSurroundingNoise() {
-        val positives = listOf(
-            "2026-09-16" to "2026-09-16",
-            "14:30" to "14:30",
-            "€12.50" to "12.50 EUR",
-            "https://example.org/a" to "https://example.org/a",
-            "ann@example.org" to "ann@example.org",
-            "Tel: 01632 960123" to "01632960123",
-        )
         val random = Random(SEED + 2)
-        var found = 0
+        val failures = mutableListOf<String>()
+        var reads = 0
         repeat(ITERATIONS / 4) {
-            val (text, expected) = positives[random.nextInt(positives.size)]
-            // ';' keeps dash noise from touching an amount: a dash within 4 spaces of one abstains it (E-04, Q10)
-            val line = "${noise(random)}; $text ;${noise(random)}"
-            val result = FactExtractor.extract(listOf(ExtractionSpan("s", null, 1, line)))
-            checkInvariants(listOf(ExtractionSpan("s", null, 1, line)), result)
-            if (result.candidates.any { it.canonicalText == expected }) found++
+            val positive = positives[random.nextInt(positives.size)]
+            val left = touches[random.nextInt(touches.size)]
+            val right = touches[random.nextInt(touches.size)]
+            val before = noise(random) + if (positive.kind == ExtractedKind.MONEY) "; " else left
+            val line = before + positive.text + (if (positive.kind == ExtractedKind.MONEY) " ;" else right) +
+                noise(random)
+            val spans = listOf(ExtractionSpan("s", null, 1, line))
+            val result = FactExtractor.extract(spans)
+            checkInvariants(spans, result)
+            val found = result.candidates.any { it.canonicalText == positive.expected }
+            val expected = positive.kind == ExtractedKind.MONEY || readsBeside(positive.kind, left, right)
+            if (found) reads++
+            if (found != expected) failures += "<$line> found=$found"
+            val marks = listOfNotNull(
+                (before.length - 1).takeIf { left == MARK && positive.kind != ExtractedKind.PHONE },
+                (before.length + positive.text.length).takeIf { right == MARK && positive.kind != ExtractedKind.MONEY },
+            )
+            val uncovered = marks.filterNot { at -> result.abstentions.any { at in it.startOffset until it.endOffset } }
+            if (uncovered.isNotEmpty()) failures += "<$line> mark at $uncovered not covered by an abstention"
         }
-        assertEquals(ITERATIONS / 4, found)
+        assertEquals(emptyList<String>(), failures.take(FAILURES_SHOWN))
+        assertTrue("only $reads positives read", reads > ITERATIONS / 8)
     }
+
+    /** An adjacent NBSP, thin space or tab is a boundary, and the token still reads (A-8). */
+    @Test
+    fun spaceSeparatorsBesideTokensStillRead() {
+        val cases = listOf(
+            "Due:\u00A02026-09-16\t" to "2026-09-16",
+            "at\t14:30\u00A0" to "14:30",
+            "Total\u00A0€12.50\t" to "12.50 EUR",
+            "see\u2009https://example.org/a\u00A0" to "https://example.org/a",
+            "mail\tann@example.org\u202F" to "ann@example.org",
+            "Tel:\u00A001632 960123\t" to "01632960123",
+        )
+        for ((text, expected) in cases) {
+            val result = FactExtractor.extract(listOf(ExtractionSpan("s", null, 1, text)))
+            assertEquals(text, listOf(expected), result.candidates.map { it.canonicalText })
+        }
+    }
+
+    private fun readsBeside(kind: ExtractedKind, left: String, right: String): Boolean = when {
+        left == MARK || right == MARK -> false
+        kind == ExtractedKind.TIME && left in DASHES -> false
+        else -> true
+    }
+
+    private data class Positive(val kind: ExtractedKind, val text: String, val expected: String)
+
+    private val positives = listOf(
+        Positive(ExtractedKind.DATE, "2026-09-16", "2026-09-16"),
+        Positive(ExtractedKind.TIME, "14:30", "14:30"),
+        Positive(ExtractedKind.MONEY, "€12.50", "12.50 EUR"),
+        Positive(ExtractedKind.URL, "https://example.org/a", "https://example.org/a"),
+        Positive(ExtractedKind.EMAIL, "ann@example.org", "ann@example.org"),
+        Positive(ExtractedKind.PHONE, "Tel: 01632 960123", "01632960123"),
+    )
+
+    private val touches = listOf(" ", "\u00A0", "\t", "\u2009", MARK, "\u2212", "\u2014")
 
     private fun checkInvariants(spans: List<ExtractionSpan>, result: ExtractionResult) {
         for (span in spans) {
@@ -113,5 +164,8 @@ class ExtractorPropertyTest {
     private companion object {
         const val SEED = 20261126
         const val ITERATIONS = 4_000
+        const val FAILURES_SHOWN = 10
+        const val MARK = "\u200B"
+        val DASHES = setOf("\u2212", "\u2014")
     }
 }

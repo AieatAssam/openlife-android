@@ -137,9 +137,9 @@ Paid 03/04/2026 €5 ‖ DATE¦03/04/2026¦2026-03-04 | 2026-04-03 ‖ MONEY¦�
 # Review fixes 2026-11-26 (ADR-0008 amendments)
 # E-01: ASCII-space groups keep every printed zero
 €5 000 ‖ MONEY¦€5 000¦5 EUR | 5000 EUR
-1 000 € ‖ MONEY¦1 000 €¦0 EUR | 1000 EUR
+1 000 € ‖ MONEY¦1 000 €¦1 EUR | 1000 EUR
 12 005 € ‖ MONEY¦12 005 €¦5 EUR | 12005 EUR
-1 000 000 € ‖ MONEY¦1 000 000 €¦0 EUR | 1000000 EUR
+1 000 000 € ‖ MONEY¦1 000 000 €¦1 EUR | 1000000 EUR
 €1 050 ‖ MONEY¦€1 050¦1 EUR | 1050 EUR
 € 1 000 ‖ MONEY¦€ 1 000¦1 EUR | 1000 EUR
 €5\u00a0000 ‖ MONEY¦€5\u00a0000¦5000 EUR
@@ -183,3 +183,73 @@ CHF 1'234,567 ‖ !MONEY¦CHF 1'234,567
 # E-10: a code beside a signed number is never context
 $5␤USD -33.10 ‖ MONEY¦$5¦5 $ ‖ @2 !MONEY¦USD -33.10
 $5␤USD −33.10 ‖ MONEY¦$5¦5 $ ‖ @2 !MONEY¦USD −33.10
+
+# Verification fixes 2026-11-26 (EE-01..EE-06 and residual rulings)
+# EE-01: a + run of 7-15 digits beside a free marker is phone or money: abstained as PHONE
++1234567 EUR ‖ !PHONE¦+1234567
++1234567 € ‖ !PHONE¦+1234567
+€ +1234567 ‖ !PHONE¦+1234567
+Balance: +1234567 GBP ‖ !PHONE¦+1234567
+Gain +2500000 JPY ‖ !PHONE¦+2500000
++1 234 567 EUR ‖ !PHONE¦+1 234 567
++12.345.678 EUR ‖ !PHONE¦+12.345.678
++1234567.89 € ‖ !PHONE¦+1234567.89
++123456 EUR ‖ MONEY¦123456 EUR¦123456 EUR
++5 € ‖ MONEY¦5 €¦5 EUR
++12345678901234567 EUR ‖ !MONEY¦12345678901234567 EUR
+Call +44 20 7946 0018 €5 ‖ PHONE¦+44 20 7946 0018¦+442079460018 ‖ MONEY¦€5¦5 EUR
+# EE-02: a space-grouped amount with a fraction abstains whole, prefix and suffix alike
+€5 000.00 ‖ !MONEY¦€5 000.00
+5 000.00 € ‖ !MONEY¦5 000.00 €
+$1 234.56 ‖ !MONEY¦$1 234.56
+1 234.56 $ ‖ !MONEY¦1 234.56 $
+CHF 1 234.50 ‖ !MONEY¦CHF 1 234.50
+1 234.50 CHF ‖ !MONEY¦1 234.50 CHF
+EUR 1 234,50 ‖ !MONEY¦EUR 1 234,50
+€12 345,67 ‖ !MONEY¦€12 345,67
+12 345,67 € ‖ !MONEY¦12 345,67 €
+€1 000 000.50 ‖ !MONEY¦€1 000 000.50
+1 000 000.50 € ‖ !MONEY¦1 000 000.50 €
+€5\u2009000.00 ‖ !MONEY¦€5\u2009000.00
+5\u2009000.00 € ‖ !MONEY¦5\u2009000.00 €
+€1\u0009234.56 ‖ !MONEY¦€1\u0009234.56
+# EE-02 / A-8: any single space separator splitting a number groups like an ASCII space
+€5\u2009000 ‖ MONEY¦€5\u2009000¦5 EUR | 5000 EUR
+5\u2009000 € ‖ MONEY¦5\u2009000 €¦5 EUR | 5000 EUR
+1\u0009234 € ‖ MONEY¦1\u0009234 €¦234 EUR | 1234 EUR
+€5 12.50 ‖ MONEY¦€5¦5 EUR
+# EE-03: ranges
+10 and 20 € ‖ !MONEY¦10 and 20 €
+between 10 and 20 € ‖ !MONEY¦10 and 20 €
+€10 and 20 ‖ MONEY¦€10¦10 EUR
+-€5 to -€10 ‖ !MONEY¦-€5 to -€10
+€-5 - €-10 ‖ !MONEY¦€-5 - €-10
+€10 and €20 and €30 ‖ !MONEY¦€10 and €20 and €30
+€10-€20-€30 ‖ !MONEY¦€10-€20-€30
+5 € - 10 € - 15 € ‖ !MONEY¦5 € - 10 € - 15 €
+# EE-04: a mark leading or inside an amount abstains visibly, covering the mark
+€\u200D5 ‖ !*¦€\u200D5
+€\u03015 ‖ !*¦€\u03015
+\uD83D\uDC69\u200D\uD83D\uDCBB €5 ‖ MONEY¦€5¦5 EUR
+\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67 €5 ‖ MONEY¦€5¦5 EUR
+#\uFE0F\u20E3 5 € ‖ MONEY¦5 €¦5 EUR
+# EE-05: a second sign or a plus-minus abstains
+--€5 ‖ !MONEY¦--€5
+±€5 ‖ !MONEY¦±€5
+\u2212-€5 ‖ !MONEY¦\u2212-€5
+# EE-06: zero-led groups; the first group stands in for a zero-led adjacent group
+€5 000 ‖ MONEY¦€5 000¦5 EUR | 5000 EUR
+12 005 € ‖ MONEY¦12 005 €¦12 EUR | 12005 EUR
+€0 001 ‖ !MONEY¦€0 001
+€ 001 000 ‖ !MONEY¦€ 001 000
+0 500 € ‖ !MONEY¦0 500 €
+# Residual rulings: currency pairs and credit markers
+EUR/USD 1.08 ‖ !MONEY¦EUR/USD 1.08
+1.08 EUR/USD ‖ !MONEY¦1.08 EUR/USD
+EUR / USD 1.08 ‖ !MONEY¦EUR / USD 1.08
+$5␤EUR/USD ‖ MONEY¦$5¦5 $
+€5.00 Cr ‖ !MONEY¦€5.00 Cr
+€5.00 dr ‖ !MONEY¦€5.00 dr
+€5.00\u00A0CR ‖ !MONEY¦€5.00\u00A0CR
+€5.00\u0009Dr ‖ !MONEY¦€5.00\u0009Dr
+€5.00 Credit ‖ MONEY¦€5.00¦5.00 EUR

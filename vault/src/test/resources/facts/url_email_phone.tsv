@@ -99,7 +99,7 @@ https://example.com/\u200bx ‖ !URL¦https://example.com/\u200bx
 https://example.com\u0301 ‖ !URL¦https://example.com\u0301
 Tel: 01632 960123\u200b ‖ !PHONE¦01632 960123\u200b
 # E-09: a '+'-led phone claims before money; '.' or ',' in a '+' run abstains
-+1 555 123 4567 USD ‖ PHONE¦+1 555 123 4567¦+15551234567
++1 555 123 4567 USD ‖ !PHONE¦+1 555 123 4567
 Tel: +44 20 7946 0018 €5 ‖ PHONE¦+44 20 7946 0018¦+442079460018 ‖ MONEY¦€5¦5 EUR
 Δ +1234567.89 ‖ !PHONE¦+1234567.89
 Change +12.345.678 ‖ !PHONE¦+12.345.678
@@ -107,3 +107,8 @@ Change +12.345.678 ‖ !PHONE¦+12.345.678
 Total 12.00 € +1 555 123 4567 ‖ MONEY¦12.00 €¦12.00 EUR ‖ PHONE¦+1 555 123 4567¦+15551234567
 # E-08: space separators after a label
 Tel:\u00a001632 960123 ‖ PHONE¦01632 960123¦01632960123
+
+# Verification fixes 2026-11-26 (EE-04): a mark before an address is covered by its abstention
+\u200Buser@example.com ‖ !EMAIL¦\u200Buser@example.com
+u\u200Bser@example.com ‖ !EMAIL¦u\u200Bser@example.com
+ref\u200BTel: 01632 960123 ‖ -

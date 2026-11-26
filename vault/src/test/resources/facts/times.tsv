@@ -153,3 +153,9 @@ Offset −02:00 ‖ -
 14h30 ‖ !TIME¦14h30
 €12.50 ‖ MONEY¦€12.50¦12.50 EUR
 12.50 EUR ‖ MONEY¦12.50 EUR¦12.50 EUR
+
+# Verification fixes 2026-11-26 (EE-04, Zulu ruling)
+\u200F14:30 ‖ !*¦\u200F14:30
+14:30 Zulu ‖ !TIME¦14:30 Zulu
+14:30 zulu ‖ !TIME¦14:30 zulu
+14:30 ZULU ‖ !TIME¦14:30 ZULU

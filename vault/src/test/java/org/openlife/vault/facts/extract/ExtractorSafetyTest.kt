@@ -3,6 +3,7 @@ package org.openlife.vault.facts.extract
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.openlife.vault.facts.FactKind
 import java.io.File
 
 /**
@@ -45,6 +46,8 @@ class ExtractorSafetyTest {
         "non-ascii-digits" to fill("1\u0663"),
         "time-ann" to fill("1:00 ("),
         "url-many" to fill("www.a "),
+        "range-chain" to fill("€1 and "),
+        "mark-led" to fill("\u200E1 "),
         "mixed" to fill("Tel: +44 (0)20 7946 0018 3/4/26 €1,234 https://a.example/x a@b.example 2:30 pm "),
     )
 
@@ -69,7 +72,7 @@ class ExtractorSafetyTest {
     /** Ten times the input must not cost much more than ten times the time (linear scanning). */
     @Test
     fun workGrowsLinearly() {
-        for (name in listOf("digit-space", "label-run", "at", "groups", "months", "time-ann", "url-many")) {
+        for (name in LINEAR) {
             val small = adversarial.getValue(name)
             val large = small.repeat(SCALE)
             val all = RuleStage.entries.toSet()
@@ -77,6 +80,30 @@ class ExtractorSafetyTest {
             println("ExtractorSafetyTest linearity $name x$SCALE ratio ${"%.1f".format(ratio)}")
             assertTrue("$name grew by $ratio for ${SCALE}x input", ratio < SCALE * 2)
         }
+    }
+
+    /**
+     * Deterministic: the scanner's character reads (`LineScan.ch`, `raw`)
+     * grow at most linearly. Timing ratios are noisy on a shared host; this
+     * counter is not. It cannot see work done on the text directly, which
+     * the timing tests still cover.
+     */
+    @Test
+    fun scannerReadsGrowLinearly() {
+        val grown = adversarial.mapNotNull { (name, small) ->
+            val few = FactExtractor.countReads(ExtractionSpan("s", null, 1, small))
+            val many = FactExtractor.countReads(ExtractionSpan("s", null, 1, small.repeat(SCALE)))
+            println("ExtractorSafetyTest reads $name $few x$SCALE $many")
+            "$name: $few -> $many".takeIf { few == 0L || many > few * (SCALE + 1) }
+        }
+        assertEquals(emptyList<String>(), grown)
+    }
+
+    /** P3-04 maps each extracted kind to the stored kind by name; the two enums cannot drift apart. */
+    @Test
+    fun everyExtractedKindIsAFactKind() {
+        val stored = FactKind.entries.filter { it != FactKind.UNRECOGNISED }.map { it.name }
+        assertEquals(stored, ExtractedKind.entries.map { it.name })
     }
 
     @Test
@@ -186,5 +213,8 @@ class ExtractorSafetyTest {
         const val RUNS = 5
         const val SCALE = 10
         const val NANOS_PER_MILLI = 1_000_000.0
+        val LINEAR = listOf(
+            "digit-space", "label-run", "at", "groups", "months", "time-ann", "url-many", "range-chain", "mark-led",
+        )
     }
 }

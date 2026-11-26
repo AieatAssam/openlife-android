@@ -180,3 +180,9 @@ Ref 123-2026-09-16 ‖ -
 Wed\u202f16 Sep 2026 ‖ DATE¦Wed\u202f16 Sep 2026¦2026-09-16
 # E-09(c): three dotted groups stay date candidates (stated residual)
 Version 1.2.33 ‖ DATE¦1.2.33¦1933-01-02 | 1933-02-01 | 2033-01-02 | 2033-02-01
+
+# Verification fixes 2026-11-26 (EE-04): a mark leading or inside a date abstains visibly
+\u200E2026-09-16 ‖ !*¦\u200E2026-09-16
+\u202E2026-09-16 ‖ !*¦\u202E2026-09-16
+2026\u200B-09-16 ‖ !*¦2026\u200B-09-16
+ref\u200B2026-09-16 x ‖ !*¦ref\u200B2026-09-16

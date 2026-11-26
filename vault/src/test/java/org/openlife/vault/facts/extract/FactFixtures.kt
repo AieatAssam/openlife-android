@@ -15,7 +15,8 @@ import org.junit.Assert.fail
  * - Candidate: `[@N ]KIND¦rawText¦canonicalText` (span N, default 1). The
  *   candidates of a row must match exactly, in span then offset order.
  * - Abstention: `[@N ]!KIND¦rawText`: that exact slice must be recorded as
- *   abstained (recognised and claimed, ADR-0008 §1).
+ *   abstained (recognised and claimed, ADR-0008 §1). `!*¦rawText` is an
+ *   abstention recorded before any kind is known (kind null).
  * - `#` starts a comment line.
  */
 internal object FactFixtures {
@@ -84,7 +85,8 @@ internal object FactFixtures {
     private fun hasAbstention(result: ExtractionResult, spans: List<ExtractionSpan>, item: String): Boolean {
         val spanIndex = spanIndexOf(item)
         val body = item.withoutSpan().removePrefix("!")
-        val kind = ExtractedKind.valueOf(body.substringBefore('¦'))
+        val kindName = body.substringBefore('¦')
+        val kind = if (kindName == "*") null else ExtractedKind.valueOf(kindName)
         val raw = body.substringAfter('¦')
         val span = spans[spanIndex]
         return result.abstentions.any {

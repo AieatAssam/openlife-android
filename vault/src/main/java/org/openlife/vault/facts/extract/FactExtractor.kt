@@ -52,6 +52,9 @@ object FactExtractor {
         stage(line, RuleStage.PHONE in stages) { PhoneExtractor.scan(line) }
     }
 
+    /** Test seam: the scanner's character reads for one span with every rule (stub until GREEN). */
+    internal fun countReads(span: ExtractionSpan): Long = 0L
+
     private inline fun stage(line: LineScan, enabled: Boolean, body: () -> Unit) {
         if (!enabled) return
         line.beginStage()
