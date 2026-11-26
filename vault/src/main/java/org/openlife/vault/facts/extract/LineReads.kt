@@ -48,10 +48,10 @@ internal fun LineScan.emit(output: LineScan.Output) {
     }
 }
 
-private fun hasUnpairedSurrogate(value: FactValue): Boolean =
+private fun hasUnpairedSurrogate(value: TypedValue): Boolean =
     CanonicalJson.strings(value).any { it != null && CanonicalJson.hasUnpairedSurrogate(it) }
 
-private fun LineScan.toCandidate(output: LineScan.Output, values: List<FactValue>) = ExtractedCandidate(
+private fun LineScan.toCandidate(output: LineScan.Output, values: List<TypedValue>) = ExtractedCandidate(
     kind = output.kind,
     rawText = text.substring(output.start, output.end),
     spanId = span.spanId,

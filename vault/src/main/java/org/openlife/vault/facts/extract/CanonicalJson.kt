@@ -10,7 +10,7 @@ internal object CanonicalJson {
     private const val HEX_RADIX = 16
     private const val HEX_WIDTH = 2
 
-    fun of(single: FactValue?, candidates: List<FactValue>): String = buildString {
+    fun of(single: TypedValue?, candidates: List<TypedValue>): String = buildString {
         if (single != null) {
             value(this, single)
         } else {
@@ -40,7 +40,7 @@ internal object CanonicalJson {
     }
 
     /** Every string a value would write, for the surrogate check. */
-    fun strings(value: FactValue): List<String?> = when (value) {
+    fun strings(value: TypedValue): List<String?> = when (value) {
         is DateValue -> listOf(value.canonicalText())
         is TimeValue -> listOf(value.canonicalText())
         is DateTimeValue -> listOf(value.canonicalText())
@@ -48,7 +48,7 @@ internal object CanonicalJson {
         is TextValue -> listOf(value.normalized, value.raw)
     }
 
-    private fun value(out: StringBuilder, value: FactValue) {
+    private fun value(out: StringBuilder, value: TypedValue) {
         when (value) {
             is DateValue -> fields(out, "date" to value.canonicalText())
             is TimeValue -> fields(out, "time" to value.canonicalText())

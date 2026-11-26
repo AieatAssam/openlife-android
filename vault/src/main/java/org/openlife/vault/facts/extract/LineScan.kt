@@ -66,7 +66,7 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
         val kind: ExtractedKind,
         val start: Int,
         val end: Int,
-        val values: List<FactValue>,
+        val values: List<TypedValue>,
         val rule: RuleRef,
         val english: Boolean = false,
         val context: List<CurrencyContext> = emptyList(),
@@ -84,9 +84,9 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
         fun isAsciiUpper(char: Char): Boolean = char in 'A'..'Z'
 
         /** ADR-0008 §2 ordering inside one candidate set; amounts compare as decimals, never binary floats. */
-        val VALUE_ORDER: Comparator<FactValue> = Comparator { left, right -> compareValues(left, right) }
+        val VALUE_ORDER: Comparator<TypedValue> = Comparator { left, right -> compareValues(left, right) }
 
-        private fun compareValues(left: FactValue, right: FactValue): Int = when {
+        private fun compareValues(left: TypedValue, right: TypedValue): Int = when {
             left is DateValue && right is DateValue -> left.date.compareTo(right.date)
             left is TimeValue && right is TimeValue -> left.secondOfDay().compareTo(right.secondOfDay())
             left is DateTimeValue && right is DateTimeValue -> compareDateTimes(left, right)

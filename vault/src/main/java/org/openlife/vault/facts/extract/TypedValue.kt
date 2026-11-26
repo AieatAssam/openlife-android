@@ -6,7 +6,7 @@ import java.time.LocalDate
  * One typed value (ADR-0008 §2). Amounts are decimal strings, never binary
  * floating point; dates and times are floating local values with no zone.
  */
-sealed interface FactValue {
+sealed interface TypedValue {
     val kind: ExtractedKind
 
     /** ADR-0008 §3. */
@@ -14,7 +14,7 @@ sealed interface FactValue {
 }
 
 /** A calendar date, proleptic Gregorian, year 1000..9999. */
-data class DateValue(val date: LocalDate) : FactValue {
+data class DateValue(val date: LocalDate) : TypedValue {
     init {
         require(date.year in MIN_YEAR..MAX_YEAR) { "Year out of range" }
     }
@@ -30,7 +30,7 @@ data class DateValue(val date: LocalDate) : FactValue {
 }
 
 /** A 24-hour local time; [second] is set only when seconds were printed. */
-data class TimeValue(val hour: Int, val minute: Int, val second: Int?) : FactValue {
+data class TimeValue(val hour: Int, val minute: Int, val second: Int?) : TypedValue {
     init {
         require(hour in 0..MAX_HOUR && minute in 0..MAX_MINUTE) { "Time out of range" }
         require(second == null || second in 0..MAX_MINUTE) { "Second out of range" }
@@ -58,7 +58,7 @@ data class TimeValue(val hour: Int, val minute: Int, val second: Int?) : FactVal
 }
 
 /** A date and a time printed together, both unambiguous (ADR-0008 §4.3). */
-data class DateTimeValue(val date: DateValue, val time: TimeValue) : FactValue {
+data class DateTimeValue(val date: DateValue, val time: TimeValue) : TypedValue {
     override val kind: ExtractedKind get() = ExtractedKind.DATETIME
 
     override fun canonicalText(): String = date.canonicalText() + " " + time.canonicalText()
@@ -70,7 +70,7 @@ data class DateTimeValue(val date: DateValue, val time: TimeValue) : FactValue {
  * [currency] is an ISO 4217 code or null ("not stated"); [rawSymbol] is the
  * printed symbol or null when only a code was printed.
  */
-data class MoneyValue(val amount: String, val currency: String?, val rawSymbol: String?) : FactValue {
+data class MoneyValue(val amount: String, val currency: String?, val rawSymbol: String?) : TypedValue {
     init {
         require(currency != null || rawSymbol != null) { "An amount needs a code or a symbol" }
     }
@@ -81,7 +81,7 @@ data class MoneyValue(val amount: String, val currency: String?, val rawSymbol: 
 }
 
 /** A URL, email address or phone number: its normalised form and the printed slice. */
-data class TextValue(override val kind: ExtractedKind, val normalized: String, val raw: String) : FactValue {
+data class TextValue(override val kind: ExtractedKind, val normalized: String, val raw: String) : TypedValue {
     init {
         require(kind in TEXT_KINDS) { "Not a text kind" }
     }
