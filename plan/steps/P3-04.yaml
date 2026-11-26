@@ -14,15 +14,15 @@ summary: >
 
 requirements:
   - id: P3-04-R1
-    text: "MUST add FactExtractionRepository.extract(sourceId): result, running under withContext(IO), reading spans and their latest corrections: facts extracted from corrected text carry origin EXTRACTED, evidence = the span, and a methodId suffix `+correction`; the UI labels them 'from your correction'."
+    text: "MUST add FactExtractionRepository.extract(sourceId): result, running under withContext(IO), reading spans and their latest corrections: facts extracted from corrected text carry origin EXTRACTED, evidence = the span, and a methodId suffix `+correction`; the UI labels them 'from your correction'. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): reads the current correction (head of the supersession chain), not the latest; methodId ends in +correction iff any evidence row came from a correction; reads, matches and commits per the epoch protocol of C2-R31 (no lease held across matching, no withMutation inside a lease)."
   - id: P3-04-R2
-    text: "MUST skip re-creating identical facts (same kind, canonical value, span) on re-run; new candidates create new fact identities; missing candidates on re-run mark previous EXTRACTED revisions STALE only if the OCR revision changed."
+    text: "MUST skip re-creating identical facts (same kind, canonical value, span) on re-run; new candidates create new fact identities; missing candidates on re-run mark previous EXTRACTED revisions STALE only if the OCR revision changed. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): 'new candidates create new fact identities' means candidates that continue no STALE fact (C2-R33, D-8)."
   - id: P3-04-R3
-    text: "MUST enforce the 5 s deadline and 500-revision cap; on overflow fail closed with a LIMIT_EXCEEDED result and no partial commit (single transaction)."
+    text: "MUST enforce the 5 s deadline and 500-revision cap; on overflow fail closed with a LIMIT_EXCEEDED result and no partial commit (single transaction). Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): the 500 cap counts current revisions only and never refuses review, clarify or correct (C2-R62); a kind over 64 candidates is skipped with a visible outcome and the other kinds commit (C2-R57)."
   - id: P3-04-R4
-    text: "MUST auto-run extraction after an OCR revision reaches READY (user-visible as 'Facts found: n, review them') — proposal only, nothing confirmed."
+    text: "MUST auto-run extraction after an OCR revision reaches READY (user-visible as 'Facts found: n, review them') — proposal only, nothing confirmed. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): the auto-run is state-based and runs only for a Source with no extracted fact and no run row for its current reading (C2-R30); otherwise facts go STALE and the user is offered 'Find facts again'."
   - id: P3-04-R5
-    text: "MUST mark STALE via FactRepository when: a span gets a new correction, a newer OCR revision becomes READY, or an OCR revision is rejected."
+    text: "MUST mark STALE via FactRepository when: a span gets a new correction, a newer OCR revision becomes READY, or an OCR revision is rejected. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): the full trigger list is C2 section 9 (also span rejected, whole-reading correction, BASIS propagation), each in the same transaction as its trigger, with an epoch bump."
   - id: P3-04-R6
     text: "VS-3 (docs/reviews/2026-11-24-vault-audit.md): MUST read only the current-revision pointer and the explicit correction supersession chain from P3-02-R7 (never 'latest createdAt'), extract only from spans whose persisted hasEvidenceRegion is true and scriptStatus is supported, and record the STALE reason from P3-02-R7 rather than a bare STALE."
 
