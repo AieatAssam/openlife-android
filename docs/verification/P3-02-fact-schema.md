@@ -45,14 +45,30 @@ indices Room creates.
 | `FactWriterTest` (5) | the bodies of `FactRepository`: the §5 status table, clarify byte for byte and re-choose (C2-R36), correct refused on STALE (C2-R37), user facts (C2-R38) and the 500 cap (C2-R62), the BFS stale traversal with BASIS_STALE and the epoch bump on every call (C2-R19, C2-R63) |
 | `SchemaV5MigrationTest`, `EnumDecodingTest` | v5 tests updated for the narrowed triggers; tolerant decoding of the new enums |
 
-## Mutations
+## RED and mutations
 
-- Removing `NEW.x IS NOT OLD.x` guards: `UPDATE OF` fires on host SQLite
-  even for an unchanged value, so the pointer triggers refused
-  same-value updates (seen while writing the triggers).
 - RED (commit 5c328bf): 22 of 30 targeted tests failed, each for the
   intended reason (no 6.json, TODO stubs, boundary checks, narrowed
   triggers missing).
+- `DependencyEdgeTest.noKotlinStatementWritesEdges` passed at RED (no
+  Kotlin wrote edges yet), so RED is proven by mutation: appending
+  `// MUTATION: DELETE FROM dependency_edges` to `FactDao.kt` and running
+  `./gradlew :vault:testDebugUnitTest --rerun --tests 'org.openlife.vault.storage.DependencyEdgeTest'`
+  gave `noKotlinStatementWritesEdges FAILED` (4 tests, 1 failed); reverted,
+  the same command passes. `--rerun` is needed: a comment-only change
+  leaves the test task UP-TO-DATE because these boundary tests read
+  sources Gradle does not track as inputs.
+- Observation, not a recorded mutation run: on host SQLite an
+  `UPDATE OF col` trigger fires even when the value is unchanged, so the
+  pointer triggers are guarded by `NEW.x IS NOT OLD.x`.
+
+## Gate log note
+
+The final gate run (`BUILD SUCCESSFUL`, exit 0) log also contains a
+"Gradle build daemon disappeared unexpectedly" dump from an earlier,
+concurrent client whose daemon died; that client's tasks were re-run by
+the successful build. `:vault:lint` was re-run alone afterwards: "No
+issues found".
 
 ## Deviations recorded in the step notes
 
