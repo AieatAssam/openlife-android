@@ -5,7 +5,8 @@ package org.openlife.vault.facts.extract
  * only when each has exactly one value, neither is part of a range, and
  * only whitespace, a comma, `at`, `@`, `-` or a joining `T` lies between them.
  * Otherwise each is emitted on its own. A zone after the time abstains the
- * time; a date joined to it by `T` abstains with it.
+ * time; a date joined to it by `T` abstains with it, with the same reason,
+ * whatever made the time abstain (amendment E-02).
  */
 object DateTimeExtractor {
     const val RULE_ID = "rules-datetime"
@@ -26,7 +27,7 @@ object DateTimeExtractor {
         }
         val timeStarts = times.mapTo(HashSet()) { it.start }
         dates.forEachIndexed { index, date ->
-            if (index !in pairing.dates) emitDate(line, date, index in pairing.zoned, date.end + 1 in timeStarts)
+            if (index !in pairing.dates) emitDate(line, date, pairing.zoned[index], date.end + 1 in timeStarts)
         }
         times.forEachIndexed { index, time -> if (index !in pairing.times) emitTime(line, time) }
     }
@@ -42,15 +43,16 @@ object DateTimeExtractor {
         }
     }
 
-    /** Which dates and times were merged, and which dates abstain with a zoned time. */
+    /** Which dates and times were merged, and which `T`-joined dates abstain with their time, and why. */
     private class Pairing {
         val dates = HashSet<Int>()
         val times = HashSet<Int>()
-        val zoned = HashSet<Int>()
+        val zoned = HashMap<Int, AbstentionReason>()
 
         fun judge(line: LineScan, dateIndex: Int, date: DateToken, timeIndex: Int, time: TimeToken) {
-            if (time.reason == AbstentionReason.ZONE_OR_ANNOTATION && date.joinedByT) {
-                zoned += dateIndex
+            val reason = time.reason
+            if (reason != null && date.joinedByT) {
+                zoned[dateIndex] = reason
             } else if (pairable(date, time)) {
                 emitPair(line, date, time)
                 dates += dateIndex
@@ -68,8 +70,8 @@ object DateTimeExtractor {
         if (to - from > MAX_GAP || to < from) return false
         val gap = line.text.substring(from, to)
         if (gap == "T") return dateFirst && date.joinedByT
-        val core = gap.trim(' ')
-        val spaced = gap.isNotEmpty() && (core.isEmpty() || core == "," || gap.startsWith(' '))
+        val core = gap.trim(LineScan::isSpace)
+        val spaced = gap.isNotEmpty() && (core.isEmpty() || core == "," || LineScan.isSpace(gap[0]))
         return spaced && core.lowercase() in SEPARATORS && !date.joinedByT
     }
 
@@ -86,9 +88,9 @@ object DateTimeExtractor {
         line.emit(output)
     }
 
-    private fun emitDate(line: LineScan, date: DateToken, zoned: Boolean, timeFollows: Boolean) {
+    private fun emitDate(line: LineScan, date: DateToken, zoned: AbstentionReason?, timeFollows: Boolean) {
         val reason = when {
-            zoned -> AbstentionReason.ZONE_OR_ANNOTATION
+            zoned != null -> zoned
             date.joinedByT && !timeFollows -> AbstentionReason.ATTACHED_CHARACTERS
             else -> null
         }

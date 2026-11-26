@@ -10,15 +10,19 @@ internal object MoneyShapes {
     fun amount(scene: MoneyScene, index: Int, prefix: Marker?, suffix: Marker?): Amount? {
         val line = scene.line
         val number = scene.numbers[index]
-        val signAt = number.start - 1
-        if (prefix == null && line.raw(signAt) != '-' && !line.boundaryBefore(number.start)) return null
+        if (prefix == null && !LineScan.isDashLike(line.raw(number.start - 1)) && !line.boundaryBefore(number.start)) {
+            return null
+        }
         if (suffix != null && prefix == null) groupedFraction(scene, number, suffix)?.let { return it }
         val first = if (suffix != null && prefix == null) leftChain(scene, index) else index
         val last = if (prefix != null && suffix == null) rightChain(scene, index) else index
         val readings = readings(scene, first, last, index)
         val digitsStart = scene.numbers[first].start
-        val (start, negative) = sign(line, prefix?.start ?: digitsStart, prefix != null && line.raw(prefix.end) == '-')
-        return Amount(start, suffix?.end ?: scene.numbers[last].end, prefix, suffix, readings, negative)
+        val digitsEnd = scene.numbers[last].end
+        val core = prefix?.start ?: digitsStart
+        val before = (prefix?.end ?: digitsStart)..digitsStart
+        val sign = MoneySigns.of(line, core, before, digitsEnd..(suffix?.start ?: digitsEnd))
+        return Amount(sign.start, suffix?.end ?: digitsEnd, prefix, suffix, readings, sign.negative, core, sign.problem)
     }
 
     /** `1 234,50 €` with an ASCII space: a grouped number with a fraction is not read (§5.2). */
@@ -59,13 +63,41 @@ internal object MoneyShapes {
     private fun links(scene: MoneyScene, left: Dense, right: Dense): Boolean =
         left.pureDigits && right.pureDigits && left.text.length <= GROUP && right.text.length == GROUP &&
             left.end + 1 == right.start && scene.line.ch(left.end) == ' ' && !scene.line.isClaimed(left.start)
+}
 
-    /** A `-` directly before the amount, not after a digit (§5.1). */
-    private fun sign(line: LineScan, start: Int, between: Boolean): Pair<Int, Boolean> {
-        if (between) return start to true
-        val dash = start - 1
-        val signed = line.ch(dash) == '-' && !digitBefore(line, dash)
-        return if (signed) dash to true else start to false
+/** Where an amount's sign starts, whether it is read as negative, and whether §5.1 abstains it. */
+internal data class Sign(val start: Int, val negative: Boolean, val problem: Boolean)
+
+/**
+ * ADR-0008 §5.1 signs (amendment E-04). Only a lone ASCII `-` touching the
+ * marker or the digits is read (`-€5`, `€-5`, `-5 €`). Any other hyphen,
+ * dash or minus look-alike, a sign with spaces beside it (`- €5`, `EUR -5`),
+ * a dash between the digits and a marker after them, or two signs abstain.
+ * A dash after a digit is a range or a minus between numbers, never a sign.
+ */
+internal object MoneySigns {
+    private const val READ = "-"
+
+    fun of(line: LineScan, core: Int, beforeDigits: IntRange, afterDigits: IntRange): Sign {
+        val inner = between(line, beforeDigits) + between(line, afterDigits)
+        val dash = core - 1 - line.spaceRunBefore(core)
+        val outer = LineScan.isDashLike(line.ch(dash)) && core - dash <= LineScan.MAX_SPACE_RUN + 1 &&
+            !digitBefore(line, dash)
+        val signs = if (outer) inner + line.text[dash] else inner
+        val spaced = outer && dash < core - 1
+        val start = if (outer) dash else core
+        return when {
+            signs.isEmpty() -> Sign(start, negative = false, problem = false)
+            signs == READ && !spaced -> Sign(start, negative = true, problem = false)
+            else -> Sign(start, negative = false, problem = true)
+        }
+    }
+
+    /** The dash-like characters in `[range.first, range.last)`; a lone `-` stays readable, anything else does not. */
+    private fun between(line: LineScan, range: IntRange): String {
+        val text = line.text.substring(range.first, range.last)
+        val dashes = text.filter(LineScan::isDashLike)
+        return if (dashes.isEmpty() || text == READ) dashes else "$dashes?"
     }
 
     private fun digitBefore(line: LineScan, at: Int): Boolean =

@@ -17,7 +17,7 @@ internal object DateShapes {
     private const val CENTURY_19 = 1900
     private const val CENTURY_20 = 2000
     private const val NUMERIC_SEPARATORS = "/-."
-    private const val CONTINUATION = "/.:,"
+    private const val CONTINUATION = "/.:,-"
 
     /** A token starting with digits: year-first, day/month numeric, or day and month name. */
     fun numberFirst(line: LineScan, start: Int): DateToken? {
@@ -89,7 +89,7 @@ internal object DateShapes {
         val distinct = values.distinct()
         val token = finish(line, extent.first, extent.last, distinct, english = false)
         val single = token.reason == null && distinct.size == 1
-        return if (single) token.abstained(AbstentionReason.AMBIGUOUS_FORM) else token
+        return if (single) token.abstained(AbstentionReason.AMBIGUOUS_FORM) else token.copy(twoDigitYear = true)
     }
 
     /** `D Month YYYY`, `Dth Month YYYY` and `D-Mon-YYYY`. */
@@ -102,7 +102,7 @@ internal object DateShapes {
         if (gap !in 1..MAX_SPACES) return null
         val nameStart = at + gap
         val nameEnd = line.asciiWordEnd(nameStart, LONGEST_NAME)
-        if (nameEnd == nameStart || Character.isLetter(line.raw(nameEnd).code)) return null
+        if (nameEnd == nameStart || line.letterAt(nameEnd)) return null
         val month = DateNames.month(line.text.substring(nameStart, nameEnd)) ?: return null
         val afterName = if (line.ch(nameEnd) == '.') nameEnd + 1 else nameEnd
         val yearGap = line.spaces(afterName, MAX_SPACES)
@@ -170,7 +170,7 @@ internal object DateShapes {
         return when {
             next in CONTINUATION && nextDigit -> continued(line, token)
             next == 'T' && nextDigit && values.isNotEmpty() -> token.copy(joinedByT = true)
-            !line.boundaryAfter(end) -> token.abstained(AbstentionReason.ATTACHED_CHARACTERS)
+            !line.boundaryAfter(end) -> token.abstained(AbstentionReason.ATTACHED_CHARACTERS, to = line.marksEnd(end))
             values.isEmpty() -> token.abstained(AbstentionReason.INVALID_VALUE)
             else -> token
         }

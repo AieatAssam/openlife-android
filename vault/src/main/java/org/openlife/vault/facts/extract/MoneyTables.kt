@@ -20,10 +20,17 @@ internal object MoneyTables {
             "SRD XCD DOP CUP"
 
     /**
-     * ISO 4217 List One, active codes, transcribed by hand on 2026-11-26
-     * from the published list. Withdrawn codes (for example EEK, SIT, ESP,
-     * STD, HRK, SLL, CUC, ANG, ZWL) are absent. The "no currency" and
+     * ISO 4217 List One, active codes, transcribed by hand on 2026-11-26.
+     * The edition (amendment number) of the list transcribed was not
+     * recorded, so none is cited. Withdrawn codes (for example EEK, SIT,
+     * ESP, STD, HRK, SLL, CUC, ANG, ZWL) are absent. The "no currency" and
      * testing codes XXX and XTS are left out: they never mark an amount.
+     *
+     * Checked on 2026-11-26 against `java.util.Currency` of the host JDK
+     * (OpenJDK 21.0.13.1): every code here is known to it except UYW,
+     * which that JDK lacks; of its codes, only withdrawn ones and XAD are
+     * absent here. BGN is kept (that JDK lists it); whether List One still
+     * lists it after Bulgaria's euro changeover is open question 21.
      */
     val LIST_ONE: Set<String> = LIST_ONE_TEXT.split(' ').toSet()
 

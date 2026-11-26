@@ -7,11 +7,17 @@ package org.openlife.vault.facts.extract
  *
  * A code qualifies when it is a whole uppercase word, a code some
  * multi-code symbol takes, not on the §5.5 English-word list, and not in
- * marker position (at most one space from an ASCII digit). The span text is
- * read as printed; claims made by other rules there are not consulted.
+ * marker position (at most one space, and any sign, from an ASCII digit:
+ * `USD -33.10` is a marker, never context). The span text is read as
+ * printed; claims made by other rules there are not consulted.
+ *
+ * Neighbours are found by ordinal, so the spans must be one reading with
+ * unique ordinals; duplicates fail loudly.
  */
 internal class CurrencyContextIndex(spans: List<ExtractionSpan>) {
-    private val byOrdinal: Map<Int, ExtractionSpan> = spans.associateBy { it.ordinal }
+    private val byOrdinal: Map<Int, ExtractionSpan> = spans.associateBy { it.ordinal }.also {
+        require(it.size == spans.size) { "span ordinals must be unique within one reading" }
+    }
     private val codes = HashMap<String, Map<String, Int>>()
 
     /**
@@ -40,7 +46,7 @@ internal class CurrencyContextIndex(spans: List<ExtractionSpan>) {
         while (at <= text.length - CODE_LENGTH) {
             val end = at + CODE_LENGTH
             val word = text.substring(at, end)
-            val whole = !letterAt(text, at - 1) && !letterAt(text, end)
+            val whole = !letterBefore(text, at) && !letterAt(text, end)
             if (whole && word in MoneyTables.CONTEXT_CODES && !nearDigit(text, at, end)) out.putIfAbsent(word, at)
             at++
         }
@@ -48,12 +54,23 @@ internal class CurrencyContextIndex(spans: List<ExtractionSpan>) {
     }
 
     private fun nearDigit(text: String, start: Int, end: Int): Boolean {
-        val before = if (text.getOrNull(start - 1) == ' ') start - 2 else start - 1
-        val after = if (text.getOrNull(end) == ' ') end + 1 else end
+        var before = start - 1
+        if (text.getOrNull(before)?.let(LineScan::isSignLike) == true) before--
+        if (text.getOrNull(before) == ' ') before--
+        var after = end
+        if (text.getOrNull(after) == ' ') after++
+        if (text.getOrNull(after)?.let(LineScan::isSignLike) == true) after++
         return digitAt(text, before) || digitAt(text, after)
     }
 
-    private fun letterAt(text: String, index: Int): Boolean = text.getOrNull(index)?.let(Character::isLetter) == true
+    private fun letterAt(text: String, index: Int): Boolean =
+        index in text.indices && isLetterLike(Character.codePointAt(text, index))
+
+    private fun letterBefore(text: String, index: Int): Boolean =
+        index in 1..text.length && isLetterLike(Character.codePointBefore(text, index))
+
+    private fun isLetterLike(codePoint: Int): Boolean =
+        Character.isLetter(codePoint) || LineScan.isAttachedMark(codePoint)
 
     private fun digitAt(text: String, index: Int): Boolean = text.getOrNull(index)?.let(LineScan::isAsciiDigit) == true
 

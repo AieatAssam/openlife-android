@@ -30,7 +30,7 @@ internal object DateRanges {
     /** True when `[from, to)` is a range joiner with optional spaces around it. */
     private fun joined(line: LineScan, from: Int, to: Int): Boolean {
         if (to - from > MAX_GAP * 2 + "until".length) return false
-        val between = line.text.substring(from, to).trim(' ')
+        val between = line.text.substring(from, to).trim(LineScan::isSpace)
         return (between.length == 1 && between[0] in DateNames.DASHES) ||
             DateNames.RANGE_WORDS.any { it.equals(between, ignoreCase = true) }
     }
@@ -58,7 +58,7 @@ internal object DateRanges {
 
     private fun spacesBefore(line: LineScan, end: Int): Int {
         var count = 0
-        while (count < MAX_GAP && line.ch(end - count - 1) == ' ') count++
+        while (count < MAX_GAP && LineScan.isSpace(line.ch(end - count - 1))) count++
         return count
     }
 }

@@ -22,6 +22,28 @@ object PhoneExtractor {
     private val CARD_DIGITS = 13..19
     private const val SEPARATORS = " -."
 
+    /** A `+` run also reads commas, so a grouped `+` number is judged whole; a dot or comma abstains (E-09(b)). */
+    private const val PLUS_SEPARATORS = " -.,"
+
+    /**
+     * Amendment E-09(a): before MONEY, a `+`-led run that the phone rule
+     * accepts is emitted and claims its characters (`+1 555 123 4567 USD`).
+     * A run it would abstain is left for [scan], after MONEY.
+     */
+    internal fun scanPlusLed(line: LineScan) {
+        var index = 0
+        while (index < line.length) {
+            line.reach(index)
+            if (line.ch(index) == '+' && startsPlus(line, index)) {
+                val run = read(line, index)
+                if (run.reason == null) emit(line, run)
+                index = maxOf(run.end, index + 1)
+            } else {
+                index++
+            }
+        }
+    }
+
     internal fun scan(line: LineScan) {
         var index = 0
         while (index < line.length) {
@@ -40,38 +62,49 @@ object PhoneExtractor {
 
     private fun label(line: LineScan, start: Int): Int {
         val end = line.asciiWordEnd(start, LONGEST_LABEL)
-        if (Character.isLetter(line.raw(end).code) || line.text.substring(start, end).lowercase() !in LABELS) {
+        if (line.letterAt(end) || line.text.substring(start, end).lowercase() !in LABELS) {
             return maxOf(end, start + 1)
         }
         var at = end
         if (line.ch(at) == ':' || line.ch(at) == '.') at++
-        if (line.ch(at) == ' ') at++
+        if (LineScan.isSpace(line.ch(at))) at++
         val next = line.ch(at)
         val starts = LineScan.isAsciiDigit(next) || (next == '+' && LineScan.isAsciiDigit(line.ch(at + 1)))
         return if (starts) judge(line, at) else end
     }
 
+    /** One maximal run from [start]: its groups, extent, and why it is abstained (null when it is a phone). */
+    private class Run(val start: Int, val end: Int, val groups: List<String>, val reason: AbstentionReason?)
+
     /** Reads the maximal run from [start] and judges it; returns where scanning continues. */
     private fun judge(line: LineScan, start: Int): Int {
+        val run = read(line, start)
+        if (run.reason != null) line.abstain(ExtractedKind.PHONE, run.start, run.end, run.reason) else emit(line, run)
+        return maxOf(run.end, start + 1)
+    }
+
+    private fun read(line: LineScan, start: Int): Run {
+        val plus = line.ch(start) == '+'
+        val separators = if (plus) PLUS_SEPARATORS else SEPARATORS
         val groups = mutableListOf<String>()
-        var at = if (line.ch(start) == '+') start + 1 else start
+        var at = if (plus) start + 1 else start
         do {
             val digits = line.digits(at, Int.MAX_VALUE - 1)
             val group = if (digits > 0) line.text.substring(at, at + digits) else "(${parenGroup(line, at)})"
             groups += group
             at += group.length
-            if (!startsGroup(line, at) && line.ch(at) in SEPARATORS && startsGroup(line, at + 1)) at++
+            if (!startsGroup(line, at) && line.ch(at) in separators && startsGroup(line, at + 1)) at++
         } while (startsGroup(line, at))
         val end = continuationEnd(line, at)
         val reason = reason(line, start, at, end, groups)
-        if (reason != null) {
-            line.abstain(ExtractedKind.PHONE, start, end, reason)
-        } else {
-            val normalized = normalized(line.text[start] == '+', groups)
-            val value = TextValue(ExtractedKind.PHONE, normalized, line.text.substring(start, end))
-            line.emit(LineScan.Output(ExtractedKind.PHONE, start, end, listOf(value), RULE))
-        }
-        return maxOf(end, start + 1)
+        val claimEnd = if (reason == AbstentionReason.ATTACHED_CHARACTERS) line.marksEnd(end) else end
+        return Run(start, claimEnd, groups, reason)
+    }
+
+    private fun emit(line: LineScan, run: Run) {
+        val normalized = normalized(line.text[run.start] == '+', run.groups)
+        val value = TextValue(ExtractedKind.PHONE, normalized, line.text.substring(run.start, run.end))
+        line.emit(LineScan.Output(ExtractedKind.PHONE, run.start, run.end, listOf(value), RULE))
     }
 
     private fun startsGroup(line: LineScan, at: Int): Boolean =
@@ -103,6 +136,7 @@ object PhoneExtractor {
             line.isClaimed(runEnd) || !line.boundaryAfter(runEnd) -> AbstentionReason.ATTACHED_CHARACTERS
             touchesClaim(line, runEnd) -> AbstentionReason.OVERLAPS_CLAIM
             dottedQuad(text) -> AbstentionReason.DOTTED_QUAD
+            text.startsWith('+') && (text.contains('.') || text.contains(',')) -> AbstentionReason.AMBIGUOUS_FORM
             cardLike(bare, digits, groups.size) -> AbstentionReason.CARD_LIKE
             digits !in MIN_DIGITS..MAX_DIGITS -> AbstentionReason.LIMIT
             else -> null

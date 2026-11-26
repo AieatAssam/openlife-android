@@ -16,10 +16,10 @@ internal fun LineScan.asciiWordEnd(start: Int, cap: Int): Int {
     return end
 }
 
-/** Number of unclaimed ASCII spaces from [start], counting at most [cap] + 1. */
+/** Number of unclaimed space separators or tabs from [start], counting at most [cap] + 1 (amendment E-08). */
 internal fun LineScan.spaces(start: Int, cap: Int): Int {
     var end = start
-    while (end - start <= cap && ch(end) == ' ') end++
+    while (end - start <= cap && LineScan.isSpace(ch(end))) end++
     return end - start
 }
 

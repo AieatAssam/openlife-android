@@ -58,7 +58,8 @@ class ExtractorPropertyTest {
         var found = 0
         repeat(ITERATIONS / 4) {
             val (text, expected) = positives[random.nextInt(positives.size)]
-            val line = "${noise(random)} $text ${noise(random)}"
+            // ';' keeps dash noise from touching an amount: a dash within 4 spaces of one abstains it (E-04, Q10)
+            val line = "${noise(random)}; $text ;${noise(random)}"
             val result = FactExtractor.extract(listOf(ExtractionSpan("s", null, 1, line)))
             checkInvariants(listOf(ExtractionSpan("s", null, 1, line)), result)
             if (result.candidates.any { it.canonicalText == expected }) found++
@@ -103,8 +104,10 @@ class ExtractorPropertyTest {
         repeat(random.nextInt(0, 24)) { append(pieces[random.nextInt(pieces.size)]) }
     }
 
+    private val noiseWords = listOf("Total", "ref", "item", "and", "—", ";", "\u2212", "\u200B", "\u00A0", "\t")
+
     private fun noise(random: Random): String = buildString {
-        repeat(random.nextInt(0, 4)) { append(listOf("Total", "ref", "item", "and", "—", ";", "\u2212", "\u200B", "\u00A0", "\t").random(random)) }
+        repeat(random.nextInt(0, 4)) { append(noiseWords.random(random)) }
     }
 
     private companion object {

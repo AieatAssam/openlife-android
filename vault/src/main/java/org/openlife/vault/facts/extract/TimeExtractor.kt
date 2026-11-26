@@ -17,6 +17,7 @@ internal data class TimeToken(
  * after the time abstains it.
  */
 object TimeExtractor {
+    private val ATTACHED = AbstentionReason.ATTACHED_CHARACTERS
     const val RULE_ID = "rules-time"
     const val RULES_VERSION = "v1"
     internal val RULE = RuleRef(RULE_ID, RULES_VERSION)
@@ -34,17 +35,19 @@ object TimeExtractor {
         var index = 0
         while (index < line.length) {
             line.reach(index)
-            val token = if (canStart(line, index)) parse(line, index) else null
+            val token = if (canStart(line, index, tokens.lastOrNull()?.end)) parse(line, index) else null
             index = token?.end ?: (index + 1)
             if (token != null) tokens += token
         }
         return TimeRanges.apply(line, tokens)
     }
 
-    private fun canStart(line: LineScan, index: Int): Boolean {
+    /** Never right after a sign, unless the sign joins this time to the one before (`9am-5pm`; amendment E-02). */
+    private fun canStart(line: LineScan, index: Int, previousEnd: Int?): Boolean {
         if (!LineScan.isAsciiDigit(line.ch(index))) return false
+        val afterSign = LineScan.isSignLike(line.raw(index - 1)) && previousEnd != index - 1
         val afterDate = line.raw(index - 1) == 'T' && line.isClaimed(index - 2)
-        return afterDate || NumericStarts.canStart(line, index)
+        return !afterSign && (afterDate || NumericStarts.canStart(line, index))
     }
 
     private fun parse(line: LineScan, start: Int): TimeToken? {
@@ -57,20 +60,41 @@ object TimeExtractor {
             at += SHORT + 1
         }
         val marker = marker(line, at)
-        if (parts.size == 1 && marker == null) return null
+        if (parts.size == 1 && marker == null) return otherSeparator(line, start, at)
+        if (parts.size > 1 && fraction(line, at)) {
+            return TimeToken(start, line.tokenEnd(at), emptyList(), english = false, reason = ATTACHED)
+        }
         val end = marker?.first ?: at
         val leadingZero = hourDigits == SHORT && line.text[start] == '0'
         val token = TimeToken(start, end, emptyList(), english = marker != null)
         val problem = TimeZones.after(line, end)
         return when {
             problem != null -> token.copy(end = problem, reason = AbstentionReason.ZONE_OR_ANNOTATION)
-            attached(line, end) -> token.copy(reason = AbstentionReason.ATTACHED_CHARACTERS)
+            attached(line, end) -> token.copy(end = line.marksEnd(end), reason = ATTACHED)
             else -> withValues(token, parts, marker?.second, leadingZero)
         }
     }
 
     private fun attached(line: LineScan, end: Int): Boolean =
         !line.boundaryAfter(end) || (line.raw(end) == ':' && LineScan.isAsciiDigit(line.raw(end + 1)))
+
+    /** Fractional seconds (`14:30:00.000`): a dot or comma and a digit after the time (amendment E-02). */
+    private fun fraction(line: LineScan, at: Int): Boolean =
+        (line.raw(at) == '.' || line.raw(at) == ',') && LineScan.isAsciiDigit(line.raw(at + 1))
+
+    /**
+     * Ruling Q16: `H.MM` before an am/pm marker and `HhMM` are claimed and
+     * abstained. A bare `H.MM` stays a number (`12.50 EUR`).
+     */
+    private fun otherSeparator(line: LineScan, start: Int, at: Int): TimeToken? {
+        val separator = line.ch(at)
+        if ((separator != '.' && separator != 'h') || line.digits(at + 1, SHORT) != SHORT) return null
+        val end = at + 1 + SHORT
+        val marker = if (separator == '.') marker(line, end) ?: return null else null
+        val tokenEnd = marker?.first ?: end
+        if (marker == null && !line.boundaryAfter(end)) return null
+        return TimeToken(start, tokenEnd, emptyList(), marker != null, AbstentionReason.AMBIGUOUS_FORM)
+    }
 
     private fun withValues(token: TimeToken, parts: List<Int>, pm: Boolean?, leadingZero: Boolean): TimeToken {
         val hour = parts[0]
@@ -106,9 +130,11 @@ object TimeExtractor {
         else -> listOf(hour)
     }
 
-    /** An am/pm marker directly after or one space after [at]: its end offset and whether it is pm. */
+    /** An am/pm marker after [at] and at most 4 space separators or tabs: its end offset and whether it is pm. */
     private fun marker(line: LineScan, at: Int): Pair<Int, Boolean>? {
-        val from = if (line.ch(at) == ' ') at + 1 else at
+        val gap = line.spaceRun(at)
+        if (gap > LineScan.MAX_SPACE_RUN) return null
+        val from = at + gap
         for ((word, pm) in MARKERS) {
             val end = from + word.length
             if (line.matchesIgnoreCase(from, word) && line.boundaryAfter(end)) return end to pm
@@ -128,13 +154,15 @@ internal object TimeZones {
     private const val MAX_ANNOTATION = 32
     private val NOT_ZONES = setOf("TO", "TILL", "UNTIL", "AND", "OR", "AT", "ON")
 
-    /** The end of a zone token directly or one space after [end], or null when none follows. */
+    /** The end of a zone token after [end] and at most 4 space separators or tabs, or null (amendment E-08). */
     fun after(line: LineScan, end: Int): Int? {
-        val at = if (line.ch(end) == ' ') end + 1 else end
+        val gap = line.spaceRun(end)
+        if (gap > LineScan.MAX_SPACE_RUN) return null
+        val at = end + gap
         val char = line.ch(at)
         return when {
             char == 'Z' && line.boundaryAfter(at + 1) -> at + 1
-            char == '+' || char == '-' -> offset(line, at)
+            LineScan.isOffsetSign(char) -> offset(line, at)
             LineScan.isAsciiUpper(char) -> letters(line, at)
             char == '(' -> annotation(line, at)
             else -> null
@@ -157,13 +185,29 @@ internal object TimeZones {
         var end = at
         while (end - at <= MAX_LETTERS && LineScan.isAsciiUpper(line.ch(end))) end++
         val word = line.text.substring(at, end)
-        val zone = end - at in MIN_LETTERS..MAX_LETTERS && !Character.isLetter(line.raw(end).code) && word !in NOT_ZONES
-        return if (zone) end else null
+        val zone = end - at in MIN_LETTERS..MAX_LETTERS && !line.letterAt(end) && word !in NOT_ZONES
+        return if (zone) wordOffset(line, end) ?: end else null
     }
+
+    /** A zone word takes a directly following offset of 1-2 or 4 digits (`GMT+01:00`, `UTC-5`; amendment E-02). */
+    private fun wordOffset(line: LineScan, sign: Int): Int? {
+        if (!LineScan.isOffsetSign(line.ch(sign))) return null
+        val digits = line.digits(sign + 1, LONG_OFFSET)
+        val hoursEnd = sign + 1 + digits
+        return when {
+            digits == LONG_OFFSET -> hoursEnd
+            digits !in 1..OFFSET_DIGITS -> null
+            minutesAfter(line, hoursEnd) -> hoursEnd + 1 + OFFSET_DIGITS
+            else -> hoursEnd
+        }
+    }
+
+    private fun minutesAfter(line: LineScan, at: Int): Boolean =
+        line.ch(at) == ':' && line.digits(at + 1, OFFSET_DIGITS) == OFFSET_DIGITS
 
     private fun annotation(line: LineScan, open: Int): Int? {
         val next = line.ch(open + 1)
-        if (!LineScan.isAsciiLetter(next) && next != '+' && next != '-') return null
+        if (!LineScan.isAsciiLetter(next) && !LineScan.isOffsetSign(next)) return null
         var end = open + 1
         while (end - open < MAX_ANNOTATION && line.ch(end) != ')' && line.ch(end) != LineScan.NONE) end++
         return if (line.raw(end) == ')') end + 1 else line.tokenEnd(open)
@@ -183,9 +227,10 @@ internal object TimeRanges {
                 continue
             }
             out[out.lastIndex] = previous.copy(inRange = true)
-            out += if (token.reason == AbstentionReason.ZONE_OR_ANNOTATION) {
+            val reason = token.reason ?: previous.reason
+            out += if (reason != null) {
                 out.removeAt(out.lastIndex)
-                token.copy(start = previous.start, values = emptyList(), inRange = true)
+                token.copy(start = previous.start, values = emptyList(), reason = reason, inRange = true)
             } else {
                 token.copy(inRange = true)
             }
@@ -195,7 +240,7 @@ internal object TimeRanges {
 
     private fun joined(line: LineScan, from: Int, to: Int): Boolean {
         if (to - from > MAX_GAP) return false
-        val between = line.text.substring(from, to).trim(' ')
+        val between = line.text.substring(from, to).trim(LineScan::isSpace)
         return (between.length == 1 && between[0] in DateNames.DASHES) ||
             DateNames.RANGE_WORDS.any { it.equals(between, ignoreCase = true) }
     }

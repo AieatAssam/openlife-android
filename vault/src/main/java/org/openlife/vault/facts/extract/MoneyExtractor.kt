@@ -1,6 +1,10 @@
 package org.openlife.vault.facts.extract
 
-/** An amount being judged: `[start, end)` covers sign, markers and every digit group read. */
+/**
+ * An amount being judged: `[start, end)` covers sign, markers and every
+ * digit group read; [coreStart] is where it starts without a sign before
+ * it. [signProblem] marks a sign §5.1 recognises but does not read.
+ */
 internal data class Amount(
     val start: Int,
     val end: Int,
@@ -8,6 +12,8 @@ internal data class Amount(
     val suffix: Marker?,
     val readings: Readings,
     val negative: Boolean,
+    val coreStart: Int = start,
+    val signProblem: Boolean = false,
 )
 
 /**
@@ -71,25 +77,49 @@ internal class MoneyScene(val line: LineScan, markers: List<Marker>, val numbers
     private val numberByStart = numbers.associateBy { it.start }
     private val numberByEnd = numbers.associateBy { it.end }
 
-    /** A marker ending at [number] or one space before it; a sign may sit between them. */
+    /**
+     * A marker before [number]: directly or one space separator before it,
+     * or across a dash-like sign and up to 4 space separators (§5.1 signs,
+     * amendment E-04; [MoneyShapes] judges the sign).
+     */
     fun prefixOf(number: Dense): Marker? {
-        val at = if (line.raw(number.start - 1) == '-') number.start - 1 else number.start
-        val marker = markerByEnd[at] ?: markerByEnd[at - 1]?.takeIf { line.raw(at - 1) == ' ' && at == number.start }
-        return marker?.takeIf { !line.anyClaimed(it.start, it.end) }
+        val signed = LineScan.isDashLike(line.raw(number.start - 1))
+        val at = if (signed) number.start - 1 else number.start
+        val gap = line.spaceRunBefore(at)
+        val marker = markerByEnd[at - gap]?.takeIf { gap <= if (signed) LineScan.MAX_SPACE_RUN else 1 }
+        val owned = signed && marker != null && numberEndingAt(marker.start) != null
+        return marker?.takeIf { !owned && !line.anyClaimed(it.start, it.end) }
     }
 
+    /**
+     * A marker after [number]: directly or one space separator after it, or
+     * across a dash-like character. Across a sign, a marker that marks a
+     * number on its other side belongs to that number (`€10–€20`).
+     */
     fun suffixOf(number: Dense): Marker? {
-        val marker = markerByStart[number.end] ?: markerByStart[number.end + 1]?.takeIf { line.raw(number.end) == ' ' }
-        return marker?.takeIf { !line.anyClaimed(it.start, it.end) }
+        val signed = LineScan.isDashLike(line.raw(number.end))
+        val at = if (signed) number.end + 1 else number.end
+        val gap = line.spaceRun(at)
+        val marker = markerByStart[at + gap]?.takeIf { gap <= if (signed) LineScan.MAX_SPACE_RUN else 1 }
+        val owned = signed && marker != null && numberStartingAt(marker.end) != null
+        return marker?.takeIf { !owned && !line.anyClaimed(it.start, it.end) }
     }
 
+    /** An unclaimed marker starting at [at]. */
+    fun markerAt(at: Int): Marker? = markerByStart[at]?.takeIf { !line.anyClaimed(it.start, it.end) }
+
+    /** An unclaimed marker ending at [at]. */
+    fun markerEndingAt(at: Int): Marker? = markerByEnd[at]?.takeIf { !line.anyClaimed(it.start, it.end) }
+
+    /** A number starting at [at] or one space separator after it. */
     fun numberStartingAt(at: Int): Dense? {
-        val number = numberByStart[at] ?: numberByStart[at + 1]?.takeIf { line.raw(at) == ' ' }
+        val number = numberByStart[at] ?: numberByStart[at + 1]?.takeIf { LineScan.isSpace(line.raw(at)) }
         return number?.takeIf { !line.isClaimed(it.start) }
     }
 
+    /** A number ending at [at] or one space separator before it. */
     fun numberEndingAt(at: Int): Dense? {
-        val number = numberByEnd[at] ?: numberByEnd[at - 1]?.takeIf { line.raw(at - 1) == ' ' }
+        val number = numberByEnd[at] ?: numberByEnd[at - 1]?.takeIf { LineScan.isSpace(line.raw(at - 1)) }
         return number?.takeIf { !line.isClaimed(it.start) }
     }
 }

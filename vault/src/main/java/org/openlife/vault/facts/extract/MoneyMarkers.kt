@@ -25,7 +25,7 @@ internal object MoneyMarkers {
             val marker = when {
                 char == '$' -> dollar(line, index)
                 char in SYMBOL_CHARS -> Marker(index, index + 1, char.toString(), null)
-                LineScan.isAsciiLetter(char) && !Character.isLetter(line.raw(index - 1).code) -> word(line, index)
+                LineScan.isAsciiLetter(char) && !line.letterBefore(index) -> word(line, index)
                 else -> null
             }
             if (marker != null) out += marker
@@ -44,15 +44,15 @@ internal object MoneyMarkers {
         for (prefix in DOLLAR_PREFIXES) {
             val start = at - prefix.length
             val whole = start >= 0 && line.text.startsWith(prefix, start) && !line.anyClaimed(start, at) &&
-                !Character.isLetter(line.raw(start - 1).code)
+                !line.letterBefore(start)
             if (whole) return Marker(start, at + 1, prefix + "$", null)
         }
-        return if (Character.isLetter(line.raw(at - 1).code)) null else Marker(at, at + 1, "$", null)
+        return if (line.letterBefore(at)) null else Marker(at, at + 1, "$", null)
     }
 
     private fun word(line: LineScan, start: Int): Marker? {
         val end = line.asciiWordEnd(start, CODE_LENGTH)
-        if (Character.isLetter(line.raw(end).code)) return null
+        if (line.letterAt(end)) return null
         val word = line.text.substring(start, end)
         return when {
             word == KR -> Marker(start, end, KR, null)

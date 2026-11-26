@@ -59,14 +59,16 @@ internal object MoneyNumbers {
     /**
      * One comma or dot before exactly 3 digits: the decimal reading and the
      * grouping reading. When the grouping reading cannot exist (a first
-     * group over 3 digits, or another grouping character) only the decimal
-     * reading remains.
+     * group over 3 digits, a first group led by `0`, or another grouping
+     * character) the form is abstained: `1234,567`, `0.500` and `1'234,567`
+     * (amendments, rulings Q11 and E-10).
      */
     private fun both(printed: String, mark: Char, at: Int, otherGrouping: Boolean): Readings {
         val decimal = decimal(printed, at)
-        val group = if (otherGrouping || at > GROUP) null else grouped(printed, mark, null)
         if (decimal.reason != null) return decimal
-        return Readings(decimal.amounts + group?.takeIf { it.reason == null }?.amounts.orEmpty())
+        if (otherGrouping || at > GROUP || printed.first() == '0') return abstain(AbstentionReason.AMBIGUOUS_FORM)
+        val group = grouped(printed, mark, null)
+        return Readings(decimal.amounts + group.takeIf { it.reason == null }?.amounts.orEmpty())
     }
 
     private fun decimal(printed: String, at: Int): Readings =
@@ -86,15 +88,17 @@ internal object MoneyNumbers {
         return Readings(listOf(if (fraction == null) digits else "$digits.$fraction"))
     }
 
-    /** Joins space-separated groups read as one grouped number (§5.2): the last group may carry a fraction. */
+    /**
+     * Joins ASCII-space-separated digit groups read as one grouped number
+     * (§5.2). The printed digits are joined first and leading zeros removed
+     * after, so `5 000` is 5000 (amendment E-01).
+     */
     fun joined(groups: List<String>): Readings {
-        val last = read(groups.last())
-        if (last.reason != null || last.amounts.size != 1) return abstain(AbstentionReason.AMBIGUOUS_FORM)
-        val head = groups.dropLast(1).joinToString("")
-        val trimmed = (head + last.amounts.single()).trimStart('0')
-        val amount = if (trimmed.isEmpty() || trimmed.startsWith('.')) "0$trimmed" else trimmed
-        val integer = amount.substringBefore('.')
-        return if (integer.length > MAX_INTEGER) abstain(AbstentionReason.LIMIT) else Readings(listOf(amount))
+        if (!groups.all { group -> group.isNotEmpty() && group.all(LineScan::isAsciiDigit) }) {
+            return abstain(AbstentionReason.AMBIGUOUS_FORM)
+        }
+        val digits = groups.joinToString("").trimStart('0').ifEmpty { "0" }
+        return if (digits.length > MAX_INTEGER) abstain(AbstentionReason.LIMIT) else Readings(listOf(digits))
     }
 
     private fun abstain(reason: AbstentionReason) = Readings(emptyList(), reason)

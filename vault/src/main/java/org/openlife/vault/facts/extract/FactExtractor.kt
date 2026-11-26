@@ -47,6 +47,7 @@ object FactExtractor {
         stage(line, RuleStage.DATE in stages) { dates = DateExtractor.scan(line) }
         stage(line, RuleStage.TIME in stages) { times = TimeExtractor.scan(line) }
         DateTimeExtractor.emit(line, dates, times)
+        stage(line, RuleStage.PHONE in stages) { PhoneExtractor.scanPlusLed(line) }
         stage(line, RuleStage.MONEY in stages) { MoneyExtractor.scan(line, context) }
         stage(line, RuleStage.PHONE in stages) { PhoneExtractor.scan(line) }
     }

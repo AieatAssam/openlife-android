@@ -15,6 +15,8 @@ object EmailExtractor {
     private const val MIN_TOP_LABEL = 2
     private const val MAILTO = "mailto:"
     private const val LOCAL_PUNCTUATION = "._%+-"
+    private const val AFTER = "@_"
+    private const val PUNYCODE = "xn--"
 
     internal fun scan(line: LineScan) {
         var index = 0
@@ -38,7 +40,7 @@ object EmailExtractor {
         val start = if (line.matchesIgnoreCase(mailto, MAILTO)) mailto else localStart
         val local = line.text.substring(localStart, at)
         val domain = line.text.substring(at + 1, domainEnd)
-        val attached = !line.boundaryBefore(start) || !line.boundaryAfter(domainEnd) || line.raw(domainEnd) == '@'
+        val attached = !line.boundaryBefore(start) || !line.boundaryAfter(domainEnd) || line.raw(domainEnd) in AFTER
         val reason = when {
             attached -> AbstentionReason.ATTACHED_CHARACTERS
             !validLocal(local) -> AbstentionReason.INVALID_VALUE
@@ -84,9 +86,14 @@ object EmailExtractor {
     private fun validDomain(domain: String): Boolean {
         val labels = domain.split('.')
         val top = labels.last()
-        return labels.size >= 2 && labels.all { it.isNotEmpty() && it.all(::isLabelChar) } &&
-            top.length >= MIN_TOP_LABEL && top.all(LineScan::isAsciiLetter)
+        return labels.size >= 2 && labels.all(::validLabel) && top.length >= MIN_TOP_LABEL &&
+            top.all(LineScan::isAsciiLetter)
     }
+
+    /** ASCII letters, digits and inner hyphens; never an IDNA `xn--` label (amendment E-10). */
+    private fun validLabel(label: String): Boolean =
+        label.isNotEmpty() && label.all(::isLabelChar) && !label.startsWith('-') && !label.endsWith('-') &&
+            !label.startsWith(PUNYCODE, ignoreCase = true)
 
     private fun isLocalChar(char: Char): Boolean =
         LineScan.isAsciiLetter(char) || LineScan.isAsciiDigit(char) || char in LOCAL_PUNCTUATION

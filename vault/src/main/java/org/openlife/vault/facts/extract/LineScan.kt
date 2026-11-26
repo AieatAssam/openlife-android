@@ -46,11 +46,11 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
     /** The raw character at [index], or [NONE] past either end. */
     fun raw(index: Int): Char = if (index in 0 until length) text[index] else NONE
 
-    /** ADR-0008 §1: no letter or digit (any script) immediately before [index]. */
-    fun boundaryBefore(index: Int): Boolean = index <= 0 || !Character.isLetterOrDigit(text.codePointBefore(index))
+    /** ADR-0008 §1: no letter, digit or attached mark (any script) immediately before [index]. */
+    fun boundaryBefore(index: Int): Boolean = index <= 0 || index > length || !isWordPart(text.codePointBefore(index))
 
-    /** ADR-0008 §1: no letter or digit (any script) at [index]. */
-    fun boundaryAfter(index: Int): Boolean = index >= length || !Character.isLetterOrDigit(text.codePointAt(index))
+    /** ADR-0008 §1: no letter, digit or attached mark (any script) at [index]. */
+    fun boundaryAfter(index: Int): Boolean = index !in 0 until length || !isWordPart(text.codePointAt(index))
 
     fun matchesIgnoreCase(start: Int, word: String): Boolean =
         start >= 0 && start + word.length <= length && text.regionMatches(start, word, 0, word.length, true) &&
@@ -82,6 +82,39 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
         fun isAsciiLetter(char: Char): Boolean = char in 'a'..'z' || char in 'A'..'Z'
 
         fun isAsciiUpper(char: Char): Boolean = char in 'A'..'Z'
+
+        /** The longest run of space separators or tabs read as one gap (amendment E-08). */
+        const val MAX_SPACE_RUN = 4
+
+        /** A Unicode space separator (Zs) or a tab (amendment E-08). */
+        fun isSpace(char: Char): Boolean = char == '\t' || Character.getType(char) == Character.SPACE_SEPARATOR.toInt()
+
+        /** `-` or a hyphen, dash or minus look-alike (amendment E-04). */
+        fun isDashLike(char: Char): Boolean = char == '-' || char in DASH_LIKE
+
+        /** A plus or minus sign as an offset writes it: `+`, `-`, `−`, `±` and their fullwidth forms. */
+        fun isOffsetSign(char: Char): Boolean = char in OFFSET_SIGNS
+
+        /** A sign that could start an offset or an amount: dash-like, `+` or `±` (amendment E-02). */
+        fun isSignLike(char: Char): Boolean = isDashLike(char) || char == '+' || char == '\u00B1' || char == '\uFF0B'
+
+        /** Format (Cf) and mark (Mn, Mc, Me) code points attach to their neighbours (amendment E-06). */
+        fun isAttachedMark(codePoint: Int): Boolean = Character.getType(codePoint) in ATTACHED_TYPES
+
+        private fun isWordPart(codePoint: Int): Boolean =
+            Character.isLetterOrDigit(codePoint) || isAttachedMark(codePoint)
+
+        /** A letter (any script) or an attached mark. */
+        fun isLetterLike(codePoint: Int): Boolean = Character.isLetter(codePoint) || isAttachedMark(codePoint)
+
+        private const val OFFSET_SIGNS = "+-\u2212\u00B1\uFF0B\uFF0D\uFE63"
+        private const val DASH_LIKE = "\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D"
+        private val ATTACHED_TYPES = setOf(
+            Character.FORMAT.toInt(),
+            Character.NON_SPACING_MARK.toInt(),
+            Character.COMBINING_SPACING_MARK.toInt(),
+            Character.ENCLOSING_MARK.toInt(),
+        )
 
         /** ADR-0008 §2 ordering inside one candidate set; amounts compare as decimals, never binary floats. */
         val VALUE_ORDER: Comparator<TypedValue> = Comparator { left, right -> compareValues(left, right) }
