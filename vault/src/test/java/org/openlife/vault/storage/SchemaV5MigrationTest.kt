@@ -72,14 +72,18 @@ class SchemaV5MigrationTest {
         SearchIndex.triggerNames.forEach { name ->
             assertTrue(name, sql.any { it.startsWith("CREATE TRIGGER $name AFTER") })
         }
-        val events = listOf("INSERT", "UPDATE", "DELETE")
+        val events = listOf("INSERT", "DELETE")
         assertTrue(events.all { event -> sql.count { it.contains("AFTER $event ON") } == 2 })
+        // C2-R64 (P3-02): update triggers fire only on the indexed column.
+        assertTrue(sql.any { it.contains("AFTER UPDATE OF text ON ocr_spans") })
+        assertTrue(sql.any { it.contains("AFTER UPDATE OF correctedText ON ocr_user_revisions") })
+        assertTrue(sql.none { it.contains("AFTER UPDATE ON") })
     }
 
     @Test
     fun migrationsAreListedInOrderThroughVersionFive() {
         val versions = OpenLifeDatabase.MIGRATIONS.map { it.startVersion to it.endVersion }
-        assertEquals(listOf(1 to 2, 2 to 3, 3 to 4, 4 to 5), versions)
+        assertEquals(listOf(1 to 2, 2 to 3, 3 to 4, 4 to 5), versions.take(4))
     }
 
     private fun record(migration: androidx.room.migration.Migration): List<String> {

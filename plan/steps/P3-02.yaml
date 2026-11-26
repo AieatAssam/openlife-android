@@ -1,7 +1,8 @@
 id: P3-02
 title: Fact model, schema, migration, cascade
 phase: P3
-status: todo
+status: in_progress
+started: 2026-11-26
 depends_on: [P3-01]
 estimate: M
 owner: agent
