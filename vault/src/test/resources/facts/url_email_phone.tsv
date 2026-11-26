@@ -1,0 +1,85 @@
+# URL, EMAIL and PHONE rules (ADR-0008 §6-§7). Format: see FactFixtures.kt.
+#
+# URLs: scheme and host lowercased, nothing added, decoded or resolved
+https://example.org ‖ URL¦https://example.org¦https://example.org
+HTTPS://Example.ORG/Path?q=A ‖ URL¦HTTPS://Example.ORG/Path?q=A¦https://example.org/Path?q=A
+http://example.org/a%20b ‖ URL¦http://example.org/a%20b¦http://example.org/a%20b
+see www.Example.org/a. ‖ URL¦www.Example.org/a¦www.example.org/a
+(https://example.org/a) ‖ URL¦https://example.org/a¦https://example.org/a
+https://en.example.org/wiki/Foo_(bar) ‖ URL¦https://en.example.org/wiki/Foo_(bar)¦https://en.example.org/wiki/Foo_(bar)
+http://example.org/a, ‖ URL¦http://example.org/a¦http://example.org/a
+"https://example.org/x?" ‖ URL¦https://example.org/x¦https://example.org/x
+https://example.org:8080/x ‖ URL¦https://example.org:8080/x¦https://example.org:8080/x
+https://example.org#top ‖ URL¦https://example.org#top¦https://example.org#top
+https://example.org:123456 ‖ !URL¦https://example.org:123456
+https://bank.example@evil.example ‖ !URL¦https://bank.example@evil.example
+https://user:pass@example.org/x ‖ !URL¦https://user:pass@example.org/x
+https://xn--80ak6aa92e.com ‖ !URL¦https://xn--80ak6aa92e.com
+https://exаmple.org ‖ !URL¦https://exаmple.org
+https://example.org/café ‖ !URL¦https://example.org/café
+https://localhost/x ‖ !URL¦https://localhost/x
+javascript:alert(1) ‖ !URL¦javascript:alert(1)
+ftp://example.org/file ‖ !URL¦ftp://example.org/file
+file:///etc/hosts ‖ !URL¦file:///etc/hosts
+data:text/html,hello ‖ !URL¦data:text/html,hello
+intent://scan#Intent;end ‖ !URL¦intent://scan#Intent;end
+example.org ‖ -
+xwww.example.org ‖ -
+Total: 5 ‖ -
+#
+# Email addresses: local part kept, domain lowercased
+ann@example.org ‖ EMAIL¦ann@example.org¦ann@example.org
+Ann@Example.ORG ‖ EMAIL¦Ann@Example.ORG¦Ann@example.org
+mailto:ann@example.org ‖ EMAIL¦mailto:ann@example.org¦ann@example.org
+a.b+c_d%e-f@sub.example.co.uk ‖ EMAIL¦a.b+c_d%e-f@sub.example.co.uk¦a.b+c_d%e-f@sub.example.co.uk
+Write to ann@example.org. ‖ EMAIL¦ann@example.org¦ann@example.org
+<ann@example.org> ‖ EMAIL¦ann@example.org¦ann@example.org
+.ann@example.org ‖ !EMAIL¦.ann@example.org
+ann.@example.org ‖ !EMAIL¦ann.@example.org
+an..n@example.org ‖ !EMAIL¦an..n@example.org
+ann@example ‖ !EMAIL¦ann@example
+ann@example.c ‖ !EMAIL¦ann@example.c
+ann@example.c0m ‖ !EMAIL¦ann@example.c0m
+ann@ ‖ !EMAIL¦ann@
+"ann b"@example.org ‖ !EMAIL¦"ann b"@example.org
+ann@exämple.org ‖ !EMAIL¦ann@exämple.org
+@example.org ‖ -
+https://example.org/a@b.example ‖ URL¦https://example.org/a@b.example¦https://example.org/a@b.example
+#
+# Phone numbers: a +, tel: or a whole-token label is required (Z-07, ZZ-05)
+Tel: 01632 960123 ‖ PHONE¦01632 960123¦01632960123
++44 (0)20 7946 0018 ‖ PHONE¦+44 (0)20 7946 0018¦+442079460018
++44 20 7946 0018 ‖ PHONE¦+44 20 7946 0018¦+442079460018
+Phone 0221 123456 ‖ PHONE¦0221 123456¦0221123456
+phone: 0221 123456 ‖ PHONE¦0221 123456¦0221123456
+PHONE 0221 123456 ‖ PHONE¦0221 123456¦0221123456
+Telephone: 0221 123456 ‖ PHONE¦0221 123456¦0221123456
+Ph. 0221-123456 ‖ PHONE¦0221-123456¦0221123456
+Mob. 07700 900123 ‖ PHONE¦07700 900123¦07700900123
+Mobile: +33 1 23 45 67 89 ‖ PHONE¦+33 1 23 45 67 89¦+33123456789
+Cell 555.123.4567 ‖ PHONE¦555.123.4567¦5551234567
+Fax: 020.7946.0018 ‖ PHONE¦020.7946.0018¦02079460018
+Call 0800-123-4567 ‖ PHONE¦0800-123-4567¦08001234567
+tel:+15551234567 ‖ PHONE¦+15551234567¦+15551234567
+TEL:0221123456 ‖ PHONE¦0221123456¦0221123456
++1 555 123 ‖ PHONE¦+1 555 123¦+1555123
++44 20 7946 0018 ext 12 ‖ PHONE¦+44 20 7946 0018¦+442079460018
++12 345 ‖ !PHONE¦+12 345
++1234567890123456 ‖ !PHONE¦+1234567890123456
+Ref 1234 5678 9 ‖ -
+Depth 1200-1500 ‖ -
+Halifax 1234-5678 ‖ -
+Hotel 0221 123456 ‖ -
+iPhone 0221 123456 ‖ -
+0221 123456 ‖ -
+Tel: (020) 7946 0018 ‖ -
+Tel: 192.168.1.10 ‖ !PHONE¦192.168.1.10
++44 4111 1111 1111 ‖ !PHONE¦+44 4111 1111 1111
+Tel 4111 1111 1111 1111 ‖ !PHONE¦4111 1111 1111 1111
+Tel: 0123/456789 ‖ !PHONE¦0123/456789
+Tel: 0123:456789 ‖ !PHONE¦0123:456789
+Tel: 0221 12345٦ ‖ -
+Tel: ٠١٢٣٤٥٦٧ ‖ -
+#
+# Several kinds on one line, precedence URL > EMAIL > DATETIME > DATE > TIME > MONEY > PHONE
+Visit https://example.org or mail ann@example.org, Tel: +44 20 7946 0018 on 2026-09-16 at 14:30, total €12.50 ‖ URL¦https://example.org¦https://example.org ‖ EMAIL¦ann@example.org¦ann@example.org ‖ PHONE¦+44 20 7946 0018¦+442079460018 ‖ DATETIME¦2026-09-16 at 14:30¦2026-09-16 14:30 ‖ MONEY¦€12.50¦12.50 EUR

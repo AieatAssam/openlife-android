@@ -1,0 +1,119 @@
+# MONEY rules (ADR-0008 §5, rules-money-v1). Format: see FactFixtures.kt.
+# canonicalText is `amount` + space + (currency ?: rawSymbol).
+#
+# Single-code symbols and codes
+€12.50 ‖ MONEY¦€12.50¦12.50 EUR
+12,50 € ‖ MONEY¦12,50 €¦12.50 EUR
+€ 5 ‖ MONEY¦€ 5¦5 EUR
+EUR 12.50 ‖ MONEY¦EUR 12.50¦12.50 EUR
+12.50EUR ‖ MONEY¦12.50EUR¦12.50 EUR
+USD10 ‖ MONEY¦USD10¦10 USD
+10USD ‖ MONEY¦10USD¦10 USD
+₹250 ‖ MONEY¦₹250¦250 INR
+₺45,00 ‖ MONEY¦₺45,00¦45.00 TRY
+US$5 ‖ MONEY¦US$5¦5 USD
+CA$5.25 ‖ MONEY¦CA$5.25¦5.25 CAD
+R$ 10 ‖ MONEY¦R$ 10¦10 BRL
+S$3 ‖ MONEY¦S$3¦3 SGD
+HK$1 ‖ MONEY¦HK$1¦1 HKD
+1'234.50 CHF ‖ MONEY¦1'234.50 CHF¦1234.50 CHF
+JPY 500 ‖ MONEY¦JPY 500¦500 JPY
+#
+# Multi-code symbols without context: currency null, the symbol as printed
+$12.00 ‖ MONEY¦$12.00¦12.00 $
+£5 ‖ MONEY¦£5¦5 £
+¥500 ‖ MONEY¦¥500¦500 ¥
+₩1000 ‖ MONEY¦₩1000¦1000 ₩
+500 kr ‖ MONEY¦500 kr¦500 kr
+#
+# Symbol and code on the same digits
+$10 USD ‖ MONEY¦$10 USD¦10 USD
+€5 EUR ‖ MONEY¦€5 EUR¦5 EUR
+$ 10 EUR ‖ !MONEY¦$ 10 EUR
+€5 USD ‖ !MONEY¦€5 USD
+$3.50 CUP ‖ MONEY¦$3.50 CUP¦3.50 $ | 3.50 CUP
+£5.00 GIP ‖ MONEY¦£5.00 GIP¦5.00 £ | 5.00 GIP
+$3.50 TOP ‖ !MONEY¦$3.50 TOP
+#
+# English-word codes alone need printed fraction digits (ZZ-04)
+TRY 45.00 ‖ MONEY¦TRY 45.00¦45.00 TRY
+45.50 ALL ‖ MONEY¦45.50 ALL¦45.50 ALL
+PEN 2 ‖ -
+TOP 10 ‖ -
+ALL 3 ‖ -
+CUP 2 ‖ -
+Tel: PEN 2 ‖ -
+#
+# Currency context (ADR-0008 §5.4)
+SSP £116.75 ‖ MONEY¦£116.75¦116.75 £ | 116.75 SSP
+USD $5 ‖ MONEY¦$5¦5 $ | 5 USD
+COFFEE CUP␤$3.50 ‖ @2 MONEY¦$3.50¦3.50 $
+Total $45.00␤USD 33.10 ‖ MONEY¦$45.00¦45.00 $ ‖ @2 MONEY¦USD 33.10¦33.10 USD
+Prices in AUD␤$12.00 ‖ @2 MONEY¦$12.00¦12.00 $ | 12.00 AUD
+Prices in CAD␤$12.00 ‖ @2 MONEY¦$12.00¦12.00 $
+$12.00␤Prices in AUD ‖ MONEY¦$12.00¦12.00 $ | 12.00 AUD
+Prices in AUD␤Total␤$12.00 ‖ @3 MONEY¦$12.00¦12.00 $
+AUD NZD $5 ‖ MONEY¦$5¦5 $ | 5 AUD | 5 NZD
+AUD NZD HKD $5 ‖ MONEY¦$5¦5 $
+EUR $5 ‖ MONEY¦$5¦5 $
+aud $5 ‖ MONEY¦$5¦5 $
+Prices in AUD␤1,234 $ ‖ @2 MONEY¦1,234 $¦1.234 $ | 1.234 AUD | 1234 $ | 1234 AUD
+#
+# Digits and separators (ADR-0008 §5.2)
+1,234.56 € ‖ MONEY¦1,234.56 €¦1234.56 EUR
+1.234,56 € ‖ MONEY¦1.234,56 €¦1234.56 EUR
+1,234,567 € ‖ MONEY¦1,234,567 €¦1234567 EUR
+1.234.567,89 € ‖ MONEY¦1.234.567,89 €¦1234567.89 EUR
+1,234 € ‖ MONEY¦1,234 €¦1.234 EUR | 1234 EUR
+1.234 € ‖ MONEY¦1.234 €¦1.234 EUR | 1234 EUR
+€0,500 ‖ MONEY¦€0,500¦0.500 EUR | 500 EUR
+12.5 € ‖ MONEY¦12.5 €¦12.5 EUR
+€0.50 ‖ MONEY¦€0.50¦0.50 EUR
+€007 ‖ MONEY¦€007¦7 EUR
+€0 ‖ MONEY¦€0¦0 EUR
+1,2345 € ‖ !MONEY¦1,2345 €
+1,23,456 € ‖ !MONEY¦1,23,456 €
+12,34.56 € ‖ !MONEY¦12,34.56 €
+1 234 € ‖ MONEY¦1 234 €¦1234 EUR
+1 234,50 € ‖ MONEY¦1 234,50 €¦1234.50 EUR
+1 234 € ‖ MONEY¦1 234 €¦234 EUR | 1234 EUR
+€1 234 ‖ MONEY¦€1 234¦1 EUR | 1234 EUR
+1 234 567 € ‖ MONEY¦1 234 567 €¦567 EUR | 1234567 EUR
+€5 10 ‖ MONEY¦€5¦5 EUR
+Qty 3 4 € ‖ MONEY¦4 €¦4 EUR
+€123456789012345 ‖ MONEY¦€123456789012345¦123456789012345 EUR
+€1234567890123456 ‖ !MONEY¦€1234567890123456
+€1.2345 ‖ !MONEY¦€1.2345
+€999999999999999.999 ‖ MONEY¦€999999999999999.999¦999999999999999.999 EUR
+#
+# Signs, credits and ranges (Z-13)
+-€5.00 ‖ MONEY¦-€5.00¦-5.00 EUR
+€-5.00 ‖ MONEY¦€-5.00¦-5.00 EUR
+-5.00 EUR ‖ MONEY¦-5.00 EUR¦-5.00 EUR
+€25.00- ‖ !MONEY¦€25.00-
+€25.00 - ‖ !MONEY¦€25.00 -
+25.00 EUR - ‖ !MONEY¦25.00 EUR -
+€25,- ‖ !MONEY¦€25,-
+€25.- ‖ !MONEY¦€25.-
+€25,-- ‖ !MONEY¦€25,--
+(€5.00) ‖ !MONEY¦(€5.00)
+€5.00 CR ‖ !MONEY¦€5.00 CR
+€5.00 DR ‖ !MONEY¦€5.00 DR
+10-20 € ‖ !MONEY¦10-20 €
+10–20 € ‖ !MONEY¦10–20 €
+€10–20 ‖ !MONEY¦€10–20
+10 to 20 EUR ‖ !MONEY¦10 to 20 EUR
+#
+# A bare number is never money; no marker, no claim
+Total: 45.00 ‖ -
+5 apples ‖ -
+€5abc ‖ -
+€  5 ‖ -
+#
+# Non-ASCII digits (Z-16): no salvage
+€١٢ ‖ -
+€1٢ ‖ -
+５ € ‖ -
+#
+# Claimed by an earlier rule
+Paid 03/04/2026 €5 ‖ DATE¦03/04/2026¦2026-03-04 | 2026-04-03 ‖ MONEY¦€5¦5 EUR
