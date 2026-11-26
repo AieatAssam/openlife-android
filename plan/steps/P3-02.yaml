@@ -9,22 +9,23 @@ owner: agent
 summary: >
   Implement the C2 schema from the approved specification as Room entities
   with a migration, DAO, repository CRUD under the mutation queue, cascade
-  deletion from Source, acyclic dependency enforcement, and the provenance
+  deletion from Source through one shared row-removal routine, same-source
+  dependency edges, and the provenance
   invariants as SQL triggers where Room cannot express them.
 
 requirements:
   - id: P3-02-R1
-    text: "MUST add entities FactEntity, FactRevisionEntity, FactEvidenceEntity, FactInputEntity, ReviewEventEntity with foreign keys ON DELETE CASCADE to sources/ocr_spans/fact_revisions, indices on sourceId and factId, and a migration to the next schema version with exported JSON and androidTest asset. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): no FactInputEntity (fact_inputs deferred to C3, C2-R11 withdrawn); add FactExtractionRunEntity and DependencyEdgeEntity; CASCADE only down one Source's ownership tree and NO ACTION for every reference out of it, including to ocr_spans (C2-R20, D-6)."
+    text: "MUST add entities FactEntity, FactRevisionEntity, FactEvidenceEntity, ReviewEventEntity, FactExtractionRunEntity and DependencyEdgeEntity per C2.md section 4, with ON DELETE CASCADE only down one Source's ownership tree and NO ACTION for every reference out of it, including to ocr_spans (C2-R20, D-6); the three pointer columns are trigger-checked, not foreign keys; indices on sourceId and factId; and a migration to the next schema version with exported JSON and androidTest asset. (Rewritten 2026-11-26 after the P3-01 reviews; C2.md governs.)"
   - id: P3-02-R2
-    text: "MUST enforce with triggers: an EXTRACTED revision must have at least one fact_evidence row on commit (enforced in the repository transaction; trigger checks that fact_revisions.origin='EXTRACTED' rows cannot be set to status CONFIRMED without evidence); a DERIVED revision must have at least one fact_inputs row; USER revisions must have zero fact_evidence rows. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): the DERIVED clause is withdrawn (DERIVED deferred to C3); the origin CHECK admits EXTRACTED and USER only; evidence role and count bounds by trigger (C2-R7, C2-R10)."
+    text: "MUST enforce with triggers: an EXTRACTED revision cannot be set to CONFIRMED without a VALUE evidence row (and the repository commit requires exactly one VALUE row); USER revisions have zero fact_evidence rows; the origin CHECK admits EXTRACTED and USER only; evidence role and count bounds (C2-R7, C2-R10). (Rewritten 2026-11-26 after the P3-01 reviews; C2.md governs.)"
   - id: P3-02-R3
-    text: "MUST enforce acyclicity in the repository before inserting fact_inputs (DFS over inputs, bounded depth 32) and add a trigger preventing a revision from listing itself. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): withdrawn for C2: fact_inputs and INPUT edges are deferred to C3 (C2-R11); BASIS edges point within one fact to an older revision, so no cycle is possible."
+    text: "MUST refuse, by trigger, any dependency edge whose two source ids differ and any BASIS edge that does not point to an older revision of the same fact (C2-R18); and refuse, by BEFORE DELETE triggers, deleting a row named by a current-pointer column unless its Source is DELETING (C2-R20). (Rewritten 2026-11-26 after the P3-01 reviews; C2.md governs.)"
   - id: P3-02-R4
     text: "MUST extend DeletionRepository's transaction to remove facts (cascade handles rows; explicit DELETE keeps the contract independent of pragma defaults) and extend the FTS triggers if fact values are indexed (P3-07). Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): cascade is not the contract: one shared row-removal routine used by DeletionRepository and RecoveryRepository's DELETING branch runs the whole-set statement order of C2-R43 (facts, runs, then explicit span reviews, corrections, spans, readings, then the Source), with the same result with foreign_keys on or off (C2-R61, finding F-70); the current order fails under NO ACTION and must change."
   - id: P3-02-R5
     text: "MUST provide FactRepository: listFacts(sourceId): Flow<List<FactWithLatestRevision>>, addUserFact, review(revisionId, decision), markStaleForSpan(spanId), markStaleForRevision(ocrRevisionId), with all writes under withMutation and withContext(IO). Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): listFacts returns each fact with its current revision by facts.currentRevisionId (not the latest); add clarify, re-choose and correct (C2-R36, C2-R37); stale marking is driven by the section 9 triggers in the same transaction as each trigger (C2-R40)."
   - id: P3-02-R6
-    text: "VS-2 (docs/reviews/2026-11-24-vault-audit.md): MUST add an explicit dependency-edge table (dependent kind+id -> dependency kind+id, owning source id) and route deletion and stale marking through one traversal over it: ON DELETE CASCADE only for children a single source owns; RESTRICT on edges that cross sources, so deleting a source that another source's retained fact depends on invalidates (marks STALE) the dependent instead of cascading into it; FTS rows for facts are maintained by triggers (P2-08-R8 pattern) so deletion reaches them. Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): RESTRICT is replaced by NO ACTION (host SQLite: RESTRICT failed on every tested path); in C2 edges never cross sources (trigger refuses), cross-source edges and stale-instead-of-cascade arrive with C3 (P4-02-R5); edge kinds are EVIDENCE and BASIS only; edges are written by triggers only (C2-R18)."
+    text: "VS-2 (docs/reviews/2026-11-24-vault-audit.md): MUST add an explicit dependency-edge table (dependent kind+id -> dependency kind+id, owning source ids), written and deleted only by triggers, with edge kinds EVIDENCE and BASIS (C2 section 4.8), and route stale marking through one traversal over it (C2-R19); deletion uses the shared row-removal routine of P3-02-R4; FTS rows for facts are maintained by triggers (P2-08-R8 pattern) so deletion reaches them. (Rewritten 2026-11-26 after the P3-01 reviews; C2.md governs.)"
   - id: P3-02-R7
     text: "VS-3: MUST give corrections and revisions explicit references: a correction supersedes its predecessor through an explicit supersedesId link (not latest createdAt); an explicit current-revision pointer per source (and per fact) replaces 'several revisions may be ACCEPTED'; STALE is split into distinct reasons (process restart vs source/input deleted vs superseded); each OCR span persists hasEvidenceRegion and scriptStatus so accepting a revision does not implicitly accept ungrounded or out-of-script spans. All changes are additive per conventions.schema_migrations (new columns default to the current meaning; backfill in the migration). Amended 2026-11-26 (P3-01 adversarial review; C2.md governs): also adds sources.currentOcrRevisionId with the ordering of C2-R14 (search and viewer adopt it in P3-07), sources.factInputEpoch (C2-R63), scriptStatus classified by OcrScriptPolicy in a Kotlin migration (C2-R17), NOT NULL defaults equal to the entity defaultValue, and FTS update triggers narrowed to AFTER UPDATE OF text/correctedText (C2-R64)."
 
@@ -40,11 +41,13 @@ tdd:
     - name: FactDatabaseTest.migrationCreatesFactTablesAndPreservesEverythingElse
     - name: FactDatabaseTest.extractedRevisionCannotBeConfirmedWithoutEvidence
     - name: FactDatabaseTest.userRevisionCannotCarryEvidence
-    - name: FactRepositoryTest.derivedRevisionWithCyclicInputsIsRejected
+    - name: FactRepositoryTest.basisEdgeMustPointToAnOlderRevisionOfTheSameFact
     - name: FactRepositoryTest.correctionOnSpanMarksDependentRevisionsStale
-    - name: DeletionRepositoryTest.deletingASourceRemovesFactsEvidenceInputsAndReviewEvents
-    - name: DependencyEdgeTest.deletingASourceMarksCrossSourceDependentsStaleInsteadOfCascading (VS-2)
-    - name: DependencyEdgeTest.crossSourceEdgeIsRestrictedAtTheDatabase (VS-2)
+    - name: DeletionRepositoryTest.deletingASourceRemovesFactsEvidenceRunsEdgesAndReviewEvents
+    - name: SourceRowRemovalTest.deletionAndRecoveryShareOneRoutineWithTheSameResultWithForeignKeysOnAndOff (C2-R61, F-70)
+    - name: DependencyEdgeTest.crossSourceEdgeIsRefusedByTrigger (VS-2, C2-R18)
+    - name: FactDatabaseTest.pointerTargetCannotBeDeletedUnlessSourceIsDeleting (C2-R20)
+    - name: FactDatabaseTest.ftsUpdateTriggersAreNarrowedBeforeBackfill (C2-R21, C2-R64)
     - name: OcrRevisionPointerTest.exactlyOneCurrentRevisionPerSourceAndCorrectionsSupersedeExplicitly (VS-3)
     - name: OcrSpanStatusTest.acceptingARevisionDoesNotAcceptUngroundedOrOutOfScriptSpans (VS-3)
   green: ["Implement."]

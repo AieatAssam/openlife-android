@@ -1,10 +1,14 @@
 # ADR-0008: Conservative interpretation of typed facts
 
-Date: 2026-11-25. Revised 2026-11-26 after the adversarial review (Z-01..Z-17)
-and the acting-owner decisions recorded in C2 §0.
-Status: proposed for P3-01. The review has run; the coordinator, acting as
-owner under the 2026-11-24 delegation, records approval after a verification
-pass (OA-4). Normative for C2 (`docs/capabilities/C2.md`) once approved.
+Date: 2026-11-25. Revised 2026-11-26 after the adversarial review (Z-01..Z-17),
+the verification pass (ZZ-01..ZZ-11) and the acting-owner decisions recorded
+in C2 §0.
+Status: Approved 2026-11-26 by the coordinating Claude session acting for
+the owner under the delegation of 2026-11-24 (plan/README.md), after two
+rounds of adversarial review (findings Z-01..Z-17, ZZ-01..ZZ-11 recorded in
+plan/plan.yaml P3-01 notes). Dependencies on C1 behaviour not yet verified
+on a device are listed in C2 §2. Normative for C2
+(`docs/capabilities/C2.md`).
 
 ## Context
 
@@ -240,7 +244,11 @@ recognised, abstained and claimed as a whole:
 - `D–D Month YYYY` and `D-D Month YYYY` (`3–5 April 2026`);
 - `D Month – D Month YYYY`;
 - `A–B/M/YYYY`;
-- two dates joined by `–`, `-`, `to`, `until` or `till`.
+- two dates joined by `–`, `-`, `to`, `until` or `till`;
+- `D Month YYYY` (or `D Mon YYYY`) **preceded by** `<digits>` and one of
+  `–`, `-`, `to`, `until`, `till`, `and` or `&`, with optional spaces
+  (ZZ-06). Examples: `3 to 5 April 2026`, `between 3 and 5 April 2026`,
+  `3 & 5 April 2026`. The whole `<digits> … D Month YYYY` is claimed.
 
 A range candidate type is not added in v1. A range needs both ends and a
 meaning (stay, event, validity) that C3 owns.
@@ -271,6 +279,10 @@ meaning (stay, event, validity) that C3 owns.
 facts, and each is interpreted **only from its own text** (Z-05).
 - A marker after `T2` does not apply to `T1`.
 - So `11:30 - 1:30 pm` gives `11:30 | 23:30` and `13:30`.
+- **A range abstains as a whole** (ZZ-03). If anything after `T2` makes
+  `T2` abstain under §4.3 (a zone, an uppercase token or a parenthesised
+  group), `T1` abstains too, and the whole range is claimed. For example,
+  `14:30 - 16:30 CET` gives nothing.
 
 **Abstained:**
 - `24:00`;
@@ -322,13 +334,22 @@ A marker is one of these:
 - an ISO 4217 code from the pinned **active** list (List One, the
   version used is stated in the source constant), in uppercase.
 
-An English-word code (§5.5) is a marker only in marker position.
+**English-word codes as markers** (§5.5 normative and informative lists;
+ZZ-04, decision Q-13):
+- An English-word code that is the **only** marker counts only when the
+  number has printed fraction digits. `TRY 45.00` and `45.50 ALL` are
+  money. `PEN 2`, `TOP 10` and `ALL 3` are not, and are not claimed.
+- An English-word code **never resolves a symbol**. When it marks the same
+  digits as a multi-code symbol whose codes include it, the result is the
+  candidate set of §5.4, with that code plus "not stated". So `$3.50 CUP`
+  gives `3.50 $ | 3.50 CUP`. When the symbol's codes do not include it,
+  the amount is abstained, as below.
 
 **Rules for the marker:**
 - A bare number is never money.
-- When a symbol and a code both mark the same digits (`$10 USD`), the
-  amount takes the code if the code is among the symbol's codes.
-  Otherwise (`$ 10 EUR`) it is abstained.
+- When a symbol and a code that is not on the English-word lists both
+  mark the same digits (`$10 USD`), the amount takes the code if the code
+  is among the symbol's codes. Otherwise (`$ 10 EUR`) it is abstained.
 - A code that sits next to the **symbol** rather than the digits
   (`SSP £116.75`, `USD $5`) is not a marker. It is context under §5.4.
 
@@ -450,6 +471,9 @@ hold:**
 | `Prices in AUD` / `$12.00` | `12.00 $ \| 12.00 AUD`, CLARIFICATION_NEEDED |
 | `Prices in CAD` / `$12.00` | `12.00 $` (null), UNREVIEWED: `CAD` is on the §5.5 list |
 | `$10 USD` | `10 USD` |
+| `$3.50 CUP` | `3.50 $ \| 3.50 CUP`, CLARIFICATION_NEEDED (ZZ-04) |
+| `TRY 45.00` | `45.00 TRY` |
+| `PEN 2`, `TOP 10`, `ALL 3` | nothing (an English-word code alone needs fraction digits) |
 | `$ 10 EUR` | abstained |
 
 #### §5.5 ISO codes that are English words
@@ -532,6 +556,10 @@ these introduces it:
 - a leading `+`;
 - `tel:`;
 - a label immediately before it, with optional `:`, `.` or one space. The
+  label must be a **whole token** (ZZ-05): it starts at the start of the
+  text or after a character that is not a letter, and the next character
+  is not a letter. So `Depth 1200-1500`, `Halifax 1234-5678` and `Hotel
+  0221 123456` are not phones. The
   labels (case-insensitive, English) are `Tel`, `Telephone`, `Phone`,
   `Ph`, `Mobile`, `Mob`, `Cell`, `Fax` and `Call`.
 
@@ -570,6 +598,7 @@ leading `+` at most.
 | `Tel: 01632 960123` | `01632960123` |
 | `+44 (0)20 7946 0018` | `+442079460018` |
 | `Ref 1234 5678 9` | nothing |
+| `Depth 1200-1500`, `Halifax 1234-5678`, `Hotel 0221 123456` | nothing (the label is not a whole token) |
 
 ## Consequences
 
@@ -594,6 +623,17 @@ leading `+` at most.
   reference tables are versioned source constants.
 - **Inert values.** Normalised forms never reach an API that could
   resolve or open them.
+- **Residual: mixed-case zone words** (ZZ-07, C2 §15). Only uppercase
+  tokens and brackets after a time cause abstention. `9:00 Eastern`,
+  `15:00 London time` and `10am Pacific` therefore yield a floating local
+  time, although the text names a zone. The UNREVIEWED status and the
+  evidence line mitigate it. C3 must have the user choose a zone
+  (ADR-0009) before anything is scheduled. A later rule version may add a
+  zone-word list, measured by P3-06.
+- **Residual: English-only phone labels** (decision Q-14). Labels in other
+  languages (`Tél`, `Telefon`, `Tfno`) are not recognised, so such numbers
+  are missed. This is a stated recall limit. A later capability may add
+  localised labels by ADR.
 - **Residual risk** (C2 §15). A digit-for-digit OCR confusion (`1`/`7`,
   `3`/`8`, `$`/`5`) still produces a plausible valid value. Only the
   UNREVIEWED status and the one-tap evidence link mitigate it.
@@ -624,5 +664,9 @@ Changed by review findings:
 | Z-17 | §1 claiming |
 | testability | §2 escaping |
 
-Open: C2 Q-13 (completeness of the English-word list) and Q-14 (labels in
-other languages).
+Verification pass (2026-11-26), changed by findings: ZZ-03 (§4.2 a range
+abstains as a whole), ZZ-04 (§5.1 English-word markers, examples), ZZ-05
+(§7 whole-token labels), ZZ-06 (§4.1 `3 to 5 April 2026`), ZZ-07
+(Consequences, residual). Decided by the coordinator under the 2026-11-24
+delegation: Q-13 (the §5.5 lists are accepted with the ZZ-04 marker rule)
+and Q-14 (no labels in other languages in C2). No question remains open.

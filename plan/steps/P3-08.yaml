@@ -5,7 +5,7 @@ status: todo
 depends_on: [P3-05, P3-06, P3-07]
 estimate: M
 owner: agent+owner
-summary: "Complete the C2 gate: matrix C2-01..C2-13 with evidence, security and provenance reviews (evidence chain Source -> span -> fact revision, correction propagation, deletion cascade, inert values), handoff, owner acceptance, tag v0.3.0."
+summary: "Complete the C2 gate: matrix C2-01..C2-14 with evidence, security and provenance reviews (evidence chain Source -> span -> fact revision, correction propagation, deletion cascade, inert values), handoff, owner acceptance, tag v0.3.0."
 requirements:
   - id: P3-08-R0
     text: "MUST add this release's schema fixture to ReleasedSchemaUpgradeTest (see P1-12-R6) and keep it green."
