@@ -41,6 +41,28 @@ action and keeps the no-undo explanation inside a folded card.
 - **Intake Saved.** Shows the `SAVED` stamp and a Done button, and still
   returns on its own after 5 s.
 
+## Navigation and state (P1-20)
+
+- **One list-detail destination.** `Routes.ListDetail(sourceId, spanId?)`
+  carries the selected id; nothing else is a route argument. At compact
+  width it shows the viewer alone; at expanded width the 360 dp list pane,
+  a divider and the viewer. With no selection the expanded screen shows the
+  placeholder "Select an item to see it here." A resize changes only the
+  panes, never the back stack, so the selection and Back survive it.
+- **Back.** From the viewer Back pops one entry. At expanded width the
+  first Back clears the selection (the placeholder returns) and the next
+  leaves. From the list root Back finishes the activity. Selecting another
+  row at expanded width replaces the top entry instead of stacking it.
+- **By id.** The viewer observes its source by id, not through the list, so
+  it opens before the list loads and for a source the list does not show.
+  A missing or deleted id shows "Content unavailable" and returns to the
+  list once.
+- **Scrubbing.** Going to the background clears decoded images, OCR text and
+  thumbnails but keeps the destination; returning reloads the same viewer.
+  The list's scroll position is kept (indices only).
+- **No transitions.** The graph has no enter or exit animation, so reduced
+  motion needs no special case and a resize never animates.
+
 ## Type and colour review
 
 IBM Plex Sans is the UI family, IBM Plex Mono is the data/stamp family, and

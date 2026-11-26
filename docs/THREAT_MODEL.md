@@ -79,10 +79,14 @@ adversary.
   authority names OpenLife itself is refused. The check compares the host
   only, after removing userinfo and port, so `x@org.openlife...` cannot
   bypass it.
-- **Open-source requests (P1-19-R17).** The launcher activity is exported.
-  It opens a specific item only when the request carries a single-use,
-  in-process nonce that OpenLife's own "Open existing" button issued. Any
-  other caller just opens the list.
+- **Open-source requests (P1-19-R17, P1-20-R5).** The exported launcher,
+  MainActivity, reads no navigation extra: any caller just opens the list.
+  "Open existing" goes through `InternalLinkActivity`, which is not
+  exported, has no intent filter and shows no window. It accepts a request
+  only with a known kind, a well-formed id and a single-use, in-process
+  nonce that OpenLife issued; it then queues the id in memory and starts
+  MainActivity with no extras, which opens it after the app-lock gate. A
+  replayed nonce, or a re-delivery after recreation, is ignored.
 - The Photo Picker can expose items supplied by a cloud media provider.
   OpenLife reads only the explicitly selected URI and cannot control that
   provider's download or logging behaviour (R3). This is explained at intake:

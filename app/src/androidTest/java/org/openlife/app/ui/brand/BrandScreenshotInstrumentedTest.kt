@@ -27,6 +27,14 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.ForcedSize
+import androidx.compose.ui.unit.DpSize
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
+import org.openlife.app.navigation.OpenLifeNavHost
+import org.openlife.app.navigation.Routes
+import org.openlife.app.test.FakeAppContainer
 import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.FirstRunExplanationScreen
 import org.openlife.app.ui.SourceListScreen
@@ -154,6 +162,46 @@ class BrandScreenshotInstrumentedTest {
         }
     }
 
+    /**
+     * P1-20-R7: the list-detail destination at expanded width, with a source
+     * selected (its bytes never arrive, so the detail pane shows the stable
+     * verifying state). Rendered through the real graph over a fake
+     * container. Goldens per render profile; none committed yet, so a
+     * profile without them is reported as skipped, never passed.
+     */
+    @Test
+    fun listDetailExpandedMatchesGolden() {
+        val names = listOf("list-detail-expanded-light.png", "list-detail-expanded-dark.png")
+        if (!generateGoldens) {
+            val committed = InstrumentationRegistry.getInstrumentation().context.assets
+                .list("golden/$renderProfile").orEmpty().toSet()
+            assumeTrue("no committed list-detail goldens for render profile $renderProfile", committed.containsAll(names))
+        }
+        val container = FakeAppContainer(listOf(readySource()))
+        val dark = mutableStateOf(false)
+        lateinit var navController: NavHostController
+        try {
+            composeRule.setContent {
+                navController = rememberNavController()
+                DeviceConfigurationOverride(DeviceConfigurationOverride.ForcedSize(DpSize(1280.dp, 800.dp))) {
+                    OpenLifeTheme(darkTheme = dark.value) {
+                        Box(Modifier.testTag(LIST_DETAIL_TAG)) { OpenLifeNavHost(container, navController) }
+                    }
+                }
+            }
+            composeRule.runOnIdle { navController.navigate(Routes.ListDetail(readySource().id.toString())) }
+            listOf(false, true).forEach { darkTheme ->
+                dark.value = darkTheme
+                composeRule.waitForIdle()
+                val bitmap = composeRule.onNodeWithTag(LIST_DETAIL_TAG).captureToImage().asAndroidBitmap()
+                val filename = "list-detail-expanded-${if (darkTheme) "dark" else "light"}.png"
+                if (generateGoldens) writeGolden(filename, bitmap) else assertGolden(filename, bitmap)
+            }
+        } finally {
+            container.close()
+        }
+    }
+
     private fun capture(name: String, darkTheme: Boolean, content: @Composable () -> Unit) {
         val tag = "$name-${if (darkTheme) "dark" else "light"}"
         activeSpec.value = ScreenSpec(tag, darkTheme, content)
@@ -217,6 +265,10 @@ class BrandScreenshotInstrumentedTest {
         wrappedDek = ByteArray(16),
         artefactVersion = 1,
     )
+
+    private companion object {
+        const val LIST_DETAIL_TAG = "list-detail-expanded"
+    }
 
     private data class ScreenSpec(
         val tag: String,

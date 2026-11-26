@@ -25,6 +25,7 @@ import org.openlife.app.MainActivity
 import org.openlife.app.OpenLifeApp
 import org.openlife.app.VaultAccess
 import org.openlife.app.test.StrictModeRule
+import org.openlife.app.test.requestOpenSource
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.repository.PrepareResult
 import org.openlife.vault.repository.SaveResult
@@ -33,6 +34,7 @@ import org.openlife.vault.repository.SaveResult
  * P1-16-R2: in split-screen an activity can be STARTED without being
  * RESUMED while still visible. Content is scrubbed when the activity is
  * hidden (CREATED, onStop), not when it merely loses focus (onPause).
+ * P1-20-R4: scrubbing drops content only; the destination stays.
  */
 @RunWith(AndroidJUnit4::class)
 class MultiWindowScrubTest {
@@ -61,11 +63,9 @@ class MultiWindowScrubTest {
     @Test
     fun startedNotResumedKeepsContentAndCreatedScrubs() {
         val id = saveSyntheticSource()
-        val intent = Intent(context, MainActivity::class.java)
-            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
-            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
+        app.requestOpenSource(id)
 
-        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
             assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS))
             val scrubsBefore = scrubCount(scenario)
 
@@ -78,60 +78,62 @@ class MultiWindowScrubTest {
                 device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS),
             )
 
-            // Hidden.
+            // Hidden: scrubbed, but (P1-20-R4) the destination is kept and reloads.
             scenario.moveToState(Lifecycle.State.CREATED)
             assertEquals("hiding must scrub", scrubsBefore + 1, scrubCount(scenario))
             scenario.moveToState(Lifecycle.State.RESUMED)
             assertTrue(
-                "after being hidden the viewer returns to the list",
-                device.wait(Until.hasObject(By.desc("More options")), WAIT_MS),
+                "after being hidden the viewer is still the destination and reloads its image",
+                device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS),
             )
-            assertTrue(device.wait(Until.gone(By.desc("Saved image")), WAIT_MS))
         }
     }
 
     /**
-     * A-06 (P1-19-R13, suspected): the viewer's decoded bitmap is freed by a
-     * DisposableEffect, which runs only when Compose recomposes. Checked
-     * while the activity is still stopped (before ON_START): is any decoded
-     * bitmap still alive and not recycled?
+     * P1-20-R4 (AS-4): while stopped no decoded bitmap is held (the viewer
+     * session recycles it synchronously in onStop, not on recomposition); on
+     * return the same destination reloads the same source by id. OCR text
+     * leaving memory while hidden is proven on the JVM
+     * (ViewerSessionTest.hidingClearsContentAndOcrTextSynchronouslyButKeepsTheDestination).
+     */
+    @Test
+    fun backgroundingClearsContentButKeepsTheDestination() {
+        val id = saveSyntheticSource()
+        app.requestOpenSource(id)
+
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+            assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS))
+            assertTrue("the viewer bitmap was decoded", DecodedBitmapProbe.liveCountForTest() > 0)
+
+            scenario.moveToState(Lifecycle.State.CREATED)
+            instrumentation.waitForIdleSync()
+            assertEquals("decoded bitmaps alive while hidden", 0, DecodedBitmapProbe.liveCountForTest())
+
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            assertTrue(
+                "the same destination reloads its content",
+                device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS),
+            )
+            assertTrue("reloaded by id", DecodedBitmapProbe.liveCountForTest() > 0)
+        }
+    }
+
+    /**
+     * A-06 (P1-19-R13): checked while the activity is still stopped (before
+     * ON_START), with no wait: the release is synchronous since P1-20-R4.
      */
     @Test
     fun decodedBitmapsAreReleasedWhileHidden() {
         val id = saveSyntheticSource()
-        val intent = Intent(context, MainActivity::class.java)
-            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
-            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
+        app.requestOpenSource(id)
 
-        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
             assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS))
-            awaitTrue("the viewer bitmap was never decoded") { DecodedBitmapProbe.liveCountForTest() > 0 }
 
             scenario.moveToState(Lifecycle.State.CREATED)
-            val released = pollWhileStopped { DecodedBitmapProbe.liveCountForTest() == 0 }
             val live = DecodedBitmapProbe.liveCountForTest()
             scenario.moveToState(Lifecycle.State.RESUMED)
-            assertTrue("decoded bitmaps alive while hidden: $live", released)
-        }
-    }
-
-    /** Polls with GC for up to [STOPPED_WINDOW_MS]; never moves the activity. */
-    private fun pollWhileStopped(condition: () -> Boolean): Boolean {
-        val deadline = System.currentTimeMillis() + STOPPED_WINDOW_MS
-        while (System.currentTimeMillis() < deadline) {
-            Runtime.getRuntime().gc()
-            instrumentation.waitForIdleSync()
-            if (condition()) return true
-            Thread.sleep(POLL_MS)
-        }
-        return condition()
-    }
-
-    private fun awaitTrue(message: String, condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + WAIT_MS
-        while (!condition()) {
-            if (System.currentTimeMillis() > deadline) throw AssertionError(message)
-            Thread.sleep(POLL_MS)
+            assertEquals("decoded bitmaps alive while hidden", 0, live)
         }
     }
 
@@ -160,8 +162,6 @@ class MultiWindowScrubTest {
 
     private companion object {
         const val WAIT_MS = 30_000L
-        const val STOPPED_WINDOW_MS = 3_000L
-        const val POLL_MS = 100L
         const val WIDTH = 64
         const val HEIGHT = 48
         const val JPEG_QUALITY = 90

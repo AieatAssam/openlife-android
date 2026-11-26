@@ -292,6 +292,8 @@ class ViewerSessionTest {
     private class MapSavedValues : SavedValues {
         val values = mutableMapOf<String, Any?>()
 
+        override fun contains(key: String): Boolean = key in values
+
         override fun get(key: String): Any? = values[key]
 
         override fun set(key: String, value: Any?) {

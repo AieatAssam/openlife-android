@@ -29,10 +29,12 @@ class SecureWindowTest {
         )
         assertTrue(secureWindow.contains("FLAG_SECURE"))
         assertTrue(
-            "both activities must apply the shared secure-window policy",
+            "every activity must apply the shared secure-window policy",
             listOf(
                 "app/src/main/java/org/openlife/app/MainActivity.kt",
                 "app/src/main/java/org/openlife/app/intake/IntakeActivity.kt",
+                // P1-20-R5: the non-exported internal link entry.
+                "app/src/main/java/org/openlife/app/intake/InternalLinkActivity.kt",
             ).all { Files.readString(projectDir.resolve(it)).contains("applySecureWindow()") },
         )
     }
@@ -45,7 +47,7 @@ class SecureWindowTest {
                 .filter { ACTIVITY_CLASS.containsMatchIn(Files.readString(it)) }
                 .collect(Collectors.toList())
         }
-        assertEquals("activities found: $activities", 2, activities.size)
+        assertEquals("activities found: $activities", 3, activities.size)
         val missing = activities.filterNot { appliesPolicy(Files.readString(it)) }
         assertTrue("activities without applySecureWindow(): $missing", missing.isEmpty())
 

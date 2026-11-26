@@ -373,7 +373,7 @@ class ViewerScreenC1Test {
         val application = androidx.test.core.app.ApplicationProvider
             .getApplicationContext<org.openlife.app.OpenLifeApp>()
         val (list, ocr) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-            SourceListViewModel(application) to OcrViewModel(application)
+            SourceListViewModel(application.container) to application.container.ocr
         }
         val sourceId = saveSyntheticSource(application)
 

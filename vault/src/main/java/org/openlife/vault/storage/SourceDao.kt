@@ -83,6 +83,10 @@ interface SourceDao {
     /** Saved, corrupt, and pending-deletion rows; STAGED remains transient and hidden. */
     @Query("SELECT * FROM sources WHERE state IN ('READY', 'CORRUPT', 'DELETING') ORDER BY importedAt ASC")
     fun observeVisibleSources(): Flow<List<SourceEntity>>
+
+    /** P1-20-R2: one visible source by id (the same states as the list); null once it is gone. */
+    @Query("SELECT * FROM sources WHERE id = :id AND state IN ('READY', 'CORRUPT', 'DELETING')")
+    fun observeVisibleSource(id: String): Flow<SourceEntity?>
 }
 
 /** Outcome of a compare-and-set state transition (P1-18-R13). */

@@ -1,26 +1,21 @@
 package org.openlife.app.ui
 
-import androidx.annotation.VisibleForTesting
+import android.graphics.Bitmap
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.openlife.app.OpenLifeApp
-import org.openlife.app.VaultAccess
-import org.openlife.vault.model.Orientation
+import org.openlife.app.AppContainer
 import org.openlife.vault.model.Source
-import org.openlife.vault.model.SourceState
 import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.repository.DeleteResult
-import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.storage.VaultUnavailableCause
 import java.util.UUID
 
@@ -31,13 +26,13 @@ sealed interface SourceListUiState {
 }
 
 /**
- * Backs [MainActivity]'s source list (design §8: "ordered by import time
- * and uses generic labels. Thumbnails are generated in memory on
- * demand."). Thumbnails are decoded on request and cached only in memory
- * for this process's lifetime - never written to disk (design §9: "Do not
- * store plaintext image caches or thumbnails").
+ * Backs the list destination (design §8: "ordered by import time and uses
+ * generic labels. Thumbnails are generated in memory on demand."). Scoped to
+ * the list's back-stack entry (P1-20-R1) and built from the [AppContainer].
+ * Thumbnails are decoded on request and cached only in memory - never written
+ * to disk (design §9) - and dropped by every content scrub (P1-20-R4).
  */
-class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
+class SourceListViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _state = MutableStateFlow<SourceListUiState>(SourceListUiState.Loading)
     val state: StateFlow<SourceListUiState> = _state
@@ -45,14 +40,17 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
     // Evicted thumbnails are dropped, never recycled: a row that is still
     // composed may draw the same instance again (F-28, P1-13-R6). From API 26
     // on, bitmap pixel memory is released when the bitmap is collected.
-    private val thumbnailCache = SensitiveContentCache<UUID, android.graphics.Bitmap?>(
+    private val thumbnailCache = SensitiveContentCache<UUID, Bitmap?>(
         onEvict = {},
         sizeOf = { bitmap -> bitmap?.allocationByteCount?.toLong() ?: 0L },
     )
-    private val unregisterTrimCallback = application.registerSensitiveContentClearer(::clearSensitiveContent)
+    private val unregisterScrub = container.scrubber.register { clearSensitiveContent() }
     private val _sensitiveContentGeneration = MutableStateFlow(thumbnailCache.generation())
     val sensitiveContentGeneration: StateFlow<Long> = _sensitiveContentGeneration.asStateFlow()
     private var vaultObservation: Job? = null
+
+    /** The list's scroll position (indices only, no content); shared by the list pane in every entry. */
+    val listPosition = LazyListState()
 
     init {
         observeVault()
@@ -60,31 +58,25 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
 
     fun retryVault() {
         viewModelScope.launch {
-            application.retryVault()
+            container.sources.retryVault()
             observeVault()
         }
     }
 
     fun finishVaultReset() {
         viewModelScope.launch {
-            if (application.resetVault() == VaultResetResult.COMPLETED) observeVault()
+            if (container.sources.finishVaultReset()) observeVault()
         }
     }
 
     private fun observeVault() {
         vaultObservation?.cancel()
         vaultObservation = viewModelScope.launch {
-            when (val access = application.vault()) {
-                is VaultAccess.Unavailable -> _state.value = SourceListUiState.VaultUnavailable(access.cause)
-
-                is VaultAccess.Ready -> access.viewRepository.observeVisibleSources().collect { sources ->
-                    _state.value = SourceListUiState.Loaded(sources)
-                }
-            }
+            container.sources.observeList().collect { _state.value = it }
         }
     }
 
-    suspend fun loadThumbnail(sourceId: UUID): android.graphics.Bitmap? {
+    suspend fun loadThumbnail(sourceId: UUID): Bitmap? {
         val cached = thumbnailCache.get(sourceId)
         return when {
             cached != null -> cached
@@ -92,83 +84,43 @@ class SourceListViewModel(private val application: OpenLifeApp) : ViewModel() {
             thumbnailCache.contains(sourceId) -> null
 
             else -> {
-                application.appLock.awaitContentAccess()
                 val generation = thumbnailCache.generation()
-                val access = application.vault() as? VaultAccess.Ready
-                if (access == null) {
-                    null
-                } else {
-                    val bitmap = withContext(Dispatchers.Default) {
-                        val source = access.viewRepository.findSource(sourceId)
-                        val bytes = source?.let { access.viewRepository.loadReadyBytes(sourceId) }
-                        if (source == null || source.state != SourceState.READY || bytes == null) {
-                            null
-                        } else {
-                            SampledBitmapDecoder.decode(
-                                bytes,
-                                source.orientation ?: Orientation.NORMAL,
-                                THUMBNAIL_TARGET_PIXELS,
-                                android.graphics.Bitmap.Config.RGB_565,
-                            )
-                        }
-                    }
-                    if (thumbnailCache.put(sourceId, bitmap, generation)) bitmap else null
-                }
+                val bitmap = container.sources.loadThumbnail(sourceId, THUMBNAIL_TARGET_PIXELS)
+                if (thumbnailCache.put(sourceId, bitmap, generation)) bitmap else null
             }
         }
     }
 
-    fun delete(sourceId: UUID, onResult: (DeleteResult) -> Unit) {
-        viewModelScope.launch {
-            val access = application.vault() as? VaultAccess.Ready ?: return@launch
-            val result = access.deletionRepository.deleteSource(sourceId)
+    /** Runs in the container's application scope, so it completes after this entry is gone. */
+    fun delete(sourceId: UUID, onResult: (DeleteResult) -> Unit = {}) {
+        container.sources.delete(sourceId) { result ->
             if (result is DeleteResult.Deleted) thumbnailCache.remove(sourceId)
-            // A-10 test hook: lets the Room flow win the race against the callback.
-            beforeDeleteResultForTest?.invoke()
-            onResult(result)
+            result?.let(onResult)
         }
     }
 
     /**
-     * P2-07-R3: stores the user's answer; the visible-source flow carries the
-     * stored value back to the viewer. Not a safety judgement.
+     * P2-07-R3: stores the user's answer; the source flow carries the stored
+     * value back to the viewer. Not a safety judgement.
      */
-    fun setUserContentKind(sourceId: UUID, kind: UserContentKind?) {
-        viewModelScope.launch {
-            (application.vault() as? VaultAccess.Ready)?.viewRepository?.setUserContentKind(sourceId, kind)
-        }
-    }
+    fun setUserContentKind(sourceId: UUID, kind: UserContentKind?) = container.sources.setUserContentKind(sourceId, kind)
 
-    /** P1-01-R3: on foreground, remove stages no screen owns; a busy vault is retried next time. */
-    fun cleanAbandonedStages() {
-        viewModelScope.launch { application.importHousekeeping.cleanAbandonedStages() }
-    }
-
-    /** Drop decoded thumbnails when the app leaves the foreground. */
+    /** Drop decoded thumbnails (hidden, memory trim, vault reset). */
     fun clearSensitiveContent() {
         thumbnailCache.clear()
         _sensitiveContentGeneration.value = thumbnailCache.generation()
     }
 
     override fun onCleared() {
-        unregisterTrimCallback()
+        unregisterScrub()
         clearSensitiveContent()
     }
 
     companion object {
-        /**
-         * Test seam (P1-19-R14): holds back the delete callback until the test
-         * releases it, so the list flow emits first. Kept until P1-20, which
-         * rebuilds ViewModel scoping and can inject the repository instead.
-         */
-        @VisibleForTesting
-        @Volatile
-        internal var beforeDeleteResultForTest: (suspend () -> Unit)? = null
-
         private const val THUMBNAIL_TARGET_PIXELS = 40_000L
 
-        fun factory(application: OpenLifeApp): ViewModelProvider.Factory = viewModelFactory {
-            initializer { SourceListViewModel(application) }
+        fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
+            initializer { SourceListViewModel(container) }
         }
     }
 }

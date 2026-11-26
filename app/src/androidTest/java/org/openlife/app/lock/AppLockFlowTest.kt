@@ -30,6 +30,7 @@ import org.openlife.app.intake.IntakeActivity
 import org.openlife.app.intake.currentStatusForTest
 import org.openlife.app.intake.TestHostileContentProvider
 import org.openlife.app.test.StrictModeRule
+import org.openlife.app.test.requestOpenSource
 import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.repository.PrepareResult
@@ -74,9 +75,8 @@ class AppLockFlowTest {
         val authenticator = ScriptedAuthenticator()
         app.appLock.setForTest(authenticator, AppLockPolicy(enabled = true))
         val readsBefore = app.appLock.contentReadsForTest.get()
+        app.requestOpenSource(id)
         val intent = Intent(context, MainActivity::class.java)
-            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, id.toString())
-            .putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, app.openSourceNonce.issue())
 
         ActivityScenario.launch<MainActivity>(intent).use {
             assertTrue("lock screen not shown", device.wait(Until.hasObject(By.text(LOCKED_TITLE)), WAIT_MS))
@@ -88,8 +88,9 @@ class AppLockFlowTest {
             authenticator.complete(AuthOutcome.Succeeded)
 
             // The requested item opens after unlock, and only now are its bytes read.
-            awaitTrue("no content read after unlock") { app.appLock.contentReadsForTest.get() > readsBefore }
             assertTrue(device.wait(Until.gone(By.text(LOCKED_TITLE)), WAIT_MS))
+            assertTrue("viewer not shown after unlock", device.wait(Until.hasObject(By.desc("Saved image")), WAIT_MS))
+            assertTrue("no content read after unlock", app.appLock.contentReadsForTest.get() > readsBefore)
         }
     }
 
@@ -310,6 +311,7 @@ class AppLockFlowTest {
         val deadline = System.currentTimeMillis() + WAIT_MS
         while (!condition()) {
             if (System.currentTimeMillis() > deadline) throw AssertionError(message)
+            // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
             Thread.sleep(POLL_MS)
         }
     }

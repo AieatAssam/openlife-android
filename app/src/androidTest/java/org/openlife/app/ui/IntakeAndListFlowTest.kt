@@ -31,6 +31,7 @@ import org.openlife.app.VaultAccess
 import org.openlife.app.intake.IntakeActivity
 import org.openlife.app.intake.currentStatusForTest
 import org.openlife.app.intake.TestHostileContentProvider
+import org.openlife.app.test.requestOpenSource
 import org.openlife.vault.storage.VaultPaths
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.repository.DeleteResult
@@ -77,6 +78,7 @@ class IntakeAndListFlowTest {
 
         override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
             ownerThreadId = Thread.currentThread().id
+            // P1-20-R8: the delay is the behaviour under test (a slow source), not a wait.
             Thread.sleep(1_000)
             if (closed) throw IOException("synthetic deadline close")
             if (chunksRemaining-- == 0) return -1
@@ -117,7 +119,7 @@ class IntakeAndListFlowTest {
         intakeViewModel.confirmSave()
         awaitState(intakeViewModel) { it is IntakeUiState.Saved }
 
-        val listViewModel = SourceListViewModel(application)
+        val listViewModel = SourceListViewModel(application.container)
         val loaded = awaitListContaining(listViewModel, prepared.sourceId)
         assertTrue(loaded.sources.any { it.id == prepared.sourceId })
 
@@ -148,7 +150,7 @@ class IntakeAndListFlowTest {
             savedIds += prepared.sourceId
         }
 
-        val listViewModel = SourceListViewModel(application)
+        val listViewModel = SourceListViewModel(application.container)
         val loaded = awaitState(listViewModel, timeoutMs = CRYPTO_WAIT_MS) {
             it is SourceListUiState.Loaded && it.sources.map { source -> source.id }.toSet().containsAll(savedIds)
         } as SourceListUiState.Loaded
@@ -172,7 +174,7 @@ class IntakeAndListFlowTest {
         intakeViewModel.cancel()
         awaitState(intakeViewModel) { it is IntakeUiState.Cancelled }
 
-        val listViewModel = SourceListViewModel(application)
+        val listViewModel = SourceListViewModel(application.container)
         val loaded = awaitState(listViewModel) { it is SourceListUiState.Loaded } as SourceListUiState.Loaded
         assertNull(loaded.sources.find { it.id == prepared.sourceId })
     }
@@ -324,7 +326,9 @@ class IntakeAndListFlowTest {
                 while (System.currentTimeMillis() < deadline &&
                     !status.startsWith("Prepared") && status != "Cancelled"
                 ) {
-                    Thread.sleep(POLL_MS)
+                    // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
+                    // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
+            Thread.sleep(POLL_MS)
                     status = statusOf(scenario)
                 }
                 assertTrue("rotation during Preparing stranded the import; last=$status",
@@ -394,7 +398,9 @@ class IntakeAndListFlowTest {
                 while (System.currentTimeMillis() < deadline && !status.startsWith("Prepared") &&
                     !status.startsWith("Not imported")
                 ) {
-                    Thread.sleep(POLL_MS)
+                    // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
+                    // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
+            Thread.sleep(POLL_MS)
                     status = statusOf(scenario)
                 }
                 assertTrue("a share that was never started must still import; last=$status",
@@ -555,6 +561,7 @@ class IntakeAndListFlowTest {
         val deadline = System.currentTimeMillis() + CRYPTO_WAIT_MS
         while (System.currentTimeMillis() < deadline) {
             if (statusOf(scenario).startsWith(prefix)) return
+            // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
             Thread.sleep(POLL_MS)
         }
         throw AssertionError("status never reached $prefix; last=${statusOf(scenario)}")
@@ -584,10 +591,8 @@ class IntakeAndListFlowTest {
         intake.confirmSave()
         awaitState(intake) { it is IntakeUiState.Saved }
 
-        val open = Intent(context, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_OPEN_SOURCE_ID, preview.sourceId.toString())
-            putExtra(MainActivity.EXTRA_OPEN_SOURCE_NONCE, application.openSourceNonce.issue())
-        }
+        application.requestOpenSource(preview.sourceId)
+        val open = Intent(context, MainActivity::class.java)
         ActivityScenario.launch<MainActivity>(open).use { scenario ->
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             assertTrue("viewer did not show the saved image",
@@ -618,6 +623,7 @@ class IntakeAndListFlowTest {
         while (System.currentTimeMillis() < deadline) {
             if (scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED) return
             if (statusOf(scenario) == "Cancelled") return
+            // P1-20-R8: bounded poll; this state has no flow or callback the test can await.
             Thread.sleep(POLL_MS)
         }
         throw AssertionError("import was not cancelled; last=${statusOf(scenario)}")

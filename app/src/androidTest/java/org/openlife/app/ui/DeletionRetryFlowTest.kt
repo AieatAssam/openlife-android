@@ -58,7 +58,7 @@ class DeletionRetryFlowTest {
         val blocker = File(blob, "occupied")
         blocker.writeText("x")
 
-        val list = SourceListViewModel(application)
+        val list = SourceListViewModel(application.container)
         try {
             awaitListContaining(list, preview.sourceId)
 

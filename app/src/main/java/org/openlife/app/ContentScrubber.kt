@@ -1,13 +1,31 @@
 package org.openlife.app
 
 /**
- * P1-20-R4 (AS-4): one registry of everything that holds decoded content.
- * [scrub] runs every clearer synchronously on the caller's thread.
+ * P1-20-R4 (AS-4): one registry of everything that holds decoded content
+ * (thumbnails, viewer images, OCR text, search results). [scrub] runs every
+ * clearer synchronously on the caller's thread: MainActivity.onStop (hidden),
+ * memory trim, and before a vault reset. Navigation is not part of it.
  */
 class ContentScrubber {
-    val hiddenScrubs: Long get() = TODO()
+    private val clearers = mutableListOf<(Boolean) -> Unit>()
 
-    fun register(clearer: (hidden: Boolean) -> Unit): () -> Unit = TODO()
+    @Volatile
+    private var hiddenScrubCount = 0L
 
-    fun scrub(hidden: Boolean): Unit = TODO()
+    /** How many times hiding the app has scrubbed content. */
+    val hiddenScrubs: Long get() = hiddenScrubCount
+
+    @Synchronized
+    fun register(clearer: (hidden: Boolean) -> Unit): () -> Unit {
+        clearers += clearer
+        return { synchronized(this) { clearers.remove(clearer) } }
+    }
+
+    fun scrub(hidden: Boolean) {
+        val current = synchronized(this) {
+            if (hidden) hiddenScrubCount++
+            clearers.toList()
+        }
+        current.forEach { it(hidden) }
+    }
 }

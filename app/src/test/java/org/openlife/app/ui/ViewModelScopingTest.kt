@@ -29,7 +29,11 @@ class ViewModelScopingTest {
 
     @Test
     fun screenViewModelsAreBuiltFromTheContainer() {
-        val screenViewModels = listOf(SourceListViewModel::class.java, SearchViewModel::class.java)
+        val screenViewModels = listOf(
+            SourceListViewModel::class.java,
+            ViewerViewModel::class.java,
+            SearchViewModel::class.java,
+        )
         screenViewModels.forEach { type ->
             val constructors = type.constructors.toList()
             assertTrue("$type has a public constructor", constructors.isNotEmpty())

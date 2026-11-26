@@ -7,11 +7,10 @@ sealed interface Routes {
     @Serializable
     data object List : Routes
 
-    /** [spanId] (P2-08): the span to select on opening, from a search result. */
-    @Serializable
-    data class Viewer(val sourceId: String, val spanId: String? = null) : Routes
-
-    /** P1-20-R3: the list-detail destination; the selected source is part of the route. */
+    /**
+     * P1-20-R3: the list-detail destination; the selected source is part of the
+     * route. [spanId] (P2-08): the span to select on opening, from a search result.
+     */
     @Serializable
     data class ListDetail(val sourceId: String, val spanId: String? = null) : Routes
 
