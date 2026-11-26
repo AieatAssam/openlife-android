@@ -29,13 +29,18 @@ import java.lang.reflect.Proxy
  * close and reopen the same database.
  */
 class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closeable {
+    /**
+     * The SQLite error text, the failing statement's kind (its leading
+     * keywords and object name, never values) and the host SQLite version,
+     * so a CI log explains a failure without row content.
+     */
     class Failure(message: String) : RuntimeException(message)
 
     private val script: File = File.createTempFile("host-sqlite", ".py").apply {
         deleteOnExit()
         writeText(PROGRAM)
     }
-    private val command: List<String> = listOf("python3", "-I", script.absolutePath) + listOfNotNull(path?.absolutePath)
+    private val command: List<String> = interpreter(script) + listOfNotNull(path?.absolutePath)
     private val process: Process = ProcessBuilder(command)
         .redirectErrorStream(false)
         .start()
@@ -44,6 +49,10 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
 
     init {
         if (!recursiveTriggers) exec("PRAGMA recursive_triggers = OFF")
+        if (!versionReported) {
+            versionReported = true
+            System.err.println("HostSqlite: host SQLite ${version()}")
+        }
     }
 
     fun exec(sql: String, vararg args: Any?) {
@@ -65,8 +74,21 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
             if (row == "END") break
             rows += row.split(' ').map(::decode)
         }
-        if (status.startsWith("ERR ")) throw Failure(String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8))
+        if (status.startsWith("ERR ")) {
+            val error = String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8)
+            throw Failure("$error [statement: ${statementKind(sql)}; host SQLite ${version()}]")
+        }
         return rows
+    }
+
+    private var knownVersion: String? = null
+
+    /** The engine's `sqlite_version()`, read once per connection. */
+    fun version(): String = knownVersion ?: run {
+        knownVersion = "unknown" // a failing version query must not recurse through Failure
+        runCatching { query("SELECT sqlite_version()").single().single() as String }
+            .getOrDefault("unknown")
+            .also { knownVersion = it }
     }
 
     private fun nextLine(): String = output.readLine()
@@ -162,6 +184,10 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
     }
 
     companion object {
+        /** The engine version is printed once per test JVM (CI log; Gradle shows standard error). */
+        @Volatile
+        private var versionReported = false
+
         /** Creates every table and index of an exported Room schema (e.g. 4.json) on this database. */
         fun HostSqlite.createFromExportedSchema(json: File) {
             val text = json.readText()
@@ -172,6 +198,31 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
                 exec(raw.replace("\${TABLE_NAME}", table))
             }
         }
+
+        /**
+         * The host interpreter: `python3 -I <script>` unless the environment
+         * variable `OPENLIFE_HOST_SQLITE` names another command speaking the
+         * same line protocol (for example one over an older SQLite, to
+         * reproduce a CI runner's engine; P3-02 CI failure).
+         */
+        private fun interpreter(script: File): List<String> =
+            System.getenv("OPENLIFE_HOST_SQLITE")
+                ?.split(' ')
+                ?.filter(String::isNotBlank)
+                ?.takeIf { it.isNotEmpty() }
+                ?: listOf("python3", "-I", script.absolutePath)
+
+        private val STATEMENT_KIND = Regex(
+            "^\\s*((?:CREATE|DROP|ALTER|INSERT|REPLACE|UPDATE|DELETE|SELECT|PRAGMA|SAVEPOINT|RELEASE|ROLLBACK)" +
+                "(?:\\s+(?:OR\\s+\\w+|TEMP|TEMPORARY|UNIQUE|VIRTUAL|TABLE|INDEX|TRIGGER|VIEW|" +
+                "INTO|FROM|IF|NOT|EXISTS))*" +
+                "(?:\\s+[\\w`\"]+)?)",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /** Leading keywords plus the object name: schema identifiers only, never literals or bound values. */
+        internal fun statementKind(sql: String): String =
+            STATEMENT_KIND.find(sql)?.groupValues?.get(1)?.replace(Regex("\\s+"), " ") ?: "other"
 
         private val CREATE_SQL = Regex("\"createSql\": \"((?:[^\"\\\\]|\\\\.)*)\"")
         private val TABLE_NAME = Regex("\"tableName\": \"([^\"]+)\"")
