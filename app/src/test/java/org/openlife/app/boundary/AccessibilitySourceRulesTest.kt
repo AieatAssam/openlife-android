@@ -316,6 +316,7 @@ class AccessibilitySourceRulesTest {
             Regex("""\bdetect\w*Gestures\("""),
             Regex("""\.draggable\("""),
         )
+
         // Assignments, not imports: a gesture's equivalent must be set in semantics.
         val GESTURE_EQUIVALENTS = listOf(Regex("""\bcustomActions\s*="""), Regex("""\bonClick\("""))
         val SECOND_CUE = listOf("textDecoration =", "fontWeight =", "fontStyle =")
