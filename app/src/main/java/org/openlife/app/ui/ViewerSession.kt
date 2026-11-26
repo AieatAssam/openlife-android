@@ -88,19 +88,18 @@ class ViewerSession<T : Any>(
     private val scope: CoroutineScope,
 ) {
     private val mutableSource = MutableStateFlow<SourceLookup>(SourceLookup.Loading)
-    private val mutableContent = MutableStateFlow<DecodedContent<T>>(DecodedContent.Loading)
+    private val slot = ContentSlot<T>(ports::release)
     private val mutableOcr = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
-    private val mutableSelected = MutableStateFlow(restoredSelection(initialSpanId))
+    private val mutableSelected = MutableStateFlow(saved.restoredSelection(initialSpanId))
     private val mutableExit = MutableStateFlow(false)
     private val exitConsumed = AtomicBoolean(false)
     private val attempt = MutableStateFlow(0)
     private var visible = false
-    private var epoch = 0L
     private var contentJob: Job? = null
     private var ocrJob: Job? = null
 
     val source: StateFlow<SourceLookup> = mutableSource.asStateFlow()
-    val content: StateFlow<DecodedContent<T>> = mutableContent.asStateFlow()
+    val content: StateFlow<DecodedContent<T>> = slot.state
     val ocr: StateFlow<OcrUiState> = mutableOcr.asStateFlow()
     val selectedSpanId: StateFlow<UUID?> = mutableSelected.asStateFlow()
 
@@ -169,14 +168,14 @@ class ViewerSession<T : Any>(
     }
 
     private fun startLoading() {
-        val loadEpoch = epoch
+        val loadEpoch = slot.epoch
         contentJob = scope.launch {
             val found = mutableSource.filterIsInstance<SourceLookup.Found>()
                 .map { it.source.state to (it.source.orientation ?: Orientation.NORMAL) }
                 .distinctUntilChanged()
             combine(found, attempt) { current, _ -> current }.collectLatest { (state, orientation) ->
-                install(DecodedContent.Loading, loadEpoch)
-                install(load(state, orientation), loadEpoch)
+                slot.install(DecodedContent.Loading, loadEpoch)
+                slot.install(ports.loadContent(sourceId, state, orientation), loadEpoch)
             }
         }
         ocrJob = scope.launch {
@@ -184,52 +183,13 @@ class ViewerSession<T : Any>(
         }
     }
 
-    private suspend fun load(state: SourceState, orientation: Orientation): DecodedContent<T> {
-        if (state == SourceState.CORRUPT) return DecodedContent.Unreadable
-        return when (val result = ports.readReadyContent(sourceId)) {
-            is ReadyReadResult.Loaded -> {
-                val decoded = try {
-                    ports.decode(result.bytes, orientation)
-                } finally {
-                    result.bytes.fill(0)
-                }
-                decoded?.let { DecodedContent.Shown(it) } ?: DecodedContent.Unreadable
-            }
-
-            ReadyReadResult.Transient -> DecodedContent.Transient
-
-            ReadyReadResult.Corrupt, ReadyReadResult.Missing, ReadyReadResult.Unavailable -> DecodedContent.Unreadable
-        }
-    }
-
-    /** A result from before the last [drop] is released at once and never shown. */
-    @Synchronized
-    private fun install(next: DecodedContent<T>, loadEpoch: Long) {
-        if (loadEpoch != epoch) {
-            (next as? DecodedContent.Shown)?.let { ports.release(it.value) }
-            return
-        }
-        val previous = mutableContent.value
-        mutableContent.value = next
-        if (previous is DecodedContent.Shown && previous != next) ports.release(previous.value)
-    }
-
     private fun drop() {
         contentJob?.cancel()
         ocrJob?.cancel()
         contentJob = null
         ocrJob = null
-        epoch++
-        val previous = mutableContent.value
-        mutableContent.value = DecodedContent.Loading
-        (previous as? DecodedContent.Shown)?.let { ports.release(it.value) }
+        slot.clear()
         mutableOcr.value = OcrUiState.Loading
-    }
-
-    private fun restoredSelection(initialSpanId: UUID?): UUID? = if (KEY_SELECTED_SPAN in saved) {
-        (saved[KEY_SELECTED_SPAN] as? String)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-    } else {
-        initialSpanId
     }
 
     companion object {
@@ -239,4 +199,64 @@ class ViewerSession<T : Any>(
         const val KEY_PAN_Y = "panY"
         private const val DEFAULT_ZOOM = 1f
     }
+}
+
+/**
+ * Holds the decoded content. A replaced or dropped value is released at once;
+ * a result older than the last [clear] is never shown.
+ */
+private class ContentSlot<T : Any>(private val release: (T) -> Unit) {
+    private val mutable = MutableStateFlow<DecodedContent<T>>(DecodedContent.Loading)
+    val state: StateFlow<DecodedContent<T>> = mutable.asStateFlow()
+
+    @Volatile
+    var epoch = 0L
+        private set
+
+    @Synchronized
+    fun install(next: DecodedContent<T>, loadEpoch: Long) {
+        if (loadEpoch != epoch) {
+            (next as? DecodedContent.Shown)?.let { release(it.value) }
+            return
+        }
+        val previous = mutable.value
+        mutable.value = next
+        if (previous is DecodedContent.Shown && previous != next) release(previous.value)
+    }
+
+    @Synchronized
+    fun clear() {
+        epoch++
+        val previous = mutable.value
+        mutable.value = DecodedContent.Loading
+        (previous as? DecodedContent.Shown)?.let { release(it.value) }
+    }
+}
+
+private suspend fun <T : Any> ViewerPorts<T>.loadContent(
+    sourceId: UUID,
+    state: SourceState,
+    orientation: Orientation,
+): DecodedContent<T> {
+    if (state == SourceState.CORRUPT) return DecodedContent.Unreadable
+    return when (val result = readReadyContent(sourceId)) {
+        is ReadyReadResult.Loaded -> {
+            val decoded = try {
+                decode(result.bytes, orientation)
+            } finally {
+                result.bytes.fill(0)
+            }
+            decoded?.let { DecodedContent.Shown(it) } ?: DecodedContent.Unreadable
+        }
+
+        ReadyReadResult.Transient -> DecodedContent.Transient
+
+        ReadyReadResult.Corrupt, ReadyReadResult.Missing, ReadyReadResult.Unavailable -> DecodedContent.Unreadable
+    }
+}
+
+private fun SavedValues.restoredSelection(initialSpanId: UUID?): UUID? = if (ViewerSession.KEY_SELECTED_SPAN in this) {
+    (this[ViewerSession.KEY_SELECTED_SPAN] as? String)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+} else {
+    initialSpanId
 }

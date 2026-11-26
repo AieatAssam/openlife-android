@@ -221,8 +221,7 @@ class ViewerSessionTest {
         assertSame(DecodedContent.Loading, session.content.value)
     }
 
-    private fun newSession(initialSpanId: UUID? = null) =
-        ViewerSession(sourceId, initialSpanId, ports, saved, scope)
+    private fun newSession(initialSpanId: UUID? = null) = ViewerSession(sourceId, initialSpanId, ports, saved, scope)
 
     private fun source(state: SourceState = SourceState.READY) = Source(
         id = sourceId,

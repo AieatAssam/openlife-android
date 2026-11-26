@@ -24,8 +24,8 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.openlife.app.intake.InternalLink
 import org.openlife.app.intake.IntakeActivity
+import org.openlife.app.intake.InternalLink
 import org.openlife.app.lock.AppLockGate
 import org.openlife.app.lock.AppLockOfferScreen
 import org.openlife.app.lock.AppLockPolicy

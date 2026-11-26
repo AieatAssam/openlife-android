@@ -103,7 +103,9 @@ class SourceListViewModel(private val container: AppContainer) : ViewModel() {
      * P2-07-R3: stores the user's answer; the source flow carries the stored
      * value back to the viewer. Not a safety judgement.
      */
-    fun setUserContentKind(sourceId: UUID, kind: UserContentKind?) = container.sources.setUserContentKind(sourceId, kind)
+    fun setUserContentKind(sourceId: UUID, kind: UserContentKind?) {
+        container.sources.setUserContentKind(sourceId, kind)
+    }
 
     /** Drop decoded thumbnails (hidden, memory trim, vault reset). */
     fun clearSensitiveContent() {

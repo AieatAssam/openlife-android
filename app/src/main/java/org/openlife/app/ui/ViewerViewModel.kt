@@ -87,7 +87,9 @@ private class BitmapViewerPorts(private val container: AppContainer) : ViewerPor
         container.sources.readReadyContent(sourceId)
 
     override suspend fun decode(bytes: ByteArray, orientation: Orientation): Bitmap? =
-        withContext(Dispatchers.Default) { SampledBitmapDecoder.decode(bytes, orientation)?.also(DecodedBitmapProbe::track) }
+        withContext(Dispatchers.Default) {
+            SampledBitmapDecoder.decode(bytes, orientation)?.also(DecodedBitmapProbe::track)
+        }
 
     // The session has already replaced the state that showed it, so no new frame draws this bitmap.
     override fun release(value: Bitmap) {
