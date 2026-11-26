@@ -50,10 +50,15 @@ object FactExtractor {
         stage(line, RuleStage.PHONE in stages) { PhoneExtractor.scanPlusLed(line) }
         stage(line, RuleStage.MONEY in stages) { MoneyExtractor.scan(line, context) }
         stage(line, RuleStage.PHONE in stages) { PhoneExtractor.scan(line) }
+        stage(line, true) { AttachedMarkGuard.scan(line) }
     }
 
-    /** Test seam: the scanner's character reads for one span with every rule (stub until GREEN). */
-    internal fun countReads(span: ExtractionSpan): Long = 0L
+    /** Test seam: the scanner's character reads for one span with every rule. */
+    internal fun countReads(span: ExtractionSpan): Long {
+        val line = LineScan(span, ExtractionDeadline.NONE)
+        run(line, RuleStage.entries.toSet(), CurrencyContextIndex(listOf(span)))
+        return line.reads
+    }
 
     private inline fun stage(line: LineScan, enabled: Boolean, body: () -> Unit) {
         if (!enabled) return

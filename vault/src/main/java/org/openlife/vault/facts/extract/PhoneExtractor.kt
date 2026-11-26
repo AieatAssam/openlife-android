@@ -26,9 +26,12 @@ object PhoneExtractor {
     private const val PLUS_SEPARATORS = " -.,"
 
     /**
-     * Amendment E-09(a): before MONEY, a `+`-led run that the phone rule
-     * accepts is emitted and claims its characters (`+1 555 123 4567 USD`).
-     * A run it would abstain is left for [scan], after MONEY.
+     * Amendment A-9(a): before MONEY, a `+`-led run that the phone rule
+     * accepts is emitted and claims its characters. A run of 7-15 digits
+     * with a currency marker no other number owns within one space either
+     * side (`+1234567 EUR`, `€ +1234567`) could be a phone or an amount: it
+     * is claimed and abstained (finding EE-01). Any other run is left for
+     * MONEY and [scan].
      */
     internal fun scanPlusLed(line: LineScan) {
         var index = 0
@@ -36,7 +39,13 @@ object PhoneExtractor {
             line.reach(index)
             if (line.ch(index) == '+' && startsPlus(line, index)) {
                 val run = read(line, index)
-                if (run.reason == null) emit(line, run)
+                val digits = run.groups.sumOf { group -> group.count(LineScan::isAsciiDigit) }
+                val either = digits in MIN_DIGITS..MAX_DIGITS && MoneyMarkers.freeBeside(line, run.start, run.end)
+                if (either) {
+                    line.abstain(ExtractedKind.PHONE, run.start, run.end, AbstentionReason.AMBIGUOUS_FORM)
+                } else if (run.reason == null) {
+                    emit(line, run)
+                }
                 index = maxOf(run.end, index + 1)
             } else {
                 index++

@@ -6,6 +6,7 @@ package org.openlife.vault.facts.extract
  */
 internal object MoneyShapes {
     private const val GROUP = 3
+    private val AMBIGUOUS = Readings(emptyList(), AbstentionReason.AMBIGUOUS_FORM)
 
     fun amount(scene: MoneyScene, index: Int, prefix: Marker?, suffix: Marker?): Amount? {
         val line = scene.line
@@ -13,10 +14,8 @@ internal object MoneyShapes {
         if (prefix == null && !LineScan.isDashLike(line.raw(number.start - 1)) && !line.boundaryBefore(number.start)) {
             return null
         }
-        if (suffix != null && prefix == null) groupedFraction(scene, number, suffix)?.let { return it }
-        val first = if (suffix != null && prefix == null) leftChain(scene, index) else index
-        val last = if (prefix != null && suffix == null) rightChain(scene, index) else index
-        val readings = readings(scene, first, last, index)
+        val (first, last, fraction) = extent(scene, index, prefix, suffix)
+        val readings = if (fraction) AMBIGUOUS else readings(scene, first, last, index)
         val digitsStart = scene.numbers[first].start
         val digitsEnd = scene.numbers[last].end
         val core = prefix?.start ?: digitsStart
@@ -25,25 +24,52 @@ internal object MoneyShapes {
         return Amount(sign.start, suffix?.end ?: digitsEnd, prefix, suffix, readings, sign.negative, core, sign.problem)
     }
 
-    /** `1 234,50 €` with an ASCII space: a grouped number with a fraction is not read (§5.2). */
-    private fun groupedFraction(scene: MoneyScene, number: Dense, suffix: Marker): Amount? {
-        val before = scene.numberEndingAt(number.start)?.takeIf { it.pureDigits && it.text.length <= GROUP }
-        if (before == null || !hasFraction(number)) return null
-        val ambiguous = Readings(emptyList(), AbstentionReason.AMBIGUOUS_FORM)
-        return Amount(before.start, suffix.end, null, suffix, ambiguous, false)
+    /**
+     * The first and last digit groups read, and whether a fraction follows a
+     * space-grouped number. A marker after the digits reads groups to its
+     * left, one before it to its right (§5.2). `1 234,50 €` and `€1 234,50`
+     * alike end in a group with a fraction: the whole run abstains (findings
+     * E-01, EE-02).
+     */
+    private fun extent(scene: MoneyScene, index: Int, prefix: Marker?, suffix: Marker?): Triple<Int, Int, Boolean> {
+        val numbers = scene.numbers
+        val fractionBefore = index > 0 && joinsFraction(scene, numbers[index - 1], numbers[index])
+        return when {
+            suffix != null && prefix == null && fractionBefore -> Triple(leftChain(scene, index - 1), index, true)
+            suffix != null && prefix == null -> Triple(leftChain(scene, index), index, false)
+            prefix != null && suffix == null -> rightExtent(scene, index)
+            else -> Triple(index, index, false)
+        }
     }
 
-    private fun hasFraction(number: Dense): Boolean {
-        val mark = number.text.indexOfFirst { it == '.' || it == ',' }
-        return mark == GROUP && number.text.take(GROUP).all(LineScan::isAsciiDigit)
+    private fun rightExtent(scene: MoneyScene, index: Int): Triple<Int, Int, Boolean> {
+        val last = rightChain(scene, index)
+        val next = scene.numbers.getOrNull(last + 1)
+        val fraction = next != null && joinsFraction(scene, scene.numbers[last], next)
+        return Triple(index, if (fraction) last + 1 else last, fraction)
     }
 
-    /** The adjacent group, and the whole space-grouped number when there is one. */
+    /** A group of at most 3 digits, one space separator, then 3 digits with a fraction (`5 000.00`). */
+    private fun joinsFraction(scene: MoneyScene, left: Dense, right: Dense): Boolean {
+        val mark = right.text.indexOfFirst { it == '.' || it == ',' }
+        val fraction = mark == GROUP && right.text.take(GROUP).all(LineScan::isAsciiDigit)
+        return fraction && left.pureDigits && left.text.length <= GROUP && spaced(scene, left, right)
+    }
+
+    /**
+     * The adjacent group, and the whole space-grouped number when there is
+     * one. A grouped number led by a `0` group is abstained (`€0 001`). A
+     * zero-led adjacent group is never a reading of its own; the first
+     * group stands in for it (`1 000 €` gives `1 | 1000`; finding EE-06).
+     */
     private fun readings(scene: MoneyScene, first: Int, last: Int, adjacent: Int): Readings {
         val own = MoneyNumbers.read(scene.numbers[adjacent].text)
         if (first == last) return own
-        val joined = MoneyNumbers.joined((first..last).map { scene.numbers[it].text })
-        return Readings(own.amounts + joined.amounts, own.reason ?: joined.reason)
+        val groups = (first..last).map { scene.numbers[it].text }
+        if (groups.first().startsWith('0')) return AMBIGUOUS
+        val alone = if (groups[adjacent - first].startsWith('0')) MoneyNumbers.read(groups.first()) else own
+        val joined = MoneyNumbers.joined(groups)
+        return Readings(alone.amounts + joined.amounts, alone.reason ?: joined.reason)
     }
 
     /** Groups before a marker after the digits: each later group exactly 3 digits, one space apart. */
@@ -62,7 +88,11 @@ internal object MoneyShapes {
 
     private fun links(scene: MoneyScene, left: Dense, right: Dense): Boolean =
         left.pureDigits && right.pureDigits && left.text.length <= GROUP && right.text.length == GROUP &&
-            left.end + 1 == right.start && scene.line.ch(left.end) == ' ' && !scene.line.isClaimed(left.start)
+            spaced(scene, left, right)
+
+    /** Exactly one space separator or tab between the groups (finding E-08: any space splits like ASCII). */
+    private fun spaced(scene: MoneyScene, left: Dense, right: Dense): Boolean =
+        left.end + 1 == right.start && LineScan.isSpace(scene.line.ch(left.end)) && !scene.line.isClaimed(left.start)
 }
 
 /** Where an amount's sign starts, whether it is read as negative, and whether §5.1 abstains it. */
@@ -72,26 +102,35 @@ internal data class Sign(val start: Int, val negative: Boolean, val problem: Boo
  * ADR-0008 §5.1 signs (finding E-04). Only a lone ASCII `-` touching the
  * marker or the digits is read (`-€5`, `€-5`, `-5 €`). Any other hyphen,
  * dash or minus look-alike, a sign with spaces beside it (`- €5`, `EUR -5`),
- * a dash between the digits and a marker after them, or two signs abstain.
+ * a dash between the digits and a marker after them, two signs (`--€5`)
+ * or `±` abstain.
  * A dash after a digit is a range or a minus between numbers, never a sign.
  */
 internal object MoneySigns {
     private const val READ = "-"
+    private const val PLUS_MINUS = '\u00B1'
 
     fun of(line: LineScan, core: Int, beforeDigits: IntRange, afterDigits: IntRange): Sign {
         val inner = between(line, beforeDigits) + between(line, afterDigits)
         val dash = core - 1 - line.spaceRunBefore(core)
-        val outer = LineScan.isDashLike(line.ch(dash)) && core - dash <= LineScan.MAX_SPACE_RUN + 1 &&
-            !digitBefore(line, dash)
+        val outer = isSign(line.ch(dash)) && core - dash <= LineScan.MAX_SPACE_RUN + 1 && !digitBefore(line, dash)
         val signs = if (outer) inner + line.text[dash] else inner
-        val spaced = outer && dash < core - 1
-        val start = if (outer) dash else core
+        val doubled = outer && LineScan.isSignLike(line.ch(dash - 1))
+        val spaced = outer && (dash < core - 1 || doubled)
+        val start = when {
+            doubled -> dash - 1
+            outer -> dash
+            else -> core
+        }
         return when {
             signs.isEmpty() -> Sign(start, negative = false, problem = false)
             signs == READ && !spaced -> Sign(start, negative = true, problem = false)
             else -> Sign(start, negative = false, problem = true)
         }
     }
+
+    /** A dash-like character or `±` in sign position; only a lone `-` is read (finding EE-05). */
+    private fun isSign(char: Char): Boolean = LineScan.isDashLike(char) || char == PLUS_MINUS
 
     /** The dash-like characters in `[range.first, range.last)`; a lone `-` stays readable, anything else does not. */
     private fun between(line: LineScan, range: IntRange): String {

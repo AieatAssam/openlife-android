@@ -61,3 +61,39 @@ internal object MoneyTables {
     /** Every code any multi-code symbol can take: the only codes that can ever be context (§5.5). */
     val CONTEXT_CODES: Set<String> = MULTI.values.flatten().toSet() - ENGLISH_NORMATIVE
 }
+
+/**
+ * Currency pairs (ruling 2026-11-26): a code joined by `/`, with at most one
+ * space separator each side, to another List One code (`EUR/USD`) names an
+ * exchange rate, not an amount's currency. Neither code is a marker or
+ * context. Reads the text as printed; constant window.
+ */
+internal object CurrencyPairs {
+    private const val CODE = 3
+
+    /** The end of a pair whose first code ends at [end], or null. */
+    fun endAfter(text: String, end: Int): Int? {
+        var at = end
+        if (at < text.length && LineScan.isSpace(text[at])) at++
+        if (text.getOrNull(at) != '/') return null
+        at++
+        if (at < text.length && LineScan.isSpace(text[at])) at++
+        return (at + CODE).takeIf { isCode(text, at) && !letterAt(text, at + CODE) }
+    }
+
+    /** True when the code at `[start, start + 3)` is the second code of a pair. */
+    fun isSecond(text: String, start: Int): Boolean {
+        var at = start - 1
+        if (at >= 0 && LineScan.isSpace(text[at])) at--
+        if (text.getOrNull(at) != '/') return false
+        at--
+        if (at >= 0 && LineScan.isSpace(text[at])) at--
+        val first = at + 1 - CODE
+        return first >= 0 && isCode(text, first) && (first == 0 || !Character.isLetter(text.codePointBefore(first)))
+    }
+
+    private fun isCode(text: String, at: Int): Boolean =
+        at >= 0 && at + CODE <= text.length && text.substring(at, at + CODE) in MoneyTables.LIST_ONE
+
+    private fun letterAt(text: String, at: Int): Boolean = at < text.length && Character.isLetter(text.codePointAt(at))
+}

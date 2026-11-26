@@ -19,6 +19,10 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
     val candidates = mutableListOf<ExtractedCandidate>()
     val abstentions = mutableListOf<Abstention>()
 
+    /** Character reads through [ch] and [raw]; a deterministic work measure for tests. */
+    var reads = 0L
+        private set
+
     /** Starts a rule's walk over the text: the deadline is checked again from offset 0. */
     fun beginStage() {
         nextCheck = 0
@@ -41,10 +45,16 @@ internal class LineScan(val span: ExtractionSpan, private val deadline: Extracti
     }
 
     /** The character at [index] if it exists and is unclaimed, otherwise [NONE]. */
-    fun ch(index: Int): Char = if (index in 0 until length && !claimed[index]) text[index] else NONE
+    fun ch(index: Int): Char {
+        reads++
+        return if (index in 0 until length && !claimed[index]) text[index] else NONE
+    }
 
     /** The raw character at [index], or [NONE] past either end. */
-    fun raw(index: Int): Char = if (index in 0 until length) text[index] else NONE
+    fun raw(index: Int): Char {
+        reads++
+        return if (index in 0 until length) text[index] else NONE
+    }
 
     /** ADR-0008 §1: no letter, digit or attached mark (any script) immediately before [index]. */
     fun boundaryBefore(index: Int): Boolean = index <= 0 || index > length || !isWordPart(text.codePointBefore(index))

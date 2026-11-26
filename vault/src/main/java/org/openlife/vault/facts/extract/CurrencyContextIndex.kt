@@ -6,9 +6,10 @@ package org.openlife.vault.facts.extract
  * indexed once, so a lookup costs a constant per amount (C2-R29).
  *
  * A code qualifies when it is a whole uppercase word, a code some
- * multi-code symbol takes, not on the §5.5 English-word list, and not in
- * marker position (at most one space, and any sign, from an ASCII digit:
- * `USD -33.10` is a marker, never context). The span text is read as
+ * multi-code symbol takes, not on the §5.5 English-word list, not one
+ * half of a currency pair (`EUR/USD`), and not in marker position (at
+ * most one space separator, and any sign, from an ASCII digit: `USD -33.10`
+ * is a marker, never context). The span text is read as
  * printed; claims made by other rules there are not consulted.
  *
  * Neighbours are found by ordinal, so the spans must be one reading with
@@ -47,7 +48,11 @@ internal class CurrencyContextIndex(spans: List<ExtractionSpan>) {
             val end = at + CODE_LENGTH
             val word = text.substring(at, end)
             val whole = !letterBefore(text, at) && !letterAt(text, end)
-            if (whole && word in MoneyTables.CONTEXT_CODES && !nearDigit(text, at, end)) out.putIfAbsent(word, at)
+            val free = !nearDigit(text, at, end) && CurrencyPairs.endAfter(text, end) == null &&
+                !CurrencyPairs.isSecond(text, at)
+            if (whole && word in MoneyTables.CONTEXT_CODES && free) {
+                out.putIfAbsent(word, at)
+            }
             at++
         }
         return out
@@ -56,9 +61,9 @@ internal class CurrencyContextIndex(spans: List<ExtractionSpan>) {
     private fun nearDigit(text: String, start: Int, end: Int): Boolean {
         var before = start - 1
         if (text.getOrNull(before)?.let(LineScan::isSignLike) == true) before--
-        if (text.getOrNull(before) == ' ') before--
+        if (text.getOrNull(before)?.let(LineScan::isSpace) == true) before--
         var after = end
-        if (text.getOrNull(after) == ' ') after++
+        if (text.getOrNull(after)?.let(LineScan::isSpace) == true) after++
         if (text.getOrNull(after)?.let(LineScan::isSignLike) == true) after++
         return digitAt(text, before) || digitAt(text, after)
     }

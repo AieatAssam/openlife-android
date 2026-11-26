@@ -93,7 +93,7 @@ user@example.com_evil ‖ !EMAIL¦user@example.com_evil
 user@example.comé ‖ !EMAIL¦user@example.comé
 user@my-example.com ‖ EMAIL¦user@my-example.com¦user@my-example.com
 # E-06: format and combining marks attach
-u\u200bser@example.com ‖ !EMAIL¦ser@example.com
+u\u200bser@example.com ‖ !EMAIL¦u\u200Bser@example.com
 user@example.com\u200b ‖ !EMAIL¦user@example.com\u200b
 https://example.com/\u200bx ‖ !URL¦https://example.com/\u200bx
 https://example.com\u0301 ‖ !URL¦https://example.com\u0301
@@ -110,5 +110,4 @@ Tel:\u00a001632 960123 ‖ PHONE¦01632 960123¦01632960123
 
 # Verification fixes 2026-11-26 (EE-04): a mark before an address is covered by its abstention
 \u200Buser@example.com ‖ !EMAIL¦\u200Buser@example.com
-u\u200Bser@example.com ‖ !EMAIL¦u\u200Bser@example.com
 ref\u200BTel: 01632 960123 ‖ -

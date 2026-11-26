@@ -138,7 +138,7 @@ Paid 03/04/2026 €5 ‖ DATE¦03/04/2026¦2026-03-04 | 2026-04-03 ‖ MONEY¦�
 # E-01: ASCII-space groups keep every printed zero
 €5 000 ‖ MONEY¦€5 000¦5 EUR | 5000 EUR
 1 000 € ‖ MONEY¦1 000 €¦1 EUR | 1000 EUR
-12 005 € ‖ MONEY¦12 005 €¦5 EUR | 12005 EUR
+12 005 € ‖ MONEY¦12 005 €¦12 EUR | 12005 EUR
 1 000 000 € ‖ MONEY¦1 000 000 €¦1 EUR | 1000000 EUR
 €1 050 ‖ MONEY¦€1 050¦1 EUR | 1050 EUR
 € 1 000 ‖ MONEY¦€ 1 000¦1 EUR | 1000 EUR
@@ -239,7 +239,6 @@ between 10 and 20 € ‖ !MONEY¦10 and 20 €
 \u2212-€5 ‖ !MONEY¦\u2212-€5
 # EE-06: zero-led groups; the first group stands in for a zero-led adjacent group
 €5 000 ‖ MONEY¦€5 000¦5 EUR | 5000 EUR
-12 005 € ‖ MONEY¦12 005 €¦12 EUR | 12005 EUR
 €0 001 ‖ !MONEY¦€0 001
 € 001 000 ‖ !MONEY¦€ 001 000
 0 500 € ‖ !MONEY¦0 500 €

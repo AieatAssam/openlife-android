@@ -154,6 +154,9 @@ internal object TimeZones {
     private const val MAX_ANNOTATION = 32
     private val NOT_ZONES = setOf("TO", "TILL", "UNTIL", "AND", "OR", "AT", "ON")
 
+    /** Zone words in any case (ruling 2026-11-26: military `Zulu`, as `Z`). */
+    private const val ZULU = "zulu"
+
     /** The end of a zone token after [end] and at most 4 space separators or tabs, or null (finding E-08). */
     fun after(line: LineScan, end: Int): Int? {
         val gap = line.spaceRun(end)
@@ -162,6 +165,7 @@ internal object TimeZones {
         val char = line.ch(at)
         return when {
             char == 'Z' && line.boundaryAfter(at + 1) -> at + 1
+            line.matchesIgnoreCase(at, ZULU) && line.boundaryAfter(at + ZULU.length) -> at + ZULU.length
             LineScan.isOffsetSign(char) -> offset(line, at)
             LineScan.isAsciiUpper(char) -> letters(line, at)
             char == '(' -> annotation(line, at)

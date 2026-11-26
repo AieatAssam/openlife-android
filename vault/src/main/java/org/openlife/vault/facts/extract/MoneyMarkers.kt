@@ -1,7 +1,17 @@
 package org.openlife.vault.facts.extract
 
-/** A symbol (§5.3) or an uppercase ISO 4217 code at `[start, end)`. */
-internal data class Marker(val start: Int, val end: Int, val symbol: String?, val code: String?)
+/**
+ * A symbol (§5.3) or an uppercase ISO 4217 code at `[start, end)`. A
+ * [pair] (`EUR/USD`) is recognised so that the amount beside it abstains;
+ * it names no currency.
+ */
+internal data class Marker(
+    val start: Int,
+    val end: Int,
+    val symbol: String?,
+    val code: String?,
+    val pair: Boolean = false,
+)
 
 /** A dense number: ASCII digits with single inner separators (§5.2), at `[start, end)`. */
 internal data class Dense(val start: Int, val end: Int, val text: String) {
@@ -54,9 +64,52 @@ internal object MoneyMarkers {
         val end = line.asciiWordEnd(start, CODE_LENGTH)
         if (line.letterAt(end)) return null
         val word = line.text.substring(start, end)
+        val pairEnd = if (isCode(word)) CurrencyPairs.endAfter(line.text, end) else null
         return when {
             word == KR -> Marker(start, end, KR, null)
+            pairEnd != null -> Marker(start, pairEnd, null, null, pair = true)
             isCode(word) -> Marker(start, end, null, word)
+            else -> null
+        }
+    }
+
+    /**
+     * A marker no number owns within one space separator of the run
+     * `[start, end)`: a marker with a digit on its far side marks that
+     * number instead (`12.00 € +1 555 123 4567`). Constant window
+     * (finding EE-01).
+     */
+    fun freeBeside(line: LineScan, start: Int, end: Int): Boolean {
+        val before = markerEndingAt(line, if (LineScan.isSpace(line.ch(start - 1))) start - 1 else start)
+        val after = markerStartingAt(line, if (LineScan.isSpace(line.ch(end))) end + 1 else end)
+        return before?.takeIf { !digitNear(line, it.start - 1, -1) } != null ||
+            after?.takeIf { !digitNear(line, it.end, 1) } != null
+    }
+
+    private fun digitNear(line: LineScan, at: Int, step: Int): Boolean {
+        val spaced = LineScan.isSpace(line.ch(at)) && LineScan.isAsciiDigit(line.ch(at + step))
+        return LineScan.isAsciiDigit(line.ch(at)) || spaced
+    }
+
+    private fun markerStartingAt(line: LineScan, at: Int): Marker? {
+        val char = line.ch(at)
+        val dollarAt = if (LineScan.isAsciiLetter(char)) line.asciiWordEnd(at, 2) else at
+        return when {
+            line.ch(dollarAt) == '$' -> dollar(line, dollarAt)?.takeIf { it.start == at }
+            char in SYMBOL_CHARS -> Marker(at, at + 1, char.toString(), null)
+            LineScan.isAsciiLetter(char) && !line.letterBefore(at) -> word(line, at)
+            else -> null
+        }
+    }
+
+    private fun markerEndingAt(line: LineScan, end: Int): Marker? {
+        val char = line.ch(end - 1)
+        var start = end
+        while (end - start < CODE_LENGTH && LineScan.isAsciiLetter(line.ch(start - 1))) start--
+        return when {
+            char == '$' -> dollar(line, end - 1)
+            char in SYMBOL_CHARS -> Marker(end - 1, end, char.toString(), null)
+            start < end && !line.letterBefore(start) -> word(line, start)?.takeIf { it.end == end }
             else -> null
         }
     }

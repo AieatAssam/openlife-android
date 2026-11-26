@@ -71,9 +71,10 @@ class ExtractorPropertyTest {
             val expected = positive.kind == ExtractedKind.MONEY || readsBeside(positive.kind, left, right)
             if (found) reads++
             if (found != expected) failures += "<$line> found=$found"
+            val touching = positive.kind != ExtractedKind.MONEY
             val marks = listOfNotNull(
-                (before.length - 1).takeIf { left == MARK && positive.kind != ExtractedKind.PHONE },
-                (before.length + positive.text.length).takeIf { right == MARK && positive.kind != ExtractedKind.MONEY },
+                (before.length - 1).takeIf { touching && left == MARK && positive.kind != ExtractedKind.PHONE },
+                (before.length + positive.text.length).takeIf { touching && right == MARK },
             )
             val uncovered = marks.filterNot { at -> result.abstentions.any { at in it.startOffset until it.endOffset } }
             if (uncovered.isNotEmpty()) failures += "<$line> mark at $uncovered not covered by an abstention"
