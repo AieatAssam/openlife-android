@@ -251,9 +251,18 @@ This is the search and comparison text. It never depends on locale.
 - **When parts are ambiguous.** If either part is ambiguous, the date and
   the time are emitted as separate facts with their own candidates. No
   cross-product of DATETIME candidates is formed.
-- **Zone designators.** These are `Z`, `±HH:MM`, `±HHMM`, `UTC`, `GMT`,
-  `UTC±…`, or a run of 2 to 5 capital letters immediately after the time.
-  A date-time or time followed by one emits nothing for that date-time or
+- **Zone designators.** An `am`/`pm` marker (any case, with or without
+  dots) is consumed by the time rule first and is never a zone. A zone
+  designator is then exactly one of these tokens immediately after the
+  time (optionally after one space): `Z`; `±HH:MM` or `±HHMM`; `UTC` or
+  `GMT`, alone or followed by `±H[H][:MM]`; or one of `CET`, `CEST`, `EET`,
+  `EEST`, `WET`, `WEST`, `BST`, `IST`, `EST`, `EDT`, `CST`, `CDT`, `MST`,
+  `MDT`, `PST`, `PDT`, `AKST`, `AKDT`, `HST`, `AEST`, `AEDT`, `ACST`,
+  `AWST`, `NZST`, `NZDT`, `JST`, `KST`, `SGT`, `HKT`. Any other word after
+  a time (`TO` in `10:30 TO 11:30`, `HRS`) is not a zone and does not stop
+  the time from being read; `10:30 TO 11:30` is read as a range only when
+  joined by `–` or `-`, so with `TO` it yields two separate times. A
+  date-time or time followed by one emits nothing for that date-time or
   time; the date alone is still emitted when it is a separate token. A
   zone is never stored, and the device zone is never attached. The
   `timezone` column stays NULL in C2.
