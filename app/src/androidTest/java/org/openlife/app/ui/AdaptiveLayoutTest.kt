@@ -29,6 +29,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.app.navigation.OpenLifeNavHost
 import org.openlife.app.navigation.Routes
+import org.openlife.app.settings.AboutScreen
 import org.openlife.app.test.FakeAppContainer
 import org.openlife.app.test.StrictModeRule
 import org.openlife.app.ui.theme.OpenLifeTheme

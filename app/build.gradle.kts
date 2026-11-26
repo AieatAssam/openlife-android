@@ -38,6 +38,59 @@ val releaseSigningEnvironmentNames = listOf(
 val openLifeVersionName = rootProject.extensions.extraProperties["openLifeVersionName"] as String
 val openLifeVersionCode = rootProject.extensions.extraProperties["openLifeVersionCode"] as Int
 
+// P1-08-R2: the source revision shown in About. `git describe` output, or
+// "unknown" when git or the repository is unavailable; never fails the build.
+// P5-03 pins it to the release tag for reproducible builds.
+val openLifeGitCommit: String = providers.exec {
+    commandLine("git", "describe", "--tags", "--always", "--dirty")
+    workingDir = rootProject.projectDir
+    isIgnoreExitValue = true
+}.let { describe ->
+    runCatching {
+        if (describe.result.get().exitValue == 0) describe.standardOutput.asText.get().trim() else ""
+    }.getOrDefault("")
+}.takeIf { Regex("[\\w.+-]+").matches(it) } ?: "unknown"
+
+/**
+ * P1-08-R2: About shows the repository's own privacy policy and licence
+ * report. They are copied (never hand-kept) into a generated raw resource
+ * directory; Gradle's input/output check keeps the copy current.
+ */
+abstract class BundleOfflineDocuments : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val licenceReport: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val privacyPolicy: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val raw = outputDirectory.get().dir("raw").asFile
+        raw.deleteRecursively()
+        raw.mkdirs()
+        licenceReport.get().asFile.copyTo(raw.resolve("third_party_licenses.md"))
+        privacyPolicy.get().asFile.copyTo(raw.resolve("privacy_policy.md"))
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val bundle = tasks.register<BundleOfflineDocuments>("bundle${variant.name.replaceFirstChar(Char::uppercase)}OfflineDocuments") {
+            licenceReport.set(rootProject.layout.projectDirectory.file("docs/generated/THIRD_PARTY_LICENSES.md"))
+            privacyPolicy.set(rootProject.layout.projectDirectory.file("docs/PRIVACY_POLICY.md"))
+            // Copies the committed report; when the same build refreshes it, copy the refreshed one.
+            mustRunAfter("generateLicenseReport")
+        }
+        // AGP sets the output directory and runs the task before resources are merged.
+        variant.sources.res?.addGeneratedSourceDirectory(bundle, BundleOfflineDocuments::outputDirectory)
+    }
+}
+
 tasks.withType<CyclonedxAggregateTask>().configureEach {
     jsonOutput.set(layout.buildDirectory.file("reports/bom/bom.json"))
     xmlOutput.unsetConvention()
@@ -107,6 +160,8 @@ android {
             // shipped. Later native additions (P8-01) build for this set.
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        buildConfigField("String", "GIT_COMMIT", "\"$openLifeGitCommit\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["profileInstallerReceiverClass"] =

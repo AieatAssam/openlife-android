@@ -31,7 +31,8 @@ class VaultSecurityInfoTest {
         api31.forEach { (level, expected) ->
             // On API 31+ the level decides; the deprecated flag cannot upgrade or downgrade it.
             listOf(true, false).forEach { inside ->
-                assertEquals("level $level", expected, VaultSecurityInfo.levelOf(WrappingKeyReport.Reported(level, inside)))
+                val report = WrappingKeyReport.Reported(level, inside)
+                assertEquals("level $level", expected, VaultSecurityInfo.levelOf(report))
             }
         }
         // API 29-30: only isInsideSecureHardware exists, which does not say TEE or StrongBox.
@@ -61,10 +62,12 @@ class VaultSecurityInfoTest {
             KeySecurityLevel.NOT_REPORTED to R.string.vault_key_level_not_reported,
             KeySecurityLevel.NO_KEY to R.string.vault_key_level_no_key,
         )
-        KeySecurityLevel.entries.forEach { level -> assertEquals(level.name, labels[level], VaultSecurityInfo.label(level)) }
+        KeySecurityLevel.entries.forEach { level ->
+            assertEquals(level.name, labels[level], VaultSecurityInfo.label(level))
+        }
     }
 
-    /** The copy itself: no label says "hardware-backed", and only hardware levels mention secure hardware positively. */
+    /** The copy: no label says "hardware-backed"; only hardware levels mention secure hardware positively. */
     @Test
     fun labelTextNeverOverclaims() {
         val strings = Files.readString(projectDir.resolve("app/src/main/res/values/strings.xml"))

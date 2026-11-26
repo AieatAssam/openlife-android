@@ -15,6 +15,7 @@ import org.openlife.app.intake.InternalLinks
 import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.LockAvailability
 import org.openlife.app.settings.AboutPort
+import org.openlife.app.settings.AppAboutPort
 import org.openlife.app.ui.OcrBackend
 import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SampledBitmapDecoder
@@ -122,7 +123,7 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
         override suspend fun verifyAll(): VerifyReport? = app.verifyAllItems()
     }
 
-    override val about: AboutPort get() = TODO("P1-08 RED")
+    override val about: AboutPort = AppAboutPort(app)
 
     override fun registerPreReset(callback: () -> Unit): () -> Unit = app.registerPreResetCallback(callback)
 

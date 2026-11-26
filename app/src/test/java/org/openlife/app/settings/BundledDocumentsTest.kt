@@ -13,7 +13,7 @@ import java.nio.file.Path
  */
 class BundledDocumentsTest {
     private val projectDir = Path.of(System.getProperty("openlife.projectDir", "."))
-    private val generatedRaw = projectDir.resolve("app/build/generated/openlife/bundledDocuments/raw")
+    private val generated = projectDir.resolve("app/build/generated")
 
     @Test
     fun packagedCopiesEqualTheirRepositorySources() {
@@ -21,13 +21,24 @@ class BundledDocumentsTest {
             "third_party_licenses.md" to "docs/generated/THIRD_PARTY_LICENSES.md",
             "privacy_policy.md" to "docs/PRIVACY_POLICY.md",
         ).forEach { (packaged, source) ->
-            val copy = generatedRaw.resolve(packaged)
-            assertTrue("$packaged is not generated", Files.isRegularFile(copy))
-            assertArrayEquals(packaged, Files.readAllBytes(projectDir.resolve(source)), Files.readAllBytes(copy))
+            // One generated raw resource per variant (the variant API chooses the directory).
+            val copies = generatedRawFiles(packaged)
+            assertTrue("$packaged is not generated", copies.isNotEmpty())
+            copies.forEach { copy ->
+                assertArrayEquals("$copy", Files.readAllBytes(projectDir.resolve(source)), Files.readAllBytes(copy))
+            }
         }
         val committedCopies = listOf("third_party_licenses.md", "privacy_policy.md")
             .filter { Files.exists(projectDir.resolve("app/src/main/res/raw").resolve(it)) }
         assertTrue("hand-kept copies drift: $committedCopies", committedCopies.isEmpty())
+    }
+
+    private fun generatedRawFiles(name: String): List<Path> = if (!Files.isDirectory(generated)) {
+        emptyList()
+    } else {
+        Files.walk(generated).use { paths ->
+            paths.filter { it.fileName.toString() == name && it.parent.fileName.toString() == "raw" }.toList()
+        }
     }
 
     @Test

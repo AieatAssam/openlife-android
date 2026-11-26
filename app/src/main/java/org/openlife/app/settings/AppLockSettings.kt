@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.lock.AppLockPolicy
@@ -60,7 +62,7 @@ fun AppLockSettingsSection(settings: AppLockSettings) {
             Text(
                 stringResource(R.string.app_lock_title),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).semantics { heading() },
             )
             Switch(checked = policy.enabled, onCheckedChange = null)
         }

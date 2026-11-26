@@ -22,6 +22,7 @@ class SigningFingerprintTest {
         )
         val shape = Regex("""([0-9A-F]{2}:){31}[0-9A-F]{2}""")
         val documented = shape.find(readme)?.value ?: error("README has no SHA-256 fingerprint")
-        assertEquals(documented, SigningFingerprint.format(documented.split(':').map { it.toInt(16).toByte() }.toByteArray()))
+        val bytes = documented.split(':').map { it.toInt(16).toByte() }.toByteArray()
+        assertEquals(documented, SigningFingerprint.format(bytes))
     }
 }

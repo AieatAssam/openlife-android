@@ -48,6 +48,11 @@ class SourceViewRepository(
     fun observeVisibleSource(sourceId: UUID): Flow<Source?> =
         database.sourceDao().observeVisibleSource(sourceId.toString()).map { it?.toDomain() }
 
+    /** P1-08-R4: how many sources are in each state, every state included; counts only. */
+    suspend fun countSourcesByState(): Map<SourceState, Int> = withContext(ioDispatcher) {
+        database.sourceDao().findAll().groupingBy { it.toDomain().state }.eachCount()
+    }
+
     suspend fun findSource(sourceId: UUID): Source? = database.sourceDao().findById(sourceId.toString())?.toDomain()
 
     /**

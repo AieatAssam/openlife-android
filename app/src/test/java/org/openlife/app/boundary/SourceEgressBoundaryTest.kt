@@ -77,7 +77,12 @@ class SourceEgressBoundaryTest {
             ?: activityViolation(file, line, location)
             ?: selectableTextViolation(line, location)
             ?: shareViolation(line, location)
+            ?: linkViolation(line, location)
     }
+
+    /** P1-08-R5: no link or URI handler, HTML link parsing, Linkify or custom tab anywhere in shipped code. */
+    private fun linkViolation(line: String, location: String): String? =
+        if (LINK_OPENING.containsMatchIn(line)) "$location: link-opening API" else null
 
     /** Review U-02: platform text views (AndroidView-hosted) and SelectionContainer can copy shown text. */
     private fun selectableTextViolation(line: String, location: String): String? =
@@ -370,6 +375,10 @@ class SourceEgressBoundaryTest {
         val SELECTABLE_TEXT = Regex(
             """\b(EditText|TextView|AppCompatEditText|AppCompatTextView|TextInputEditText|SelectionContainer)\b|""" +
                 """TextIsSelectable|textIsSelectable""",
+        )
+        val LINK_OPENING = Regex(
+            """\b(LocalUriHandler|UriHandler|openUri|LinkAnnotation|UrlAnnotation|fromHtml|Linkify|launchUrl)\b|""" +
+                """\bCustomTabs\w*|\bautoLink\w*""",
         )
         val SHARE_OR_EXPORT = Regex("""\bShareCompat\b|\bCreateDocument\b|ACTION_CREATE_DOCUMENT|\bcreateChooser\b""")
         val BARE_OUTPUT = Regex(

@@ -53,7 +53,8 @@ class DiagnosticsCountsTest {
         assertEquals(listOf(1, 12, 1, 2, 3, 4, 5, 6), recovery.map { it.count })
 
         val failures = rows.filter { it.group == DiagnosticGroup.VAULT_OPEN_FAILURES }
-        assertEquals(listOf(DiagnosticRow(DiagnosticGroup.VAULT_OPEN_FAILURES, VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE, 2)), failures)
+        val keystore = VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE
+        assertEquals(listOf(DiagnosticRow(DiagnosticGroup.VAULT_OPEN_FAILURES, keystore, 2)), failures)
 
         // A vault that is not open has no item or recovery counts, only failures.
         val closed = DiagnosticsCounts(null, null, emptyMap()).rows()
