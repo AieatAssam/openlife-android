@@ -25,6 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.openlife.app.test.StrictModeRule
+import org.openlife.app.settings.AboutScreen
 import org.openlife.app.settings.SettingsScreen
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat

@@ -1,6 +1,7 @@
 package org.openlife.app.dependencies
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -97,6 +98,35 @@ class DependencyBoundaryTest {
         assertTrue("dependencies without an allowlisted licence: $unknown", unknown.isEmpty())
     }
 
+    /**
+     * P1-08 review K-06: About shows docs/generated/THIRD_PARTY_LICENSES.md as
+     * the app's licences, so it must name exactly the release runtime
+     * classpath (project modules, version "unspecified", aside). Regenerate it
+     * with `./gradlew :app:generateLicenseReport` when this fails.
+     */
+    @Test
+    fun licenceReportListsExactlyTheReleaseRuntimeClasspath() {
+        assertTrue("release classpath report is missing: $classpathFile", Files.isRegularFile(classpathFile))
+        val classpath = Files.readAllLines(classpathFile)
+            .map(String::trim)
+            .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("denylist-path:") }
+            .filterNot { it.endsWith(":unspecified") }
+            .toSet()
+        val report = Files.readAllLines(licenseReport)
+            .mapNotNull { line -> REPORT_ROW.find(line)?.groupValues?.drop(1)?.joinToString(":") }
+            .toSet()
+        assertTrue("classpath report has no coordinates", classpath.isNotEmpty())
+        assertEquals(emptyList<String>(), licenceDrift(classpath, report))
+
+        // Recorded mutations: a new dependency without a report row, and a row for one no longer shipped.
+        assertFalse(licenceDrift(classpath + "org.example:new-library:1.0", report).isEmpty())
+        assertFalse(licenceDrift(classpath, report + "org.example:removed-library:1.0").isEmpty())
+    }
+
+    private fun licenceDrift(classpath: Set<String>, report: Set<String>): List<String> =
+        (classpath - report).sorted().map { "shipped but not in the licence report: $it" } +
+            (report - classpath).sorted().map { "in the licence report but not shipped: $it" }
+
     private fun policyDocument(): List<String> {
         val resource = checkNotNull(javaClass.getResourceAsStream("/dependency-policy.md")) {
             "dependency policy test resource is missing"
@@ -122,5 +152,11 @@ class DependencyBoundaryTest {
             .map(String::trim)
             .filter(String::isNotEmpty)
             .toSet()
+    }
+
+    private companion object {
+        val REPORT_ROW = Regex(
+            "\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`",
+        )
     }
 }

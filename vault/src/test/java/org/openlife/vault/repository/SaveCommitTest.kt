@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.storage.SourceDao
 import org.openlife.vault.storage.SourceEntity
+import org.openlife.vault.storage.StateCount
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -82,6 +83,8 @@ class SaveCommitTest {
         override fun observeVisibleSources(): Flow<List<SourceEntity>> = unused()
 
         override fun observeVisibleSource(id: String): Flow<SourceEntity?> = unused()
+
+        override suspend fun countByState(): List<StateCount> = unused()
 
         private fun unused(): Nothing = throw AssertionError("not used by the commit")
     }

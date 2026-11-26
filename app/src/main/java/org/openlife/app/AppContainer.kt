@@ -14,6 +14,8 @@ import kotlinx.coroutines.withContext
 import org.openlife.app.intake.InternalLinks
 import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.LockAvailability
+import org.openlife.app.settings.AboutPort
+import org.openlife.app.settings.AppAboutPort
 import org.openlife.app.ui.OcrBackend
 import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SampledBitmapDecoder
@@ -30,6 +32,7 @@ import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.DeleteResult
 import org.openlife.vault.repository.ReadyReadResult
+import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
 import org.openlife.vault.repository.VerifyReport
 import org.openlife.vault.search.SearchHit
@@ -48,6 +51,9 @@ interface AppContainer {
     val scrubber: ContentScrubber
     val internalLinks: InternalLinks
     val settings: SettingsPort
+
+    /** P1-08: build identity, vault security details, diagnostics counts and bundled documents. */
+    val about: AboutPort
 
     /** Runs [callback] before a vault reset; returns the call that unregisters it. */
     fun registerPreReset(callback: () -> Unit): () -> Unit
@@ -85,7 +91,8 @@ interface SettingsPort {
 
     fun updateLockPolicy(policy: AppLockPolicy)
 
-    suspend fun resetVault(): VaultResetResult
+    /** Requires the user's [ResetConfirmation] (P1-08 review); there is no unconfirmed reset. */
+    suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult
 
     suspend fun verifyAll(): VerifyReport?
 }
@@ -113,10 +120,13 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
 
         override fun updateLockPolicy(policy: AppLockPolicy) = app.appLock.updatePolicy(policy)
 
-        override suspend fun resetVault(): VaultResetResult = app.resetVault()
+        override suspend fun resetVault(confirmation: ResetConfirmation): VaultResetResult =
+            app.resetVault(confirmation)
 
         override suspend fun verifyAll(): VerifyReport? = app.verifyAllItems()
     }
+
+    override val about: AboutPort = AppAboutPort(app)
 
     override fun registerPreReset(callback: () -> Unit): () -> Unit = app.registerPreResetCallback(callback)
 
@@ -209,7 +219,11 @@ private class VaultSourceStore(private val app: OpenLifeApp, private val scope: 
 
     override suspend fun retryVault() = app.retryVault()
 
-    override suspend fun finishVaultReset(): Boolean = app.resetVault() == VaultResetResult.COMPLETED
+    /** Finishes a reset the user confirmed earlier, only while its marker is still on disk (P1-06-R5). */
+    override suspend fun finishVaultReset(): Boolean {
+        val confirmation = ResetConfirmation.ofIncompleteReset(app.paths.resetMarkerFile) ?: return false
+        return app.resetVault(confirmation) == VaultResetResult.COMPLETED
+    }
 
     override suspend fun cleanAbandonedStages() {
         app.importHousekeeping.cleanAbandonedStages()
