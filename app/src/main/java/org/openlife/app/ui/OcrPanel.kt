@@ -204,10 +204,12 @@ private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
                 .then(
                     if (selectable) {
-                        Modifier.clickable(onClickLabel = selectLabel, role = Role.Button) { actions.onSelect(span) }
+                        // Only a row that can be selected is a target, so only it needs the 48 dp minimum.
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .clickable(onClickLabel = selectLabel, role = Role.Button) { actions.onSelect(span) }
                     } else {
                         Modifier
                     },

@@ -15,6 +15,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -169,9 +170,13 @@ private class EvidenceView(
         }
     }
 
-    /** An accessibility action that zooms to [target], the equivalent of a pinch (P1-10). */
-    fun zoomAction(label: String, target: Float) = CustomAccessibilityAction(label) {
-        zoomTo(target)
+    /**
+     * An accessibility action that zooms to the step [step] computes from the zoom at the moment
+     * the action runs, the equivalent of a pinch (P1-10). Reading the zoom here, not while
+     * composing, keeps pinch frames from rebuilding the action list.
+     */
+    fun zoomAction(label: String, step: (Float) -> Float) = CustomAccessibilityAction(label) {
+        zoomTo(step(zoom.floatValue))
         true
     }
 
@@ -336,9 +341,14 @@ private fun Modifier.placeAt(box: IntRect): Modifier = layout { measurable, cons
 @Composable
 private fun PlacedImage(bitmap: Bitmap, box: IntRect, view: EvidenceView) {
     if (box.width <= 0 || box.height <= 0) return
-    // P1-10: pinch and double tap have TalkBack and switch-access equivalents.
-    val zoom = view.zoom.floatValue
-    val zoomState = stringResource(R.string.viewer_zoom_state, (zoom * PERCENT).roundToInt())
+    // P1-10: pinch and double tap have TalkBack and switch-access equivalents. The zoom is read
+    // through derived state, so a pinch frame recomposes only when the rounded percent or a bound changes.
+    val zoomPercent by remember(view.zoom) {
+        derivedStateOf { (view.zoom.floatValue * PERCENT).roundToInt() }
+    }
+    val canZoomIn by remember(view.zoom) { derivedStateOf { view.zoom.floatValue < EvidenceGeometry.MAX_ZOOM } }
+    val canZoomOut by remember(view.zoom) { derivedStateOf { view.zoom.floatValue > EvidenceGeometry.MIN_ZOOM } }
+    val zoomState = stringResource(R.string.viewer_zoom_state, zoomPercent)
     val zoomIn = stringResource(R.string.viewer_zoom_in)
     val zoomOut = stringResource(R.string.viewer_zoom_out)
     val zoomReset = stringResource(R.string.viewer_zoom_reset)
@@ -351,12 +361,10 @@ private fun PlacedImage(bitmap: Bitmap, box: IntRect, view: EvidenceView) {
             .semantics {
                 stateDescription = zoomState
                 customActions = buildList {
-                    if (zoom < EvidenceGeometry.MAX_ZOOM) {
-                        add(view.zoomAction(zoomIn, EvidenceGeometry.zoomInStep(zoom)))
-                    }
-                    if (zoom > EvidenceGeometry.MIN_ZOOM) {
-                        add(view.zoomAction(zoomOut, EvidenceGeometry.zoomOutStep(zoom)))
-                        add(view.zoomAction(zoomReset, EvidenceGeometry.MIN_ZOOM))
+                    if (canZoomIn) add(view.zoomAction(zoomIn) { EvidenceGeometry.zoomInStep(it) })
+                    if (canZoomOut) {
+                        add(view.zoomAction(zoomOut) { EvidenceGeometry.zoomOutStep(it) })
+                        add(view.zoomAction(zoomReset) { EvidenceGeometry.MIN_ZOOM })
                     }
                 }
             },
@@ -375,6 +383,7 @@ private fun RegionNode(
 ) {
     if (box.width <= 0 || box.height <= 0) return
     val preview = evidenceSpanPreview(span.text)
+    val selectLabel = stringResource(R.string.viewer_select_text_action)
     val rejectedDescription = stringResource(R.string.viewer_region_rejected_description, preview)
     Box(
         Modifier
@@ -389,7 +398,7 @@ private fun RegionNode(
                     contentDescription = preview
                     // The highlight fill is not the only cue: TalkBack says "selected" (P1-10).
                     this.selected = selected
-                    onClick(label = preview) {
+                    onClick(label = selectLabel) {
                         onSelect()
                         true
                     }
