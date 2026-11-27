@@ -6,6 +6,7 @@ import android.view.inspector.WindowInspector
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -54,6 +55,7 @@ class SecureWindowUiTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = android.os.Build.VERSION_CODES.Q)
     fun everyContentWindowAndDialogIsSecure() {
         org.junit.Assume.assumeTrue(
             "WindowInspector needs API 29; this device is API ${android.os.Build.VERSION.SDK_INT}",
@@ -80,6 +82,7 @@ class SecureWindowUiTest {
         }
     }
 
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.Q)
     private fun assertAllWindowsSecure(where: String, expectedAtLeast: Int) {
         instrumentation.waitForIdleSync()
         var views: List<View> = emptyList()
