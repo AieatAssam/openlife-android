@@ -152,7 +152,7 @@ ADR-0008 amendment:
 
 | Finding | Amendment | Fixed behaviour (fixture examples) |
 | --- | --- | --- |
-| E-01 | A-1 | `€5 000` gives `5 \| 5000 EUR`; `1 000 €` gives `0 \| 1000 EUR` |
+| E-01 | A-1 | `€5 000` gives `5 \| 5000 EUR`; `1 000 €` gave `0 \| 1000 EUR`, since EE-06 `1 \| 1000 EUR` |
 | E-02 | A-2 | `14:30:00.000Z`, `UTC+05:30`, `14:30 GMT+01:00` abstain or give nothing |
 | E-03 | A-3 | `Thu 03/04/26` abstains (was a single date) |
 | E-04 | A-4 | `−€5.00`, `- €5`, `( €5.00 )`, `EUR -33.10` abstain `SIGN_OR_CREDIT`; `USD -33.10` on the next span does not resolve `$5` (money.tsv row 184) |
@@ -160,7 +160,7 @@ ADR-0008 amendment:
 | E-06 | A-6 | a zero-width or combining mark inside or beside a token abstains it |
 | E-07 | A-7 | `€10–€20`, `€10 to €20`, `between €10 and €20` abstain as one range |
 | E-08 | A-8 | tab, U+2009, U+202F, U+00A0 gaps behave like spaces, up to 4 |
-| E-09 | A-9 | `+1 555 123 4567 USD` is a phone; `+12.345.678` and `+1234567.89` abstain; `1.2.33` stays a date candidate (residual) |
+| E-09 | A-9 | `+1 555 123 4567 USD` was a phone (since EE-01 it abstains); `+12.345.678` and `+1234567.89` abstain; `1.2.33` stays a date candidate (residual) |
 | E-10 | A-10 | `xn--` and `-`-edged email labels rejected; `_` after a domain abstains; `€0.500` abstains; `2:30 PM` reads its marker; `RULES_VERSION` asserted equal to the joined rule constants |
 
 Two RED fixtures were corrected during GREEN: `14:30 GMT+1` now abstains
@@ -199,3 +199,80 @@ app 189 (main's own growth since the first gate), eval 26; 0 failures,
 10x: digit-space 8.1, label-run 10.6, at 8.4, groups 6.9, months 7.2,
 time-ann 9.8, url-many 11.3 (limit 20). `scripts/plan-check.sh`: steps=82
 errors=0. `bash scripts/tests/run.sh`, run alone: 51 passed, 0 failed.
+
+## Verification fixes (2026-11-26, EE-01 to EE-06)
+
+The coordinator's verification pass found E-01 to E-05, E-08 and E-10
+resolved and six findings still open. RED fixtures (4c2ccab: kotlinc 34
+tests, 6 failing), then the fix (d708095), then these documents.
+
+| Finding | Amendment | Fixed behaviour (fixture examples) |
+| --- | --- | --- |
+| EE-01 | A-9 (a) | a `+`-led run of 7–15 digits with a free currency marker within one space separator either side abstains PHONE `AMBIGUOUS_FORM`: `+1234567 EUR`, `+1234567 €`, `€ +1234567`, `Balance: +1234567 GBP`, `Gain +2500000 JPY`, `+1 234 567 EUR`, `+1 555 123 4567 USD`. `+123456 EUR` and `+5 €` stay money; `Call +44 20 7946 0018 €5` keeps both |
+| EE-02 | A-12 | a space-grouped amount ending in a fraction abstains whole, prefix and suffix: `€5 000.00`/`5 000.00 €`, `$1 234.56`, `CHF 1 234.50`, `€12 345,67`, `€1 000 000.50`, U+2009 and tab variants |
+| EE-03 | A-7 | `10 and 20 €`, `between 10 and 20 €`, `-€5 to -€10`, `€-5 - €-10`, `€10 and €20 and €30`, `€10-€20-€30` abstain as one range; `€10 and 20` stays `10 EUR` |
+| EE-04 | A-6 | `\u200E2026-09-16`, `\u200F14:30`, `€\u200D5`, `2026\u200B-09-16` abstain over the mark (no kind when no abstention is touched); the ZWSP email abstention now starts at the mark. Emoji ZWJ sequences beside an amount are left alone |
+| EE-05 | A-4 | `--€5`, `±€5`, `−-€5` abstain `SIGN_OR_CREDIT` |
+| EE-06 | A-12 | `€5 000` `5 \| 5000`; `1 000 €` `1 \| 1000`; `12 005 €` `12 \| 12005`; `1 000 000 €` `1 \| 1000000`; `€0 001`, `0 500 €`, `€ 001 000` abstain |
+| rulings | A-13 | `14:30 Zulu`/`zulu` abstain; `EUR/USD 1.08`, `1.08 EUR/USD`, `EUR / USD 1.08` abstain and a pair is not context (`$5` then `EUR/USD` gives `5 $`); `€5.00 Cr`, `dr`, U+00A0 `CR`, tab `Dr` abstain; `€5.00 Credit` stays `5.00 EUR` |
+
+Fixture corrections during GREEN: the existing `12 005 €` row took the
+new first-group reading (its duplicate was dropped), the old
+`u\u200Bser@example.com` row's expectation was replaced by the wider
+abstention, and the noise property test no longer expects a mark beside a
+fenced money positive (the fence `;` is what touches the mark).
+
+Tests added: `knownPositivesSurviveSurroundingNoise` now fences only the
+money positive and lets the other kinds touch space separators, marks and
+dashes; `spaceSeparatorsBesideTokensStillRead` asserts NBSP, tab, U+2009
+and U+202F beside each kind still read; `everyExtractedKindIsAFactKind`
+compares the enum names with `org.openlife.vault.facts.FactKind`
+(mutation: adding an `ADDRESS` entry fails it); `scannerReadsGrowLinearly`
+counts `LineScan.ch`/`raw` reads, which are exactly linear today (for
+example digit-space 209,999 to 2,099,999 at 10x), and the linearity
+inputs gained `range-chain` and `mark-led`.
+
+The work counter is deterministic but sees only reads through `LineScan`.
+A mutation that loops through `ch()` every 64 characters fails it (and
+the timing test). The original mutation, an O(n) `text.indexOf` every 64
+characters, bypasses the counter; only the timing test sees it, at ratio
+21.0 and 41.8 in two kotlinc runs against the limit of 20. **The every-64
+`indexOf` mutation is therefore not reliably caught**: the first run
+passed the limit by 1.0.
+
+Reviewer corpus re-run (`cases.txt` to `cases7.txt`, compared with the
+previous outputs): 67 inputs changed, and none gained a definite value
+(checked by script: no new output line without `|`). Classified:
+- now abstained, previously a definite value: EE-01 (`+1234567 EUR` and
+  its variants, `+44 20 7946 0018 USD` and `+1 555 123 4567 USD` phones
+  are now recall losses), EE-02 prefix fractions (were truncated to the
+  first group), EE-03 ranges (were the last amount), EE-05 signs,
+  `EUR/USD 1.08`, `€5.00 Cr`/`cr`, `14:30 Zulu`, `+1,234,567 USD` and
+  `Balance +1234567.89 EUR` (were money, now PHONE abstentions);
+- abstention widened only (same outcome): `GBP/USD 1.2345`, the ZWSP
+  email, `-−€5`, `€10–€20–€30` style chains;
+- newly abstained where nothing was emitted: leading marks
+  (`\u200E2026-09-16`, `\u202E…`, `\u200F14:30`, `€\u200D5`, `€\u03015`,
+  `2026\u200B-09-16`, `5\u20E3 €`);
+- clarification sets changed (still clarifications): `1 000 €`,
+  `1 000 000 €`, `100 000 €` (`0` became the first group), `12 005 €`
+  (`5` became `12`);
+- clarification now abstained: `€0 001`, `€ 001 000`, `0 000 €`,
+  `00 000 €`.
+
+Residuals kept: `14:30 +1` gives `14:30`; `Coffee – €3.50` gives nothing;
+`9:00 Eastern` reads `9:00`.
+
+Gate on d708095, 2026-11-27 (`./gradlew detekt lint :app:test :vault:test
+assembleDebug :vault:compileDebugAndroidTestKotlin
+:app:compileDebugAndroidTestKotlin :eval:test`, private daemon registry,
+`--max-workers=2`): BUILD SUCCESSFUL, 40m 14s wall on the shared host.
+`scripts/plan-check.sh`: steps=82 errors=0. `bash scripts/tests/run.sh`,
+run alone: 51 passed, 0 failed.
+vault 265 tests, app 211, eval 26; 0 failures, 0 errors, 0 skipped.
+Timing, slowest (CPU ms / wall ms): time-ann / ALL 16.68 / 38.76,
+plus / ALL 12.65 / 13.50, markers / ALL 10.12 / 14.84. Linearity at 10x:
+digit-space 9.0, label-run 7.6, at 7.8, groups 8.5, months 10.6, time-ann
+11.2, url-many 14.4, range-chain 10.4, mark-led 8.3 (limit 20). The
+documentation commit after it changes only Markdown and `plan/plan.yaml`.
+
