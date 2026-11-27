@@ -291,8 +291,10 @@ class OcrDatabaseTest {
         )
         val name = "p114-triggers-${UUID.randomUUID()}"
         val v1 = helper.createDatabase(name, 1)
-        // A version-1 install created these through the Room callback.
-        OpenLifeDatabase.readyInvariantCallback.onCreate(v1)
+        // A version-1 install had only the READY triggers. The full readyInvariantCallback is
+        // the current-version onCreate (it also creates the v5 and v6 objects, which need tables
+        // a v1 file does not have); Room runs it only for a new file at the current version.
+        ReadyInvariantTriggers.create(v1)
         v1.close()
 
         val migrated = helper.runMigrationsAndValidate(

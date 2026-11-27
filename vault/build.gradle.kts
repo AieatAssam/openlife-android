@@ -18,7 +18,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        minSdk = 29
+        minSdk = 26
         // The test-only fault-injection and adversarial-provider hooks live behind
         // this instrumentation runner; see vault/src/androidTest.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -470,3 +470,13 @@ Every change below is a decision the owner asked the planning review to make. Ea
 ## 18 Visual identity
 
 The interface identity is specified in `docs/design/VISUAL_IDENTITY.md` (paper-and-stamp language: fixed cream/ink/vermilion palette, IBM Plex Sans for the app's words, IBM Plex Mono for data, Fraunces for display, folded-corner mark with a keyhole, stamp badges for confirmed and verified states, highlighter-yellow evidence outlines, two motion hero moments). It is deliberately not a generic Material You look and contains no AI-product tropes. The brief is subordinate to this document: no visual choice may hide a limit, soften a warning, or present an extracted value as established.
+
+
+---
+
+Amendment 2026-11-27 (ADR-0019, P1-21): the proposed minSdk 29 at line 190 and
+the "minSdk 29" status at line 406 are superseded; the minimum is now 26
+(Android 8.0). The PDF row (line 460) still says refuse on API 29; under the new
+minimum the refusal applies to API 26-29 (PdfRenderer over memfd is API 30+),
+to be re-specified in P7-02. The test-evidence row (line 468) remains the CI
+matrix (API 29 and 36); no API 26 CI leg exists.

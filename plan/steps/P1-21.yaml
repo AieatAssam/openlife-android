@@ -1,0 +1,130 @@
+id: P1-21
+title: Support Android 8.0 (API 26)
+phase: P1
+status: review
+started: 2026-11-27
+depends_on: [P1-08]
+estimate: M
+owner: agent
+
+summary: >
+  Lower minSdk from 29 (Android 10) to 26 (Android 8.0), the owner's decision
+  of 2026-11-27: the only available test device is an API 26 tablet. Fix every
+  API-level lint error the change exposes, keep the API 26-27 fingerprint
+  permission and the API 26-29 device-credential lock path correct, and record
+  what is unverified on a device.
+
+rationale: >
+  The product's stated lowest version (design v0.3, ADR-0001 item 2) was chosen
+  before the owner had a device. Below API 28 the signing data is only the
+  legacy `signatures` array; below API 30 the biometric prompt cannot use STRONG
+  with the device credential; below API 27 the light navigation-bar attribute
+  does not exist; the androidx.biometric library needs the legacy
+  USE_FINGERPRINT permission below API 28. Each of these must be handled
+  explicitly rather than left to lint.
+
+ethos_check:
+  - "Honesty: device behaviour below API 29 is not claimed as verified. Every device check is listed as a gap in docs/verification/P1-21-min-sdk-26.md."
+  - "Least privilege: USE_FINGERPRINT is restored only for maxSdkVersion 27; INTERNET stays absent."
+
+requirements:
+  - id: P1-21-R1
+    text: "MUST set minSdk 26 in app and vault, with compileSdk and targetSdk unchanged."
+  - id: P1-21-R2
+    text: "MUST fix every lint error from the trial build (lintDebug, 5 errors) with a version check or an API-correct path. No blanket lint suppression and no baseline entry."
+  - id: P1-21-R3
+    text: "MUST read the signing certificate with GET_SIGNING_CERTIFICATES and signingInfo on API 28+, and with the legacy signatures array below API 28; both paths yield the certificates that signed the installed APK."
+  - id: P1-21-R4
+    text: "MUST declare the light navigation-bar appearance (windowLightNavigationBar, API 27+) only in values-v27 and values-night-v27. Below API 27 the appearance is set by the activity's edge-to-edge code (WindowInsetsControllerCompat)."
+  - id: P1-21-R5
+    text: "MUST restore android.permission.USE_FINGERPRINT with android:maxSdkVersion=27 in the app manifest, so the merged release manifest carries it only for API 26-27 and INTERNET stays absent."
+  - id: P1-21-R6
+    text: "MUST keep BIOMETRIC_WEAK | DEVICE_CREDENTIAL for API 26-29 and BIOMETRIC_STRONG | DEVICE_CREDENTIAL for API 30+. Comments and tests MUST NOT describe API 29 as the lowest supported level."
+  - id: P1-21-R7
+    text: "MUST NOT weaken any test. A device test that needs a newer API MUST skip with a stated reason and be listed as a gap, never pass silently."
+
+constraints:
+  - "No StrongBox (setIsStrongBoxBacked is API 28+) and no setUnlockedDeviceRequired (API 28+) are used or added below API 28."
+  - "No emulator and no adb (owner instruction 2026-11-27). Instrumented tests are compiled only."
+  - "No push; commits on plan/minsdk-26 only."
+
+files_touched:
+  - app/build.gradle.kts, vault/build.gradle.kts (minSdk)
+  - app/src/main/AndroidManifest.xml (USE_FINGERPRINT)
+  - app/src/main/java/org/openlife/app/settings/AppAboutPort.kt (signing path)
+  - app/src/main/java/org/openlife/app/lock/BiometricPromptAuthenticator.kt (authenticator set)
+  - app/src/main/res/values/themes.xml, values-night/themes.xml, new values-v27/themes.xml, values-night-v27/themes.xml
+  - app/src/test/java/org/openlife/app/boundary/ManifestBoundaryTest.kt
+  - app/src/test/java/org/openlife/app/boundary/ApiLevelResourceTest.kt (new)
+  - app/src/test/java/org/openlife/app/lock/AllowedAuthenticatorsTest.kt (new)
+  - app/src/androidTest/java/org/openlife/app/lock/AppLockFlowTest.kt (API 26-29 condition)
+  - app/src/androidTest/java/org/openlife/app/ui/SecureWindowUiTest.kt (WindowInspector is API 29+; skip below)
+  - app/src/main/java/org/openlife/app/settings/VaultSecurityInfo.kt (comment: securityLevel is API 31+)
+  - docs/PERMISSIONS.md, docs/decisions/0019-min-sdk-26.md (new), docs/decisions/0001-c0-defaults.md, docs/decisions/0004-app-lock.md (dated amendments)
+  - AGENTS.md, CLAUDE.md, README.md, docs/THREAT_MODEL.md, openlife-design-v0.3.md (dated amendment notes)
+  - docs/verification/P1-21-min-sdk-26.md (new)
+
+tdd:
+  red:
+    - name: ManifestBoundaryTest.releasePermissionsAreExactlyTheAllowlist (expected set now includes USE_FINGERPRINT)
+    - name: ManifestBoundaryTest.legacyFingerprintPermissionIsLimitedToApiBelow28 (USE_FINGERPRINT present with maxSdkVersion 27)
+    - name: AllowedAuthenticatorsTest (API 26-29 -> WEAK|CREDENTIAL; API 30+ -> STRONG|CREDENTIAL), stub throws TODO()
+    - name: ApiLevelResourceTest.lightNavigationBarAttributeIsOnlyDeclaredFromApi27 (attribute only in values-v27 and values-night-v27)
+  green:
+    - "minSdk 26; AppAboutPort inline SDK_INT guard for signingInfo (28+) and signatures (below 28) with a targeted @Suppress('DEPRECATION') and comment; BiometricPromptAuthenticator.allowedAuthenticatorsFor(sdkInt); theme attribute moved to values-v27 and values-night-v27; manifest USE_FINGERPRINT maxSdkVersion 27; AppLockFlowTest A-12 condition covers API 26-29; SecureWindowUiTest skips below API 29 with a stated reason."
+  refactor:
+    - "Comments and KDoc that name API 29 as the lowest level; ADR and docs amendments."
+
+verification:
+  commands:
+    - "./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test"
+    - "scripts/plan-check.sh"
+    - "bash scripts/tests/run.sh"
+  evidence_required:
+    - "Real output of each command (test counts, BUILD SUCCESSFUL or FAILED, plan-check errors=0, run.sh passed/failed counts)."
+    - "Merged release manifest excerpt showing USE_FINGERPRINT with maxSdkVersion 27 and no INTERNET."
+    - "Lint XML shows zero errors."
+
+acceptance_criteria:
+  - "minSdk is 26 in app and vault; the lint run has no errors."
+  - "USE_FINGERPRINT appears in the merged release manifest only with maxSdkVersion 27."
+  - "The authenticator set and signing path are chosen by API level and covered by JVM tests."
+  - "Every device behaviour below API 29 is listed as unverified in docs/verification/P1-21-min-sdk-26.md, with a device checklist."
+
+docs_to_update:
+  - docs/decisions/0019-min-sdk-26.md (new)
+  - docs/decisions/0001-c0-defaults.md (dated amendment on item 2)
+  - docs/decisions/0004-app-lock.md (dated amendment on the API 26-29 authenticator set)
+  - docs/PERMISSIONS.md
+  - docs/verification/P1-21-min-sdk-26.md (new)
+  - AGENTS.md, CLAUDE.md, README.md, docs/THREAT_MODEL.md, openlife-design-v0.3.md (dated amendment notes only)
+
+risks:
+  - "Biometric class: BIOMETRIC_WEAK on API 26-29 is weaker than STRONG; the device credential fallback is unchanged."
+  - "Light navigation bar on API 26 depends on the activity's WindowInsetsControllerCompat call, not on the theme; unverified on a device."
+  - "The CI matrix still has only API 29 and API 36 legs; no API 26 leg was added (emulators are forbidden for this owner)."
+
+rollback: "Restore minSdk 29 in app/build.gradle.kts and vault/build.gradle.kts, restore the USE_FINGERPRINT tools:node=remove line, restore the ManifestBoundaryTest set, and revert the theme move."
+
+notes: >
+  Owner decision 2026-11-27 (the coordinating session). P1-08 is in review, not
+  done; it is the only dependency, per the owner's instruction.
+
+  Trial build (scratchpad minsdk-build.log, lint XML app/build/reports/lint-results-debug.xml):
+  five lint errors, all API 26 vs introduced-in: AppAboutPort.kt:48
+  GET_SIGNING_CERTIFICATES (28); AppAboutPort.kt:36 SigningInfo#getApkContentsSigners (28);
+  AppAboutPort.kt:36 PackageInfo#signingInfo (28); values/themes.xml:8 and
+  values-night/themes.xml:8 windowLightNavigationBar (27).
+
+  Device gaps (implemented or changed, unverified, gap - pending physical-device run):
+  see docs/verification/P1-21-min-sdk-26.md.
+
+evidence: >
+  RED d9c3ed6 (ManifestBoundaryTest, AllowedAuthenticatorsTest, ApiLevelResourceTest: 5 failed of 10 before GREEN).
+  GREEN 0077c38: :app:testDebugUnitTest --tests AllowedAuthenticatorsTest, ManifestBoundaryTest, ApiLevelResourceTest: 2/2, 7/7, 1/1 pass.
+  Docs 0ecc75d: ADR-0019, PERMISSIONS.md, dated amendments in 0001, 0004, THREAT_MODEL, AGENTS, CLAUDE, README, design v0.3.
+  Full verification (foreground-equivalent, exit=0, log /tmp/.../scratchpad/full-verify.log): BUILD SUCCESSFUL in 4m 8s;
+  lint-results-debug.txt "No issues found."; JUnit XML totals 506 tests, 0 skipped, 0 failures, 0 errors.
+  Merged release manifest: USE_FINGERPRINT maxSdkVersion="27"; no INTERNET.
+  scripts/plan-check.sh: steps=83 errors=0. bash scripts/tests/run.sh: 51 passed, 0 failed.
+  Device: none run (owner gap); checklist in docs/verification/P1-21-min-sdk-26.md, all rows unverified.

@@ -9,7 +9,7 @@ enum class KeySecurityLevel {
     STRONGBOX,
     TRUSTED_ENVIRONMENT,
 
-    /** Secure hardware, but Android does not say which kind (API 29-30, or UNKNOWN_SECURE). */
+    /** Secure hardware, but Android does not say which kind (API 26-30, or UNKNOWN_SECURE). */
     SECURE_HARDWARE_UNSPECIFIED,
     SOFTWARE,
 
@@ -59,7 +59,7 @@ object VaultSecurityInfo {
         else -> KeySecurityLevel.NOT_REPORTED
     }
 
-    /** API 29-30: `isInsideSecureHardware` does not say TEE or StrongBox. */
+    /** API 26-30: `isInsideSecureHardware` does not say TEE or StrongBox. */
     private fun levelBeforeApi31(report: WrappingKeyReport.Reported): KeySecurityLevel =
         if (report.insideSecureHardware) KeySecurityLevel.SECURE_HARDWARE_UNSPECIFIED else KeySecurityLevel.SOFTWARE
 

@@ -125,3 +125,11 @@ does file or crypto work on the main thread.
   them). Do not invent a parallel harness.
 - Keep responses to the owner factual: what ran, what passed, what did not,
   what is unverified.
+
+---
+
+Amendment 2026-11-27 (ADR-0019, P1-21): the lowest supported Android version is
+now API 26 (`minSdk = 26`), not API 29. The CI matrix still runs only API 29
+and API 36 legs; no API 26 leg exists, and emulators are not used for this
+owner. The "API 29" wording above is the CI matrix, not the lowest supported
+level.
