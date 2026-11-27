@@ -248,9 +248,11 @@ previous outputs): 67 inputs changed, and none gained a definite value
   are now recall losses), EE-02 prefix fractions (were truncated to the
   first group), EE-03 ranges (were the last amount), EE-05 signs,
   `EUR/USD 1.08`, `€5.00 Cr`/`cr`, `14:30 Zulu`, `+1,234,567 USD` and
-  `Balance +1234567.89 EUR` (were money, now PHONE abstentions);
+  `Balance +1234567.89 EUR` (were money, now PHONE abstentions), and the
+  three-amount chains `€10-€20-€30`, `€10 – €20 – €30` and
+  `€10 and €20 and €30` (each gave a definite `30 EUR` before);
 - abstention widened only (same outcome): `GBP/USD 1.2345`, the ZWSP
-  email, `-−€5`, `€10–€20–€30` style chains;
+  email, `-−€5`;
 - newly abstained where nothing was emitted: leading marks
   (`\u200E2026-09-16`, `\u202E…`, `\u200F14:30`, `€\u200D5`, `€\u03015`,
   `2026\u200B-09-16`, `5\u20E3 €`);
@@ -275,4 +277,10 @@ plus / ALL 12.65 / 13.50, markers / ALL 10.12 / 14.84. Linearity at 10x:
 digit-space 9.0, label-run 7.6, at 7.8, groups 8.5, months 10.6, time-ann
 11.2, url-many 14.4, range-chain 10.4, mark-led 8.3 (limit 20). The
 documentation commit after it changes only Markdown and `plan/plan.yaml`.
+
+A mark directly on an amount (the noise test fences money, so it does not
+check this) was probed with the corpus driver: `\u200B€5`, `€5\u200B` and
+`5 €\u200B` abstain MONEY over the mark; `\u200B5 €` and `5\u200B €`
+abstain the digit and mark with no kind; none gives a value. The commits
+after d708095 change only `docs/` Markdown and `plan/plan.yaml`.
 
