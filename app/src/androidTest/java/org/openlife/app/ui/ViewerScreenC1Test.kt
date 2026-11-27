@@ -364,7 +364,10 @@ class ViewerScreenC1Test {
         composeRule.onNodeWithText(
             "Text extraction is stale because the source changed or was deleted.",
         ).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("STALE").performScrollTo().assertIsDisplayed()
+        // The stamp carries its label as its one accessible name (P1-19-R12); the uppercase text is cleared semantics.
+        val staleLabel = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .targetContext.getString(org.openlife.app.R.string.stamp_stale)
+        composeRule.onNodeWithContentDescription(staleLabel).performScrollTo().assertIsDisplayed()
     }
 
     /** P2-02-R6/R7, C1-R7: deleting the source clears its OCR panel and leaves no OCR rows. */
