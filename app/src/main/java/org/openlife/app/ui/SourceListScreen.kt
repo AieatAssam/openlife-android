@@ -90,32 +90,7 @@ fun SourceListScreen(
         Scaffold(
             modifier = Modifier.semantics { paneTitle = pane },
             contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-            topBar = {
-                TopAppBar(
-                    // One line, ellipsised: at 200 % font on a narrow window the two action
-                    // buttons take the width the title would otherwise overflow into.
-                    title = {
-                        Text(
-                            stringResource(R.string.list_title),
-                            modifier = Modifier.asHeading(),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    actions = {
-                        // P2-08: local search; an empty vault simply finds nothing.
-                        if (onOpenSearch != null) {
-                            IconButton(onClick = onOpenSearch) {
-                                Icon(
-                                    Icons.Filled.Search,
-                                    contentDescription = stringResource(R.string.list_search_content_description),
-                                )
-                            }
-                        }
-                        ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
-                    },
-                )
-            },
+            topBar = { ListTopBar(onOpenSearch, onOpenSettings, onOpenAbout) },
             // VISUAL_IDENTITY §7: one filled primary action per screen. An empty
             // list carries it in the body instead; loading and an unavailable
             // vault offer no import at all.
@@ -182,6 +157,35 @@ fun SourceListScreen(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListTopBar(onOpenSearch: (() -> Unit)?, onOpenSettings: () -> Unit, onOpenAbout: () -> Unit) {
+    TopAppBar(
+        // One line, ellipsised: at 200 % font on a narrow window the two action
+        // buttons take the width the title would otherwise overflow into.
+        title = {
+            Text(
+                stringResource(R.string.list_title),
+                modifier = Modifier.asHeading(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        actions = {
+            // P2-08: local search; an empty vault simply finds nothing.
+            if (onOpenSearch != null) {
+                IconButton(onClick = onOpenSearch) {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.list_search_content_description),
+                    )
+                }
+            }
+            ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
+        },
+    )
 }
 
 @Composable

@@ -206,7 +206,10 @@ private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Uni
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.viewer_delete_content_description, sourceLabel(source)),
+                    contentDescription = stringResource(
+                        R.string.viewer_delete_content_description,
+                        sourceLabel(source),
+                    ),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
