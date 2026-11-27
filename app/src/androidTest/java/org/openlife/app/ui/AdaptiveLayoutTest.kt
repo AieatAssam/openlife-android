@@ -119,9 +119,11 @@ class AdaptiveLayoutTest {
         composeRule.onNodeWithText(PLACEHOLDER).assertIsDisplayed()
         composeRule.onNodeWithText("Import from photos").assertIsDisplayed()
 
+        // Hold the activity before the last Back: the rule cannot read it once it is destroyed.
+        val activity = composeRule.activity
         pressBackUnconditionally()
         composeRule.waitForIdle()
-        assertTrue("the second Back leaves", composeRule.activity.isFinishing)
+        assertTrue("the second Back leaves", activity.isFinishing)
     }
 
     @Test

@@ -3,10 +3,16 @@ package org.openlife.app.ui
 import android.graphics.Bitmap
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.SAVED_STATE_REGISTRY_OWNER_KEY
+import androidx.lifecycle.VIEW_MODEL_STORE_OWNER_KEY
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.MutableCreationExtras
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.ByteArrayInputStream
@@ -132,8 +138,18 @@ class IntakeScreenFlowTest {
     @Test
     fun saveThenHomeEndsReadyOrCleanlyCancelledNeverUnknown(): Unit = runBlocking {
         val store = androidx.lifecycle.ViewModelStore()
-        val intake = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-            androidx.lifecycle.ViewModelProvider.create(store, IntakeViewModel.factory(application))[IntakeViewModel::class.java]
+        // IntakeViewModel reads a SavedStateHandle, which needs the owner's registry. IntakeActivity supplies
+        // it through viewModels(); here a ComponentActivity supplies it through CreationExtras (test defect fix).
+        val intake = ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
+            lateinit var created: IntakeViewModel
+            scenario.onActivity { activity ->
+                val extras = MutableCreationExtras().apply {
+                    set(SAVED_STATE_REGISTRY_OWNER_KEY, activity)
+                    set(VIEW_MODEL_STORE_OWNER_KEY, activity)
+                }
+                created = ViewModelProvider.create(store, IntakeViewModel.factory(application), extras)[IntakeViewModel::class.java]
+            }
+            created
         }
         val access = application.vault() as org.openlife.app.VaultAccess.Ready
         intake.startImport(ByteArrayInputStream(syntheticJpegBytes(variant = 19)), "image/jpeg", IntakeKind.SHARE)

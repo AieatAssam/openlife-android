@@ -113,3 +113,50 @@ Harness note. With the argument unset, the runner logs `ignored: recoveryTimeWit
 - Eval gate failure for `mlkit-latin` (`abstention_correct_rate_non_latin`) is recorded, not investigated. No Tesseract eval result in this run.
 - Lint `NewApi` is not enforced on androidTest sources: enabling `checkTestSources` produced 46 app and 15 vault findings, all in host `src/test` files. The one androidTest finding (`UseSdkSuppress` on `SecureWindowUiTest`) was fixed with `@SdkSuppress`.
 - `SecureWindowUiTest`: outcome unknown (see above).
+
+## Device run 3-5, 2026-11-27, Huawei AGS2-W09, API 26 (`plan/minsdk-26`)
+
+Device evidence for these runs is in the scratchpad, not the repository:
+`device-logs/app-results-run3/`, `device-logs/run4-<Class>.log|.xml`,
+`device-logs/app-run5.log` and `device-logs/app-results-run5/`.
+
+### Run 3 (baseline)
+
+- XML: `tests=146 failures=19 errors=0 skipped=0`: 15 real failures and 4 opt-in or assumption entries.
+
+### Run 4 (per-class re-runs, one Gradle invocation each)
+
+Classification uses four categories: (a) product defect, (b) API-26 or tablet behaviour, (c) test assumes phone or emulator size, (d) flaky or harness timing. A separate "test defect" category covers a fault in the test code itself.
+
+Fixed in this step (each change is test-only; no production code changed):
+
+- `SavedStateTest.viewerWithOcrPanelSavesNoSpanTextOrBytes`: test defect. The fixture span had `evidenceRegion = null`, and `EvidenceSelection.selectableSpans` drops such spans, so the viewer never showed its selection announcement and the wait timed out after 30 s. The class also used `createEmptyComposeRule()`; it now uses `createAndroidComposeRule<ComponentActivity>()`. Passes alone (`run4-SavedStateTest.xml`, `tests=1 failures=0`).
+- `savedBundleHoldsNoContent`, moved to the new `SearchQuerySavedStateTest` (no compose rule in that class): (d), harness. With the compose rule declared in the same class, the real list stayed on its "Loading..." placeholder although `OpenLifeApp` had emitted `Loaded` (logcat: `vm state=Loaded` at +1.7 s; pane last composed with `Loading`). Without the rule, the pane recomposed with `Loaded` at +1.7 s and the test passed in 6.9 s. The mechanism was not identified. Product path checked by manual launch on the tablet (no instrumentation): the list left "Loading..." and showed "Nothing kept yet". The test now waits for the loading text to disappear before tapping search. Passes alone (`run4-SearchQuerySavedStateTest.xml`, `tests=1 failures=0`).
+- `fieldIsEmptyAfterTheActivityStops`, moved from `SearchScreenTest` to the new `SearchFieldResetTest`: (d) and a test assumption. `MainActivity.onStop` clears the search query (ADR-0010), but the search screen can stay open. The test assumed the search button returned. The reopen step now accepts either the open field or the search button, and the assertion that the query text is absent is unchanged. Passes alone (`run4-SearchFieldResetTest.xml`, `tests=1 failures=0`). `SearchScreenTest` passes alone, 2 of 2.
+- `IntakeScreenFlowTest.saveThenHomeEndsReadyOrCleanlyCancelledNeverUnknown`: test defect. `ViewModelProvider.create` was called without `CreationExtras`, so `createSavedStateHandle()` threw `IllegalArgumentException: CreationExtras must have a value by VIEW_MODEL_STORE_OWNER_KEY`. The test now supplies a `ComponentActivity` (from `ActivityScenario`) as both owners, as `IntakeActivity` does through `viewModels()`. Assertions unchanged. Class passes alone, 3 of 3 (`run4-IntakeScreenFlowTest.xml`).
+- `AdaptiveLayoutTest.expandedBackClearsSelectionBeforeLeaving`: test defect. The assertion read `composeRule.activity` after the second Back had destroyed it (`NullPointerException: Cannot run onActivity since Activity has been destroyed already`). The activity is now captured before that Back; the same `isFinishing` assertion is kept. Passes in the class run (`run4-AdaptiveLayoutTest-fix.xml`).
+
+Not fixed; open, with the evidence observed:
+
+- `InternalLinkTest.openExistingGoesThroughTheInternalEntryWithNonce` (line 57): `ActivityScenario.close` cannot move `MainActivity` to DESTROYED; it stays PAUSED after the internal link opens the viewer in another task. Not classified.
+- `AccessibilitySemanticsTest.stampBadgeLabelIsAnnouncedOnce` (line 398): the merged-tree check passes (one announcing node). The unmerged-tree check counts 2 nodes (the labelled container and its child text). The assertion was not loosened; whether the unmerged check is intended needs an owner decision.
+- `AdaptiveLayoutTest.selectionSurvivesCompactToExpandedAndBack` (line 97): after a resize to 1280x800 dp, `Details` is not displayed. Not classified.
+- `EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets` (line 60): the title's top is above the injected inset. Not classified. The test also uses `createEmptyComposeRule()` with `MainActivity`, the pattern of the list stall above; this was not tested.
+- `EvidenceNavigationTest` (3): `doubleTapZoomsImageToThreeTimesItsFitWidth` (zoomed width expected 10368, was 3456), `doubleTapAtThreeTimesZoomsOutEvenWhenTheFirstTapPans` (expected 1152, was 3456), `rejectedSpanRegionCannotBeSelectedAsEvidence` (node count). Not classified; double-tap zoom did not apply on the device.
+- `LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640` (line 91): the list's text overflows its layout at font scale 2. Possibly (a), a product layout defect; not changed.
+- `ViewerScreenC1Test.staleExtractionIsGreyedAndExplained` (line 367): `performScrollTo()` cannot find the node. Not classified.
+- `ButtonShapeTest.buttonsUseTheEightDpShape` (line 59): the corner pixel is outside the shape (colour `-5753824`, expected `-16711936`). Possibly (b), API-26 rendering; not classified.
+
+### Run 5 (`./gradlew :app:connectedDebugAndroidTest --continue`, exit 1)
+
+- XML: `tests=146 failures=14 errors=0 skipped=0`. Of the 14, 4 are opt-in or assumption entries, left unchanged: `AppLockFlowTest.deviceCredentialUnlockBelowApi30KeepsThePendingShare` (skipped unless `allowDevicePinChange` is passed); `BrandScreenshotInstrumentedTest` `listDetailExpandedMatchesGolden`, `deleteDialogMatchesGolden`, `listViewerFirstRunMatchGoldensLightAndDark` (no committed goldens for render profile `api26-AGS2-W09EEA-320dpi`).
+- 10 real failures remain, the open items listed above: InternalLinkTest (1), AccessibilitySemanticsTest (1), AdaptiveLayoutTest (1), EdgeToEdgeUiTest (1), EvidenceNavigationTest (3), LargeFontUiTest (1), ViewerScreenC1Test (1), ButtonShapeTest (1).
+- The five fixed items above all pass in run 5 (`SavedStateTest`, `SearchQuerySavedStateTest`, `SearchFieldResetTest`, `SearchScreenTest`, `IntakeScreenFlowTest`; `AdaptiveLayoutTest` now fails only on line 97).
+
+### Device-free gate
+
+- `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`: exit 0.
+
+### Unverified
+
+- The 10 open real failures have not been fixed or classified beyond the notes above. Each remains a device-verification gap.
