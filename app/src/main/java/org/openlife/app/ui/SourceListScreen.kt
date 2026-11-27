@@ -163,7 +163,7 @@ fun SourceListScreen(
     }
 }
 
-private val TITLE_MIN_FONT_SIZE = 12.sp
+private val TITLE_MIN_FONT_SIZE = 16.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
