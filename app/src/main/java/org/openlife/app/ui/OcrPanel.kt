@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,7 +68,11 @@ internal fun OcrSection(
             modifier = Modifier.asHeading(),
         )
         val runAgain = @Composable {
-            OpenLifeTextButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
+            OpenLifeTextButton(
+                onClick = onExtractText,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+                enabled = source.state == SourceState.READY,
+            ) {
                 Text(stringResource(R.string.viewer_run_again))
             }
         }
@@ -179,10 +184,16 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
     }
     state.revisionCorrection?.let { CorrectionLine(it) }
     Row {
-        OpenLifeTextButton(onClick = { onReview(OcrReviewState.ACCEPTED) }) {
+        OpenLifeTextButton(
+            onClick = { onReview(OcrReviewState.ACCEPTED) },
+            modifier = Modifier.minimumInteractiveComponentSize(),
+        ) {
             Text(stringResource(R.string.viewer_accept_text))
         }
-        OpenLifeTextButton(onClick = { onReview(OcrReviewState.REJECTED) }) {
+        OpenLifeTextButton(
+            onClick = { onReview(OcrReviewState.REJECTED) },
+            modifier = Modifier.minimumInteractiveComponentSize(),
+        ) {
             Text(stringResource(R.string.viewer_reject_text))
         }
     }
