@@ -32,52 +32,50 @@ fun VaultUnavailableScreen(
     onOpenResetSettings: () -> Unit,
     onFinishReset: () -> Unit = {},
 ) {
-    StatusHost {
-        var expanded by remember { mutableStateOf(false) }
-        Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
+    var expanded by remember { mutableStateOf(false) }
+    Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                stringResource(R.string.vault_unavailable_title),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.asHeading(),
+            )
+            Text(
+                stringResource(cause.explanationString()),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            if (expanded) {
                 Text(
-                    stringResource(R.string.vault_unavailable_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.asHeading(),
-                )
-                Text(
-                    stringResource(cause.explanationString()),
-                    style = MaterialTheme.typography.bodyLarge,
+                    stringResource(R.string.vault_unavailable_details),
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp),
                 )
-                if (expanded) {
-                    Text(
-                        stringResource(R.string.vault_unavailable_details),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
+            }
+            OpenLifeTextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(top = 8.dp)) {
+                val detailsLabel = when (expanded) {
+                    true -> R.string.vault_unavailable_hide_details
+                    false -> R.string.vault_unavailable_what_means
                 }
-                OpenLifeTextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(top = 8.dp)) {
-                    val detailsLabel = when (expanded) {
-                        true -> R.string.vault_unavailable_hide_details
-                        false -> R.string.vault_unavailable_what_means
-                    }
-                    Text(stringResource(detailsLabel))
+                Text(stringResource(detailsLabel))
+            }
+            if (cause == VaultUnavailableCause.RESET_INCOMPLETE) {
+                OpenLifeButton(onClick = onFinishReset, modifier = Modifier.padding(top = 8.dp)) {
+                    Text(stringResource(R.string.vault_unavailable_finish_reset))
                 }
-                if (cause == VaultUnavailableCause.RESET_INCOMPLETE) {
-                    OpenLifeButton(onClick = onFinishReset, modifier = Modifier.padding(top = 8.dp)) {
-                        Text(stringResource(R.string.vault_unavailable_finish_reset))
-                    }
-                } else if (cause.retryable) {
-                    OpenLifeButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
-                        Text(stringResource(R.string.vault_unavailable_try_again))
-                    }
+            } else if (cause.retryable) {
+                OpenLifeButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
+                    Text(stringResource(R.string.vault_unavailable_try_again))
                 }
-                OpenLifeOutlinedButton(onClick = onOpenResetSettings, modifier = Modifier.padding(top = 8.dp)) {
-                    Text(stringResource(R.string.vault_unavailable_open_settings))
-                }
+            }
+            OpenLifeOutlinedButton(onClick = onOpenResetSettings, modifier = Modifier.padding(top = 8.dp)) {
+                Text(stringResource(R.string.vault_unavailable_open_settings))
             }
         }
     }
