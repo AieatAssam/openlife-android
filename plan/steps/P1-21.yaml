@@ -1,7 +1,7 @@
 id: P1-21
 title: Support Android 8.0 (API 26)
 phase: P1
-status: in_progress
+status: review
 started: 2026-11-27
 depends_on: [P1-08]
 estimate: M
@@ -120,4 +120,11 @@ notes: >
   see docs/verification/P1-21-min-sdk-26.md.
 
 evidence: >
-  pending
+  RED d9c3ed6 (ManifestBoundaryTest, AllowedAuthenticatorsTest, ApiLevelResourceTest: 5 failed of 10 before GREEN).
+  GREEN 0077c38: :app:testDebugUnitTest --tests AllowedAuthenticatorsTest, ManifestBoundaryTest, ApiLevelResourceTest: 2/2, 7/7, 1/1 pass.
+  Docs 0ecc75d: ADR-0019, PERMISSIONS.md, dated amendments in 0001, 0004, THREAT_MODEL, AGENTS, CLAUDE, README, design v0.3.
+  Full verification (foreground-equivalent, exit=0, log /tmp/.../scratchpad/full-verify.log): BUILD SUCCESSFUL in 4m 8s;
+  lint-results-debug.txt "No issues found."; JUnit XML totals 506 tests, 0 skipped, 0 failures, 0 errors.
+  Merged release manifest: USE_FINGERPRINT maxSdkVersion="27"; no INTERNET.
+  scripts/plan-check.sh: steps=83 errors=0. bash scripts/tests/run.sh: 51 passed, 0 failed.
+  Device: none run (owner gap); checklist in docs/verification/P1-21-min-sdk-26.md, all rows unverified.
