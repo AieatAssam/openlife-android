@@ -28,7 +28,8 @@ import org.openlife.app.R
 import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.refusalText
-import org.openlife.app.ui.announceStatus
+import org.openlife.app.ui.Announce
+import org.openlife.app.ui.Announcement
 import org.openlife.app.ui.asHeading
 
 /** What Settings needs to show and change the app lock (P1-07-R1/R4). */
@@ -70,10 +71,10 @@ fun AppLockSettingsSection(settings: AppLockSettings) {
         }
         Text(stringResource(R.string.app_lock_explanation), style = MaterialTheme.typography.bodyMedium)
         refusal?.let {
+            Announce(Announcement.statusOf(refusalText(it)))
             Text(
                 stringResource(refusalText(it)),
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.announceStatus(),
             )
         }
         if (policy.enabled) TimeoutChoices(policy, settings.onChange)

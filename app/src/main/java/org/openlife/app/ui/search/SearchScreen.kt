@@ -1,5 +1,6 @@
 package org.openlife.app.ui.search
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,10 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -36,15 +35,18 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.util.UUID
 import org.openlife.app.R
+import org.openlife.app.ui.Announce
+import org.openlife.app.ui.Announcement
 import org.openlife.app.ui.ContentTextField
+import org.openlife.app.ui.StatusHost
 import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.theme.Ink
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.app.ui.theme.OpenLifeMono
 import org.openlife.vault.search.SearchHit
-import java.util.UUID
 
 /**
  * P2-08-R4: local search. The field is the content field (no Copy/Cut, no
@@ -65,39 +67,41 @@ fun SearchScreen(
     onBack: () -> Unit,
     labelFor: @Composable (UUID) -> String? = { null },
 ) {
-    val pane = stringResource(R.string.search_title)
-    Scaffold(
-        modifier = Modifier.semantics { paneTitle = pane },
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = {
-            TopAppBar(
-                title = { Text(pane, modifier = Modifier.asHeading()) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.viewer_back_content_description),
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                val label = stringResource(R.string.search_field_label)
-                ContentTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .testTag("search_input")
-                        .semantics { contentDescription = label },
-                    label = { Text(label) },
-                    singleLine = true,
+    StatusHost {
+        val pane = stringResource(R.string.search_title)
+        Scaffold(
+            modifier = Modifier.semantics { paneTitle = pane },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            topBar = {
+                TopAppBar(
+                    title = { Text(pane, modifier = Modifier.asHeading()) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.viewer_back_content_description),
+                            )
+                        }
+                    },
                 )
-                SearchResults(state, onOpenResult, labelFor)
+            },
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    val label = stringResource(R.string.search_field_label)
+                    ContentTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .testTag("search_input")
+                            .semantics { contentDescription = label },
+                        label = { Text(label) },
+                        singleLine = true,
+                    )
+                    SearchResults(state, onOpenResult, labelFor)
+                }
             }
         }
     }
@@ -110,11 +114,11 @@ private fun SearchResults(
     labelFor: @Composable (UUID) -> String?,
 ) {
     when (state) {
-        SearchUiState.Idle -> Message(stringResource(R.string.search_idle))
+        SearchUiState.Idle -> Message(R.string.search_idle)
 
-        SearchUiState.Searching -> Message(stringResource(R.string.search_searching))
+        SearchUiState.Searching -> Message(R.string.search_searching)
 
-        SearchUiState.NoResults -> Message(stringResource(R.string.search_no_results))
+        SearchUiState.NoResults -> Message(R.string.search_no_results)
 
         is SearchUiState.Results -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
             // Keys are positional: the same span can appear as extracted text and as a correction.
@@ -127,12 +131,12 @@ private fun SearchResults(
 }
 
 @Composable
-private fun Message(text: String) {
+private fun Message(@StringRes textRes: Int) {
+    Announce(Announcement.statusOf(textRes))
     Text(
-        text,
+        stringResource(textRes),
         modifier = Modifier
-            .padding(16.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite },
+            .padding(16.dp),
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

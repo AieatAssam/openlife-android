@@ -54,6 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import java.util.UUID
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.OpenLifeButton
@@ -63,7 +64,6 @@ import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,94 +82,97 @@ fun SourceListScreen(
     // P1-20-R3: held by the list's ViewModel, so the position survives a change of selection.
     listState: LazyListState = rememberLazyListState(),
 ) {
-    var pendingDelete by remember { mutableStateOf<Source?>(null) }
+    StatusHost {
+        var pendingDelete by remember { mutableStateOf<Source?>(null) }
 
-    val hasItems = state is SourceListUiState.Loaded && state.sources.isNotEmpty()
+        val hasItems = state is SourceListUiState.Loaded && state.sources.isNotEmpty()
 
-    val pane = stringResource(R.string.list_title)
-    Scaffold(
-        modifier = Modifier.semantics { paneTitle = pane },
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.list_title), modifier = Modifier.asHeading()) },
-                actions = {
-                    // P2-08: local search; an empty vault simply finds nothing.
-                    if (onOpenSearch != null) {
-                        IconButton(onClick = onOpenSearch) {
-                            Icon(
-                                Icons.Filled.Search,
-                                contentDescription = stringResource(R.string.list_search_content_description),
-                            )
-                        }
-                    }
-                    ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
-                },
-            )
-        },
-        // VISUAL_IDENTITY §7: one filled primary action per screen. An empty
-        // list carries it in the body instead; loading and an unavailable
-        // vault offer no import at all.
-        floatingActionButton = {
-            if (hasItems) {
-                // The content-slot overload keeps the label a plain Text; the
-                // icon/text overload hides it from semantics while animating.
-                OpenLifeExtendedFloatingActionButton(
-                    onClick = onImportFromPhotoPicker,
-                    // VISUAL_IDENTITY §7: the primary action is filled vermilion,
-                    // not the tonal container M3 uses for FABs by default.
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) { ImportActionContent(gap = 12.dp) }
-            }
-        },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (state) {
-                SourceListUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.list_loading), modifier = Modifier.announceStatus())
-                }
-
-                is SourceListUiState.VaultUnavailable -> VaultUnavailableScreen(
-                    cause = state.cause,
-                    onRetry = onRetryVault,
-                    onOpenResetSettings = onOpenSettings,
-                    onFinishReset = onFinishReset,
-                )
-
-                is SourceListUiState.Loaded -> {
-                    if (state.sources.isEmpty()) {
-                        EmptyList(onImportFromPhotoPicker)
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING_FOR_FAB),
-                        ) {
-                            items(state.sources, key = { it.id }) { source ->
-                                SourceRow(
-                                    source = source,
-                                    loadThumbnail = loadThumbnail,
-                                    thumbnailGeneration = thumbnailGeneration,
-                                    onOpen = { onOpen(source.id) },
-                                    onDeleteRequested = { pendingDelete = source },
+        val pane = stringResource(R.string.list_title)
+        Scaffold(
+            modifier = Modifier.semantics { paneTitle = pane },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.list_title), modifier = Modifier.asHeading()) },
+                    actions = {
+                        // P2-08: local search; an empty vault simply finds nothing.
+                        if (onOpenSearch != null) {
+                            IconButton(onClick = onOpenSearch) {
+                                Icon(
+                                    Icons.Filled.Search,
+                                    contentDescription = stringResource(R.string.list_search_content_description),
                                 )
+                            }
+                        }
+                        ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
+                    },
+                )
+            },
+            // VISUAL_IDENTITY §7: one filled primary action per screen. An empty
+            // list carries it in the body instead; loading and an unavailable
+            // vault offer no import at all.
+            floatingActionButton = {
+                if (hasItems) {
+                    // The content-slot overload keeps the label a plain Text; the
+                    // icon/text overload hides it from semantics while animating.
+                    OpenLifeExtendedFloatingActionButton(
+                        onClick = onImportFromPhotoPicker,
+                        // VISUAL_IDENTITY §7: the primary action is filled vermilion,
+                        // not the tonal container M3 uses for FABs by default.
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) { ImportActionContent(gap = 12.dp) }
+                }
+            },
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                when (state) {
+                    SourceListUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Announce(Announcement.statusOf(R.string.list_loading))
+                        Text(stringResource(R.string.list_loading))
+                    }
+
+                    is SourceListUiState.VaultUnavailable -> VaultUnavailableScreen(
+                        cause = state.cause,
+                        onRetry = onRetryVault,
+                        onOpenResetSettings = onOpenSettings,
+                        onFinishReset = onFinishReset,
+                    )
+
+                    is SourceListUiState.Loaded -> {
+                        if (state.sources.isEmpty()) {
+                            EmptyList(onImportFromPhotoPicker)
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING_FOR_FAB),
+                            ) {
+                                items(state.sources, key = { it.id }) { source ->
+                                    SourceRow(
+                                        source = source,
+                                        loadThumbnail = loadThumbnail,
+                                        thumbnailGeneration = thumbnailGeneration,
+                                        onOpen = { onOpen(source.id) },
+                                        onDeleteRequested = { pendingDelete = source },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    pendingDelete?.let { source ->
-        DeleteConfirmationDialog(
-            itemLabel = sourceLabel(source),
-            onConfirm = {
-                onDelete(source.id)
-                pendingDelete = null
-            },
-            onDismiss = { pendingDelete = null },
-        )
+        pendingDelete?.let { source ->
+            DeleteConfirmationDialog(
+                itemLabel = sourceLabel(source),
+                onConfirm = {
+                    onDelete(source.id)
+                    pendingDelete = null
+                },
+                onDismiss = { pendingDelete = null },
+            )
+        }
     }
 }
 

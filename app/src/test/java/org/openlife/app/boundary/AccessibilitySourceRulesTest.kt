@@ -263,9 +263,13 @@ class AccessibilitySourceRulesTest {
 
     /** True when the composable that holds the call at [offset] posts through [Announce]. */
     private fun announcedAt(source: KotlinSource, offset: Int): Boolean {
+        // A resource passed to a composable of this file (a helper such as CenteredMessage) is announced by that helper.
         var call = source.enclosingCall(offset)
-        while (call != null && source.functionBody(call.name) == null) call = source.enclosingCall(call.start)
-        return call != null && announces(source.functionBody(call.name).orEmpty())
+        while (call != null && call.name in STRING_HELPERS) call = source.enclosingCall(call.start)
+        val callee = call?.let { source.functionBody(it.name) }
+        if (callee != null) return announces(callee)
+        val declaration = FUN_DECLARATION.findAll(source.code.substring(0, offset)).lastOrNull() ?: return false
+        return announces(source.functionBody(declaration.groupValues[1]).orEmpty())
     }
 
     /** P1-10 (review H-01): a live region exists only in the status host, so it is never inserted with its text. */
@@ -292,8 +296,6 @@ class AccessibilitySourceRulesTest {
         return when {
             // An enum entry holds the resource as data; the composable that shows it is checked where it is called.
             call != null && call.name.isNotEmpty() && call.name.all { it.isUpperCase() || it == '_' } -> null
-
-            call == null -> "$where is not shown by a call"
 
             announcedAt(source, offset) -> null
 
@@ -343,6 +345,7 @@ class AccessibilitySourceRulesTest {
         val ANNOUNCE = Regex("""\bAnnounce\(""")
         val LIVE_OUTSIDE_HOST = Regex("""liveRegion\s*=|LiveRegionMode\.""")
         val ANNOUNCE_STATUS_LEGACY = Regex("""announceStatus\(""")
+        val FUN_DECLARATION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w.]+\.)?(\w+)\s*\(""")
         val STRING_HELPERS = setOf("stringResource", "pluralStringResource", "listOf", "localizedList", "withDataSpan")
 
         /** Text that appears when state changes without the user moving focus there. */

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
+import org.openlife.app.ui.StatusHost
 import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.theme.OpenLifeMono
@@ -44,29 +45,31 @@ fun AboutScreen(
     onBack: () -> Unit = {},
     lowRamDevice: Boolean = false,
 ) {
-    val pane = stringResource(R.string.about_title)
-    Scaffold(
-        modifier = Modifier.semantics { paneTitle = pane },
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { BackTopAppBar(title = pane, onBack = onBack) },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item { AboutHeader(lowRamDevice) }
-                section(R.string.about_section_build) {
-                    BuildSection(state.identity, AboutFact.BUILD_IDENTITY in state.unavailable)
+    StatusHost {
+        val pane = stringResource(R.string.about_title)
+        Scaffold(
+            modifier = Modifier.semantics { paneTitle = pane },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            topBar = { BackTopAppBar(title = pane, onBack = onBack) },
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item { AboutHeader(lowRamDevice) }
+                    section(R.string.about_section_build) {
+                        BuildSection(state.identity, AboutFact.BUILD_IDENTITY in state.unavailable)
+                    }
+                    section(R.string.about_section_security) { SecuritySection(state.keyLevel) }
+                    section(R.string.about_section_will_not_do) { WillNotDoSection() }
+                    section(R.string.about_section_diagnostics) {
+                        DiagnosticsSection(state.diagnostics, AboutFact.DIAGNOSTICS in state.unavailable)
+                    }
+                    documentSection(BundledDocument.PRIVACY_POLICY, state.documents, onToggleDocument)
+                    documentSection(BundledDocument.THIRD_PARTY_LICENCES, state.documents, onToggleDocument)
                 }
-                section(R.string.about_section_security) { SecuritySection(state.keyLevel) }
-                section(R.string.about_section_will_not_do) { WillNotDoSection() }
-                section(R.string.about_section_diagnostics) {
-                    DiagnosticsSection(state.diagnostics, AboutFact.DIAGNOSTICS in state.unavailable)
-                }
-                documentSection(BundledDocument.PRIVACY_POLICY, state.documents, onToggleDocument)
-                documentSection(BundledDocument.THIRD_PARTY_LICENCES, state.documents, onToggleDocument)
             }
         }
     }

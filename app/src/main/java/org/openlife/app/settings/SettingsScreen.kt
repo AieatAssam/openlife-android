@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
+import org.openlife.app.ui.StatusHost
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.vault.repository.ResetConfirmation
 import org.openlife.vault.repository.VaultResetResult
@@ -40,29 +41,31 @@ fun SettingsScreen(
     onVerifyAll: (suspend () -> VerifyReport?)? = null,
     appLock: AppLockSettings? = null,
 ) {
-    val controller = viewModel<SettingsViewModel>().controller
-    val pane = stringResource(R.string.settings_title)
-    Scaffold(
-        modifier = Modifier.semantics { paneTitle = pane },
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { BackTopAppBar(title = pane, onBack = onBack) },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                appLock?.let {
-                    AppLockSettingsSection(it)
-                    PerforationDivider()
+    StatusHost {
+        val controller = viewModel<SettingsViewModel>().controller
+        val pane = stringResource(R.string.settings_title)
+        Scaffold(
+            modifier = Modifier.semantics { paneTitle = pane },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            topBar = { BackTopAppBar(title = pane, onBack = onBack) },
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    appLock?.let {
+                        AppLockSettingsSection(it)
+                        PerforationDivider()
+                    }
+                    Text(
+                        stringResource(R.string.settings_section_vault),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    onVerifyAll?.let { VerifyAllSection(controller, it) }
+                    ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete, controller = controller)
                 }
-                Text(
-                    stringResource(R.string.settings_section_vault),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() },
-                )
-                onVerifyAll?.let { VerifyAllSection(controller, it) }
-                ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete, controller = controller)
             }
         }
     }

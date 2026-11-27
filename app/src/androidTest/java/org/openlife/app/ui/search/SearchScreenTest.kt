@@ -105,7 +105,7 @@ class SearchScreenTest {
         composeRule.onAllNodesWithTag("search_result").assertCountEqualsOne()
         composeRule.onNodeWithTag("search_result").performClick()
         composeRule.waitUntil(WAIT_MS) {
-            composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onNodeWithTag("viewer_span_announcement").fetchSemanticsNode().config.contains(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
         }
         composeRule.onNodeWithTag("viewer_span_announcement").assertTextContains("Pick up by Friday", substring = true)
     }

@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -80,7 +81,8 @@ internal fun OcrSection(
 
             is OcrUiState.Running -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.viewer_extracting), modifier = Modifier.announceStatus())
+                    Announce(Announcement.statusOf(R.string.viewer_extracting))
+                    Text(stringResource(R.string.viewer_extracting))
                     Spacer(Modifier.width(8.dp))
                     OpenLifeTextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
                 }
@@ -94,13 +96,19 @@ internal fun OcrSection(
             }
 
             is OcrUiState.Failed -> OcrOutcome(
-                stringResource(R.string.viewer_extraction_failed, ocrFailureMessage(state.reason)),
+                Announcement.statusOf(R.string.viewer_extraction_failed, ocrFailureRes(state.reason)),
+                stringResource(R.string.viewer_extraction_failed, stringResource(ocrFailureRes(state.reason))),
                 state.history,
                 runAgain,
             )
 
             is OcrUiState.Cancelled ->
-                OcrOutcome(stringResource(R.string.viewer_extraction_cancelled), state.history, runAgain)
+                OcrOutcome(
+                    Announcement.statusOf(R.string.viewer_extraction_cancelled),
+                    stringResource(R.string.viewer_extraction_cancelled),
+                    state.history,
+                    runAgain,
+                )
 
             is OcrUiState.Stale -> StaleOutcome(state.history, runAgain)
         }
@@ -266,19 +274,25 @@ private fun CorrectionLine(correctedText: String) {
 private fun StaleOutcome(history: List<OcrHistoryItem>, runAgain: @Composable () -> Unit) {
     val muted = LocalOpenLifeBrandColors.current.mutedInk
     StampBadge(StampState.Stale)
+    Announce(Announcement.statusOf(R.string.viewer_extraction_stale))
     Text(
         stringResource(R.string.viewer_extraction_stale),
         color = muted,
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.announceStatus(),
     )
     runAgain()
     OcrHistory(history)
 }
 
 @Composable
-private fun OcrOutcome(explanation: String, history: List<OcrHistoryItem>, runAgain: @Composable () -> Unit) {
-    Text(explanation, modifier = Modifier.announceStatus())
+private fun OcrOutcome(
+    status: Announcement,
+    explanation: String,
+    history: List<OcrHistoryItem>,
+    runAgain: @Composable () -> Unit,
+) {
+    Announce(status)
+    Text(explanation)
     runAgain()
     OcrHistory(history)
 }
@@ -331,17 +345,18 @@ private fun revisionStateLabel(state: org.openlife.vault.ocr.OcrRevisionState): 
 }
 
 @Composable
-private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) {
-    OcrFailureReason.SOURCE_NOT_READY -> stringResource(R.string.ocr_failure_source_not_ready)
-    OcrFailureReason.SOURCE_CORRUPT -> stringResource(R.string.ocr_failure_source_corrupt)
-    OcrFailureReason.SOURCE_DELETED -> stringResource(R.string.ocr_failure_source_deleted)
-    OcrFailureReason.LIMIT_EXCEEDED -> stringResource(R.string.ocr_failure_limit_exceeded)
-    OcrFailureReason.UNSUPPORTED_SCRIPT -> stringResource(R.string.ocr_failure_unsupported_script)
-    OcrFailureReason.ENGINE_FAILURE -> stringResource(R.string.ocr_failure_engine)
-    OcrFailureReason.CANCELLED -> stringResource(R.string.ocr_failure_cancelled)
-    OcrFailureReason.PROCESS_RESTART -> stringResource(R.string.ocr_failure_process_restart)
-    OcrFailureReason.TIMEOUT -> stringResource(R.string.ocr_failure_timeout)
-    OcrFailureReason.STORAGE_FAILURE -> stringResource(R.string.ocr_failure_storage)
-    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> stringResource(R.string.ocr_failure_source_unavailable)
-    OcrFailureReason.UNRECOGNISED -> stringResource(R.string.ocr_failure_unrecognised)
+@StringRes
+private fun ocrFailureRes(reason: OcrFailureReason): Int = when (reason) {
+    OcrFailureReason.SOURCE_NOT_READY -> R.string.ocr_failure_source_not_ready
+    OcrFailureReason.SOURCE_CORRUPT -> R.string.ocr_failure_source_corrupt
+    OcrFailureReason.SOURCE_DELETED -> R.string.ocr_failure_source_deleted
+    OcrFailureReason.LIMIT_EXCEEDED -> R.string.ocr_failure_limit_exceeded
+    OcrFailureReason.UNSUPPORTED_SCRIPT -> R.string.ocr_failure_unsupported_script
+    OcrFailureReason.ENGINE_FAILURE -> R.string.ocr_failure_engine
+    OcrFailureReason.CANCELLED -> R.string.ocr_failure_cancelled
+    OcrFailureReason.PROCESS_RESTART -> R.string.ocr_failure_process_restart
+    OcrFailureReason.TIMEOUT -> R.string.ocr_failure_timeout
+    OcrFailureReason.STORAGE_FAILURE -> R.string.ocr_failure_storage
+    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> R.string.ocr_failure_source_unavailable
+    OcrFailureReason.UNRECOGNISED -> R.string.ocr_failure_unrecognised
 }

@@ -268,7 +268,7 @@ class ScreenSemanticsTest {
             ScreenCase("intake-failed", heading = false, liveRegion = true, content = intake(IntakeUiState.Failed)),
             ScreenCase("first-run") { FirstRunExplanationScreen(onContinue = {}) },
             ScreenCase("lock") {
-                LockScreen(title = "Locked", body = "Unlock to continue.", note = "Not verified.", action = "Unlock", onAction = {})
+                LockScreen(title = "Locked", body = "Unlock to continue.", note = org.openlife.app.R.string.lock_not_verified, action = "Unlock", onAction = {})
             },
             ScreenCase("lock-offer") { AppLockOfferScreen(onEnable = { LockAvailability.AVAILABLE }, onSkip = {}) },
             ScreenCase("settings") {
