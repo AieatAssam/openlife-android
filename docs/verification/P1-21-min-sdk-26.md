@@ -58,3 +58,58 @@ Device: owner's API 26 tablet. Install a debug build with `adb install` from the
 - `MainActivity.kt` (around line 82) and `IntakeActivity.kt` (around line 87): `enableEdgeToEdge()`. Works on 26 through the activity library. Not device-verified (item 10).
 - `app/src/androidTest/java/org/openlife/app/ui/SecureWindowUiTest.kt`: `WindowInspector` is API 29+; skipped below Q (see gaps).
 - Not API-29-sensitive: `ImageDecoder` (not used); `BitmapFactory` in `SampledBitmapDecoder.kt` and `OcrBitmapPreparer.kt` (fine); `java.time` in vault facts and Type.kt fonts: not checked in this step; lint reported no API errors for them at minSdk 26.
+
+## Device run 2026-11-27, Huawei AGS2-W09, API 26
+
+Device: Huawei AGS2-W09, Android 8.0.0, `ro.build.version.sdk=26`, adb serial U8BBB20806201256. Code: commit `a212431` (test-only fixes on top of the minSdk change). Gradle connected runs; logs and XML under `scratchpad/device-logs/` (`vault-run2.log`, `vault-results-run2/`, `app-run2.log`, `app-results-run2/`). No emulator was used. Only `org.openlife` and `org.openlife.test` were installed by Gradle.
+
+Device-free gate on `a212431` (`detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`): `GATE_EXIT=0`. Lint with `checkTestSources` enabled (temporary probe) reported NewApi only in host `src/test` files (vault `GoldenEnvelopeFixtureTest`, app `ApiLevelResourceTest` and others); the androidTest sites guarded in this step were not flagged. The probe is not committed.
+
+### Vault module, run 2 (`:vault:connectedDebugAndroidTest --continue`, exit 1)
+
+- XML: `tests=171 failures=4 errors=0 skipped=0`.
+- Failures:
+  1. `ocr.OcrEngineMeasurementTest.measureEnginesOnSyntheticFixtures`: empty failure element. Opt-in class, argument not set (see harness note).
+  2. `ocr.eval.OcrEvaluationTest.evaluateRegisteredEnginesOverTheFixtureSet`: empty failure element. Opt-in class, argument not set.
+  3. `repository.ImportRepositoryTest.slowProviderReadDoesNotBlockViewerReadsOrDeletion`: `java.lang.AssertionError: deletion and a viewer read must finish within 1 s while the provider stalls`, at `org.junit.Assert.assertTrue(Assert.java:42)`. Observed, not investigated in this step.
+  4. `repository.RecoveryTimingTest.recoveryTimeWithFiftySources`: empty failure element. Opt-in class, argument not set.
+- C1, C2 and C3 (the `OcrDatabaseTest`, `SourceDatabaseTest` and `VaultBootstrapperTest` failures from run 1) do not appear in run 2.
+
+Harness note. With the argument unset, the runner logs `ignored: recoveryTimeWithFiftySources` (logcat, `TestRunner`, `run finished: 0 tests, 0 failed, 1 ignored`), yet the Gradle XML records a `<failure>` with no message. The three empty failures therefore come from how the ignored opt-in tests are reported, not from test code. This is observed for `RecoveryTimingTest`; the same mechanism and the same empty message apply to the other two classes (inference, not separately logged).
+
+### Opt-in measurements (argument `true`; no thresholds relaxed)
+
+- C4 `OcrEngineMeasurementTest` (`-Pp203Measure=true`): passes (XML `tests=1 failures=0`). Per-fixture runs in ms, with peak PSS:
+  - tesseract-eng-fast, receipt-900x360: 896, 905, 949; peak PSS 64182 kB.
+  - tesseract-eng-fast, screenshot-1080x2400: 2874, 2851, 2932; peak PSS 75849 kB.
+  - tesseract-eng-fast, dense-1200x1600: 4061, 4073, 4033; peak PSS 67535 kB.
+  - mlkit-latin, receipt-900x360: 324, 337, 312; peak PSS 60114 kB.
+  - mlkit-latin, screenshot-1080x2400: 1152, 927, 887; peak PSS 91110 kB.
+  - mlkit-latin, dense-1200x1600: 1205, 1161, 1109; peak PSS 99006 kB.
+- C5 `OcrEvaluationTest` (`-Pp204Eval=true -Pp204Commit=a2124316894bfea2d53e3a19082950366493b339`, the HEAD commit recorded in the results JSON): the JUnit test passes (XML `tests=1 failures=0`). The eval logged one engine, `mlkit-latin`, with `gate=FAIL`: `abstention_correct_rate_non_latin FAIL observed=0.0`. The other checks logged PASS (for example `cer_mean_receipt observed=0.02328556294786782`, `line_match_rate observed=0.9980806142034548`, `duration_p95_ms observed=759.0`). No Tesseract result appears in this run. The first attempt without `p204Commit` failed with the message that the argument is required.
+- C6 `RecoveryTimingTest` (`-Pp114Timing=true`): passes (XML `tests=1 failures=0`). The test asserts no threshold, only logs: `sources=50 blobBytes=44788827 recoverMs=[91, 73, 54, 51, 39] medianMs=54`.
+
+### App module, run 2 (`:app:connectedDebugAndroidTest --continue`, exit 1, 25m45s)
+
+- XML: `tests=146 failures=113 errors=0 skipped=0`. Assumption violations are recorded as `<failure>` elements, so they are counted in the 113.
+- Failures grouped by first exception line:
+  - 76: `IllegalStateException: No compose hierarchies found in the app` (the activity did not reach `setContent`). Example: `SettingsScreenTest.resetVaultRequiresTypedConfirmation` at `SettingsScreenTest.kt:46`. Logcat for `SettingsScreenTest` shows no `FATAL EXCEPTION`; the test activity was launched, then `appSwitch from org.openlife.test to org.openlife`. Root cause not established. Related failures show `Activity never becomes requested state "[RESUMED]" (last lifecycle transition = "STOPPED")` (`FirstRunFlowTest.kt:45`).
+  - 4: `IntakeActivityTest` `status never contained 'Prepared'` (`IntakeActivityTest.kt:216`) (plus `status never reached Prepared; last=Preparing`).
+  - 4: `InternalLinkTest` `list not shown` (`InternalLinkTest.kt:77`).
+  - 4: `MultiWindowScrubTest` `viewer not shown` (`MultiWindowScrubTest.kt:105`).
+  - 3: `IntakeAndListFlowTest` bare `AssertionError` (`IntakeAndListFlowTest.kt:392`).
+  - 2: `PhotoPickerRouteTest` `preview never appeared` (`PhotoPickerRouteTest.kt:149`).
+  - 2 each: `AppLockFlowTest` `lock screen not shown` (`AppLockFlowTest.kt:82`), `NullPointerException` (`AppLockFlowTest.kt:134`); `AboutScreenTest` `ComposeTimeoutException: Condition still not satisfied after 10000 ms` (`AboutScreenTest.kt:121`).
+  - 2: `FirstRunFlowTest` activity lifecycle not RESUMED (above).
+  - 1 each: `PhotoPickerRouteTest` picked image never reached preview, unsupported format not explained; `AppLockFlowTest` no cannot-verify explanation, `ScriptedAuthenticator.awaitRequest` `no authentication was requested`, and an `AssumptionViolatedException` for device PIN opt-in (`AppLockFlowTest.kt:222`); `IntakeAndListFlowTest` viewer did not show saved image; `NavigationBackTest` viewer did not load image; `ViewerByIdRealStoreTest` real store did not show source; `IntakeViewModel` `CreationExtras must have a value by SAVED_STATE_REGISTRY_OWNER_KEY` (`IntakeViewModel.kt:514`).
+  - Assumption-as-failure, goldens: `BrandScreenshotInstrumentedTest` (3) `no committed ... goldens for render profile api26-AGS2-W09EEA-320dpi`.
+- `SecureWindowUiTest` does not appear in the app XML at all in this run, so its outcome is unknown. `SecureWindowTest` (a different class) passes.
+- Behavioural failures other than the API-level StrictMode and `NoSuchMethodError` failures from run 1 were not changed in this step.
+
+### Unfinished
+
+- Root cause of the 76 "No compose hierarchy" failures is not established. Next step: a logcat capture for one `ComponentActivity`-based class at the moment the activity is expected to resume.
+- `ImportRepositoryTest.slowProviderReadDoesNotBlockViewerReadsOrDeletion` (1 s bound) fails on this device; not investigated.
+- Eval gate failure for `mlkit-latin` (`abstention_correct_rate_non_latin`) is recorded, not investigated. No Tesseract eval result in this run.
+- Lint `NewApi` is not enforced on androidTest sources: enabling `checkTestSources` produced 46 app and 15 vault findings, all in host `src/test` files. The one androidTest finding (`UseSdkSuppress` on `SecureWindowUiTest`) was fixed with `@SdkSuppress`.
+- `SecureWindowUiTest`: outcome unknown (see above).
