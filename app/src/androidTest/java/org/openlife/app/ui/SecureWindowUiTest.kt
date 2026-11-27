@@ -71,7 +71,7 @@ class SecureWindowUiTest {
             assertAllWindowsSecure("overflow menu", expectedAtLeast = 2)
             device.pressBack()
 
-            device.wait(Until.findObject(By.desc("Delete")), WAIT_MS)!!.click()
+            device.wait(Until.findObject(By.descStartsWith("Delete ")), WAIT_MS)!!.click()
             assertTrue(device.wait(Until.hasObject(By.text("Cancel")), WAIT_MS))
             assertAllWindowsSecure("delete dialog", expectedAtLeast = 2)
             device.findObject(By.text("Cancel")).click()

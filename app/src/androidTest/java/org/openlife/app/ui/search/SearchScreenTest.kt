@@ -4,12 +4,13 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.DpSize
@@ -104,10 +105,11 @@ class SearchScreenTest {
         }
         composeRule.onAllNodesWithTag("search_result").assertCountEqualsOne()
         composeRule.onNodeWithTag("search_result").performClick()
+        // The selected span is shown as visible text only; the status host never carries span text.
         composeRule.waitUntil(WAIT_MS) {
-            composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("Selected: Pick up by Friday").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("viewer_span_announcement").assertTextContains("Pick up by Friday", substring = true)
+        composeRule.onNodeWithText("Selected: Pick up by Friday").performScrollTo().assertIsDisplayed()
     }
 
     private fun setHost(size: DpSize) {

@@ -192,7 +192,8 @@ class ViewerScreenC1Test {
 
         composeRule.onNodeWithText("Run again").performScrollTo().performClick()
         assertEquals(1, runs)
-        composeRule.onNodeWithText("History (1)").performScrollTo().performClick()
+        composeRule.onNodeWithText("Show history (1)").performScrollTo().performClick()
+        composeRule.onNodeWithText("Hide history (1)").assertIsDisplayed()
         composeRule.onNodeWithText("Failed", substring = true).performScrollTo().assertIsDisplayed()
     }
 

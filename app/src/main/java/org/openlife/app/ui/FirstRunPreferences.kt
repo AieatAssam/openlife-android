@@ -14,6 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
@@ -56,30 +58,37 @@ object FirstRunPreferences {
 
 @Composable
 fun FirstRunExplanationScreen(onContinue: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-        Column(
-            // Keep the explanation reachable when the user enables a large
-            // accessibility font. The screen is intentionally scrollable
-            // instead of relying on a particular viewport height.
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
-            FoldedCornerCard(modifier = Modifier.padding(top = 16.dp)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.first_run_title), style = MaterialTheme.typography.displaySmall)
-                    Text(stringResource(R.string.first_run_body))
-                    Text(stringResource(R.string.first_run_device_lock))
-                }
-            }
-            OpenLifeButton(
-                modifier = Modifier.padding(top = 24.dp),
-                onClick = onContinue,
+    StatusHost {
+        val pane = stringResource(R.string.first_run_title)
+        Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding().semantics { paneTitle = pane }) {
+            Column(
+                // Keep the explanation reachable when the user enables a large
+                // accessibility font. The screen is intentionally scrollable
+                // instead of relying on a particular viewport height.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
             ) {
-                Text(stringResource(R.string.first_run_continue))
+                Text(
+                    stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.displaySmall,
+                    modifier = Modifier.asHeading(),
+                )
+                FoldedCornerCard(modifier = Modifier.padding(top = 16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(pane, style = MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading())
+                        Text(stringResource(R.string.first_run_body))
+                        Text(stringResource(R.string.first_run_device_lock))
+                    }
+                }
+                OpenLifeButton(
+                    modifier = Modifier.padding(top = 24.dp),
+                    onClick = onContinue,
+                ) {
+                    Text(stringResource(R.string.first_run_continue))
+                }
             }
         }
     }

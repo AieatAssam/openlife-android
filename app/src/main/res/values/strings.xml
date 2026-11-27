@@ -25,7 +25,7 @@
     <string name="search_result_no_location">No location in the image</string>
     <string name="content_unavailable">Content unavailable</string>
     <string name="deletion_pending_retry">Deletion pending — retry</string>
-    <string name="delete_content_description">Delete</string>
+    <string name="delete_content_description">Delete %1$s</string>
     <string name="retry_deletion_content_description">Retry deletion</string>
     <string name="saved_image_thumbnail_content_description">Saved image thumbnail</string>
 
@@ -72,7 +72,7 @@
     <string name="rejection_unsupported_picked_format">OpenLife imports JPEG and PNG images only, and this item is in a different format</string>
 
     <string name="viewer_back_content_description">Back</string>
-    <string name="viewer_delete_content_description">Delete</string>
+    <string name="viewer_delete_content_description">Delete %1$s</string>
     <string name="viewer_span_selected">Selected: %1$s</string>
     <string name="viewer_verifying">Verifying…</string>
     <string name="viewer_saved_content_unreadable_explained">This item’s saved content is unreadable. It failed its integrity check or is missing, so OpenLife will not show it. You can delete OpenLife’s copy; the original stays wherever you shared it from.</string>
@@ -107,7 +107,8 @@
     <string name="viewer_review_accepted">Accepted</string>
     <string name="viewer_review_rejected">Rejected</string>
     <string name="viewer_review_unrecognised">Unknown review state</string>
-    <string name="viewer_ocr_history">History (%1$d)</string>
+    <string name="viewer_ocr_history_show">Show history (%1$d)</string>
+    <string name="viewer_ocr_history_hide">Hide history (%1$d)</string>
     <string name="viewer_ocr_history_item">%1$s · %2$s · %3$s %4$s</string>
     <string name="viewer_revision_not_started">Not started</string>
     <string name="viewer_revision_running">Running</string>
@@ -313,4 +314,14 @@
     <string name="about_document_loading">Loading…</string>
     <string name="about_document_failed">This text could not be read.</string>
     <string name="settings_section_vault">Vault</string>
+    <!-- P1-10: accessibility-only text. Generic by design: never document content. -->
+    <string name="list_open_action">Open</string>
+    <string name="search_open_action">Open in viewer</string>
+    <string name="viewer_pane_title">Saved image</string>
+    <string name="intake_pane_title">Import an image</string>
+    <string name="viewer_select_text_action">Show in image</string>
+    <string name="viewer_zoom_in">Zoom in</string>
+    <string name="viewer_zoom_out">Zoom out</string>
+    <string name="viewer_zoom_reset">Fit to screen</string>
+    <string name="viewer_zoom_state">Zoom: %1$d%%</string>
 </resources>

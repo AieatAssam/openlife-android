@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import androidx.compose.ui.test.onNodeWithTag
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -95,7 +96,7 @@ class SavedStateTest {
                 navController.navigate(Routes.ListDetail(sourceId.toString(), span.id.toString()))
             }
             composeRule.waitUntil(WAIT_MS) {
-                composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("Selected:", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.waitUntil(WAIT_MS) {
                 composeRule.onAllNodesWithText(SPAN_TEXT, substring = true).fetchSemanticsNodes().isNotEmpty()

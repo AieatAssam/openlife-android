@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -29,6 +32,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -47,8 +51,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.OpenLifeButton
@@ -77,96 +87,115 @@ fun SourceListScreen(
     // P1-20-R3: held by the list's ViewModel, so the position survives a change of selection.
     listState: LazyListState = rememberLazyListState(),
 ) {
-    var pendingDelete by remember { mutableStateOf<Source?>(null) }
+    StatusHost {
+        var pendingDelete by remember { mutableStateOf<Source?>(null) }
 
-    val hasItems = state is SourceListUiState.Loaded && state.sources.isNotEmpty()
-
-    Scaffold(
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.list_title)) },
-                actions = {
-                    // P2-08: local search; an empty vault simply finds nothing.
-                    if (onOpenSearch != null) {
-                        IconButton(onClick = onOpenSearch) {
-                            Icon(
-                                Icons.Filled.Search,
-                                contentDescription = stringResource(R.string.list_search_content_description),
-                            )
-                        }
+        val pane = stringResource(R.string.list_title)
+        Scaffold(
+            modifier = Modifier.semantics { paneTitle = pane },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            topBar = { ListTopBar(onOpenSearch, onOpenSettings, onOpenAbout) },
+            // VISUAL_IDENTITY §7: one filled primary action per screen. An empty
+            // list carries it in the body instead; loading and an unavailable
+            // vault offer no import at all.
+            floatingActionButton = {
+                if (state is SourceListUiState.Loaded && state.sources.isNotEmpty()) {
+                    // The content-slot overload keeps the label a plain Text; the
+                    // icon/text overload hides it from semantics while animating.
+                    OpenLifeExtendedFloatingActionButton(
+                        onClick = onImportFromPhotoPicker,
+                        // VISUAL_IDENTITY §7: the primary action is filled vermilion,
+                        // not the tonal container M3 uses for FABs by default.
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) { ImportActionContent(gap = 12.dp) }
+                }
+            },
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                when (state) {
+                    SourceListUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Announce(Announcement.statusOf(R.string.list_loading))
+                        Text(stringResource(R.string.list_loading))
                     }
-                    ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
-                },
-            )
-        },
-        // VISUAL_IDENTITY §7: one filled primary action per screen. An empty
-        // list carries it in the body instead; loading and an unavailable
-        // vault offer no import at all.
-        floatingActionButton = {
-            if (hasItems) {
-                // The content-slot overload keeps the label a plain Text; the
-                // icon/text overload hides it from semantics while animating.
-                OpenLifeExtendedFloatingActionButton(
-                    onClick = onImportFromPhotoPicker,
-                    // VISUAL_IDENTITY §7: the primary action is filled vermilion,
-                    // not the tonal container M3 uses for FABs by default.
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = 12.dp))
-                }
-            }
-        },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (state) {
-                SourceListUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.list_loading))
-                }
 
-                is SourceListUiState.VaultUnavailable -> VaultUnavailableScreen(
-                    cause = state.cause,
-                    onRetry = onRetryVault,
-                    onOpenResetSettings = onOpenSettings,
-                    onFinishReset = onFinishReset,
-                )
+                    is SourceListUiState.VaultUnavailable -> VaultUnavailableScreen(
+                        cause = state.cause,
+                        onRetry = onRetryVault,
+                        onOpenResetSettings = onOpenSettings,
+                        onFinishReset = onFinishReset,
+                    )
 
-                is SourceListUiState.Loaded -> {
-                    if (state.sources.isEmpty()) {
-                        EmptyList(onImportFromPhotoPicker)
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING_FOR_FAB),
-                        ) {
-                            items(state.sources, key = { it.id }) { source ->
-                                SourceRow(
-                                    source = source,
-                                    loadThumbnail = loadThumbnail,
-                                    thumbnailGeneration = thumbnailGeneration,
-                                    onOpen = { onOpen(source.id) },
-                                    onDeleteRequested = { pendingDelete = source },
-                                )
+                    is SourceListUiState.Loaded -> {
+                        if (state.sources.isEmpty()) {
+                            EmptyList(onImportFromPhotoPicker)
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING_FOR_FAB),
+                            ) {
+                                items(state.sources, key = { it.id }) { source ->
+                                    SourceRow(
+                                        source = source,
+                                        loadThumbnail = loadThumbnail,
+                                        thumbnailGeneration = thumbnailGeneration,
+                                        onOpen = { onOpen(source.id) },
+                                        onDeleteRequested = { pendingDelete = source },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    pendingDelete?.let { source ->
-        DeleteConfirmationDialog(
-            itemLabel = sourceLabel(source),
-            onConfirm = {
-                onDelete(source.id)
-                pendingDelete = null
-            },
-            onDismiss = { pendingDelete = null },
-        )
+        pendingDelete?.let { source ->
+            DeleteConfirmationDialog(
+                itemLabel = sourceLabel(source),
+                onConfirm = {
+                    onDelete(source.id)
+                    pendingDelete = null
+                },
+                onDismiss = { pendingDelete = null },
+            )
+        }
     }
+}
+
+private val TITLE_MIN_FONT_SIZE = 16.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListTopBar(onOpenSearch: (() -> Unit)?, onOpenSettings: () -> Unit, onOpenAbout: () -> Unit) {
+    TopAppBar(
+        // One line that scales down to the width the two action buttons leave at 200 % font
+        // (BasicText autosize, as the title role's own size is the largest it may take).
+        // The title keeps the titleLarge role and the bar's content colour.
+        title = {
+            val style = MaterialTheme.typography.titleLarge
+            BasicText(
+                stringResource(R.string.list_title),
+                modifier = Modifier.asHeading(),
+                style = style.copy(color = LocalContentColor.current),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = TITLE_MIN_FONT_SIZE, maxFontSize = style.fontSize),
+            )
+        },
+        actions = {
+            // P2-08: local search; an empty vault simply finds nothing.
+            if (onOpenSearch != null) {
+                IconButton(onClick = onOpenSearch) {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.list_search_content_description),
+                    )
+                }
+            }
+            ListOverflowMenu(onOpenSettings = onOpenSettings, onOpenAbout = onOpenAbout)
+        },
+    )
 }
 
 @Composable
@@ -182,10 +211,18 @@ private fun SourceRow(
     // bounds would otherwise sit flush against the delete control.
     Column(modifier = Modifier.fillMaxWidth()) {
         FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            val openLabel = stringResource(R.string.list_open_action)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (deletionPending) Modifier else Modifier.clickable(onClick = onOpen))
+                    .heightIn(min = 48.dp)
+                    .then(
+                        if (deletionPending) {
+                            Modifier
+                        } else {
+                            Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
+                        },
+                    )
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -223,13 +260,11 @@ private fun SourceRow(
                 IconButton(onClick = onDeleteRequested) {
                     Icon(
                         Icons.Filled.Delete,
-                        contentDescription = stringResource(
-                            if (deletionPending) {
-                                R.string.retry_deletion_content_description
-                            } else {
-                                R.string.delete_content_description
-                            },
-                        ),
+                        contentDescription = if (deletionPending) {
+                            stringResource(R.string.retry_deletion_content_description)
+                        } else {
+                            stringResource(R.string.delete_content_description, sourceLabel(source))
+                        },
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -280,6 +315,7 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
             stringResource(R.string.list_empty_title),
             style = MaterialTheme.typography.displaySmall,
             textAlign = TextAlign.Center,
+            modifier = Modifier.asHeading(),
         )
         Text(
             stringResource(R.string.list_empty),
@@ -287,10 +323,17 @@ private fun EmptyList(onImportFromPhotoPicker: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         OpenLifeButton(onClick = onImportFromPhotoPicker, modifier = Modifier.padding(top = 24.dp)) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = 8.dp))
+            ImportActionContent(gap = 8.dp)
         }
     }
+}
+
+/** The import action's icon and label, for the FAB and the empty-list button. */
+@Composable
+private fun ImportActionContent(gap: Dp) {
+    // Decorative: the text beside it names the action.
+    Icon(Icons.Filled.Add, contentDescription = null)
+    Text(stringResource(R.string.list_import_from_photos), modifier = Modifier.padding(start = gap))
 }
 
 private val LIST_BOTTOM_PADDING_FOR_FAB = 96.dp

@@ -1,6 +1,7 @@
 package org.openlife.app.settings
 
 import android.icu.text.ListFormatter
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.openlife.app.R
+import org.openlife.app.ui.Announce
+import org.openlife.app.ui.Announcement
+import org.openlife.app.ui.StatusHost
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.vault.repository.ResetConfirmation
@@ -45,6 +50,11 @@ internal fun VerifyAllSection(controller: SettingsController, onVerifyAll: suspe
             is VerifyOutcome.Done -> {
                 val report = current.report
                 val damaged = report.markedCorrupt
+                Announce(
+                    Announcement.countOf(R.plurals.verify_all_verified, report.verified) +
+                        Announcement.countOf(R.plurals.verify_all_damaged, damaged) +
+                        Announcement.countOf(R.plurals.verify_all_unchecked, report.transient),
+                )
                 Text(
                     localizedList(
                         listOf(
@@ -57,12 +67,15 @@ internal fun VerifyAllSection(controller: SettingsController, onVerifyAll: suspe
                 if (report.transient > 0) Text(stringResource(R.string.verify_all_transient_hint))
             }
 
-            VerifyOutcome.Unavailable -> Text(stringResource(R.string.verify_all_unavailable))
+            VerifyOutcome.Unavailable -> {
+                Announce(Announcement.statusOf(R.string.verify_all_unavailable))
+                Text(stringResource(R.string.verify_all_unavailable))
+            }
 
-            VerifyOutcome.Failed -> Text(
-                stringResource(R.string.verify_all_failed),
-                color = MaterialTheme.colorScheme.error,
-            )
+            VerifyOutcome.Failed -> {
+                Announce(Announcement.statusOf(R.string.verify_all_failed))
+                Text(stringResource(R.string.verify_all_failed), color = MaterialTheme.colorScheme.error)
+            }
 
             null -> Unit
         }
@@ -114,12 +127,10 @@ fun ResetVaultFlow(
         FinalConfirmationDialog(
             running = state.running,
             failure = state.failure?.let {
-                stringResource(
-                    when (it) {
-                        ResetFailure.BUSY -> R.string.reset_vault_busy
-                        ResetFailure.FAILED -> R.string.reset_vault_failed
-                    },
-                )
+                when (it) {
+                    ResetFailure.BUSY -> R.string.reset_vault_busy
+                    ResetFailure.FAILED -> R.string.reset_vault_failed
+                }
             },
             onDismiss = controller::dismissReset,
             onConfirm = { controller.confirmReset(onResetVault) },
@@ -137,7 +148,7 @@ private fun TypeWordDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.reset_vault_title)) },
+        title = { Text(stringResource(R.string.reset_vault_title), modifier = Modifier.asHeading()) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.reset_vault_explanation))
@@ -165,14 +176,25 @@ private fun TypeWordDialog(
 }
 
 @Composable
-private fun FinalConfirmationDialog(running: Boolean, failure: String?, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun FinalConfirmationDialog(
+    running: Boolean,
+    @StringRes failure: Int?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = { if (!running) onDismiss() },
-        title = { Text(stringResource(R.string.reset_vault_final_title)) },
+        title = { Text(stringResource(R.string.reset_vault_final_title), modifier = Modifier.asHeading()) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.reset_vault_final_explanation))
-                failure?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            // A dialog is its own window, so its status needs its own host.
+            StatusHost {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.reset_vault_final_explanation))
+                    failure?.let {
+                        Announce(Announcement.statusOf(it))
+                        Text(stringResource(it), color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         },
         confirmButton = {
