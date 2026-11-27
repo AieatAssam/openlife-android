@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -46,16 +47,19 @@ class ButtonShapeTest {
                 containerArgb = BACKDROP.toArgbInt()
                 buttonArgb = MaterialTheme.colorScheme.primary.toArgbInt()
                 Box(Modifier.background(BACKDROP).padding(PADDING.dp).testTag(TAG)) {
-                    OpenLifeButton(onClick = {}) { Text("Synthetic") }
+                    OpenLifeButton(onClick = {}, modifier = Modifier.testTag(BUTTON_TAG)) { Text("Synthetic") }
                 }
             }
         }
         val image = composeRule.onNodeWithTag(TAG).captureToImage().asAndroidBitmap()
-        // The visible 40 dp container is centred in the 48 dp touch target.
-        val left = (PADDING * density).toInt()
-        val top = ((PADDING + TOUCH_INSET) * density).toInt()
+        // Locate the drawn button inside the captured image from layout bounds, not from assumed offsets.
+        val tagBounds = composeRule.onNodeWithTag(TAG).fetchSemanticsNode().boundsInRoot
+        val buttonBounds = composeRule.onNodeWithTag(BUTTON_TAG).fetchSemanticsNode().boundsInRoot
+        val left = (buttonBounds.left - tagBounds.left).roundToInt()
+        val top = (buttonBounds.top - tagBounds.top).roundToInt()
         val inside = image.getPixel(left + (9 * density).toInt(), top + (3 * density).toInt())
-        val corner = image.getPixel(left + 1, top + 1)
+        // 1 dp in from the corner is outside an 8 dp arc at any density.
+        val corner = image.getPixel(left + (1 * density).toInt(), top + (1 * density).toInt())
         assertEquals("the corner itself is outside the shape", containerArgb, corner)
         assertEquals("9 dp x 3 dp is inside an 8 dp corner (a pill would leave it outside)", buttonArgb, inside)
     }
@@ -70,7 +74,7 @@ class ButtonShapeTest {
     private companion object {
         const val TAG = "button-shape"
         const val PADDING = 16
-        const val TOUCH_INSET = 4
+        const val BUTTON_TAG = "button-shape-button"
         val BACKDROP = Color(0xFF00FF00)
     }
 }
