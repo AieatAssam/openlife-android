@@ -34,6 +34,10 @@ contain the compile options `ENABLE_FTS5`, `ENABLE_FTS3`/`FTS4`,
 
 ## JVM evidence on the host engine
 
+(Since 2026-11-26 the default engine is the pinned sqlite-jdbc 3.53.4.0,
+ADR-0017; the python3 bridge described next is opt-in through
+`OPENLIFE_HOST_SQLITE=python3`.)
+
 `HostSqlite` (vault test sources) runs SQL through `python3 -I` with the
 stdlib `sqlite3` module (SQLite 3.53.3, FTS5 present). It turns on
 `foreign_keys` (as Room does) and `recursive_triggers`. (Corrected
@@ -200,6 +204,10 @@ Scripts in the session scratchpad (`exp208/e1.py`..`e5.py`), stdlib only:
 
 ### CI caveat: host SQLite version
 
+Superseded by ADR-0017 (2026-11-26): the host tests now run on the pinned
+sqlite-jdbc engine and skip nothing. The text below records the earlier
+state.
+
 The JVM job runs on `ubuntu-22.04` and installs no Python of its own, so
 `python3` is the distro's, linked to the distro SQLite (believed 3.37.2;
 not checked on the runner; below 3.42 either way), which has no FTS5
@@ -301,10 +309,13 @@ PR #36 moved the CI build job to ubuntu-24.04, whose `python3` SQLite is
 Each failed at its FTS5 `'integrity-check'` with "database disk image is
 malformed".
 
-**Reproduction** (scratchpad, not committed). A Java harness speaks
-`HostSqlite`'s line protocol over `org.xerial:sqlite-jdbc`. The JARs were
-downloaded from Maven Central and each checked against its published
-`.sha1`. `OPENLIFE_HOST_SQLITE` selects the harness.
+**Reproduction.** Every result below was observed on `org.xerial:sqlite-jdbc`
+builds of each SQLite version, not on SQLCipher. A Java harness speaks
+`HostSqlite`'s line protocol over the chosen jar; it is committed as
+`scripts/host-sqlite/LineHost.java` (see "Multi-version bisect (local
+procedure)" below). The jars were downloaded from Maven Central and each
+checked against its published `.sha1`. `OPENLIFE_HOST_SQLITE` selects the
+harness.
 
 **Minimal sequence** (table and trigger SQL as in `SearchIndex`):
 
@@ -368,7 +379,8 @@ corruption is silent unless the check runs.
   checks for 3.42. It is not raised here: on 24.04 that would fail the
   job, and every option for a newer engine adds a build input, which needs
   an owner or coordinator decision.
-- Options, smallest first. None is implemented.
+- Options, smallest first. Option 1 was chosen on 2026-11-26 (ADR-0017;
+  see "Pinned test engine" below).
   1. Add `org.xerial:sqlite-jdbc` (3.46.1 or later, with `slf4j-api`) as a
      `testImplementation` dependency, with verification metadata. A
      test-only `HostSqlite` engine over JDBC would replace the `python3`
@@ -404,3 +416,58 @@ was added and compiled, but not run (no device).
   `INSERT INTO <t>(<t>, rank) VALUES('integrity-check', 1)` on both index
   tables.
 - Read `sqlite_version()` on an opened vault and record it.
+
+## Pinned test engine (ADR-0017, 2026-11-26)
+
+Decided by the coordinating session under the owner's 2026-11-24
+delegation: option 1 above. The default `HostSqlite` engine is
+`org.xerial:sqlite-jdbc` 3.53.4.0, in-process. It is a vault
+`testImplementation`, and its SQLite (3.53.4) equals SQLCipher 4.19.0's
+3.53.4 (static read).
+- `PinnedEngineTest` asserts the version and that the index is created.
+- On this engine `SearchFixture.assumeIndexed` and
+  `SourceRowRemovalTest.hasSearchIndex` fail rather than skip when the index
+  is missing, so a default run has 0 skipped tests by construction.
+- `OPENLIFE_HOST_SQLITE` selects another engine (opt-in only):
+  - `python3` (the host python's `sqlite3`);
+  - a line-protocol command such as `scripts/host-sqlite/LineHost.java`.
+  Only on such an engine can the index tests and `PinnedEngineTest` skip.
+- `DependencyBoundaryTest.testOnlyDependenciesReachNoReleaseDebugOrInstrumentedClasspath`
+  reads `app` and `vault` `build/reports/classpath-boundary.txt`. Recorded
+  mutation: `androidTestImplementation(libs.sqlite.jdbc)` in `vault` failed
+  it with `expected:<[]> but was:<[vault debugAndroidTestRuntimeClasspath: org.xerial:sqlite-jdbc:3.53.4.0]>`.
+  - The first mutation attempt passed vacuously. `:app:testDebugUnitTest`
+    was UP-TO-DATE, because the reports were not declared test inputs.
+  - They are now declared (`classpathReports`, which also covers the older
+    `classpath-release.txt`), and the second attempt failed as above.
+- CI: the build job is back on ubuntu-22.04, and the python floor step is
+  removed. `scripts/tests/p0-04-ci-workflow.sh` checks that the job is on
+  22.04, has no floor step and never sets `OPENLIFE_HOST_SQLITE`. Recorded
+  mutation: adding `env: OPENLIFE_HOST_SQLITE: python3` to the job gave
+  41 passed, 1 failed.
+- The libsqlitejdbc native library for Linux x86_64 requires at most
+  `GLIBC_2.3` (`readelf -V`), so it loads on 22.04 (glibc 2.35).
+
+### Multi-version bisect (local procedure, not CI)
+
+The older jars are not in the CI dependency cache and are not dependencies
+of the build, so older engines are tested only locally.
+`SearchIndexEngineGateTest` covers the version comparison and the gate on
+any engine.
+
+1. Download `sqlite-jdbc-<v>.jar` from Maven Central into an empty
+   directory, and check it against its published `.sha1`.
+   - Versions from 3.45 on also need `slf4j-api` on the classpath, or the
+     driver fails with "No suitable driver".
+2. Run the vault suite on that engine, with absolute paths (the test
+   working directory is `vault/`), for example:
+   `OPENLIFE_HOST_SQLITE="java -cp /abs/sqlite-jdbc-3.45.1.0.jar:/abs/slf4j-api.jar /abs/openlife/scripts/host-sqlite/LineHost.java" ./gradlew :vault:testDebugUnitTest --rerun`
+   - `--rerun` is needed because the environment variable is not a task
+     input.
+3. For the minimal case, run the SQL above through the same harness.
+
+Results already observed (2026-11-26, sqlite-jdbc builds; minimal
+sequence): corrupt on 3.42.0, 3.43.2, 3.44.1, 3.45.1, 3.45.3, 3.46.0; clean
+on 3.46.1, 3.47.0, 3.49.1, 3.50.3 and 3.53.3. On the pinned 3.53.4 the
+minimal sequence was not run separately; the vault suite, which runs the
+integrity check after every trigger path, passes there.

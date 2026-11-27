@@ -101,7 +101,9 @@ fallback below).
   - SQLite 3.42.0 through 3.46.0 write a corrupt FTS5 external-content index
     when a row is removed with the `'delete'` command while secure-delete
     is on.
-    - Host reproduction via `org.xerial:sqlite-jdbc`: create the table,
+    - Host reproduction, observed on `org.xerial:sqlite-jdbc` builds of
+      each SQLite version (exact SQL in
+      `docs/verification/P2-08-local-search.md`): create the table,
       set secure-delete, insert one row through the insert trigger and
       remove it through the delete trigger, then run `'integrity-check'`.
       It reports `SQLITE_CORRUPT_VTAB` on 3.42.0, 3.43.2, 3.44.1, 3.45.1,
@@ -233,9 +235,12 @@ an engine that supports it (`SearchIndex.ensure`).
 ## Testing approach
 
 - The host JVM has no SQLCipher and no Android SQLite. The vault JVM tests
-  therefore run the real migration, triggers and query SQL against the
-  host's Python `sqlite3` module (SQLite 3.53.3 with FTS5) through
-  `HostSqlite`, a stdlib-only subprocess bridge.
+  therefore run the real migration, triggers and query SQL through
+  `HostSqlite` on a pinned engine: `org.xerial:sqlite-jdbc` 3.53.4.0, a
+  vault test-only dependency whose SQLite (3.53.4) is the one inside
+  SQLCipher 4.19.0 (ADR-0017). The engine is the same locally and in CI.
+  Until 2026-11-26 the engine was the host's python `sqlite3` module, so
+  the result varied by machine.
   - The bridge enables `foreign_keys` (Room turns it on) and, by
     default, `recursive_triggers`. No production code sets
     `recursive_triggers`; on a device it has the build default. The
@@ -245,9 +250,12 @@ an engine that supports it (`SearchIndex.ensure`).
     with it on and off (P3-02 review M-05; corrected 2026-11-26). Cascades fire the index's delete triggers with
     `recursive_triggers` on or off (host check); the setting is not what
     makes deletion reach the index.
-  - The index needs SQLite 3.46.1 or later on the host (see "Engine
-    floor"). On an older host SQLite the index tests are skipped with a
-    message naming the version, not run vacuously. The fail-closed tests
+  - The index needs SQLite 3.46.1 or later (see "Engine floor"). On the
+    pinned engine a missing index is a test failure, so no index test
+    skips (`PinnedEngineTest` checks the version and the index). Only an
+    engine chosen with `OPENLIFE_HOST_SQLITE` (`python3`, or
+    `scripts/host-sqlite/LineHost.java` over another sqlite-jdbc jar) may
+    skip them, with a message naming the version. The fail-closed tests
     and `SearchIndexEngineGateTest` (which reports a chosen version
     through `sqlite_version()`) run on any version.
   - Every mutation sequence in `SearchIndexHostTest` ends with FTS5
