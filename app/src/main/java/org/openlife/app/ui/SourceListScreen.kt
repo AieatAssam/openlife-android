@@ -246,13 +246,11 @@ private fun SourceRow(
                 IconButton(onClick = onDeleteRequested) {
                     Icon(
                         Icons.Filled.Delete,
-                        contentDescription = stringResource(
-                            if (deletionPending) {
-                                R.string.retry_deletion_content_description
-                            } else {
-                                R.string.delete_content_description
-                            },
-                        ),
+                        contentDescription = if (deletionPending) {
+                            stringResource(R.string.retry_deletion_content_description)
+                        } else {
+                            stringResource(R.string.delete_content_description, sourceLabel(source))
+                        },
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }

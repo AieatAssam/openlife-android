@@ -25,7 +25,7 @@
     <string name="search_result_no_location">No location in the image</string>
     <string name="content_unavailable">Content unavailable</string>
     <string name="deletion_pending_retry">Deletion pending — retry</string>
-    <string name="delete_content_description">Delete</string>
+    <string name="delete_content_description">Delete %1$s</string>
     <string name="retry_deletion_content_description">Retry deletion</string>
     <string name="saved_image_thumbnail_content_description">Saved image thumbnail</string>
 
@@ -72,7 +72,7 @@
     <string name="rejection_unsupported_picked_format">OpenLife imports JPEG and PNG images only, and this item is in a different format</string>
 
     <string name="viewer_back_content_description">Back</string>
-    <string name="viewer_delete_content_description">Delete</string>
+    <string name="viewer_delete_content_description">Delete %1$s</string>
     <string name="viewer_span_selected">Selected: %1$s</string>
     <string name="viewer_verifying">Verifying…</string>
     <string name="viewer_saved_content_unreadable_explained">This item’s saved content is unreadable. It failed its integrity check or is missing, so OpenLife will not show it. You can delete OpenLife’s copy; the original stays wherever you shared it from.</string>
