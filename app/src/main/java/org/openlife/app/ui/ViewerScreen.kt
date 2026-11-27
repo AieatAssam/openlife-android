@@ -262,6 +262,14 @@ private fun ViewerContent(
                     onDelete = onDeleteRequested,
                     viewport = viewport,
                 )
+                // Shown for sighted users; the StatusHost node above announces the same text.
+                selectedSpan?.let {
+                    Text(
+                        stringResource(R.string.viewer_span_selected, evidenceSpanPreview(it.text)),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 // What the user came for (the text and its evidence) comes before
                 // the bookkeeping about the saved copy.
                 OcrSection(
