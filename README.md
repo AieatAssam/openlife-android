@@ -98,3 +98,9 @@ that build is tampered with, only that it is not an official release.
 Apache License 2.0 — see `LICENSE`. That covers the source code here; it
 isn't the same as deciding the app is ready for anyone to install and trust,
 which is a separate call to make later (design doc §14).
+
+---
+
+Amendment 2026-11-27 (ADR-0019, P1-21): the app's lowest supported Android
+version is 8.0 (API 26), set by `minSdk = 26`. The README did not previously
+state a minimum.

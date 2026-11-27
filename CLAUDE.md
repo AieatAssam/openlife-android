@@ -152,3 +152,11 @@ worked reliably in this sandbox.
 Full per-capability test results and the reasoning behind every environment
 workaround above are in `docs/verification/` — update them, don't just fix
 things quietly, when you hit and resolve something new here.
+
+---
+
+Amendment 2026-11-27 (ADR-0019, P1-21): `minSdk` is now 26 (Android 8.0), not
+29. The "No API 29 (the app's declared `minSdk`) system image" note above is
+historical: the declared minimum is 26, and the constraint is unchanged for the
+API 26 device and the CI API 29 leg. API 26 device evidence comes only from the
+physical tablet (`docs/verification/P1-21-min-sdk-26.md`).

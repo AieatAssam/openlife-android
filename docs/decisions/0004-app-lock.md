@@ -94,3 +94,15 @@ unrecoverable, which design §10 treats as the outcome to avoid.
   a credential change cannot lose the vault (P9-02).
 - **Notification-opened screens.** Before P4 adds notification-opened detail
   screens, route them through the same gate. This is P1-07-R2's P4 clause.
+
+## Amendment 2026-11-27 (ADR-0019, P1-21)
+
+The minimum Android version is now 26 (ADR-0019). The "API 29 allows
+`BIOMETRIC_WEAK | DEVICE_CREDENTIAL`" statement above now covers API 26-29: the
+lower bound moves from 29 to 26, and the STRONG/WEAK split is unchanged
+(STRONG plus the device credential from API 30). The `USE_FINGERPRINT`
+statement in Consequences is superseded: the app manifest restores
+`USE_FINGERPRINT` with `maxSdkVersion="27"`, so it is present in the merged
+release manifest for API 26-27 only. `USE_BIOMETRIC` remains the only permission
+for API 28+. Device behaviour on API 26-29 is unverified (see
+`docs/verification/P1-21-min-sdk-26.md`).

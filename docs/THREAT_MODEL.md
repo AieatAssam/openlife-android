@@ -294,3 +294,8 @@ echo the query.
 ## References
 
 Numbered references (R1–R9) match Section 16 of `openlife-design-v0.3.md`.
+
+Amendment 2026-11-27 (ADR-0019, P1-21): the lowest supported version is now
+Android 8.0 (API 26), not API 29. The gap above therefore extends to API 26-28,
+which no emulator or CI leg covers; the API 26 device checklist is in
+`docs/verification/P1-21-min-sdk-26.md` and is unverified until it is run.
