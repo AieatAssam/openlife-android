@@ -128,14 +128,18 @@ class EvidenceNavigationTest {
         val revisionId = UUID.randomUUID()
         val centerSpan = span(revisionId, 0, "center token", OcrEvidenceRegion(40, 40, 60, 60))
         showSquareSource(listOf(centerSpan))
+        composeRule.waitForIdle()
+        // SemanticsNode.size is read live, so the fit size is captured before the zoom.
         val fit = imageNode()
+        val fitWidth = fit.size.width
+        val fitHeight = fit.size.height
 
         composeRule.onNodeWithTag("viewer_evidence_canvas").performTouchInput { doubleClick(center) }
         composeRule.waitForIdle()
 
         val zoomed = imageNode()
-        assertEquals("zoomed width", fit.size.width * 3f, zoomed.size.width.toFloat(), 3f)
-        assertEquals("zoomed height", fit.size.height * 3f, zoomed.size.height.toFloat(), 3f)
+        assertEquals("zoomed width", fitWidth * 3f, zoomed.size.width.toFloat(), 3f)
+        assertEquals("zoomed height", fitHeight * 3f, zoomed.size.height.toFloat(), 3f)
         val region = composeRule.onNodeWithContentDescription("center token", useUnmergedTree = true).fetchSemanticsNode()
         assertTrue(
             "region ${unclipped(region)} must stay inside the zoomed image ${unclipped(zoomed)}",
@@ -226,7 +230,9 @@ class EvidenceNavigationTest {
         composeRule.mainClock.autoAdvance = false
         canvas.performTouchInput { click(percentOffset(0.9f, 0.9f)) } // selects "corner" and pans to it
         composeRule.mainClock.advanceTimeBy(SECOND_TAP_AFTER_MS) // recompose: the pan changes
-        canvas.performTouchInput { click(percentOffset(0.5f, 0.5f)) }
+        // A double tap lands on one spot: the pan moved the content, not the finger. Taps
+        // 0.4 of the canvas apart are outside DOUBLE_TAP_SLOP (S-04) and are two single taps.
+        canvas.performTouchInput { click(percentOffset(0.9f, 0.9f)) }
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
 
@@ -258,7 +264,8 @@ class EvidenceNavigationTest {
         composeRule.onNodeWithTag("viewer_evidence_canvas").performTouchInput { click(center) }
         composeRule.waitForIdle()
         composeRule.onAllNodesWithTag("viewer_span_announcement").assertCountEquals(0)
-        composeRule.onAllNodes(hasClickAction() and hasContentDescription("rejected token", substring = true))
+        // Exact label: the per-span Correct and Undo buttons name the span too, and are not evidence.
+        composeRule.onAllNodes(hasClickAction() and hasContentDescription("rejected token"))
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Show region").assertCountEquals(0)
         composeRule.onNodeWithText("rejected token").performScrollTo().performClick()

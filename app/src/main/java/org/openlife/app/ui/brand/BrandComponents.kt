@@ -84,6 +84,8 @@ fun StampBadge(state: StampState, modifier: Modifier = Modifier, motionScale: Fl
     ) {
         Text(
             text = label.uppercase(),
+            // The Box above carries the label; this child must not expose it again in the unmerged tree.
+            modifier = Modifier.clearAndSetSemantics { },
             style = MaterialTheme.typography.labelSmall.copy(
                 color = stampColor,
                 textDecoration = if (state == StampState.Stale) TextDecoration.LineThrough else null,

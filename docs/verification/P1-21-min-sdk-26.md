@@ -160,3 +160,42 @@ Not fixed; open, with the evidence observed:
 ### Unverified
 
 - The 10 open real failures have not been fixed or classified beyond the notes above. Each remains a device-verification gap.
+
+## Device run 6, 2026-11-27, Huawei AGS2-W09, API 26 (P1-21 device defects)
+
+Logs: `device-logs/app-run6.log`, results `device-logs/app-results-run6/`.
+
+### Items (classification, outcome)
+
+1. EvidenceNavigationTest rejected-token lookup: test assumption (the rejected region has no click action; Correct/Undo are legitimate). Test-only fix `cfed2b1`. Passes.
+2. InternalLinkTest teardown: test-harness assumption (ActivityScenario does not match the `onNewIntent`/`setIntent` path). Test-only fix `137db6d`. Passes.
+3. EdgeToEdgeUiTest `contentClearsSystemBarsWithLargeInsets`: test assumption, still failing. Real insets on device are top 48 px, bottom 68 px, and the list title sits at y=83 px, so the real app clears the status bar. Temporary logging showed the title at 41.5 dp before and after the synthetic 300 px dispatch to decorView, so Compose on API 26 does not read the synthetic insets. No production change; the test is not weakened and remains a device gap.
+4. AccessibilitySemanticsTest `stampBadgeLabelIsAnnouncedOnce`: product defect. The StampBadge Text child still exposed its label in the unmerged tree. Production change `app/src/main/java/org/openlife/app/ui/brand/BrandComponents.kt:88` (`modifier = Modifier.clearAndSetSemantics { }` on the Text). Commit `6f896f5`. Passes.
+5. EvidenceNavigationTest double-tap: two test defects (live `SemanticsNode.size`; second tap outside `DOUBLE_TAP_SLOP`). Test-only fix `cfed2b1`. 8/8 pass.
+6. ViewerScreenC1Test `staleExtractionIsGreyedAndExplained`: test assumption. The stamp's accessible name is the `stamp_stale` resource, and the uppercase text is not in the merged tree. Test now matches the label by content description. Commit `e965686`. Passes.
+7. ButtonShapeTest corner probe: test assumption. The probe used absolute pixel offsets; at 320 dpi the image origin is the tagged node, so the probe fell inside the button fill. The probe now derives the button origin from layout bounds and scales the 1 dp offset by density. Commit `8afee2d`. Passes.
+8. Two failures:
+   - AdaptiveLayoutTest `selectionSurvivesCompactToExpandedAndBack` (Details at line 97): test assumption. Details sits below the fold in the scrolled viewer at 1280 dp. Added `performScrollTo()`. Commit `bf65d17`. Passes.
+   - LargeFontUiTest `noControlIsClippedAtFontScaleTwoOn320x640`: product defect, still failing and not fixed. The list title "OpenLife" overflows its text layout at 200% font (the title slot is about 145 dp next to two 48 dp actions). An ellipsis was tried and does not clear `didOverflowWidth`. Fixing it needs a layout decision (action placement or title allocation at large font), so it is left open and the test is not weakened.
+
+### Production changes (this run)
+
+- `app/src/main/java/org/openlife/app/ui/brand/BrandComponents.kt:88`: Text child of `StampBadge` gets `Modifier.clearAndSetSemantics { }`.
+
+No other production file changed.
+
+### Full run (`./gradlew :app:connectedDebugAndroidTest --continue`, exit 1, 6m57s)
+
+- 146 tests, 6 failures. Failing: `EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets` (item 3), `LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640` (item 8), and the four expected entries left unchanged: `AppLockFlowTest.deviceCredentialUnlockBelowApi30KeepsThePendingShare`, `BrandScreenshotInstrumentedTest` `listDetailExpandedMatchesGolden`, `deleteDialogMatchesGolden`, `listViewerFirstRunMatchGoldensLightAndDark`.
+
+### Device-free gate
+
+- `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`: BUILD SUCCESSFUL (3m 1s), `device-logs/r6-gate.log`.
+
+### Device hygiene
+
+- `org.openlife` was uninstalled and reinstalled by the test runs. No emulator was started. `stay_on_while_plugged_in` was restored to 0.
+
+### Unverified
+
+- Item 3 and item 8 (LargeFont) remain failing device gaps.
