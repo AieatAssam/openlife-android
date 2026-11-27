@@ -302,8 +302,14 @@ private fun OcrOutcome(
 private fun OcrHistory(history: List<OcrHistoryItem>) {
     if (history.isEmpty()) return
     var expanded by rememberSaveable { mutableStateOf(false) }
+    // The label names the action, as the About screen's Show/Hide toggles do, so the state reaches TalkBack.
+    val label = if (expanded) {
+        stringResource(R.string.viewer_ocr_history_hide, history.size)
+    } else {
+        stringResource(R.string.viewer_ocr_history_show, history.size)
+    }
     OpenLifeTextButton(onClick = { expanded = !expanded }) {
-        Text(stringResource(R.string.viewer_ocr_history, history.size))
+        Text(label)
     }
     if (expanded) {
         history.forEach { item ->

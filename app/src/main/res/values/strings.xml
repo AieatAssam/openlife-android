@@ -107,7 +107,8 @@
     <string name="viewer_review_accepted">Accepted</string>
     <string name="viewer_review_rejected">Rejected</string>
     <string name="viewer_review_unrecognised">Unknown review state</string>
-    <string name="viewer_ocr_history">History (%1$d)</string>
+    <string name="viewer_ocr_history_show">Show history (%1$d)</string>
+    <string name="viewer_ocr_history_hide">Hide history (%1$d)</string>
     <string name="viewer_ocr_history_item">%1$s · %2$s · %3$s %4$s</string>
     <string name="viewer_revision_not_started">Not started</string>
     <string name="viewer_revision_running">Running</string>
