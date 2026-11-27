@@ -471,3 +471,27 @@ sequence): corrupt on 3.42.0, 3.43.2, 3.44.1, 3.45.1, 3.45.3, 3.46.0; clean
 on 3.46.1, 3.47.0, 3.49.1, 3.50.3 and 3.53.3. On the pinned 3.53.4 the
 minimal sequence was not run separately; the vault suite, which runs the
 integrity check after every trigger path, passes there.
+
+### Run record (2026-11-27, merge 37f890f)
+
+Tree: `origin/main` merged into `ci/host-sqlite-fts` (37f890f), on top of
+1cea913 (pinned engine) and f631a4d (records).
+
+- `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`
+  exit 0. Last lines: `138 actionable tasks: 82 executed, 56 up-to-date`,
+  `Configuration cache entry discarded with 8 problems.`
+- Results parsed from `*/build/test-results/**/*.xml` (stdlib Python; sums of
+  the `tests`, `failures` + `errors` and `skipped` attributes):
+  - vault: 61 suites, 273 tests, 0 failed, 0 skipped.
+  - app: 55 suites, 216 tests, 0 failed, 0 skipped.
+  - eval: 7 suites, 26 tests, 0 failed, 0 skipped.
+- Engine line in the vault output: `HostSqlite: SQLite 3.53.4 (pinned sqlite-jdbc)`.
+- `DependencyBoundaryTest`: 5 of 5 passed.
+- `scripts/plan-check.sh`: `steps=83 errors=0`.
+- `bash scripts/tests/run.sh`: `ok - P0-04 CI workflow contract passes`;
+  last line `51 passed, 0 failed`, exit 0.
+
+Not re-run in this record: the recorded mutations (the 41/1 workflow mutation
+and the `androidTestImplementation` boundary mutation, both from the earlier
+session), the older-engine bisect, and every device check. Those stay as stated
+above.

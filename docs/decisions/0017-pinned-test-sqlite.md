@@ -33,12 +33,17 @@ device).
   is enforced by `PinnedEngineTest`, which fails when the two drift apart
   (for example a SQLCipher bump without a matching sqlite-jdbc bump).
 - **Licence (read from the artefacts).**
-  - The POM declares "The Apache Software License, Version 2.0". That label
-    is not a verbatim entry in `config/allowed-licenses.json`, which lists
-    "Apache License, Version 2.0" and "Apache-2.0". The licence is Apache-2.0
-    in meaning, so this record treats it as allowlisted by that judgement.
-    The licence plugin's `checkLicense` does not check it, because it covers
-    `releaseRuntimeClasspath` only (`app/build.gradle.kts`).
+  - The POM declares "The Apache Software License, Version 2.0". That exact
+    label is not in `config/allowed-licenses.json` or in the allowlisted
+    labels of `docs/dependency-policy.md`, which list "Apache License,
+    Version 2.0" and "Apache-2.0". The licence plugin normalises it: the
+    release dependency `androidx.arch.core:core-runtime:2.2.0` has the same
+    POM label and appears as "Apache License, Version 2.0" in
+    `docs/generated/THIRD_PARTY_LICENSES.md`.
+  - `checkLicense` does not check this dependency, because it covers
+    `releaseRuntimeClasspath` only (`app/build.gradle.kts`). The allowlist
+    match for sqlite-jdbc therefore rests on that normalisation, not on a
+    run of the licence check.
   - The jar also carries `META-INF/maven/org.xerial/sqlite-jdbc/LICENSE`
     (Apache License 2.0 text) and `LICENSE.zentus`, a two-clause BSD
     licence (copyright 2006 David Crawshaw), which is BSD-2-Clause, also
