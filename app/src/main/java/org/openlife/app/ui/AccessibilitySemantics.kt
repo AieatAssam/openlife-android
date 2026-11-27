@@ -94,6 +94,7 @@ class StatusChannel internal constructor() {
             current = null
         }
     }
+
 }
 
 private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null }
@@ -110,20 +111,17 @@ private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null
  * It is 1 dp, not zero: a node with empty bounds is left out of the
  * accessibility tree and would miss its own first change. When there is
  * nothing to say it has no text, so TalkBack has nothing to focus. While it
- * holds a message, linear navigation reads that message here as well as
- * where it is shown (runbook A41).
+ * holds a message, linear navigation reads that message here as well as where
+ * it is shown (runbook A41).
  *
  * Place it outside any `when`, `if`, `verticalScroll` or lazy list; a dialog is
- * its own window and needs its own host. [spanSelection] is the viewer's
- * selected-span announcement (P2-06): the one live region that carries
- * document text, on purpose, read only by the user's own enabled
- * accessibility service (THREAT_MODEL).
+ * its own window and needs its own host. The announcement never carries
+ * document content (OCR text, span text, file names, queries): such text is
+ * shown as visible text only.
  */
 @Composable
 fun StatusHost(
     modifier: Modifier = Modifier,
-    spanNode: Boolean = false,
-    spanSelection: String? = null,
     content: @Composable () -> Unit,
 ) {
     val channel = remember { StatusChannel() }
@@ -131,8 +129,6 @@ fun StatusHost(
     Box(modifier) {
         CompositionLocalProvider(LocalStatusChannel provides channel) { content() }
         LiveNode(channel.current?.resolve(resources), Modifier.align(Alignment.TopStart).testTag(STATUS_NODE_TAG))
-        // Only the viewer owns the span node: on an expanded screen the list pane shares the window.
-        if (spanNode) LiveNode(spanSelection, Modifier.align(Alignment.TopEnd).testTag(SPAN_SELECTION_NODE_TAG))
     }
 }
 
@@ -163,6 +159,3 @@ private fun LiveNode(text: String?, modifier: Modifier) {
 
 /** Test tag of every screen's stable status node. */
 const val STATUS_NODE_TAG = "status_announcer"
-
-/** Test tag of the viewer's stable selected-span node (P2-06). */
-const val SPAN_SELECTION_NODE_TAG = "viewer_span_announcement"

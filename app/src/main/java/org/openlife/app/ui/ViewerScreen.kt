@@ -242,13 +242,7 @@ private fun ViewerContent(
     val spanReviews = ready?.spanReviews.orEmpty()
     // P2-06-R13: a span rejected after it was selected stops being the selection.
     val selectedSpan = EvidenceSelection.selectableSpans(spans, spanReviews).find { it.id == selectedSpanId }
-    // The span announcement is one stable node (empty when nothing is selected).
-    StatusHost(
-        spanNode = true,
-        spanSelection = selectedSpan?.let {
-            stringResource(R.string.viewer_span_selected, evidenceSpanPreview(it.text))
-        },
-    ) {
+    StatusHost {
         Surface(modifier = modifier) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 ViewerImage(
@@ -262,7 +256,7 @@ private fun ViewerContent(
                     onDelete = onDeleteRequested,
                     viewport = viewport,
                 )
-                // Shown for sighted users; the StatusHost node above announces the same text.
+                // Visible text only: status announcements never carry document content (span text).
                 selectedSpan?.let {
                     Text(
                         stringResource(R.string.viewer_span_selected, evidenceSpanPreview(it.text)),

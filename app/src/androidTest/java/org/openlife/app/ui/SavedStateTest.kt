@@ -96,7 +96,7 @@ class SavedStateTest {
                 navController.navigate(Routes.ListDetail(sourceId.toString(), span.id.toString()))
             }
             composeRule.waitUntil(WAIT_MS) {
-                composeRule.onNodeWithTag("viewer_span_announcement").fetchSemanticsNode().config.contains(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
+                composeRule.onAllNodesWithText("Selected:", substring = true).fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.waitUntil(WAIT_MS) {
                 composeRule.onAllNodesWithText(SPAN_TEXT, substring = true).fetchSemanticsNodes().isNotEmpty()

@@ -1,11 +1,9 @@
 package org.openlife.app.ui.search
 
 import android.graphics.Bitmap
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -105,15 +103,10 @@ class SearchScreenTest {
         }
         composeRule.onAllNodesWithTag("search_result").assertCountEqualsOne()
         composeRule.onNodeWithTag("search_result").performClick()
-        // The announcement node is 1 dp and carries its text as a content description (AccessibilitySemantics.kt);
-        // the selected span is also shown as visible text in the viewer.
+        // The selected span is shown as visible text only; the status host never carries span text.
         composeRule.waitUntil(WAIT_MS) {
-            composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes().any {
-                it.config.contains(SemanticsProperties.ContentDescription)
-            }
+            composeRule.onAllNodesWithText("Selected: Pick up by Friday").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("viewer_span_announcement")
-            .assert(hasContentDescription("Pick up by Friday", substring = true))
         composeRule.onNodeWithText("Selected: Pick up by Friday").assertIsDisplayed()
     }
 

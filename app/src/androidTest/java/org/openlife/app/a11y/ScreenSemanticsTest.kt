@@ -11,9 +11,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.isHeading
@@ -121,9 +121,9 @@ class ScreenSemanticsTest {
         accessibility.check("final screen")
     }
 
-    /** The viewer announces the selected evidence span as a polite live region (P2-06, kept by P1-10). */
+    /** The viewer shows the selected evidence span as visible text; span text is never a live region (P1-10 review). */
     @Test
-    fun viewerEvidenceAnnouncementIsPoliteLiveRegion() {
+    fun viewerSelectedSpanIsVisibleTextNotALiveRegion() {
         val source = readySource()
         val span = span(source, 0, "Synthetic appointment 14 October", grounded = true)
         composeRule.setContent {
@@ -138,16 +138,11 @@ class ScreenSemanticsTest {
                 )
             }
         }
-        // Tolerant of more than one node: a two-pane layout may carry a second announcer.
+        // The selected span is shown as visible text only (status announcements never carry span text).
         composeRule.waitUntil(KEY_TIMEOUT_MS) {
-            composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("Selected:", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
-        val nodes = composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes()
-        assertTrue("no span announcement node", nodes.isNotEmpty())
-        assertTrue(
-            "span announcement is not a polite live region",
-            nodes.any { it.config.getOrNull(SemanticsProperties.LiveRegion) == LiveRegionMode.Polite },
-        )
+        composeRule.onNodeWithText("Selected: Synthetic appointment 14 October").assertIsDisplayed()
         accessibility.check("viewer with a selected span")
     }
 
