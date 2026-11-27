@@ -354,3 +354,79 @@ Other known findings (device run, observed):
 - **Lint setting has no effect in practice**: lint's Accessibility category is
   set to error, but warnings already failed the build, so the change alters
   nothing in practice.
+
+
+## Regression fixes (2026-11-28)
+
+**Cause.** The selected-span line in the viewer had been moved into a 1 dp
+accessibility-only node (`StatusHost(spanNode = true, spanSelection = ...)`,
+tag `viewer_span_announcement`). Sighted users lost the visible line, and
+TalkBack read the span text from the hidden node. The line is restored as
+visible `Text`; span text is removed from every announcement. Status
+announcements never carry document content (OCR text, span text, file names,
+queries).
+
+**Review fix list, as applied** (one commit each on `plan/P1-10-accessibility`):
+
+1. ViewerScreen: `StatusHost { ... }` with no span parameters. The visible
+   "Selected: ..." `Text` has no live region.
+2. AccessibilitySemantics: `spanNode`, `spanSelection`, the second `LiveNode`
+   and `SPAN_SELECTION_NODE_TAG` are removed. The androidTest checks for the
+   tag now assert the visible text instead (ScreenSemanticsTest,
+   EvidenceNavigationTest, SavedStateTest, search/SearchScreenTest).
+3. The host node holds a message for 4 s (`LaunchedEffect` keyed on the
+   message; `StatusChannel.expire` clears only that exact message). The visible
+   Text is not hidden and `invisibleToUser` is not used. JVM test:
+   `StatusChannelTest` (3 tests, passing).
+4. SourceListScreen: `TITLE_MIN_FONT_SIZE` 12 sp -> 16 sp. The title still
+   ellipsizes on one line below that.
+5. VaultUnavailableScreen: the `StatusHost` wrapper is removed (nothing there
+   calls `Announce`).
+6. AccessibilitySourceRulesTest: `statusIsPostedOnlyThroughTheStableStatusHost`
+   is kept; new rule `announcementArgumentsAreNeverDocumentContent` fails on
+   any `Announce(...)` argument that names span, OCR, file-name or query data
+   and fails if no `Announce` call is found.
+
+Also in this round: the OCR panel's text buttons have a 48 dp touch target
+(commit a16293c). The device check below shows this is not yet met in the
+accessibility check; see the failures.
+
+**Gate.** `./gradlew detekt lint :app:test :vault:test assembleDebug
+:vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+:eval:test`: BUILD SUCCESSFUL (run after the detekt fixes in the last gate
+commit). `scripts/plan-check.sh`: `steps=83 errors=0`.
+
+**Device (Huawei AGS2-W09, Android 8.0, serial U8BBB20806201256).** Full run
+`./gradlew :app:connectedDebugAndroidTest --continue`, log
+`device-logs/p110c-app-full.log`, results `device-logs/p110c-results/`.
+Totals: 148 tests, 140 passed, 8 failed. Four of the eight are JUnit
+assumptions that stop the test on this device (AppLock 1, Brand 3); the XML
+records them as failures. The SearchScreenTest fix was committed after the
+gate run, and its class was re-run on the tablet (2 tests, 0 failures); the
+gate was not re-run after that commit.
+Main's run (`device-logs/app-results-run6/`) had 146 tests, 140 passed, 6 failed.
+
+Failures, each marked against main:
+
+- `ScreenSemanticsTest.everyScreenPassesAccessibilityChecks`: touch-target
+  failure on `viewer-ocr-ready`: "Accept text" 196x80 px and "Reject" 129x80 px.
+  At 320 dpi, 80 px is 40 dp, below the 48 dp target. The main run has no
+  entry for this test (it is new on this branch), so it is not a regression by
+  the comparison rule, but the 48 dp change is not yet satisfied. Open.
+- `AppLockFlowTest.deviceCredentialUnlockBelowApi30KeepsThePendingShare`:
+  skipped by assumption ("sets a device PIN"). Also fails on main.
+- `EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets`: "the title is
+  under the status bar". Also fails on main.
+- `LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640`: list control
+  clipped horizontally. Also fails on main.
+- `BrandScreenshotInstrumentedTest` (3 tests): assumption, no committed goldens
+  for render profile api26-AGS2-W09EEA-320dpi. Also fail on main.
+- `SearchScreenTest.expandedResultSelectsTheSpanInTheDetailPaneBesideTheList`:
+  "Selected: Pick up by Friday" not displayed at the assertion. This was a
+  regression against main. Fixed in the test (scroll to the line first, as
+  `EvidenceNavigationTest` does). Re-run of the class on the tablet:
+  2 tests, 0 failures.
+
+The renamed `ScreenSemanticsTest.viewerSelectedSpanIsVisibleTextNotALiveRegion`
+has no main entry (it replaces the old live-region test). Its result is in the
+full run and is not a failure.

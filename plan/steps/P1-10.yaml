@@ -174,3 +174,12 @@ evidence: >
   deviceCredentialUnlockBelowApi30KeepsThePendingShare (emulator-only opt-in),
   BrandScreenshotInstrumentedTest x3 (no goldens for api26-AGS2-W09EEA-320dpi).
   Gap: the TalkBack runbook (docs/runbooks/talkback.md) is not executed.
+  Regression fixes 2026-11-28 (branch plan/P1-10-accessibility): selected-span
+  line restored as visible text; span text removed from announcements (fixes 1-2);
+  host message held 4 s, StatusChannelTest 3/3 (fix 3); title min 16 sp (fix 4);
+  VaultUnavailable StatusHost removed (fix 5); rule announcementArgumentsAreNeverDocumentContent (fix 6).
+  Gate: detekt lint :app:test :vault:test assembleDebug androidTest compiles :eval:test BUILD SUCCESSFUL;
+  plan-check steps=83 errors=0. Device (AGS2-W09, Android 8.0): full app run 148 tests, 140 passed,
+  8 failed; failures vs main in docs/verification/P1-10-accessibility.md "Regression fixes (2026-11-28)".
+  SearchScreenTest re-run on device: 2 tests, 0 failures. Open: 48 dp OCR buttons still fail
+  ScreenSemanticsTest.everyScreenPassesAccessibilityChecks (80 px = 40 dp height).
