@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 /** P1-10: marks a title as a heading, so TalkBack's heading navigation reaches it. */
 fun Modifier.asHeading(): Modifier = semantics { heading() }
@@ -95,7 +97,20 @@ class StatusChannel internal constructor() {
         }
     }
 
+    /**
+     * Drops [announcement] from the host once its hold time has passed. A newer
+     * message is left alone: only the exact message that was held is cleared.
+     */
+    internal fun expire(announcement: Announcement) {
+        if (current == announcement) {
+            owner = null
+            current = null
+        }
+    }
 }
+
+/** How long a posted message stays on the host node before it is dropped (P1-10 review fix). */
+internal const val STATUS_HOLD_MILLIS = 4_000L
 
 private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null }
 
@@ -110,9 +125,9 @@ private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null
  *
  * It is 1 dp, not zero: a node with empty bounds is left out of the
  * accessibility tree and would miss its own first change. When there is
- * nothing to say it has no text, so TalkBack has nothing to focus. While it
- * holds a message, linear navigation reads that message here as well as where
- * it is shown (runbook A41).
+ * nothing to say it has no text, so TalkBack has nothing to focus. A message
+ * stays on the node only for a few seconds (see [StatusChannel]), so linear
+ * navigation does not read it a second time (runbook A41).
  *
  * Place it outside any `when`, `if`, `verticalScroll` or lazy list; a dialog is
  * its own window and needs its own host. The announcement never carries
@@ -126,6 +141,14 @@ fun StatusHost(
 ) {
     val channel = remember { StatusChannel() }
     val resources = LocalResources.current
+    val held = channel.current
+    // Keyed on the message: a newer message restarts the timer, so an older one never clears it.
+    LaunchedEffect(held) {
+        if (held != null) {
+            delay(STATUS_HOLD_MILLIS)
+            channel.expire(held)
+        }
+    }
     Box(modifier) {
         CompositionLocalProvider(LocalStatusChannel provides channel) { content() }
         LiveNode(channel.current?.resolve(resources), Modifier.align(Alignment.TopStart).testTag(STATUS_NODE_TAG))
