@@ -82,8 +82,10 @@ class LargeFontUiTest {
         val root = composeRule.onRoot().fetchSemanticsNode()
         walk(root).forEach { node ->
             if (node.config.getOrNull(SemanticsActions.OnClick) != null) {
+                val name = node.config.getOrNull(SemanticsProperties.ContentDescription)?.joinToString()
+                    ?: node.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }
                 assertTrue(
-                    "$where: a control is clipped horizontally",
+                    "$where: a control is clipped horizontally: '$name' ${node.size} ${node.boundsInRoot}",
                     node.boundsInRoot.width + 1f >= node.size.width,
                 )
             }
