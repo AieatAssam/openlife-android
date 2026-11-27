@@ -123,6 +123,56 @@ class DependencyBoundaryTest {
         assertFalse(licenceDrift(classpath, report + "org.example:removed-library:1.0").isEmpty())
     }
 
+    /**
+     * ADR-0017: a test-only dependency (sqlite-jdbc, which bundles host native
+     * libraries) reaches no release, debug or instrumented classpath of `app`
+     * or `vault`. The vault unit-test classpath must contain it, so the scan
+     * cannot pass by reading the wrong report.
+     */
+    @Test
+    fun testOnlyDependenciesReachNoReleaseDebugOrInstrumentedClasspath() {
+        val testOnly = fencedSection(policyDocument(), "Test-only dependencies")
+        assertTrue("no test-only coordinates in the policy", testOnly.isNotEmpty())
+        val reports = BOUNDARY_MODULES.associateWith(::boundaryReport)
+        assertEquals(emptyList<String>(), testOnlyLeaks(reports, testOnly))
+
+        val unitTest = reports.getValue("vault").getValue(UNIT_TEST_CLASSPATH)
+        testOnly.forEach { prefix ->
+            assertTrue(
+                "positive control: vault unit tests resolve $prefix",
+                unitTest.any { it.startsWith("$prefix:") },
+            )
+        }
+
+        // Recorded mutation: the same coordinate on vault's instrumented classpath.
+        val leaked = reports + ("vault" to reports.getValue("vault") + (INSTRUMENTED to unitTest))
+        assertFalse(testOnlyLeaks(leaked, testOnly).isEmpty())
+    }
+
+    private fun testOnlyLeaks(reports: Map<String, Map<String, List<String>>>, testOnly: Set<String>): List<String> =
+        reports.flatMap { (module, classpaths) ->
+            GUARDED_CLASSPATHS.flatMap { name ->
+                val coordinates = classpaths[name] ?: return@flatMap listOf("$module: $name is missing from the report")
+                coordinates.filter { coordinate -> testOnly.any { coordinate.startsWith("$it:") } }
+                    .map { "$module $name: $it" }
+            }
+        }
+
+    private fun boundaryReport(module: String): Map<String, List<String>> {
+        val file = projectDir.resolve("$module/build/reports/classpath-boundary.txt")
+        assertTrue("classpath boundary report is missing: $file", Files.isRegularFile(file))
+        val classpaths = linkedMapOf<String, MutableList<String>>()
+        var current: MutableList<String>? = null
+        Files.readAllLines(file).map(String::trim).filter(String::isNotEmpty).forEach { line ->
+            if (line.startsWith("## ")) {
+                current = mutableListOf<String>().also { classpaths[line.removePrefix("## ")] = it }
+            } else {
+                current?.add(line)
+            }
+        }
+        return classpaths
+    }
+
     private fun licenceDrift(classpath: Set<String>, report: Set<String>): List<String> =
         (classpath - report).sorted().map { "shipped but not in the licence report: $it" } +
             (report - classpath).sorted().map { "in the licence report but not shipped: $it" }
@@ -155,6 +205,10 @@ class DependencyBoundaryTest {
     }
 
     private companion object {
+        val BOUNDARY_MODULES = listOf("app", "vault")
+        const val INSTRUMENTED = "debugAndroidTestRuntimeClasspath"
+        const val UNIT_TEST_CLASSPATH = "debugUnitTestRuntimeClasspath"
+        val GUARDED_CLASSPATHS = listOf("releaseRuntimeClasspath", "debugRuntimeClasspath", INSTRUMENTED)
         val REPORT_ROW = Regex(
             "\\*\\*Group:\\*\\* `([^`]+)` \\*\\*Name:\\*\\* `([^`]+)` \\*\\*Version:\\*\\* `([^`]+)`",
         )

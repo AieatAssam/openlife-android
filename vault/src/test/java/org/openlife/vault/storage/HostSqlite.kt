@@ -7,16 +7,35 @@ import java.io.Closeable
 import java.io.File
 import java.io.Writer
 import java.lang.reflect.Proxy
+import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.ResultSet
+import java.sql.SQLException
+import java.sql.Types
+import java.util.Properties
 
 /**
- * P2-08 JVM evidence without a device or a new Gradle dependency: a real
- * SQLite engine with FTS5, reached through the host's `python3` standard
- * library (`sqlite3` module) over a line protocol. Every value crosses as
- * hex, so hostile strings (quotes, newlines, FTS5 operators) arrive intact.
+ * P2-08 JVM evidence without a device: a real SQLite engine with FTS5 that
+ * runs the production SQL (DDL, triggers, cascades, MATCH syntax and the
+ * repository's queries).
  *
- * This is the host's SQLite (3.53.x), not SQLCipher. It proves the SQL —
- * DDL, triggers, cascades, MATCH syntax and the repository's queries — on the
- * same FTS5 code; it is not device evidence (docs/decisions/0010-local-search.md).
+ * The default engine is pinned (ADR-0017). It is sqlite-jdbc, a vault
+ * test-only dependency, used in-process, and its SQLite version is the one
+ * inside the shipped SQLCipher ([SqliteVersionFloorTest.BUNDLED_SQLITE],
+ * checked by PinnedEngineTest). The result is the same on every host, and no
+ * search-index test skips. It is not SQLCipher (no encryption codec, a
+ * different build configuration), so it is not device evidence
+ * (docs/decisions/0010-local-search.md).
+ *
+ * The environment variable `OPENLIFE_HOST_SQLITE` selects another engine,
+ * reached over a line protocol in which every value crosses as hex, so
+ * hostile strings (quotes, newlines, FTS5 operators) arrive intact:
+ * - `python3` uses the host python's `sqlite3` module;
+ * - any other value is a command that speaks the protocol, for example
+ *   `scripts/host-sqlite/LineHost.java` over an older sqlite-jdbc (the
+ *   engine bisect in docs/verification/P2-08-local-search.md).
+ * Only then may a test skip for want of an index ([isPinned]).
+ *
  * Foreign keys are on, as Room turns them on. No production code sets
  * `recursive_triggers`; its value on a device is the build default. The
  * pinned `libsqlcipher.so` lists `DEFAULT_RECURSIVE_TRIGGERS` among its
@@ -24,34 +43,28 @@ import java.lang.reflect.Proxy
  * [recursiveTriggers] defaults to on, and the suites whose result could
  * depend on it run in both modes (P3-02 review M-05). Cascades fire the FTS
  * delete triggers with recursive triggers on or off (host check, P2-08
- * review). `PRAGMA secure_delete` is left at its default (off), as in the
- * pinned build. [path] null is an in-memory database; a file path lets a test
- * close and reopen the same database.
+ * review). `PRAGMA secure_delete` is not set here. [path] null is an
+ * in-memory database; a file path lets a test close and reopen the same
+ * database.
  */
 class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closeable {
     /**
      * The SQLite error text, the failing statement's kind (its leading
-     * keywords and object name, never values) and the host SQLite version,
-     * so a CI log explains a failure without row content.
+     * keywords and object name, never values) and the engine version, so a
+     * CI log explains a failure without row content.
      */
-    class Failure(message: String) : RuntimeException(message)
+    class Failure(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
-    private val script: File = File.createTempFile("host-sqlite", ".py").apply {
-        deleteOnExit()
-        writeText(PROGRAM)
-    }
-    private val command: List<String> = interpreter(script) + listOfNotNull(path?.absolutePath)
-    private val process: Process = ProcessBuilder(command)
-        .redirectErrorStream(false)
-        .start()
-    private val input: Writer = process.outputStream.bufferedWriter()
-    private val output: BufferedReader = process.inputStream.bufferedReader()
+    private val engine: Engine = OVERRIDE?.let { LineProtocolEngine(it, path) } ?: JdbcEngine(path)
+
+    private var knownVersion: String? = null
 
     init {
         if (!recursiveTriggers) exec("PRAGMA recursive_triggers = OFF")
         if (!versionReported) {
             versionReported = true
-            System.err.println("HostSqlite: host SQLite ${version()}")
+            val source = if (isPinned) "pinned sqlite-jdbc" else "OPENLIFE_HOST_SQLITE"
+            System.err.println("HostSqlite: SQLite ${version()} ($source)")
         }
     }
 
@@ -59,29 +72,11 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
         query(sql, *args)
     }
 
-    fun query(sql: String, vararg args: Any?): List<List<Any?>> {
-        val line = buildString {
-            append(hex(sql.toByteArray()))
-            args.forEach { append(' ').append(encode(it)) }
-        }
-        input.write(line)
-        input.write("\n")
-        input.flush()
-        val status = nextLine()
-        val rows = mutableListOf<List<Any?>>()
-        while (true) {
-            val row = nextLine()
-            if (row == "END") break
-            rows += row.split(' ').map(::decode)
-        }
-        if (status.startsWith("ERR ")) {
-            val error = String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8)
-            throw Failure("$error [statement: ${statementKind(sql)}; host SQLite ${version()}]")
-        }
-        return rows
+    fun query(sql: String, vararg args: Any?): List<List<Any?>> = try {
+        engine.run(sql, args)
+    } catch (e: EngineError) {
+        throw Failure("${e.message} [statement: ${statementKind(sql)}; host SQLite ${version()}]", e)
     }
-
-    private var knownVersion: String? = null
 
     /** The engine's `sqlite_version()`, read once per connection. */
     fun version(): String = knownVersion ?: run {
@@ -90,9 +85,6 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
             .getOrDefault("unknown")
             .also { knownVersion = it }
     }
-
-    private fun nextLine(): String = output.readLine()
-        ?: throw Failure("python3 exited: ${process.errorStream.bufferedReader().readText()}")
 
     fun long(sql: String, vararg args: Any?): Long = query(sql, *args).single().single() as Long
 
@@ -178,9 +170,120 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
     }
 
     override fun close() {
-        runCatching { input.close() }
-        process.waitFor()
-        script.delete()
+        engine.close()
+    }
+
+    /** An engine's own error text; [query] turns it into a [Failure]. */
+    private class EngineError(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+    private interface Engine : Closeable {
+        fun run(sql: String, args: Array<out Any?>): List<List<Any?>>
+    }
+
+    /** The pinned engine, in-process. One statement per call, as the line protocol. */
+    private class JdbcEngine(path: File?) : Engine {
+        private val connection: Connection = checkNotNull(
+            org.sqlite.JDBC().connect("jdbc:sqlite:${path?.absolutePath ?: ":memory:"}", Properties()),
+        ) { "sqlite-jdbc refused the database URL" }
+
+        init {
+            connection.autoCommit = true
+            connection.createStatement().use { statement ->
+                statement.execute("PRAGMA foreign_keys=ON")
+                statement.execute("PRAGMA recursive_triggers=ON")
+            }
+        }
+
+        override fun run(sql: String, args: Array<out Any?>): List<List<Any?>> = try {
+            connection.prepareStatement(sql).use { statement ->
+                args.forEachIndexed { i, value -> bind(statement, i + 1, value) }
+                if (statement.execute()) statement.resultSet?.use(::rows) ?: emptyList() else emptyList()
+            }
+        } catch (e: SQLException) {
+            throw EngineError(e.message ?: e.javaClass.simpleName, e)
+        }
+
+        override fun close() {
+            connection.close()
+        }
+
+        private fun bind(statement: PreparedStatement, index: Int, value: Any?) {
+            when (value) {
+                null -> statement.setNull(index, Types.NULL)
+                is Int -> statement.setLong(index, value.toLong())
+                is Long -> statement.setLong(index, value)
+                is Float -> statement.setDouble(index, value.toDouble())
+                is Double -> statement.setDouble(index, value)
+                is ByteArray -> statement.setBytes(index, value)
+                is Boolean -> statement.setLong(index, if (value) 1L else 0L)
+                else -> statement.setString(index, value.toString())
+            }
+        }
+
+        /** Integers come back as Long and reals as Double, as from the line protocol. */
+        private fun rows(result: ResultSet): List<List<Any?>> {
+            val columns = result.metaData.columnCount
+            val rows = mutableListOf<List<Any?>>()
+            while (result.next()) {
+                rows += (1..columns).map { column ->
+                    when (val value = result.getObject(column)) {
+                        is Int -> value.toLong()
+                        is Float -> value.toDouble()
+                        else -> value
+                    }
+                }
+            }
+            return rows
+        }
+    }
+
+    /** An engine named by `OPENLIFE_HOST_SQLITE`, in a child process speaking the line protocol. */
+    private class LineProtocolEngine(override: List<String>, path: File?) : Engine {
+        private val script: File? = if (override == listOf("python3")) {
+            File.createTempFile("host-sqlite", ".py").apply {
+                deleteOnExit()
+                writeText(PROGRAM)
+            }
+        } else {
+            null
+        }
+        private val process: Process = ProcessBuilder(
+            (script?.let { listOf("python3", "-I", it.absolutePath) } ?: override) + listOfNotNull(path?.absolutePath),
+        ).redirectErrorStream(false).start()
+        private val input: Writer = process.outputStream.bufferedWriter()
+        private val output: BufferedReader = process.inputStream.bufferedReader()
+
+        override fun run(sql: String, args: Array<out Any?>): List<List<Any?>> {
+            val line = buildString {
+                append(hex(sql.toByteArray()))
+                args.forEach { append(' ').append(encode(it)) }
+            }
+            input.write(line)
+            input.write("\n")
+            input.flush()
+            val status = nextLine()
+            val rows = mutableListOf<List<Any?>>()
+            while (true) {
+                val row = nextLine()
+                if (row == "END") break
+                rows += row.split(' ').map(::decode)
+            }
+            if (status.startsWith("ERR ")) {
+                throw EngineError(String(unhex(status.removePrefix("ERR ")), Charsets.UTF_8))
+            }
+            return rows
+        }
+
+        private fun nextLine(): String = output.readLine()
+            ?: throw Failure(
+                "the OPENLIFE_HOST_SQLITE engine exited: ${process.errorStream.bufferedReader().readText()}",
+            )
+
+        override fun close() {
+            runCatching { input.close() }
+            process.waitFor()
+            script?.delete()
+        }
     }
 
     companion object {
@@ -199,17 +302,17 @@ class HostSqlite(path: File? = null, recursiveTriggers: Boolean = true) : Closea
             }
         }
 
-        /**
-         * The host interpreter: `python3 -I <script>` unless the environment
-         * variable `OPENLIFE_HOST_SQLITE` names another command speaking the
-         * same line protocol (for example one over an older SQLite, to
-         * reproduce a CI runner's engine; P3-02 CI failure).
-         */
-        private fun interpreter(script: File): List<String> = System.getenv("OPENLIFE_HOST_SQLITE")
+        /** `OPENLIFE_HOST_SQLITE`, split on spaces; null selects the pinned engine. */
+        private val OVERRIDE: List<String>? = System.getenv("OPENLIFE_HOST_SQLITE")
             ?.split(' ')
             ?.filter(String::isNotBlank)
             ?.takeIf { it.isNotEmpty() }
-            ?: listOf("python3", "-I", script.absolutePath)
+
+        /**
+         * True on the pinned engine. Tests that need the search index may skip
+         * for want of one only when this is false (ADR-0017).
+         */
+        val isPinned: Boolean = OVERRIDE == null
 
         private val STATEMENT_KIND = Regex(
             "^\\s*((?:CREATE|DROP|ALTER|INSERT|REPLACE|UPDATE|DELETE|SELECT|PRAGMA|SAVEPOINT|RELEASE|ROLLBACK)" +

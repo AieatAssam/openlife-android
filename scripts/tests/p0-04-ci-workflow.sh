@@ -145,5 +145,18 @@ else
   fail=$((fail + 1))
 fi
 
+# ADR-0017: the vault host tests use the pinned sqlite-jdbc engine, so the
+# build job runs on ubuntu-22.04 with no python SQLite floor step, and the
+# workflow never selects another engine through OPENLIFE_HOST_SQLITE.
+if grep -A8 '^  build-lint-unit-test:' "$WORKFLOW" | grep -Eq 'runs-on: ubuntu-22.04' \
+  && ! grep -q 'Require a host SQLite' "$WORKFLOW" \
+  && ! grep -q 'OPENLIFE_HOST_SQLITE=\|OPENLIFE_HOST_SQLITE:' "$WORKFLOW"; then
+  printf 'ok - build job uses the pinned test SQLite (ubuntu-22.04, no engine override)\n'
+  pass=$((pass + 1))
+else
+  printf 'not ok - build job uses the pinned test SQLite (ubuntu-22.04, no engine override)\n' >&2
+  fail=$((fail + 1))
+fi
+
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]

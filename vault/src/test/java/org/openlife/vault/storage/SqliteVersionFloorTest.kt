@@ -12,10 +12,13 @@ import java.io.File
  *
  * [BUNDLED_SQLITE] is the SQLite inside sqlcipher-android 4.19.0's
  * `libsqlcipher.so` (3.53.4, read statically from the AAR, not observed on a
- * device). [CI_HOST_SQLITE] is the system SQLite of the ubuntu-22.04 runner
- * (Ubuntu's libsqlite3 3.37.2 package; the runner's value is printed by the
- * skipped search tests). The scan is textual and conservative: it looks for
- * each listed construct by name in the SQL-bearing sources.
+ * device). [UNGATED_FLOOR] is the oldest SQLite the ungated SQL stays
+ * compatible with: 3.37.2, Ubuntu 22.04's system SQLite, which the CI runner
+ * reached through python3 before the host tests moved to the pinned
+ * sqlite-jdbc engine (ADR-0017). Keeping it lets an `OPENLIFE_HOST_SQLITE`
+ * run on such an engine exercise everything but the gated index. The scan is
+ * textual and conservative: it looks for each listed construct by name in
+ * the SQL-bearing sources.
  */
 class SqliteVersionFloorTest {
     private val storage = File("src/main/java/org/openlife/vault/storage")
@@ -39,15 +42,15 @@ class SqliteVersionFloorTest {
     }
 
     @Test
-    fun constructsNewerThanTheCiHostAreOnlyBehindAFailClosedCheck() {
+    fun constructsNewerThanTheUngatedFloorAreOnlyBehindAFailClosedCheck() {
         val found = sources().flatMap { (file, text) ->
             CONSTRUCTS.filter { it.pattern.containsMatchIn(text) }.map { file to it }
         }
         val unguarded = found
-            .filter { (_, c) -> c.since > CI_HOST_SQLITE }
+            .filter { (_, c) -> c.since > UNGATED_FLOOR }
             .filterNot { (f, c) -> GUARDED[c.name] == f }
             .map { (f, c) -> "$f: ${c.name} ${c.since}" }
-        assertEquals("constructs newer than SQLite $CI_HOST_SQLITE outside a guard", emptyList<String>(), unguarded)
+        assertEquals("constructs newer than SQLite $UNGATED_FLOOR outside a guard", emptyList<String>(), unguarded)
     }
 
     private data class Construct(val name: String, val since: Version, val pattern: Regex)
@@ -59,11 +62,12 @@ class SqliteVersionFloorTest {
         override fun toString() = "$major.$minor.$patch"
     }
 
-    private companion object {
+    companion object {
+        /** Also the version of the pinned test engine (PinnedEngineTest, ADR-0017). */
         val BUNDLED_SQLITE = Version(3, 53, 4)
-        val CI_HOST_SQLITE = Version(3, 37, 2)
+        private val UNGATED_FLOOR = Version(3, 37, 2)
 
-        val SQL_FILES = listOf(
+        private val SQL_FILES = listOf(
             "FactSchemaTriggers.kt",
             "FactMigration.kt",
             "SourceRowRemoval.kt",
@@ -75,12 +79,12 @@ class SqliteVersionFloorTest {
         )
 
         /** FTS5 secure-delete is probed on a temp table; without it SearchIndex creates no index (fail closed). */
-        val GUARDED = mapOf("FTS5 secure-delete" to "SearchIndex.kt")
+        private val GUARDED = mapOf("FTS5 secure-delete" to "SearchIndex.kt")
 
         private fun c(name: String, since: Version, pattern: String) =
             Construct(name, since, Regex(pattern, RegexOption.IGNORE_CASE))
 
-        val CONSTRUCTS = listOf(
+        private val CONSTRUCTS = listOf(
             c(
                 "UPDATE ... FROM",
                 Version(3, 33, 0),

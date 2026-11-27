@@ -22,6 +22,17 @@ org.apache.httpcomponents
 retrofit2
 ```
 
+## Test-only dependencies
+
+These coordinates may appear only on unit-test classpaths (ADR-0017).
+`DependencyBoundaryTest` fails if one of them reaches the
+`releaseRuntimeClasspath`, `debugRuntimeClasspath` or
+`debugAndroidTestRuntimeClasspath` of `app` or `vault`.
+
+```text
+org.xerial:sqlite-jdbc
+```
+
 ## Time-boxed exception
 
 ML Kit currently brings the transport and Firebase support coordinates above

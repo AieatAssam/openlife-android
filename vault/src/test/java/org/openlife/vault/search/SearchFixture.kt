@@ -4,11 +4,13 @@ import androidx.sqlite.db.SupportSQLiteProgram
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SearchDao
+import org.openlife.vault.storage.SearchIndex
 import org.openlife.vault.storage.SearchRow
 import java.io.File
 import java.lang.reflect.Proxy
@@ -111,8 +113,19 @@ class SearchFixture(val host: HostSqlite) {
     fun secureDelete(table: String): Long? =
         host.query("SELECT v FROM ${table}_config WHERE k = 'secure-delete'").singleOrNull()?.single() as Long?
 
-    /** Fails if an index disagrees with its content table. */
-    fun integrityCheck(table: String) = host.exec("INSERT INTO $table($table) VALUES('integrity-check')")
+    /**
+     * Fails if an index is internally inconsistent or (rank 1, external
+     * content) disagrees with its content table. PR #36: SQLite 3.42.0 to
+     * 3.46.0 write a corrupt index here, which only this check reveals;
+     * queries still answer.
+     */
+    fun integrityCheck(table: String) {
+        host.exec("INSERT INTO $table($table) VALUES('integrity-check')")
+        host.exec("INSERT INTO $table($table, rank) VALUES('integrity-check', 1)")
+    }
+
+    /** [integrityCheck] on both index tables. */
+    fun integrityCheckAll() = SearchIndex.tables.forEach(::integrityCheck)
 
     companion object {
         private const val LONG_TERM = 6
@@ -122,9 +135,9 @@ class SearchFixture(val host: HostSqlite) {
 
         /**
          * A v4 vault migrated to v5 through the shipped MIGRATION_4_5. The
-         * index needs FTS5 secure-delete (SQLite 3.42+); on an older host
-         * SQLite the migration correctly creates no index, and tests that
-         * need one are skipped with this message rather than run vacuously.
+         * index needs SQLite [SearchIndex.MIN_SQLITE_VERSION] (FTS5
+         * secure-delete without the 3.42.0-3.46.0 corruption); on an older
+         * engine the migration correctly creates no index ([assumeIndexed]).
          */
         fun migrated(host: HostSqlite, seed: SearchFixture.() -> Unit = {}): SearchFixture {
             host.createFromExportedSchema(V4)
@@ -135,12 +148,26 @@ class SearchFixture(val host: HostSqlite) {
             return fixture
         }
 
+        /**
+         * On the pinned engine (ADR-0017) a missing index is a failure, so no
+         * search test skips by construction. Only an engine selected with
+         * `OPENLIFE_HOST_SQLITE` may skip, when it is older than the floor.
+         */
         fun assumeIndexed(host: HostSqlite) {
-            val version = host.query("SELECT sqlite_version()").single().single()
+            val version = host.version()
             val tables = host.long(
                 "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('ocr_text_fts', 'ocr_correction_fts')",
             )
-            assumeTrue("host SQLite $version lacks FTS5 secure-delete (needs 3.42+); test skipped", tables == 2L)
+            if (HostSqlite.isPinned) {
+                assertEquals("the search index exists on the pinned SQLite $version", 2L, tables)
+                return
+            }
+            assumeTrue(
+                "OPENLIFE_HOST_SQLITE engine $version is older than ${SearchIndex.MIN_SQLITE_VERSION}: " +
+                    "no index is created (FTS5 secure-delete missing before 3.42, corrupting from 3.42.0 " +
+                    "to 3.46.0); test skipped",
+                tables == 2L,
+            )
         }
     }
 }

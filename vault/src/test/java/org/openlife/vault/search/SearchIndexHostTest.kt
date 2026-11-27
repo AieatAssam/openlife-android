@@ -9,8 +9,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.repository.SearchRepository
+import org.openlife.vault.storage.FactHost
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
+import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.SearchIndex
 import java.io.File
 import java.util.UUID
@@ -20,8 +22,10 @@ import java.util.UUID
  * through [HostSqlite]): the shipped MIGRATION_4_5, the index triggers, the
  * cascades and the repository's own queries. Not SQLCipher and not a device;
  * the same names run on SQLCipher in the instrumented SearchRepositoryTest.
- * Tests that need the index skip on a host SQLite older than 3.42 (no FTS5
- * secure-delete; see [SearchFixture.assumeIndexed]).
+ * Tests that need the index skip on a host SQLite older than
+ * SearchIndex.MIN_SQLITE_VERSION (3.46.1: no FTS5 secure-delete before 3.42,
+ * a corrupting secure-delete from 3.42.0 to 3.46.0; see
+ * [SearchFixture.assumeIndexed]).
  */
 class SearchIndexHostTest {
     private val host = HostSqlite()
@@ -35,7 +39,7 @@ class SearchIndexHostTest {
 
     @Test
     fun migrationIndexesRowsThatExistedBeforeIt() {
-        SearchFixture.migrated(host) {
+        val fixture = SearchFixture.migrated(host) {
             source(A)
             revision(RA, A)
             span(S1, RA, 0, "Invoice 4471 from the plumber")
@@ -46,6 +50,7 @@ class SearchIndexHostTest {
         val corrected = search("electrician").single()
         assertTrue(corrected.isCorrection)
         assertEquals(id(S1), corrected.spanId)
+        fixture.integrityCheckAll()
     }
 
     @Test
@@ -248,6 +253,64 @@ class SearchIndexHostTest {
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
         assertFalse(fixture.dataContains(SearchIndex.TEXT_TABLE, "harbour"))
         assertFalse(fixture.dataContains(SearchIndex.CORRECTION_TABLE, "valley"))
+        fixture.integrityCheckAll()
+    }
+
+    /**
+     * PR #36: every index trigger (insert, narrowed update, column-only
+     * update, delete, cascade) on spans and on corrections leaves an index
+     * that passes FTS5 integrity-check after each step, on a v5 vault (index
+     * from MIGRATION_4_5), a fresh v6 vault and a v5 vault migrated to v6. On
+     * SQLite 3.42.0 to 3.46.0 the first delete fails this; SearchIndex
+     * creates no index there.
+     */
+    @Test
+    fun everyTriggerPathLeavesAnIndexThatPassesIntegrityCheck() {
+        val seed: SearchFixture.() -> Unit = {
+            source(A)
+            revision(RA, A)
+            span(S1, RA, 0, "apricot")
+        }
+        triggerPaths("v5", SearchFixture.migrated(host, seed))
+        HostSqlite().use { v6 ->
+            val fixture = FactHost.fresh(v6).apply(seed)
+            assertTrue(SearchIndex.isComplete(v6.asSupportDatabase()))
+            triggerPaths("fresh v6", fixture, v6)
+        }
+        HostSqlite().use { migrated ->
+            val fixture = SearchFixture.migrated(migrated, seed)
+            OpenLifeDatabase.MIGRATION_5_6.migrate(migrated.asSupportDatabase())
+            assertTrue(SearchIndex.isComplete(migrated.asSupportDatabase()))
+            triggerPaths("migrated v6", fixture, migrated)
+        }
+    }
+
+    private fun triggerPaths(label: String, fixture: SearchFixture, db: HostSqlite = host) {
+        val steps = listOf(
+            "insert span" to { fixture.span(S2, RA, 1, "bramble") },
+            "insert correction" to { fixture.correction(C1, RA, S1, "currant") },
+            "insert revision-level correction" to { fixture.correction(C2, RA, null, "damson") },
+            "update span text" to { db.exec("UPDATE ocr_spans SET text = 'elderberry' WHERE id = ?", S1) },
+            "update correction text" to {
+                db.exec("UPDATE ocr_user_revisions SET correctedText = 'fig' WHERE id = ?", C1)
+            },
+            "update span to the same text" to { db.exec("UPDATE ocr_spans SET text = text WHERE id = ?", S2) },
+            "column-only span update" to { db.exec("UPDATE ocr_spans SET confidence = 0.5 WHERE id = ?", S2) },
+            "delete one correction" to { db.exec("DELETE FROM ocr_user_revisions WHERE id = ?", C2) },
+            "delete one span" to { db.exec("DELETE FROM ocr_spans WHERE id = ?", S2) },
+            // v6 (C2-R20): a reading is deleted only while its Source is DELETING.
+            "mark the Source deleting" to { db.exec("UPDATE sources SET state = 'DELETING' WHERE id = ?", A) },
+            "cascade from the revision" to { db.exec("DELETE FROM ocr_revisions WHERE id = ?", RA) },
+        )
+        steps.forEach { (step, run) ->
+            run()
+            SearchIndex.tables.forEach { table ->
+                val failure = runCatching { fixture.integrityCheck(table) }.exceptionOrNull()
+                assertEquals("$label: $table after '$step'", null, failure?.message)
+            }
+        }
+        assertEquals("$label: no text rows left", 0L, fixture.indexedDocuments(SearchIndex.TEXT_TABLE))
+        assertEquals("$label: no correction rows left", 0L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
     }
 
     /** Review: the option is stored in the database and holds after a reopen; [SearchIndex.ensure] then only reads. */
@@ -290,6 +353,7 @@ class SearchIndexHostTest {
         host.exec("DROP TABLE ocr_correction_fts")
         assertTrue("a vault whose index was lost gets it back", SearchIndex.ensure(host.asSupportDatabase()))
         assertEquals(listOf(id(S1)), search("quince").map { it.spanId })
+        fixture.integrityCheckAll()
     }
 
     /** W-01 fail closed: if any index statement fails, no part of the index is left behind. Runs on any host SQLite. */
@@ -405,7 +469,7 @@ class SearchIndexHostTest {
     /** Acceptance asks < 200 ms for 500 spans on a device; this is the host engine only (recorded). */
     @Test
     fun fiveHundredSpansOnTheHostEngine() {
-        SearchFixture.migrated(host) {
+        val fixture = SearchFixture.migrated(host) {
             source(A)
             revision(RA, A)
             repeat(SPANS) { i ->
@@ -419,6 +483,7 @@ class SearchIndexHostTest {
         println("P2-08 host-engine search latency: $elapsedMs ms for $SPANS spans, ${hits.size} hits (limit 50)")
         assertEquals(SearchRepository.DEFAULT_LIMIT, hits.size)
         assertTrue("host search took $elapsedMs ms", elapsedMs < HOST_BUDGET_MS)
+        fixture.integrityCheckAll()
     }
 
     /** P2-08-R5: the LIKE fallback's latency on the same 500 spans, with no index (host engine only). */
