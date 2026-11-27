@@ -43,7 +43,8 @@ class ManifestBoundaryTest {
     /**
      * P1-07: USE_BIOMETRIC is the only permission OpenLife added. The other
      * entry is androidx.core's app-private signature permission for its
-     * non-exported dynamic receivers.
+     * non-exported dynamic receivers. P1-21: USE_FINGERPRINT is the legacy
+     * permission androidx.biometric needs on API 26-27 (see the next test).
      */
     @Test
     fun releasePermissionsAreExactlyTheAllowlist() {
@@ -54,10 +55,26 @@ class ManifestBoundaryTest {
         assertEquals(
             setOf(
                 "android.permission.USE_BIOMETRIC",
+                "android.permission.USE_FINGERPRINT",
                 "org.openlife.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
             ),
             permissions,
         )
+    }
+
+    /**
+     * P1-21-R5: USE_FINGERPRINT exists only for API 26-27. With minSdk 26 the
+     * androidx.biometric library needs it below API 28; from API 28 the
+     * USE_BIOMETRIC permission alone applies, so the merged manifest must cap it.
+     */
+    @Test
+    fun legacyFingerprintPermissionIsLimitedToApiBelow28() {
+        val entries = elements(readReleaseManifest()).filter { element ->
+            element.localName == "uses-permission" &&
+                element.getAttributeNS(androidNamespace, "name") == "android.permission.USE_FINGERPRINT"
+        }
+        assertEquals("USE_FINGERPRINT is declared once", 1, entries.size)
+        assertEquals("27", entries.single().getAttributeNS(androidNamespace, "maxSdkVersion"))
     }
 
     @Test

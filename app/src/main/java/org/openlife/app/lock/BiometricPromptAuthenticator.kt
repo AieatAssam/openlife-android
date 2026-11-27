@@ -13,17 +13,12 @@ import org.openlife.app.R
 
 /**
  * BiometricPrompt with the device credential as fallback (P1-07 constraint).
- * API 30+ allows STRONG biometrics or the credential; API 29 cannot combine
- * STRONG with the credential, so it uses WEAK or the credential. The
- * deprecated `setDeviceCredentialAllowed` is not used, and no negative
- * button is set (the builder rejects one when the credential is allowed).
+ * The authenticator set comes from [allowedAuthenticatorsFor]. The deprecated
+ * `setDeviceCredentialAllowed` is not used, and no negative button is set
+ * (the builder rejects one when the credential is allowed).
  */
 class BiometricPromptAuthenticator(private val context: Context) : BiometricAuthenticator {
-    private val allowed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        BIOMETRIC_STRONG or DEVICE_CREDENTIAL
-    } else {
-        BIOMETRIC_WEAK or DEVICE_CREDENTIAL
-    }
+    private val allowed = allowedAuthenticatorsFor(Build.VERSION.SDK_INT)
 
     /** Anything other than success, including unknown results, means "cannot verify" (P1-07-R4). */
     override fun availability(): LockAvailability = when (BiometricManager.from(context).canAuthenticate(allowed)) {
@@ -59,4 +54,16 @@ class BiometricPromptAuthenticator(private val context: Context) : BiometricAuth
             BiometricPrompt.ERROR_CANCELED,
         )
     }
+}
+
+/**
+ * P1-21-R6: the authenticator set for an API level. API 30+ allows STRONG
+ * biometrics with the device credential. API 26-29 cannot combine STRONG with
+ * the credential (the framework rejects that set below 30), so they use WEAK
+ * biometrics with the credential, a weaker class of biometric (ADR-0019).
+ */
+internal fun allowedAuthenticatorsFor(sdkInt: Int): Int = if (sdkInt >= Build.VERSION_CODES.R) {
+    BIOMETRIC_STRONG or DEVICE_CREDENTIAL
+} else {
+    BIOMETRIC_WEAK or DEVICE_CREDENTIAL
 }

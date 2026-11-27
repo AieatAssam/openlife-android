@@ -47,6 +47,10 @@ open class KeystoreWrapper(private val alias: String = DEFAULT_ALIAS) {
         existingWrappingKey()?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
+        // Options and their API levels (minSdk 26, P1-21): purposes, GCM block
+        // mode, no padding, 256-bit size and randomized encryption are all API 23+.
+        // setIsStrongBoxBacked and setUnlockedDeviceRequired are API 28+ and are
+        // deliberately not set, so no StrongBox request is made below API 28.
         val spec = KeyGenParameterSpec.Builder(
             alias,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,

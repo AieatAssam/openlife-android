@@ -35,7 +35,7 @@ class VaultSecurityInfoTest {
                 assertEquals("level $level", expected, VaultSecurityInfo.levelOf(report))
             }
         }
-        // API 29-30: only isInsideSecureHardware exists, which does not say TEE or StrongBox.
+        // API 26-30: only isInsideSecureHardware exists, which does not say TEE or StrongBox.
         assertEquals(
             KeySecurityLevel.SECURE_HARDWARE_UNSPECIFIED,
             VaultSecurityInfo.levelOf(WrappingKeyReport.Reported(null, true)),
