@@ -153,8 +153,9 @@ class AccessibilitySourceRulesTest {
     @Test
     fun statusChangesAndErrorsAreAnnounced() {
         val errors = sources.flatMap { source ->
-            source.calls("Text").filter { it.args.contains("colorScheme.error") }.filterNot { announces(it.args) }
-                .map { "${it.location()}: error text without a live region" }
+            source.calls("Text").filter { it.args.contains("colorScheme.error") }
+                .filterNot { announcedAt(source, it.start) }
+                .map { "${it.location()}: error text not posted to the status host" }
         }
         val statuses = sources.flatMap { source ->
             STATUS_RESOURCES.flatMap { resource ->
@@ -260,6 +261,26 @@ class AccessibilitySourceRulesTest {
 
     private fun announces(text: String) = ANNOUNCE.containsMatchIn(text)
 
+    /** True when the composable that holds the call at [offset] posts through [Announce]. */
+    private fun announcedAt(source: KotlinSource, offset: Int): Boolean {
+        var call = source.enclosingCall(offset)
+        while (call != null && source.functionBody(call.name) == null) call = source.enclosingCall(call.start)
+        return call != null && announces(source.functionBody(call.name).orEmpty())
+    }
+
+    /** P1-10 (review H-01): a live region exists only in the status host, so it is never inserted with its text. */
+    @Test
+    fun statusIsPostedOnlyThroughTheStableStatusHost() {
+        val outside = sources.filterNot { it.path.fileName.toString() == "AccessibilitySemantics.kt" }
+            .flatMap { source ->
+                LIVE_OUTSIDE_HOST.findAll(source.code).map { "${source.path.fileName}:${source.lineOf(it.range.first)}: ${it.value} outside the status host" }
+                    .toList()
+            }
+        assertTrue("status posted outside the host: $outside", outside.isEmpty())
+        val legacy = sources.filter { ANNOUNCE_STATUS_LEGACY.containsMatchIn(it.code) }.map { it.path.fileName.toString() }
+        assertTrue("announceStatus still used in: $legacy", legacy.isEmpty())
+    }
+
     /**
      * The call that shows [resource]: string helpers are skipped; a Text must
      * announce itself, and any other composable must announce in its own body.
@@ -274,12 +295,9 @@ class AccessibilitySourceRulesTest {
 
             call == null -> "$where is not shown by a call"
 
-            call.name == "Text" -> if (announces(call.args)) null else "$where in a Text without a live region"
+            announcedAt(source, offset) -> null
 
-            else -> {
-                val body = source.functionBody(call.name) ?: return "$where passed to ${call.name}, not found here"
-                if (announces(body)) null else "$where passed to ${call.name}, which does not announce"
-            }
+            else -> "$where is shown without Announce(...) in its composable"
         }
     }
 
@@ -322,7 +340,9 @@ class AccessibilitySourceRulesTest {
         val SECOND_CUE = listOf("textDecoration =", "fontWeight =", "fontStyle =")
         val SELECTED_PARAMETER = Regex("""\bselected:\s*Boolean""")
         val SELECTION_EXPOSED = listOf(Regex("""\bselected\s*=\s*selected\b"""), Regex("""\.selectable\("""))
-        val ANNOUNCE = Regex("""liveRegion|announceStatus\(\)""")
+        val ANNOUNCE = Regex("""\bAnnounce\(""")
+        val LIVE_OUTSIDE_HOST = Regex("""liveRegion\s*=|LiveRegionMode\.""")
+        val ANNOUNCE_STATUS_LEGACY = Regex("""announceStatus\(""")
         val STRING_HELPERS = setOf("stringResource", "pluralStringResource", "listOf", "localizedList", "withDataSpan")
 
         /** Text that appears when state changes without the user moving focus there. */
