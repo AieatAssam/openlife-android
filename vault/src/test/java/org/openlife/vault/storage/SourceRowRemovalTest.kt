@@ -136,9 +136,10 @@ class SourceRowRemovalTest {
         fun hasSearchIndex(host: HostSqlite): Boolean {
             val present = host.long("SELECT COUNT(*) FROM sqlite_master WHERE name = 'ocr_text_fts_docsize'") == 1L
             if (!present) {
+                // Only an OPENLIFE_HOST_SQLITE engine below the floor may lack the index (ADR-0017).
                 assertFalse(
                     "FTS index missing on SQLite ${host.version()}",
-                    SearchIndex.isSupportedVersion(host.version()),
+                    HostSqlite.isPinned || SearchIndex.isSupportedVersion(host.version()),
                 )
             }
             return present

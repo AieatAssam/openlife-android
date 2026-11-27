@@ -149,16 +149,14 @@ class DependencyBoundaryTest {
         assertFalse(testOnlyLeaks(leaked, testOnly).isEmpty())
     }
 
-    private fun testOnlyLeaks(
-        reports: Map<String, Map<String, List<String>>>,
-        testOnly: Set<String>,
-    ): List<String> = reports.flatMap { (module, classpaths) ->
-        GUARDED_CLASSPATHS.flatMap { name ->
-            val coordinates = classpaths[name] ?: return@flatMap listOf("$module: $name is missing from the report")
-            coordinates.filter { coordinate -> testOnly.any { coordinate.startsWith("$it:") } }
-                .map { "$module $name: $it" }
+    private fun testOnlyLeaks(reports: Map<String, Map<String, List<String>>>, testOnly: Set<String>): List<String> =
+        reports.flatMap { (module, classpaths) ->
+            GUARDED_CLASSPATHS.flatMap { name ->
+                val coordinates = classpaths[name] ?: return@flatMap listOf("$module: $name is missing from the report")
+                coordinates.filter { coordinate -> testOnly.any { coordinate.startsWith("$it:") } }
+                    .map { "$module $name: $it" }
+            }
         }
-    }
 
     private fun boundaryReport(module: String): Map<String, List<String>> {
         val file = projectDir.resolve("$module/build/reports/classpath-boundary.txt")

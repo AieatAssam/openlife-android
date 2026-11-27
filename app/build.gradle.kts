@@ -390,6 +390,13 @@ tasks.withType<Test>().configureEach {
     dependsOn(tasks.withType<BundleOfflineDocuments>())
     dependsOn(writeReleaseRuntimeClasspath)
     dependsOn("writeClasspathBoundaryReport", ":vault:writeClasspathBoundaryReport")
+    // Declared inputs, so a changed classpath re-runs DependencyBoundaryTest
+    // instead of leaving the test task up to date.
+    inputs.files(
+        releaseClasspathReport,
+        classpathBoundaryReport,
+        rootProject.file("vault/build/reports/classpath-boundary.txt"),
+    ).withPropertyName("classpathReports")
     dependsOn("checkLicense")
     dependsOn("processReleaseMainManifest")
     dependsOn("processReleaseManifest")

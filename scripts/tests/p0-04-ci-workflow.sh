@@ -145,14 +145,16 @@ else
   fail=$((fail + 1))
 fi
 
-# The build job must run on an image whose python3 SQLite is new enough for
-# the vault search-index host tests, and must fail rather than skip them.
-if grep -A8 '^  build-lint-unit-test:' "$WORKFLOW" | grep -Eq 'runs-on: ubuntu-24.04' \
-  && grep -q 'Require a host SQLite that runs the search-index tests' "$WORKFLOW"; then
-  printf 'ok - build job requires a host SQLite of 3.42 or newer\n'
+# ADR-0017: the vault host tests use the pinned sqlite-jdbc engine, so the
+# build job runs on ubuntu-22.04 with no python SQLite floor step, and the
+# workflow never selects another engine through OPENLIFE_HOST_SQLITE.
+if grep -A8 '^  build-lint-unit-test:' "$WORKFLOW" | grep -Eq 'runs-on: ubuntu-22.04' \
+  && ! grep -q 'Require a host SQLite' "$WORKFLOW" \
+  && ! grep -q 'OPENLIFE_HOST_SQLITE=\|OPENLIFE_HOST_SQLITE:' "$WORKFLOW"; then
+  printf 'ok - build job uses the pinned test SQLite (ubuntu-22.04, no engine override)\n'
   pass=$((pass + 1))
 else
-  printf 'not ok - build job requires a host SQLite of 3.42 or newer\n' >&2
+  printf 'not ok - build job uses the pinned test SQLite (ubuntu-22.04, no engine override)\n' >&2
   fail=$((fail + 1))
 fi
 

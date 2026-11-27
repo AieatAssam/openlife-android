@@ -96,6 +96,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // ADR-0017: the host-test SQLite, pinned to the SQLite inside SQLCipher.
+    // Test-only: it bundles host native libraries, which must never reach an
+    // APK (DependencyBoundaryTest checks every non-unit-test classpath).
+    testImplementation(libs.sqlite.jdbc)
     // P2-04-R5: the stray-glyph policy cost on ground truth, with the production classifier.
     testImplementation(project(":eval"))
     detektPlugins(libs.detekt.rules.ktlint.wrapper)

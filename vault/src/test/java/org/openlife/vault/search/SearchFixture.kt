@@ -4,6 +4,7 @@ import androidx.sqlite.db.SupportSQLiteProgram
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
@@ -135,9 +136,8 @@ class SearchFixture(val host: HostSqlite) {
         /**
          * A v4 vault migrated to v5 through the shipped MIGRATION_4_5. The
          * index needs SQLite [SearchIndex.MIN_SQLITE_VERSION] (FTS5
-         * secure-delete without the 3.42.0-3.46.0 corruption); on an older host
-         * SQLite the migration correctly creates no index, and tests that
-         * need one are skipped with this message rather than run vacuously.
+         * secure-delete without the 3.42.0-3.46.0 corruption); on an older
+         * engine the migration correctly creates no index ([assumeIndexed]).
          */
         fun migrated(host: HostSqlite, seed: SearchFixture.() -> Unit = {}): SearchFixture {
             host.createFromExportedSchema(V4)
@@ -148,14 +148,24 @@ class SearchFixture(val host: HostSqlite) {
             return fixture
         }
 
+        /**
+         * On the pinned engine (ADR-0017) a missing index is a failure, so no
+         * search test skips by construction. Only an engine selected with
+         * `OPENLIFE_HOST_SQLITE` may skip, when it is older than the floor.
+         */
         fun assumeIndexed(host: HostSqlite) {
-            val version = host.query("SELECT sqlite_version()").single().single()
+            val version = host.version()
             val tables = host.long(
                 "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('ocr_text_fts', 'ocr_correction_fts')",
             )
+            if (HostSqlite.isPinned) {
+                assertEquals("the search index exists on the pinned SQLite $version", 2L, tables)
+                return
+            }
             assumeTrue(
-                "host SQLite $version is older than ${SearchIndex.MIN_SQLITE_VERSION}: no index is created " +
-                    "(FTS5 secure-delete missing before 3.42, corrupting from 3.42.0 to 3.46.0); test skipped",
+                "OPENLIFE_HOST_SQLITE engine $version is older than ${SearchIndex.MIN_SQLITE_VERSION}: " +
+                    "no index is created (FTS5 secure-delete missing before 3.42, corrupting from 3.42.0 " +
+                    "to 3.46.0); test skipped",
                 tables == 2L,
             )
         }

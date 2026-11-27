@@ -20,25 +20,15 @@ permissions:
 jobs:
   build-lint-unit-test:
     name: Build, lint, unit tests
-    # ubuntu-24.04: the vault host tests run schema SQL through python3's
-    # sqlite3 module, and the search-index tests skip themselves below
-    # SQLite 3.42 (no FTS5 secure-delete). ubuntu-22.04 ships 3.37, so those
-    # tests never ran here. The emulator job keeps its own 22.04 pin.
-    runs-on: ubuntu-24.04
+    # The vault host tests run on a pinned SQLite (sqlite-jdbc, a test-only
+    # Gradle dependency; ADR-0017), not on the image's python3, so the image's
+    # SQLite does not matter. OPENLIFE_HOST_SQLITE must stay unset here.
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - uses: ./.github/actions/gradle-setup
-
-      - name: Require a host SQLite that runs the search-index tests
-        run: |
-          python3 - <<'PY'
-          import sqlite3, sys
-          v = sqlite3.sqlite_version_info
-          print("host SQLite", sqlite3.sqlite_version)
-          sys.exit(0 if v >= (3, 42, 0) else "host SQLite is older than 3.42: search-index tests would be skipped")
-          PY
 
       - name: Validate plan
         run: scripts/plan-check.sh

@@ -2,6 +2,8 @@ package org.openlife.vault.search
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
@@ -16,6 +18,12 @@ import org.openlife.vault.storage.SqliteVersionFloorTest
  * A SQLCipher bump without a matching sqlite-jdbc bump fails here.
  */
 class PinnedEngineTest {
+    /** Not applicable when `OPENLIFE_HOST_SQLITE` selects another engine on purpose. */
+    @Before
+    fun onlyOnThePinnedEngine() {
+        assumeTrue("OPENLIFE_HOST_SQLITE selects another engine", HostSqlite.isPinned)
+    }
+
     @Test
     fun theDefaultEngineIsTheSqliteInsideTheShippedSqlcipher() {
         HostSqlite().use { host ->
