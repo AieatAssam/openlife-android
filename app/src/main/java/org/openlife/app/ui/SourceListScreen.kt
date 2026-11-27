@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -91,7 +92,16 @@ fun SourceListScreen(
             contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
             topBar = {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.list_title), modifier = Modifier.asHeading()) },
+                    // One line, ellipsised: at 200 % font on a narrow window the two action
+                    // buttons take the width the title would otherwise overflow into.
+                    title = {
+                        Text(
+                            stringResource(R.string.list_title),
+                            modifier = Modifier.asHeading(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
                     actions = {
                         // P2-08: local search; an empty vault simply finds nothing.
                         if (onOpenSearch != null) {
