@@ -4,6 +4,17 @@ Branch `plan/P1-10-accessibility`, cut from main 77b4ebe. Date 2026-11-26.
 Started by acting-owner authorisation while P0-07, P1-08 and P1-20 were at
 `review`.
 
+## Device precondition (read before any instrumented run)
+
+The debug build uses application id `org.openlife`. The instrumented suites and
+`adb shell pm clear org.openlife` destroy any OpenLife vault on the device,
+including a real one. Confirm the device holds **no real OpenLife data** before
+starting (`adb shell pm list packages | grep openlife` shows only the debug build
+you install, and the owner has confirmed no vault is needed). The 2026-11-28 run
+below used the attached tablet under the owner rule in `CLAUDE.md` ("Device
+testing"); the policy text under "Device policy for this run" is the state as of
+the first (2026-11-26) branch commit and is kept for history.
+
 ## Device policy for this run
 
 Owner instruction (2026-11-24): no emulator, no `connected*AndroidTest`, no
@@ -21,6 +32,7 @@ added.
 
 Prioritised on-device checklist, in this order:
 
+0. Precondition above: no real OpenLife data on the device.
 1. `ScreenSemanticsTest` (both tests). Expect failures to be real; triage
    each before suppressing. A suppression needs a reason and an accessible
    equivalent (`AccessibilityRule.DEFAULT_SUPPRESSIONS`, target: empty).
@@ -170,3 +182,175 @@ equivalent other than "Show region" and "Fit to screen".
 FLAG_SECURE stays on every window. No content goes to notifications, logs or
 the window title. The new strings are generic. The one pre-existing debug
 log, `EvidenceBounds`, holds geometry only.
+
+## Review fixes (2026-11-27)
+
+Commits on `plan/P1-10-accessibility` after the first record (from `git log`):
+
+- **Stable status host** (3e14ba2, 5c70475 RED, 1230541, 3debf17): every screen
+  announces status through one stable polite live node. Status is no longer a
+  live region that is added and removed with the status text. The source rule
+  now requires `Announce` and forbids `liveRegion` outside the host.
+- **OCR history toggle state** (96d05e1): the toggle label now names the action
+  and the state ("Show history (N)" / "Hide history (N)"), so TalkBack hears the
+  state. The button does not expose an expanded/collapsed role.
+- **List title autosize** (e4d9b98, 4370061): the list title is one ellipsised
+  line and scales down with a `StepBased` autosize, minimum 12 sp. Visual
+  acceptability of the scaled title has **not been judged** by anyone.
+- **Delete labels** (f578cb6): each list row's delete action and the viewer's
+  delete action name the item: "Delete <item label>". The item label is the
+  import timestamp ("Imported <date and time>"), not document content.
+- **Zoom announcements off the pinch path** (a20c259): zoom state and the zoom
+  custom actions are kept off the pinch gesture path, and span targets are kept
+  off it too.
+- **Waits in ScreenSemanticsTest** (182de14): the test waits for decoded images
+  and for the screen to settle before it runs the checks, instead of checking
+  immediately.
+- **`intake_preview_image` test tag added to production source** (182de14,
+  `app/src/main/java/org/openlife/app/ui/IntakeScreen.kt`): a test tag on the
+  intake preview image, so the ScreenSemanticsTest case can find it. Production
+  source changed for a test tag only.
+- Lint and detekt/ktlint fixes for these changes (9d7bad5, 3debf17) and the
+  large-font clipping failure message (c4764bb).
+
+Gate after the merge (2026-11-27): see the step's `evidence` in
+`plan/plan.yaml`. The merge of `origin/main` was a no-op (`Already up to date`).
+
+## Device run 2026-11-28, Huawei AGS2-W09, API 26
+
+Device: Huawei AGS2-W09, Android 8.0.0 (API 26), adb serial `U8BBB20806201256`.
+No `org.openlife*` package was installed before the run (`pm list packages`).
+Command: `./gradlew :app:connectedDebugAndroidTest --continue` (full app suite),
+`ANDROID_SERIAL=U8BBB20806201256`. Gradle: `BUILD FAILED in 7m 8s`, exit 1.
+`stay_on_while_plugged_in` was set to 3 for the run and restored to 0 afterwards.
+
+Totals (parsed from `TEST-AGS2-W09 - 8.0.0.xml`, copied to
+`scratchpad/device-logs/p110-app-full-results/`): **148 tests, 8 assertion
+failures, 4 assumption skips reported as failures, 0 errors, 0 skipped**.
+The four "AssumptionViolatedException" entries are skips, not failures.
+
+Failures as observed (class.method, first line of the message):
+
+1. `org.openlife.app.a11y.ScreenSemanticsTest.everyScreenPassesAccessibilityChecks`:
+   `accessibility failures:` (236 findings; see Open findings).
+2. `org.openlife.app.ui.EdgeToEdgeUiTest.contentClearsSystemBarsWithLargeInsets`:
+   `the title is under the status bar`.
+3. `org.openlife.app.ui.EvidenceNavigationTest.tappingASpanHighlightsItsRegionWithinTheImageBounds`:
+   `Action performScrollTo() failed.`
+4. `org.openlife.app.ui.EvidenceNavigationTest.tappingInsideARegionSelectsItsSpanAndAnnounces`:
+   `Action performScrollTo() failed.`
+5. `org.openlife.app.ui.EvidenceNavigationTest.tapAtThreeTimesSelectsTheSpanUnderTheFinger`:
+   `Action performScrollTo() failed.`
+6. `org.openlife.app.ui.LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640`:
+   `list: a control is clipped horizontally: 'null' 620 x 112 Rect.fromLTRB(0.0, 1136.0, 608.0, 1248.0)`.
+   The message names the control as `'null'`, so the control name added in
+   c4764bb did not appear in this run's message. The control is not identified
+   from this output.
+7. `org.openlife.app.ui.search.SearchScreenTest.expandedResultSelectsTheSpanInTheDetailPaneBesideTheList`:
+   `Failed to assert the following: (Text + InputText + EditableText contains 'Pick up by Friday' ...)`.
+8. `org.openlife.app.ui.search.SearchScreenTest.compactResultOpensTheViewerRouteWithTheSpanSelectedAndBackReturnsToResults`:
+   same message as 7.
+9. Assumption skip: `org.openlife.app.lock.AppLockFlowTest.deviceCredentialUnlockBelowApi30KeepsThePendingShare`:
+   `skipped: sets a device PIN; pass -e allowDevicePinChange true to opt in (emulators only)`.
+10. Assumption skip: `org.openlife.app.ui.brand.BrandScreenshotInstrumentedTest.listDetailExpandedMatchesGolden`:
+    `no committed list-detail goldens for render profile api26-AGS2-W09EEA-320dpi`.
+11. Assumption skip: `BrandScreenshotInstrumentedTest.deleteDialogMatchesGolden`: `no committed delete-dialog goldens for render profile api26-AGS2-W09EEA-320dpi`.
+12. Assumption skip: `BrandScreenshotInstrumentedTest.listViewerFirstRunMatchGoldensLightAndDark`: `no committed goldens for render profile api26-AGS2-W09EEA-320dpi`.
+
+Not run or not asserted on this device: the golden comparisons (no goldens for
+this render profile) and the device PIN lock flow (opt-in, emulators only).
+
+## Open findings
+
+### ScreenSemanticsTest findings from the device run
+
+`everyScreenPassesAccessibilityChecks` reported **236 findings**: **233
+clipped-text** and **3 touch-target**. The 3 touch-target findings are at 1x
+(DEFAULT). All 233 clipped-text findings are at 2x font, with or without the
+largest display size. Counts are the message's own lines, grouped by rule and
+screen state:
+
+Rule totals: clipped-text 233, touch-target 3.
+
+touch-target (all at 1x, screen `viewer-ocr-ready`):
+- `Accept text`, 196 x 80 px (below 48 dp at this density).
+- `Reject`, 129 x 80 px.
+- `Run again`, 173 x 80 px.
+
+clipped-text (all at 2x font; the second column is 2x font with the largest
+display size). Counts per screen state and size:
+
+| Screen state | 1x | 2x font | 2x font + largest display |
+|---|---|---|---|
+| viewer-ocr-ready | 3 | 21 | 19 |
+| list-empty | - | 2 | 2 |
+| list-items | - | 4 | 3 |
+| list-loading | - | 1 | 1 |
+| vault-unavailable | - | 4 | 4 |
+| viewer-ocr-idle | - | 8 | 6 |
+| viewer-ocr-running | - | 9 | 7 |
+| viewer-ocr-failed | - | 8 | 6 |
+| viewer-ocr-stale | - | 8 | 6 |
+| viewer-transient | - | 8 | 6 |
+| viewer-unreadable | - | 5 | 4 |
+| intake-preparing | - | 2 | 2 |
+| intake-preview | - | 3 | 3 |
+| intake-saving | - | 1 | 1 |
+| intake-saved | - | 2 | 2 |
+| intake-duplicate | - | 2 | 2 |
+| intake-rejected | - | 2 | 2 |
+| intake-failed | - | 2 | 2 |
+| first-run | - | 3 | 2 |
+| lock | - | 3 | 3 |
+| lock-offer | - | 3 | 3 |
+| settings | - | 5 | 5 |
+| about | - | 11 | 11 |
+| search-idle | - | 2 | 2 |
+| search-results | - | 2 | 2 |
+| delete-dialog | - | 3 | 3 |
+
+Examples from the message: "Nothing kept yet", "Import from photos", "Content
+unavailable", "Deletion pending — retry", "Loading…", "The vault is unavailable",
+"What this means", "Try again", "Open Settings", "Extracted text", "Review: Unreviewed",
+"Show region", "Correct", "Reject span", "Undo reject", "Accept text", "Reject". Each
+finding is a node whose text overflows its measured bounds. No triage has been done yet; each finding needs a
+decision before the check is suppressed or the layout is changed.
+
+Other known findings (device run, observed):
+- The extended floating action button "Import from photos" is clipped
+  horizontally at 200 % font on a 320 x 640 dp window (LargeFontUiTest, failure
+  6 above). The control name is not in that message (it reads `'null'`).
+- `EdgeToEdgeUiTest`: the title is under the status bar with large insets.
+- Search screen: expanded and compact result tests cannot find the text
+  "Pick up by Friday" (failures 7 and 8).
+- Evidence navigation: `performScrollTo()` fails for three tests (failures 3-5).
+
+### Other open items
+
+- **Default focus indicator**: the Material default focus indicator is about
+  1.2:1 against the paper surface. Keyboard users cannot see focus well enough.
+  Not fixed.
+- **No accessible pan alternative for zoomed images** (WCAG 2.5.7): only "Show
+  region" and "Fit to screen" exist. Zoom in and zoom out are actions, but there
+  is no pan action.
+- **Text fields possibly announced twice** (correction, search and reset-word
+  fields set both a label and a content description). Device check pending
+  (runbook A22, A30).
+- **Accessibility Test Framework (requirement R1) deferred.** The step asks for
+  `enableAccessibilityChecks()`, which needs
+  `androidx.compose.ui:ui-test-accessibility` and the ATF artifact. Neither is
+  in the Gradle verification metadata, so a new dependency decision record is
+  needed. Until that is decided, `AccessibilityRule` is the in-house substitute.
+  **R1 remains a deviation.** A decision record is a follow-up.
+- **Acceptance line not met**: "AccessibilityChecks pass on both CI legs" is not
+  met. The emulator legs are manual-dispatch only by owner instruction (CI
+  emulator legs run on manual dispatch only), so no CI leg has run for this step.
+- **Known bypasses of the source rules**: the source rules read text, not
+  types, so these forms can evade them: a conditional
+  `contentDescription = if (x) null else d`; extension wrappers around
+  `clickable`; `ProvideTextStyle`; a positional `Density(d, 1f)`; named-constant
+  heights; a per-file gesture check; colour chosen by `if`; screens missing from
+  the `SCREENS` list.
+- **Lint setting has no effect in practice**: lint's Accessibility category is
+  set to error, but warnings already failed the build, so the change alters
+  nothing in practice.

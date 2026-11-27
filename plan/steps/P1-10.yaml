@@ -119,6 +119,20 @@ notes: >
     buttons and scroll actions.
   - AOSP lint's Accessibility checks see little of Compose; the source
     rules carry most of the static weight.
+  2026-11-27/28 (agent, review fixes and device run): origin/main was already
+  merged (no-op). Review fixes are listed in docs/verification/P1-10-accessibility.md
+  ("Review fixes (2026-11-27)"). Full app suite run on the attached tablet
+  (Huawei AGS2-W09, Android 8.0, API 26): 148 tests, 8 assertion failures,
+  4 assumption skips, 0 errors. Failures and the ScreenSemanticsTest findings
+  (236: 233 clipped-text, 3 touch-target) are recorded in the verification
+  record, not fixed here. The TalkBack runbook was corrected against
+  strings.xml (26 replacements), gained a precondition (no real data on the
+  device) and section D (two-pane layout and share success path); it is still
+  not executed. Open: R1 deviation (ATF not adopted, decision record pending);
+  acceptance line "checks pass on both CI legs" not met (CI emulator legs are
+  manual-dispatch only); default focus indicator about 1.2:1 on paper; no
+  accessible pan for zoomed images (WCAG 2.5.7); possible double announcement
+  of labelled text fields (device check pending). Status stays review.
 evidence: >
   RED 00d0dad: 12 of 29 targeted JVM tests failed for their intended reasons
   (Stale stamp label 3.23:1; source rules for gestures, pane titles,
@@ -142,3 +156,21 @@ evidence: >
   instruction: no emulator, no device). ScreenSemanticsTest: implemented;
   unverified (gap - pending physical-device run). See
   docs/verification/P1-10-accessibility.md.
+  2026-11-28 (agent). Merge: origin/main already an ancestor (no-op).
+  plan-check: steps=83 errors=0. Gate (./gradlew detekt lint :app:test :vault:test
+  assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+  :eval:test) exit 0, last lines: "BUILD SUCCESSFUL in 9s", "138 actionable
+  tasks: 7 executed, 131 up-to-date". Test tasks were UP-TO-DATE in that run
+  (inputs unchanged), so no new JVM counts were observed in this run; the
+  counts in the step's earlier evidence (app 231/231, vault 197/197, eval 26/26)
+  are not re-observed here. Device: Huawei AGS2-W09 Android 8.0.0 (API 26),
+  serial U8BBB20806201256, ./gradlew :app:connectedDebugAndroidTest --continue
+  -> BUILD FAILED in 7m 8s. Totals: 148 tests, 8 assertion failures, 4 assumption
+  skips reported as failures, 0 errors. Failures: ScreenSemanticsTest
+  .everyScreenPassesAccessibilityChecks (236 findings), EdgeToEdgeUiTest
+  .contentClearsSystemBarsWithLargeInsets, EvidenceNavigationTest x3
+  (performScrollTo failed), LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640,
+  SearchScreenTest x2 (Pick up by Friday not found). Skips: AppLockFlowTest
+  deviceCredentialUnlockBelowApi30KeepsThePendingShare (emulator-only opt-in),
+  BrandScreenshotInstrumentedTest x3 (no goldens for api26-AGS2-W09EEA-320dpi).
+  Gap: the TalkBack runbook (docs/runbooks/talkback.md) is not executed.

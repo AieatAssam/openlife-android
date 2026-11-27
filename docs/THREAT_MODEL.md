@@ -151,11 +151,14 @@ and inset bounds, while its final-tree connected run remains a documented
 device gap (`docs/verification/P0-07-ui-foundation.md`). P1-10 adds JVM source rules and a
 WCAG contrast check over every theme colour pair (pass), and per-screen
 semantics tests at 1x, 2x font and the largest display size (compiled, not
-yet run on a device). Accessibility-only text is fixed copy from resources:
-pane titles and action labels never carry document content. The live
-regions P1-10 adds announce status only; the viewer's existing
-selected-span announcement (P2-06) reads span text aloud to the user on
-screen, as TalkBack does for any visible text, and goes nowhere else. An actual TalkBack
+yet run on a device). Accessibility text is fixed copy from resources for pane titles, action
+labels and status announcements, and no status announcement carries document
+content. Two accessibility labels do carry document content: each evidence
+region's label is the OCR text of its span (a rejected span's label is that
+text marked as rejected), and the viewer's selected-span announcement (P2-06)
+speaks the selected span's text. Both reach only accessibility services the
+user has enabled, as on-screen text does, and are not in notifications or the
+window title. Delete labels carry only the import timestamp. An actual TalkBack
 accessibility-service run has not been performed and remains an open item
 (owner action OA-3, `docs/runbooks/talkback.md`, not yet executed;
 `docs/reviews/C0-security-self-review.md`), not a passed check.
