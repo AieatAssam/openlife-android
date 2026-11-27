@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.DpSize
@@ -108,7 +109,7 @@ class SearchScreenTest {
         composeRule.waitUntil(WAIT_MS) {
             composeRule.onAllNodesWithText("Selected: Pick up by Friday").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("Selected: Pick up by Friday").assertIsDisplayed()
+        composeRule.onNodeWithText("Selected: Pick up by Friday").performScrollTo().assertIsDisplayed()
     }
 
     private fun setHost(size: DpSize) {
