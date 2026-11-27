@@ -241,6 +241,7 @@ private fun ViewerContent(
     val selectedSpan = EvidenceSelection.selectableSpans(spans, spanReviews).find { it.id == selectedSpanId }
     // The span announcement is one stable node (empty when nothing is selected).
     StatusHost(
+        spanNode = true,
         spanSelection = selectedSpan?.let {
             stringResource(R.string.viewer_span_selected, evidenceSpanPreview(it.text))
         },

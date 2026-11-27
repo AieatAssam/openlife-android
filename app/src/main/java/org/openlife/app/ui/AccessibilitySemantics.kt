@@ -120,13 +120,19 @@ private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null
  * accessibility service (THREAT_MODEL).
  */
 @Composable
-fun StatusHost(modifier: Modifier = Modifier, spanSelection: String? = null, content: @Composable () -> Unit) {
+fun StatusHost(
+    modifier: Modifier = Modifier,
+    spanNode: Boolean = false,
+    spanSelection: String? = null,
+    content: @Composable () -> Unit,
+) {
     val channel = remember { StatusChannel() }
     val resources = LocalResources.current
     Box(modifier) {
         CompositionLocalProvider(LocalStatusChannel provides channel) { content() }
         LiveNode(channel.current?.resolve(resources), Modifier.align(Alignment.TopStart).testTag(STATUS_NODE_TAG))
-        LiveNode(spanSelection, Modifier.align(Alignment.TopEnd).testTag(SPAN_SELECTION_NODE_TAG))
+        // Only the viewer owns the span node: on an expanded screen the list pane shares the window.
+        if (spanNode) LiveNode(spanSelection, Modifier.align(Alignment.TopEnd).testTag(SPAN_SELECTION_NODE_TAG))
     }
 }
 
