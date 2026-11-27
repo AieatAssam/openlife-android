@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -38,9 +38,15 @@ class Announcement private constructor(private val parts: List<Part>) {
     private sealed interface Part
 
     /** [id] formatted with the strings named by [args] (resource ids, not text). */
-    private data class Text(@StringRes val id: Int, val args: List<Int>) : Part
+    private data class Text(
+        @StringRes val id: Int,
+        val args: List<Int>,
+    ) : Part
 
-    private data class Count(@PluralsRes val id: Int, val count: Int) : Part
+    private data class Count(
+        @PluralsRes val id: Int,
+        val count: Int,
+    ) : Part
 
     /** This announcement followed by [other], read as one message. */
     operator fun plus(other: Announcement): Announcement = Announcement(parts + other.parts)
@@ -58,11 +64,16 @@ class Announcement private constructor(private val parts: List<Part>) {
 
     companion object {
         /** A status string; each of [args] is a string resource id filled into its placeholders. */
-        fun statusOf(@StringRes id: Int, @StringRes vararg args: Int): Announcement =
-            Announcement(listOf(Text(id, args.toList())))
+        fun statusOf(
+            @StringRes id: Int,
+            @StringRes vararg args: Int,
+        ): Announcement = Announcement(listOf(Text(id, args.toList())))
 
         /** A plural status for [count] items. */
-        fun countOf(@PluralsRes id: Int, count: Int): Announcement = Announcement(listOf(Count(id, count)))
+        fun countOf(
+            @PluralsRes id: Int,
+            count: Int,
+        ): Announcement = Announcement(listOf(Count(id, count)))
     }
 }
 
@@ -111,7 +122,7 @@ private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null
 @Composable
 fun StatusHost(modifier: Modifier = Modifier, spanSelection: String? = null, content: @Composable () -> Unit) {
     val channel = remember { StatusChannel() }
-    val resources = LocalContext.current.resources
+    val resources = LocalResources.current
     Box(modifier) {
         CompositionLocalProvider(LocalStatusChannel provides channel) { content() }
         LiveNode(channel.current?.resolve(resources), Modifier.align(Alignment.TopStart).testTag(STATUS_NODE_TAG))

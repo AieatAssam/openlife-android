@@ -54,7 +54,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import java.util.UUID
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.OpenLifeButton
@@ -64,6 +63,7 @@ import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,8 +84,6 @@ fun SourceListScreen(
 ) {
     StatusHost {
         var pendingDelete by remember { mutableStateOf<Source?>(null) }
-
-        val hasItems = state is SourceListUiState.Loaded && state.sources.isNotEmpty()
 
         val pane = stringResource(R.string.list_title)
         Scaffold(
@@ -112,7 +110,7 @@ fun SourceListScreen(
             // list carries it in the body instead; loading and an unavailable
             // vault offer no import at all.
             floatingActionButton = {
-                if (hasItems) {
+                if (state is SourceListUiState.Loaded && state.sources.isNotEmpty()) {
                     // The content-slot overload keeps the label a plain Text; the
                     // icon/text overload hides it from semantics while animating.
                     OpenLifeExtendedFloatingActionButton(

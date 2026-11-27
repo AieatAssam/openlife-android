@@ -35,7 +35,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import java.util.UUID
 import org.openlife.app.R
 import org.openlife.app.ui.Announce
 import org.openlife.app.ui.Announcement
@@ -47,6 +46,7 @@ import org.openlife.app.ui.theme.Ink
 import org.openlife.app.ui.theme.LocalOpenLifeBrandColors
 import org.openlife.app.ui.theme.OpenLifeMono
 import org.openlife.vault.search.SearchHit
+import java.util.UUID
 
 /**
  * P2-08-R4: local search. The field is the content field (no Copy/Cut, no
@@ -131,7 +131,9 @@ private fun SearchResults(
 }
 
 @Composable
-private fun Message(@StringRes textRes: Int) {
+private fun Message(
+    @StringRes textRes: Int,
+) {
     Announce(Announcement.statusOf(textRes))
     Text(
         stringResource(textRes),

@@ -30,7 +30,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.openlife.app.R
@@ -39,6 +38,7 @@ import org.openlife.app.ui.brand.OpenLifeButton
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 import org.openlife.app.ui.brand.StampBadge
 import org.openlife.app.ui.brand.StampState
+import java.util.UUID
 
 @Composable
 fun IntakeScreen(
@@ -225,7 +225,11 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
 }
 
 @Composable
-private fun CenteredMessage(@StringRes textRes: Int, stampState: StampState? = null, onDone: (() -> Unit)? = null) {
+private fun CenteredMessage(
+    @StringRes textRes: Int,
+    stampState: StampState? = null,
+    onDone: (() -> Unit)? = null,
+) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -244,7 +248,11 @@ private fun CenteredMessage(@StringRes textRes: Int, stampState: StampState? = n
 }
 
 @Composable
-private fun TerminalMessage(@StringRes textRes: Int, onDone: () -> Unit, @StringRes vararg argRes: Int) {
+private fun TerminalMessage(
+    @StringRes textRes: Int,
+    onDone: () -> Unit,
+    @StringRes vararg argRes: Int,
+) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,

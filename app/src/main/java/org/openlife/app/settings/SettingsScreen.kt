@@ -64,7 +64,11 @@ fun SettingsScreen(
                         modifier = Modifier.semantics { heading() },
                     )
                     onVerifyAll?.let { VerifyAllSection(controller, it) }
-                    ResetVaultFlow(onResetVault = onResetVault, onResetComplete = onResetComplete, controller = controller)
+                    ResetVaultFlow(
+                        onResetVault = onResetVault,
+                        onResetComplete = onResetComplete,
+                        controller = controller,
+                    )
                 }
             }
         }

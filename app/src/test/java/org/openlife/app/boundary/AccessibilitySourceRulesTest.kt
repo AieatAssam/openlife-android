@@ -263,7 +263,8 @@ class AccessibilitySourceRulesTest {
 
     /** True when the composable that holds the call at [offset] posts through [Announce]. */
     private fun announcedAt(source: KotlinSource, offset: Int): Boolean {
-        // A resource passed to a composable of this file (a helper such as CenteredMessage) is announced by that helper.
+        // A resource passed to a composable of this file (a helper such as CenteredMessage)
+        // is announced by that helper.
         var call = source.enclosingCall(offset)
         while (call != null && call.name in STRING_HELPERS) call = source.enclosingCall(call.start)
         val callee = call?.let { source.functionBody(it.name) }
@@ -277,11 +278,13 @@ class AccessibilitySourceRulesTest {
     fun statusIsPostedOnlyThroughTheStableStatusHost() {
         val outside = sources.filterNot { it.path.fileName.toString() == "AccessibilitySemantics.kt" }
             .flatMap { source ->
-                LIVE_OUTSIDE_HOST.findAll(source.code).map { "${source.path.fileName}:${source.lineOf(it.range.first)}: ${it.value} outside the status host" }
-                    .toList()
+                LIVE_OUTSIDE_HOST.findAll(source.code).map {
+                    "${source.path.fileName}:${source.lineOf(it.range.first)}: ${it.value} outside the status host"
+                }.toList()
             }
         assertTrue("status posted outside the host: $outside", outside.isEmpty())
-        val legacy = sources.filter { ANNOUNCE_STATUS_LEGACY.containsMatchIn(it.code) }.map { it.path.fileName.toString() }
+        val legacy = sources.filter { ANNOUNCE_STATUS_LEGACY.containsMatchIn(it.code) }
+            .map { it.path.fileName.toString() }
         assertTrue("announceStatus still used in: $legacy", legacy.isEmpty())
     }
 

@@ -120,7 +120,13 @@ private fun LockedHost(lockState: AppLockState, authenticator: BiometricAuthenti
 
 /** Shows only fixed copy: no item count, label or other content-derived text (R7). */
 @Composable
-internal fun LockScreen(title: String, body: String, @StringRes note: Int?, action: String, onAction: () -> Unit) {
+internal fun LockScreen(
+    title: String,
+    body: String,
+    @StringRes note: Int?,
+    action: String,
+    onAction: () -> Unit,
+) {
     StatusHost {
         // Both lock variants are the locked app; the pane title is fixed copy (R7).
         val pane = stringResource(R.string.lock_title)

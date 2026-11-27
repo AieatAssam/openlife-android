@@ -176,7 +176,12 @@ private fun TypeWordDialog(
 }
 
 @Composable
-private fun FinalConfirmationDialog(running: Boolean, @StringRes failure: Int?, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun FinalConfirmationDialog(
+    running: Boolean,
+    @StringRes failure: Int?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = { if (!running) onDismiss() },
         title = { Text(stringResource(R.string.reset_vault_final_title), modifier = Modifier.asHeading()) },
