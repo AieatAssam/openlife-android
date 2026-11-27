@@ -3,6 +3,7 @@ package org.openlife.app.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.FontScale
@@ -88,7 +89,11 @@ class LargeFontUiTest {
             }
             val layouts = mutableListOf<TextLayoutResult>()
             node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
-            layouts.forEach { assertTrue("$where: text overflows its layout", !it.didOverflowWidth) }
+            // The node's text is named so a failure says which label overflows.
+            val text = node.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }
+            layouts.forEach {
+                assertTrue("$where: text overflows its layout: '$text'", !it.didOverflowWidth)
+            }
         }
     }
 

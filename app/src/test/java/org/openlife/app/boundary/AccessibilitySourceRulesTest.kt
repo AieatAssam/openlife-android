@@ -72,7 +72,9 @@ class AccessibilitySourceRulesTest {
                 .map { "${it.location()}: ${it.args.lines().first().trim()}" }
         } + sources.flatMap { source ->
             TITLE_SLOT.findAll(source.code).mapNotNull { match ->
-                source.calls("Text").firstOrNull { it.start > match.range.last }
+                // The title's text is a Text or, where it autosizes, a BasicText.
+                (source.calls("Text") + source.calls("BasicText"))
+                    .filter { it.start > match.range.last }.minByOrNull { it.start }
                     ?.takeUnless { HEADING.containsMatchIn(it.args) }
                     ?.let { "${it.location()}: title slot without heading()" }
             }.toList()

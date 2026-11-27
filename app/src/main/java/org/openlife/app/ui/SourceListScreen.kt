@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -30,6 +32,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -55,6 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.openlife.app.R
 import org.openlife.app.ui.brand.FoldedCornerCard
 import org.openlife.app.ui.brand.OpenLifeButton
@@ -159,18 +163,24 @@ fun SourceListScreen(
     }
 }
 
+private val TITLE_MIN_FONT_SIZE = 12.sp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ListTopBar(onOpenSearch: (() -> Unit)?, onOpenSettings: () -> Unit, onOpenAbout: () -> Unit) {
     TopAppBar(
-        // One line, ellipsised: at 200 % font on a narrow window the two action
-        // buttons take the width the title would otherwise overflow into.
+        // One line that scales down to the width the two action buttons leave at 200 % font
+        // (BasicText autosize, as the title role's own size is the largest it may take).
+        // The title keeps the titleLarge role and the bar's content colour.
         title = {
-            Text(
+            val style = MaterialTheme.typography.titleLarge
+            BasicText(
                 stringResource(R.string.list_title),
                 modifier = Modifier.asHeading(),
+                style = style.copy(color = LocalContentColor.current),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = TITLE_MIN_FONT_SIZE, maxFontSize = style.fontSize),
             )
         },
         actions = {
