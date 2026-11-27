@@ -291,6 +291,20 @@ class AccessibilitySourceRulesTest {
     }
 
     /**
+     * P1-10 review fix 6: an announcement is built from string and plural resource
+     * ids and counts. Span text, OCR text, file names and queries are shown as
+     * visible text only, so no `Announce(...)` argument may name them.
+     */
+    @Test
+    fun announcementArgumentsAreNeverDocumentContent() {
+        val calls = sources.flatMap { source -> source.calls("Announce") }
+        assertTrue("no Announce calls found: the rule would pass vacuously", calls.isNotEmpty())
+        val violations = calls.filter { DOCUMENT_CONTENT.containsMatchIn(it.args) }
+            .map { "${it.location()}: announcement argument names document content" }
+        assertTrue("announcements carry document content: $violations", violations.isEmpty())
+    }
+
+    /**
      * The call that shows [resource]: string helpers are skipped; a Text must
      * announce itself, and any other composable must announce in its own body.
      */
@@ -350,6 +364,7 @@ class AccessibilitySourceRulesTest {
         val ANNOUNCE = Regex("""\bAnnounce\(""")
         val LIVE_OUTSIDE_HOST = Regex("""liveRegion\s*=|LiveRegionMode\.""")
         val ANNOUNCE_STATUS_LEGACY = Regex("""announceStatus\(""")
+        val DOCUMENT_CONTENT = Regex("""evidenceSpanPreview|\.text\b|spanText|selectedSpan|fileName|displayName|\bquery\b""")
         val FUN_DECLARATION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w.]+\.)?(\w+)\s*\(""")
         val STRING_HELPERS = setOf("stringResource", "pluralStringResource", "listOf", "localizedList", "withDataSpan")
 
