@@ -31,21 +31,36 @@ internal class AppAboutPort(private val app: OpenLifeApp) : AboutPort {
         )
     }
 
-    /** The certificates that signed this APK now (`apkContentsSigners`), not past ones from a rotation. */
+    /** The certificates that signed this APK now, not past ones from a rotation. */
     private fun signingCertificates(): List<String> = try {
-        packageInfo().signingInfo?.apkContentsSigners.orEmpty().map { SigningFingerprint.sha256(it.toByteArray()) }
+        signingCertificateBytes().map { SigningFingerprint.sha256(it) }
     } catch (_: PackageManager.NameNotFoundException) {
         emptyList()
     }
 
-    private fun packageInfo(): PackageInfo {
+    /**
+     * API 28+: `signingInfo.apkContentsSigners`, the signers of this APK. API
+     * 26-27 have no signing info; their `signatures` array holds the same
+     * certificates that signed this APK (no rotation history exists there).
+     */
+    private fun signingCertificateBytes(): List<ByteArray> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val info = packageInfo(PackageManager.GET_SIGNING_CERTIFICATES)
+            return info.signingInfo?.apkContentsSigners.orEmpty().map { it.toByteArray() }
+        }
+        // PackageInfo.signatures is deprecated from API 28; this branch runs only below it.
+        @Suppress("DEPRECATION")
+        val legacy = packageInfo(PackageManager.GET_SIGNATURES).signatures.orEmpty()
+        return legacy.map { it.toByteArray() }
+    }
+
+    private fun packageInfo(flags: Int): PackageInfo {
         val manager = app.packageManager
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val flags = PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES.toLong())
-            manager.getPackageInfo(app.packageName, flags)
+            manager.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
         } else {
             @Suppress("DEPRECATION")
-            manager.getPackageInfo(app.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            manager.getPackageInfo(app.packageName, flags)
         }
     }
 

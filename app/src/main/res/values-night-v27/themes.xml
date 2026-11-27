@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  P1-21-R4: see values-v27/themes.xml. Below API 27 the dark navigation bar
+  keeps its framework default (light icons), which is the value set here.
+-->
+<resources>
+    <style name="Theme.OpenLife" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/openlife_carbon</item>
+        <item name="android:navigationBarColor">@color/openlife_carbon</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

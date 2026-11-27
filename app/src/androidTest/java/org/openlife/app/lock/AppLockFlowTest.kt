@@ -201,10 +201,11 @@ class AppLockFlowTest {
     }
 
     /**
-     * A-12 (P1-19-R4): on API 29 the DEVICE_CREDENTIAL fallback is a separate
+     * A-12 (P1-19-R4): below API 30 the DEVICE_CREDENTIAL fallback (the
+     * BIOMETRIC_WEAK | DEVICE_CREDENTIAL set, API 26-29) is a separate
      * ConfirmDeviceCredential activity. IntakeActivity is noHistory, so the
      * audit suspects that leaving it for that activity finishes it and drops
-     * the pending share. Needs API 29 and a PIN, which this test sets with
+     * the pending share. Needs API 26-29 and a PIN, which this test sets with
      * locksettings and clears afterwards.
      *
      * Device safety (review): it never changes the screen lock of a real
@@ -212,10 +213,11 @@ class AppLockFlowTest {
      * argument allowDevicePinChange=true is passed; otherwise it is skipped.
      */
     @Test
-    fun deviceCredentialUnlockOnApi29KeepsThePendingShare() {
+    fun deviceCredentialUnlockBelowApi30KeepsThePendingShare() {
         assumeTrue(
-            "A-12 needs API 29 (BIOMETRIC_WEAK|DEVICE_CREDENTIAL); this device is API ${android.os.Build.VERSION.SDK_INT}",
-            android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q,
+            "A-12 needs API 26-29 (BIOMETRIC_WEAK|DEVICE_CREDENTIAL); this device is API ${android.os.Build.VERSION.SDK_INT}",
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R,
         )
         assumeTrue(
             "skipped: sets a device PIN; pass -e allowDevicePinChange true to opt in (emulators only)",
@@ -239,7 +241,7 @@ class AppLockFlowTest {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 component = ComponentName(context.packageName, IntakeActivity::class.java.name)
                 type = "image/jpeg"
-                putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("api29-credential.jpg"))
+                putExtra(Intent.EXTRA_STREAM, TestHostileContentProvider.uriFor("api26-29-credential.jpg"))
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             ActivityScenario.launch<IntakeActivity>(intent).use { scenario ->
