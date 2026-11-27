@@ -60,3 +60,6 @@ class BiometricPromptAuthenticator(private val context: Context) : BiometricAuth
         )
     }
 }
+
+/** P1-21-R6: the authenticator set for an API level. Not implemented yet (RED). */
+internal fun allowedAuthenticatorsFor(sdkInt: Int): Int = TODO("P1-21 RED stub: $sdkInt")
