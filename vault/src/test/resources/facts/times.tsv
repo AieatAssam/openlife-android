@@ -1,0 +1,161 @@
+# TIME and DATETIME rules (ADR-0008 §4.2-§4.3). Format: see FactFixtures.kt.
+#
+# 24-hour forms: 13-23 and a leading-zero hour are unambiguous
+14:30 ‖ TIME¦14:30¦14:30
+14:30:05 ‖ TIME¦14:30:05¦14:30:05
+09:15 ‖ TIME¦09:15¦09:15
+00:00 ‖ TIME¦00:00¦00:00
+23:59 ‖ TIME¦23:59¦23:59
+13:00 ‖ TIME¦13:00¦13:00
+Arrive at 18:45. ‖ TIME¦18:45¦18:45
+24:00 ‖ !TIME¦24:00
+25:10 ‖ !TIME¦25:10
+14:60 ‖ !TIME¦14:60
+14:30:60 ‖ !TIME¦14:30:60
+#
+# No marker, hour 1-12 without a leading zero: candidates (Q-5)
+2:30 ‖ TIME¦2:30¦02:30 | 14:30
+10:30 ‖ TIME¦10:30¦10:30 | 22:30
+12:15 ‖ TIME¦12:15¦00:15 | 12:15
+11:59:30 ‖ TIME¦11:59:30¦11:59:30 | 23:59:30
+#
+# 12-hour forms with a marker
+2:30 PM ‖ TIME¦2:30 PM¦14:30
+2:30pm ‖ TIME¦2:30pm¦14:30
+2:30 p.m. ‖ TIME¦2:30 p.m.¦14:30
+10:00 AM ‖ TIME¦10:00 AM¦10:00
+10am ‖ TIME¦10am¦10:00
+10 am ‖ TIME¦10 am¦10:00
+2 PM ‖ TIME¦2 PM¦14:00
+11:59 PM ‖ TIME¦11:59 PM¦23:59
+09:30 pm ‖ TIME¦09:30 pm¦21:30
+1:05 a.m. ‖ TIME¦1:05 a.m.¦01:05
+12 pm ‖ TIME¦12 pm¦00:00 | 12:00
+12:30 am ‖ TIME¦12:30 am¦00:30 | 12:30
+13:00 pm ‖ !TIME¦13:00 pm
+00:30 am ‖ !TIME¦00:30 am
+#
+# Not time shapes: nothing at all
+14.30 ‖ -
+14h30 ‖ -
+1430 ‖ -
+2 ‖ -
+a14:30 ‖ -
+١٤:٣٠ ‖ -
+14:3٠ ‖ -
+#
+# Ranges: two separate times, each read from its own text (Z-05)
+11:30 - 1:30 pm ‖ TIME¦11:30¦11:30 | 23:30 ‖ TIME¦1:30 pm¦13:30
+14:30 - 16:30 ‖ TIME¦14:30¦14:30 ‖ TIME¦16:30¦16:30
+14:30–16:30 ‖ TIME¦14:30¦14:30 ‖ TIME¦16:30¦16:30
+14:30 to 16:30 ‖ TIME¦14:30¦14:30 ‖ TIME¦16:30¦16:30
+10:30 TO 11:30 ‖ TIME¦10:30¦10:30 | 22:30 ‖ TIME¦11:30¦11:30 | 23:30
+Open 9am-5pm ‖ TIME¦9am¦09:00 ‖ TIME¦5pm¦17:00
+Open 9-5 ‖ -
+#
+# A range abstains as a whole when the second time abstains under §4.3 (ZZ-03)
+14:30 - 16:30 CET ‖ !TIME¦14:30 - 16:30 CET
+10:00 to 11:00 (local) ‖ !TIME¦10:00 to 11:00 (local)
+#
+# What may follow a time (Z-06)
+14:30 CET ‖ !TIME¦14:30 CET
+14:30 UTC ‖ !TIME¦14:30 UTC
+14:30 GMT+1 ‖ !TIME¦14:30 GMT+1
+14:30 IST ‖ !TIME¦14:30 IST
+14:30 HRS ‖ !TIME¦14:30 HRS
+14:30 AB ‖ !TIME¦14:30 AB
+14:30Z ‖ !TIME¦14:30Z
+14:30 Z ‖ !TIME¦14:30 Z
+14:30 +01:00 ‖ !TIME¦14:30 +01:00
+14:30 -0500 ‖ !TIME¦14:30 -0500
+14:30 +01 ‖ !TIME¦14:30 +01
+14:30+0100 ‖ !TIME¦14:30+0100
+14:30 (local) ‖ !TIME¦14:30 (local)
+14:30 (CET) ‖ !TIME¦14:30 (CET)
+14:30 (+01) ‖ !TIME¦14:30 (+01)
+2:30 PM EST ‖ !TIME¦2:30 PM EST
+14:30 ON ‖ TIME¦14:30¦14:30
+14:30 AT ‖ TIME¦14:30¦14:30
+14:30 Uhr ‖ TIME¦14:30¦14:30
+14:30 to ‖ TIME¦14:30¦14:30
+14:30 A ‖ TIME¦14:30¦14:30
+14:30 MEETING ‖ TIME¦14:30¦14:30
+14:30 (2 people) ‖ TIME¦14:30¦14:30
+14:30x ‖ !TIME¦14:30
+# Stated residual (ZZ-07): mixed-case zone words do not stop a time
+9:00 Eastern ‖ TIME¦9:00¦09:00 | 21:00
+15:00 London time ‖ TIME¦15:00¦15:00
+10am Pacific ‖ TIME¦10am¦10:00
+#
+# Date-times: both parts unambiguous, separated only by whitespace, ',', at, @, T or -
+2026-09-16 14:30 ‖ DATETIME¦2026-09-16 14:30¦2026-09-16 14:30
+2026-09-16T14:30 ‖ DATETIME¦2026-09-16T14:30¦2026-09-16 14:30
+2026-09-16T14:30:05 ‖ DATETIME¦2026-09-16T14:30:05¦2026-09-16 14:30:05
+16 Sep 2026, 14:30 ‖ DATETIME¦16 Sep 2026, 14:30¦2026-09-16 14:30
+16 Sep 2026 at 14:30 ‖ DATETIME¦16 Sep 2026 at 14:30¦2026-09-16 14:30
+16 Sep 2026 @ 14:30 ‖ DATETIME¦16 Sep 2026 @ 14:30¦2026-09-16 14:30
+2026-09-16 - 14:30 ‖ DATETIME¦2026-09-16 - 14:30¦2026-09-16 14:30
+14:30 16/09/2026 ‖ DATETIME¦14:30 16/09/2026¦2026-09-16 14:30
+14:30, 16 September 2026 ‖ DATETIME¦14:30, 16 September 2026¦2026-09-16 14:30
+2026-09-16 2:30 PM ‖ DATETIME¦2026-09-16 2:30 PM¦2026-09-16 14:30
+Wed 16 Sep 2026 14:30 ‖ DATETIME¦Wed 16 Sep 2026 14:30¦2026-09-16 14:30
+# Either part ambiguous: emitted separately, no cross-product
+03/04/2026 14:30 ‖ DATE¦03/04/2026¦2026-03-04 | 2026-04-03 ‖ TIME¦14:30¦14:30
+2026-09-16 2:30 ‖ DATE¦2026-09-16¦2026-09-16 ‖ TIME¦2:30¦02:30 | 14:30
+# Not a permitted separator: separate facts
+14:30 on 16 Sep 2026 ‖ TIME¦14:30¦14:30 ‖ DATE¦16 Sep 2026¦2026-09-16
+# A zone abstains the time and the date-time; a separate date survives
+2026-09-16 14:30 CET ‖ DATE¦2026-09-16¦2026-09-16 ‖ !TIME¦14:30 CET
+16 Sep 2026, 14:30 (local) ‖ DATE¦16 Sep 2026¦2026-09-16 ‖ !TIME¦14:30 (local)
+# An invalid part does not hide the other
+31/04/2026 14:30 ‖ TIME¦14:30¦14:30 ‖ !DATE¦31/04/2026
+2026-09-16 24:00 ‖ DATE¦2026-09-16¦2026-09-16 ‖ !TIME¦24:00
+# A time range keeps its two times; the date stays a date
+16 Sep 2026 14:00 - 16:00 ‖ DATE¦16 Sep 2026¦2026-09-16 ‖ TIME¦14:00¦14:00 ‖ TIME¦16:00¦16:00
+# Claimed by a time, so no phone
+Call 2 pm ‖ TIME¦2 pm¦14:00
+Tel: 10:30 ‖ TIME¦10:30¦10:30 | 22:30
+#
+# Review fixes 2026-11-26 (ADR-0008 amendments)
+# E-02: fractional seconds abstain; no time starts after a sign; a zone word takes an offset
+14:30:00.000Z ‖ !TIME¦14:30:00.000Z
+14:30:00,5 CET ‖ !TIME¦14:30:00,5
+14:30:00.123+02:00 ‖ !TIME¦14:30:00.123+02:00
+Sent: 2026-09-16 14:30:00.000 UTC ‖ DATE¦2026-09-16¦2026-09-16 ‖ !TIME¦14:30:00.000
+2026-09-16T14:30:00.000Z ‖ !DATE¦2026-09-16 ‖ !TIME¦14:30:00.000Z
+(UTC+05:30) Chennai ‖ -
+Offset +02:00 ‖ -
+Offset −02:00 ‖ -
+±01:00 ‖ -
+14:30 GMT+01:00 ‖ !TIME¦14:30 GMT+01:00
+14:30 UTC-5 ‖ !TIME¦14:30 UTC-5
+14:30–16:30 ‖ TIME¦14:30¦14:30 ‖ TIME¦16:30¦16:30
+# E-08: up to 4 space separators or tabs before a zone or a marker
+14:30  CET ‖ !TIME¦14:30  CET
+14:30\u0009CET ‖ !TIME¦14:30\u0009CET
+14:30\u00a0CET ‖ !TIME¦14:30\u00a0CET
+14:30\u2009CET ‖ !TIME¦14:30\u2009CET
+14:30\u202fCET ‖ !TIME¦14:30\u202fCET
+14:30    CET ‖ !TIME¦14:30    CET
+14:30     CET ‖ TIME¦14:30¦14:30
+2:30\u202fPM ‖ TIME¦2:30\u202fPM¦14:30
+2:30\u00a0pm ‖ TIME¦2:30\u00a0pm¦14:30
+10:00\u2009–\u200911:00 ‖ TIME¦10:00¦10:00 | 22:00 ‖ TIME¦11:00¦11:00 | 23:00
+2026-09-16\u00a014:30 ‖ DATETIME¦2026-09-16\u00a014:30¦2026-09-16 14:30
+# E-06: format and combining marks attach
+14:30\u0301 ‖ !TIME¦14:30\u0301
+14:30\u200b ‖ !TIME¦14:30\u200b
+# Ruling Q20: any abstention in a range abstains the whole range
+10:00 - 25:00 ‖ !TIME¦10:00 - 25:00
+25:00 - 11:00 ‖ !TIME¦25:00 - 11:00
+# Ruling Q16: '.' with a marker and 'h' separators are claimed and abstained
+2.30 pm ‖ !TIME¦2.30 pm
+14h30 ‖ !TIME¦14h30
+€12.50 ‖ MONEY¦€12.50¦12.50 EUR
+12.50 EUR ‖ MONEY¦12.50 EUR¦12.50 EUR
+
+# Verification fixes 2026-11-26 (EE-04, Zulu ruling)
+\u200F14:30 ‖ !*¦\u200F14:30
+14:30 Zulu ‖ !TIME¦14:30 Zulu
+14:30 zulu ‖ !TIME¦14:30 zulu
+14:30 ZULU ‖ !TIME¦14:30 ZULU
