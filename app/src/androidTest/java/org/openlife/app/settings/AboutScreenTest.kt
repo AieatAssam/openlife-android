@@ -124,11 +124,18 @@ class AboutScreenTest {
 
     @Suppress("DEPRECATION")
     private fun expectedFingerprint(): String {
-        val info = application.packageManager.getPackageInfo(
-            application.packageName,
-            PackageManager.GET_SIGNING_CERTIFICATES,
-        )
-        val certificate = info.signingInfo!!.apkContentsSigners.first().toByteArray()
+        // Mirrors AppAboutPort.signingCertificateBytes: signingInfo exists from API 28 only.
+        val certificate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            application.packageManager.getPackageInfo(
+                application.packageName,
+                PackageManager.GET_SIGNING_CERTIFICATES,
+            ).signingInfo!!.apkContentsSigners.first().toByteArray()
+        } else {
+            application.packageManager.getPackageInfo(
+                application.packageName,
+                PackageManager.GET_SIGNATURES,
+            ).signatures!!.first().toByteArray()
+        }
         return MessageDigest.getInstance("SHA-256").digest(certificate).joinToString(":") { "%02X".format(it) }
     }
 

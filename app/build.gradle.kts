@@ -147,7 +147,7 @@ android {
 
     defaultConfig {
         applicationId = "org.openlife"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 37
         versionCode = openLifeVersionCode
         versionName = openLifeVersionName

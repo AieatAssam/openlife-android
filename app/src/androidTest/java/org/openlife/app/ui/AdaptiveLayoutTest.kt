@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -94,7 +95,8 @@ class AdaptiveLayoutTest {
 
         size = DpSize(1280.dp, 800.dp)
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Details").assertIsDisplayed()
+        // The viewer's content scrolls and Details is below the fold in the detail pane (see expandedWidthShowsTwoPanes).
+        composeRule.onNodeWithText("Details").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Import from photos").assertIsDisplayed()
         assertEquals("a resize does not navigate", stack, backStackRoutes())
 
@@ -119,9 +121,11 @@ class AdaptiveLayoutTest {
         composeRule.onNodeWithText(PLACEHOLDER).assertIsDisplayed()
         composeRule.onNodeWithText("Import from photos").assertIsDisplayed()
 
+        // Hold the activity before the last Back: the rule cannot read it once it is destroyed.
+        val activity = composeRule.activity
         pressBackUnconditionally()
         composeRule.waitForIdle()
-        assertTrue("the second Back leaves", composeRule.activity.isFinishing)
+        assertTrue("the second Back leaves", activity.isFinishing)
     }
 
     @Test

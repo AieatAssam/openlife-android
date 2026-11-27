@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  P1-21-R4: android:windowLightNavigationBar exists from API 27. Lint rejects it
+  in values/ with minSdk 26. A same-named style in this folder replaces the
+  base style for API 27+, so the whole Theme.OpenLife style is repeated here.
+-->
+<resources>
+    <style name="Theme.OpenLife" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/openlife_paper</item>
+        <item name="android:navigationBarColor">@color/openlife_paper</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

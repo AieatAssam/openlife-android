@@ -286,6 +286,8 @@ class VaultBootstrapperTest {
     /** Review R-05: no key file and no database, but saved originals: never a fresh install. */
     @Test
     fun savedOriginalsWithoutKeyOrDatabaseAreDatabaseMissingAndKept() {
+        // setUp deletes the vault directory, and a plain writeBytes does not create parents.
+        paths.ensureDirectoriesExist()
         val blob = java.io.File(paths.artefactsDir, "${UUID.randomUUID()}.blob").apply { writeBytes(ByteArray(64) { 5 }) }
         assertTrue(!paths.databaseKeyFile.exists() && !paths.databaseFile.exists())
 

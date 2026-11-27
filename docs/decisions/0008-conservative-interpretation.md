@@ -116,10 +116,24 @@ can check against the line in two taps.
     abstained, and it claims its characters.
   - Letters are ASCII for month names, weekday names, markers and labels.
 - **Token boundaries.** A match must not be preceded or followed by a
-  character for which `Character.isLetterOrDigit` is true.
+  character for which `Character.isLetterOrDigit` is true, or by a
+  format or combining mark (Unicode Cf, Mn, Mc, Me), read by code point.
+  Such a mark is attached, never a boundary, and a token containing one
+  abstains (amendment 2026-11-26, A-6). A token led or trailed by one
+  abstains visibly too: the abstention covers the mark, and takes the
+  kind of the abstention it touches, or no kind when none does
+  (`\u200E2026-09-16`, `€\u200D5`; finding EE-04). A token with no ASCII
+  digit, `@`, `//` or `www.` is left alone, so emoji sequences are not
+  abstained.
+- **Spaces.** Where a rule allows a space, any Unicode space separator
+  (Zs) or a tab counts. A gap before a zone, an offset or an am/pm
+  marker, between a sign and an amount, and around a range joiner is at
+  most 4 of them. U+00A0 and U+202F between digits stay grouping (§5.2)
+  (amendment 2026-11-26, A-8).
 - **Claiming** (C2-R28, Z-17).
   - Rules run in precedence order `URL > EMAIL > DATETIME > DATE > TIME >
-    MONEY > PHONE`.
+    MONEY > PHONE`, with one exception: a `+`-led run is judged before
+    MONEY (amendment 2026-11-26, A-9 (a), as refined by EE-01; §7).
   - A rule claims the characters of every token it **recognised**,
     whether it emitted a value or abstained.
   - A lower rule never reads claimed characters.
@@ -233,7 +247,9 @@ twice; `A` and `B` of 1–2 digits):
 **Weekday names** (Z-12). An English weekday (`Tue`, `Tuesday`, with an
 optional `,`) immediately before a date **filters** its candidates:
 - only candidates falling on that weekday remain;
-- one left: a single value;
+- one left: a single value, except that a two-digit year never gives a
+  single value: when the weekday leaves one, it is abstained (amendment
+  2026-11-26, A-3);
 - several left: candidates;
 - none left: abstain;
 - a single value that does not match is abstained;
@@ -284,12 +300,23 @@ facts, and each is interpreted **only from its own text** (Z-05).
   group), `T1` abstains too, and the whole range is claimed. For example,
   `14:30 - 16:30 CET` gives nothing.
 
+- Any abstention of `T1` or `T2`, not only a zone, abstains the whole
+  range: `10:00 - 25:00` gives nothing (amendment 2026-11-26, A-11).
+
 **Abstained:**
 - `24:00`;
 - a minute or second over 59;
-- `.` or `h` as the separator;
+- `.` before an am/pm marker (`2.30 pm`) or `h` (`14h30`) as the
+  separator, claimed (amendment 2026-11-26, A-11); a bare `14.30` is not
+  a time;
+- fractional seconds: `.` or `,` and a digit after the time
+  (`14:30:00.000Z`), over the whole token (amendment 2026-11-26, A-2);
 - a bare `1430`;
 - §4.3.
+
+A time never starts directly after `+`, `-`, `±` or a dash or minus
+look-alike (`UTC+05:30`, `Offset +02:00`), unless that character joins it
+to the time just before (`9am-5pm`) (amendment 2026-11-26, A-2).
 
 #### §4.3 Date-times and zones (`rules-datetime-v1`)
 
@@ -301,14 +328,17 @@ facts, and each is interpreted **only from its own text** (Z-05).
   cross-product is formed.
 
 **What may follow a time** (Z-06). The time rule first consumes an
-am/pm marker. It then looks at the next token, after at most one space,
+am/pm marker. It then looks at the next token, after at most 4 space separators or
+tabs (amendment 2026-11-26, A-8),
 and **abstains** on the time (and on any date-time containing it) when
 that token is one of these:
-1. `Z`, `±HH:MM`, `±HHMM` or `±HH`;
+1. `Z`, `Zulu` in any case, `±HH:MM`, `±HHMM` or `±HH` (the sign `+`,
+   `-`, U+2212 `−` or `±`);
 2. a token of 2 to 5 ASCII letters written **all in uppercase** that is
-   not on the allowlist below. This covers `CET`, `UTC`, `GMT+1`
-   (`GMT` followed by an offset), `IST`, `HRS`… and any unknown
-   abbreviation;
+   not on the allowlist below. This covers `CET`, `UTC`, `IST`, `HRS`…
+   and any unknown abbreviation. An offset of 1–2 or 4 digits, with
+   optional `:MM`, directly after the word is part of the token
+   (`GMT+1`, `GMT+01:00`, `UTC-5`; amendment 2026-11-26, A-2);
 3. a parenthesised group starting with a letter, `+` or `-`, as in
    `14:30 (local)`, `(CET)` or `(+01)`.
 
@@ -328,7 +358,8 @@ No zone is ever stored or attached.
 #### §5.1 What is money
 
 A number is money only when a **marker** sits in marker position: directly
-before or directly after the digits, with at most one space between them.
+before or directly after the digits, with at most one space between them
+(any space separator; amendment 2026-11-26, A-8).
 A marker is one of these:
 - a symbol from §5.3;
 - an ISO 4217 code from the pinned **active** list (List One, the
@@ -353,15 +384,41 @@ ZZ-04, decision Q-13):
 - A code that sits next to the **symbol** rather than the digits
   (`SSP £116.75`, `USD $5`) is not a marker. It is context under §5.4.
 
-**Signs** (Z-13):
-- A `-` immediately before the marker or the digits, and not preceded by
-  a digit with at most one space between, makes the amount negative.
+**Signs** (Z-13; amendment 2026-11-26, A-4):
+- A lone ASCII `-` touching the marker or the digits, with no space
+  (`-€5`, `€-5`, `-5 €`), and not preceded by a digit with at most one
+  space between, makes the amount negative. This is the only sign read.
 - A `-` that follows digits is never a sign.
 - These forms are recognised, abstained and claimed:
-  - a trailing minus (`25.00-`, `25.00 -`);
+  - any other hyphen, dash or minus look-alike (U+2010–U+2015, U+2212
+    `−`, U+FE58, U+FE63, U+FF0D) in a sign position: `−€5.00`,
+    `–€5.00`, `€−5.00`, `−5 €`;
+  - a sign with up to 4 space separators between it and the marker or
+    the digits: `- €5`, `-  €5.00`, `€ –5.00`, `EUR -33.10`;
+  - a dash between the digits and a marker after them (`5.00− €`);
+  - a trailing minus, any dash-like character up to 4 space separators
+    after the amount (`25.00-`, `25.00 -`, `€25.00 −`);
   - `25,-`, `25.-` and `25,--`;
-  - parentheses, `CR` and `DR`;
+  - two signs (`--€5`, `-−€5`) or `±` before the amount (finding EE-05);
+  - parentheses, with or without inner spaces (`( €5.00 )`), and `CR` or
+    `DR` in any case directly after the amount or after one space
+    separator (`€5.00 Cr`, `€5.00\u00A0dr`; ruling 2026-11-26);
   - an amount range (`10-20 €`, `10–20 €`, `€10–20`, `10 to 20 EUR`).
+    The joiner is a dash-like character or `to`, `until`, `till` or
+    `and`, with up to 4 space separators each side, and the range takes
+    in the partner's own markers: `€10–€20`, `€10 - €20`, `10 € - 20 €`,
+    `€10 to €20` (amendment 2026-11-26, A-7). A partner may carry a lone
+    sign (`-€5 to -€10`, `€-5 - €-10`), and the range runs on over further
+    joiners (`€10-€20-€30`, `€10 and €20 and €30`) (finding EE-03). `and`
+    joins two amounts with the same marker (`between €10 and €20`), or a
+    bare number before an amount marked after its digits (`10 and 20 €`),
+    so `$5 and £10` and `€10 and 20` stay amounts.
+- A **currency pair**, a List One code joined by `/` (at most one space
+  separator each side) to another (`EUR/USD`), is not a marker: an amount
+  beside it is abstained (`EUR/USD 1.08`, `1.08 EUR/USD`). Neither code
+  is §5.4 context (ruling 2026-11-26).
+- A code beside a signed number (`USD -33.10`) is a marker, never §5.4
+  context (amendment 2026-11-26, A-10).
 
 #### §5.2 Digits and separators
 
@@ -376,7 +433,10 @@ and `'`.
   Followed by 4 or more digits, the number is abstained.
 - **One `,` or `.` followed by exactly 3 digits** gives two candidates, the
   decimal reading and the grouping reading: `1,234 €` gives
-  `1.234 EUR | 1234 EUR`.
+  `1.234 EUR | 1234 EUR`. When the grouping reading cannot exist (a first
+  group over 3 digits, a first group led by `0`, or another grouping
+  character), the number is abstained: `1234,567`, `0.500`, `1'234,567`
+  (amendment 2026-11-26, A-10).
 - **U+202F, U+00A0 and `'`** are grouping only, in groups of 3: `1'234.50
   CHF` gives `1234.50 CHF`.
 - **An ASCII space between digit groups is ambiguous** (Z-13). It may be
@@ -388,7 +448,25 @@ and `'`.
     for a marker before the digits, the right group for one after).
 
   So `1 234 €` gives `234 EUR | 1234 EUR`. Any other spacing is not an
-  amount beyond the adjacent group.
+  amount beyond the adjacent group. "Space" here is any one space
+  separator or tab (A-8); U+00A0 and U+202F inside a dense number stay
+  grouping only. The grouped reading joins the printed digits before
+  dropping leading zeros (amendment 2026-11-26, A-1).
+- **Zero-led groups** (finding EE-06). A grouped number whose first group
+  starts with `0` is abstained (`€0 001`, `0 500 €`). An adjacent group
+  that starts with `0` is never a reading of its own; the first group's
+  reading takes its place. The candidates are therefore:
+
+  | Text | Candidates |
+  | --- | --- |
+  | `€5 000` | `5 EUR \| 5000 EUR` |
+  | `1 000 €` | `1 EUR \| 1000 EUR` |
+  | `12 005 €` | `12 EUR \| 12005 EUR` |
+  | `1 000 000 €` | `1 EUR \| 1000000 EUR` |
+  | `€0 001` | abstained |
+- **A fraction after space groups** (finding EE-02). When the last group
+  carries a decimal mark (`5 000.00 €`, `€5 000.00`, `$1 234.56`,
+  `€12 345,67`), the whole run is abstained, prefix and suffix alike.
 - **Limits.** At most 15 integer digits and 3 fraction digits, or the
   number is abstained.
 
@@ -440,7 +518,8 @@ hold:**
 1. it is in uppercase and in the symbol's code list;
 2. it is not on the English-word list (§5.5);
 3. it is not itself in marker position for another number on its line
-   (**another amount's own marker is never context**).
+   (**another amount's own marker is never context**);
+4. it is not half of a currency pair (`EUR/USD`; ruling 2026-11-26).
 
 **Result:**
 
@@ -543,7 +622,10 @@ either list bumps `rules-money` (C2 Q-13).
 - **Local part.** A dot-atom of `[A-Za-z0-9._%+-]`, 1–64 characters, with
   no leading, trailing or doubled dot. Quoted local parts are abstained.
 - **Domain.** ASCII labels, at least two, with a final label of 2 or more
-  letters.
+  letters. A label never starts or ends with `-` and is never an IDNA
+  `xn--` label. A domain directly followed by `_`, `@`, a letter, a digit
+  or a mark is attached and abstained (`user@example.com_evil`)
+  (amendment 2026-11-26, A-10).
 - **Total length.** At most 254 characters.
 - **`mailto:`** is consumed.
 - **Normalisation.** The local part is unchanged; the domain is
@@ -574,7 +656,20 @@ these introduces it:
 The whole maximal run is judged. A sub-run is never taken.
 
 **Accepted when** the run has 7 to 15 digits in all and exactly one
-leading `+` at most.
+leading `+` at most. A `+`-led run also extends over `,`; a `+`-led run
+containing `.` or `,` is abstained (`+1234567.89`, `+12.345.678`)
+(amendment 2026-11-26, A-9).
+
+**A `+`-led run beside a currency marker** (A-9 (a), refined by finding
+EE-01). `+`-led runs are judged before MONEY. A run of 7 to 15 digits
+with a currency marker within one space separator on either side
+(`+1234567 EUR`, `€ +1234567`, `+1 555 123 4567 USD`) could be a phone or
+a signed amount: it is claimed and abstained as PHONE with
+`AMBIGUOUS_FORM`, and gives no value of either type. A marker that has a
+digit on its far side marks that number instead (`12.00 € +1 555 123
+4567` keeps the phone). A run with fewer than 7 digits is left to MONEY
+(`+5 €` is `5 EUR`); one with more than 15 digits is abstained by MONEY
+as over its limit.
 
 **Abstained** (and claimed):
 - a dotted quad: four groups of 1–3 digits separated by `.`, for example
@@ -670,3 +765,44 @@ abstains as a whole), ZZ-04 (§5.1 English-word markers, examples), ZZ-05
 (Consequences, residual). Decided by the coordinator under the 2026-11-24
 delegation: Q-13 (the §5.5 lists are accepted with the ZZ-04 marker rule)
 and Q-14 (no labels in other languages in C2). No question remains open.
+
+## Amendments 2026-11-26 (decided by the coordinating session under the 2026-11-24 delegation, after the P3-03 adversarial review)
+
+The P3-03 adversarial review (findings E-01 to E-10 and 23 specification
+questions) ran its own corpus against the first implementation. The
+coordinating session decided the changes below under the 2026-11-24
+delegation. Nothing had shipped or been recorded, so every rule stays
+`v1`. Each change is also written into the section named.
+
+| Ref | Finding | Change | Section |
+| --- | --- | --- | --- |
+| A-1 | E-01 | Space-grouped amounts join the printed digit groups before dropping leading zeros (`€5 000` gives `5 EUR \| 5000 EUR`, not `50`). | §5.2 |
+| A-2 | E-02 | Fractional seconds (`.`/`,` and a digit after a time) abstain the whole token. No time starts directly after `+`, `-`, `±` or a look-alike unless that character joins it to the previous time. A zone word takes a directly following offset (`GMT+01:00`, `UTC-5`). Offsets also accept U+2212. A date joined by `T` abstains with its time for any reason, not only a zone. | §4.2, §4.3 |
+| A-3 | E-03 | A two-digit year never yields a single definite date. When weekday filtering leaves one reading, the date abstains. This resolves the earlier conflict between "never a single value" and "one left: a single value". | §4.1 |
+| A-4 | E-04, Q10, EE-05 | Only a lone ASCII `-` touching the amount is a sign. Look-alikes, spaced signs (up to 4 space separators), two signs or `±`, a dash before a marker after the digits, a trailing dash-like character, parentheses with inner spaces and `CR`/`DR` in any case abstain with `SIGN_OR_CREDIT`. | §5.1 |
+| A-5 | E-05 | `-` followed by a digit continues a numeric date run (`2026-09-16-17`, `5512-03-04-2026` abstain). A numeric token does not start after `-` that follows a digit run, unless that run is a standalone 1–2 digit day (`3-5 April 2026` stays a range); `Ref 123-2026-09-16` gives nothing. | §4.1 |
+| A-6 | E-06, EE-04 | Unicode categories Cf, Mn, Mc and Me are attached characters, never boundaries, read by code point; a token containing, led by or trailed by one abstains, and the abstention covers the mark. | §1 |
+| A-7 | E-07, EE-03 | A money range extends over the partner's markers, sign and number, and over further joiners, with `to`, `until`, `till` or `and` (same marker, or a bare number before an amount marked after its digits) as joiners. | §5.1 |
+| A-8 | E-08, Q7 | Zone, offset and am/pm lookahead skips at most 4 Unicode space separators or tabs. Any space separator counts wherever a rule allows a space (marker gaps, date gaps, range gaps, phone labels); U+00A0 and U+202F between digits remain grouping. | §1, §4.3, §5.1 |
+| A-9 | E-09, EE-01 | (a) `+`-led runs are judged before MONEY. A run that §7 accepts is emitted and claimed, except that a run of 7–15 digits with a currency marker within one space separator either side abstains (PHONE, `AMBIGUOUS_FORM`), so `+1 555 123 4567 USD` and `+1234567 EUR` give nothing. (b) A `+`-led run containing `.` or `,` abstains as PHONE. (c) Three dotted numeric groups (`Version 1.2.33`, `10.4.21`) remain date candidates: a stated residual of v1. | §1, §7 |
+| A-10 | E-10, Q11 | Email labels never start or end with `-` and are never `xn--`; a domain followed by `_` is attached. A code beside a signed number is not currency context. One separator before 3 digits whose grouping reading is impossible (`1234,567`, `0.500`, `1'234,567`) abstains. | §5.1, §5.2, §6.2 |
+| A-11 | Q16, Q20 | `H.MM` before an am/pm marker and `HhMM` are claimed and abstained. Any abstention of either time in a range abstains the whole range. | §4.2 |
+| A-12 | EE-02, EE-06 | Any single space separator groups digits. A space-grouped amount ending in a fraction abstains whole. A zero-led first group abstains; a zero-led adjacent group is replaced by the first group as the alternative. | §5.2 |
+| A-13 | rulings | `Zulu` is a zone word. A currency pair (`EUR/USD`) is neither a marker nor context. `CR`/`DR` match in any case. | §4.3, §5.1, §5.4 |
+
+Other questions keep the behaviour recorded in the P3-03 verification
+record. Q2 (`D Month, YYYY` with a comma), Q6 (`09:00-17:00` read as an
+offset) and Q12 (`Tel: (020)…` without `+`) are deferred to rules v2.
+
+**Stated residuals of v1.**
+- Three dotted numeric groups are date candidates (A-9 (c)).
+- A dash-like character within 4 spaces of an amount abstains it, so
+  a menu line such as `Coffee – €3.50` gives no amount.
+- `14:30 +1` and `14:30 -5` (a sign and one digit after a space) are not
+  read as offsets, and `9:00 Eastern` is not read as a zone. In each case
+  the time is still read.
+- A `+`-led phone beside a currency marker gives nothing
+  (`+44 20 7946 0018 USD`), a recall loss accepted to avoid a sign flip.
+- A zone after the second time of a list joined by `and` or `,`
+  (`10:00 and 11:00 UTC`) abstains only that time.
+

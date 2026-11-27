@@ -53,8 +53,8 @@ class SourceDatabaseTest {
             """
             INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
                 orientation, wrappedDek, artefactVersion)
-            VALUES ('s1', 'READY', 1, 'SHARE', 'image/jpeg', 10, X'01', 10, 10, 'NORMAL', X'02', 1),
-                   ('s2', 'STAGED', 2, 'PHOTO_PICKER', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+            VALUES ('00000000-0000-4000-8000-000000000001', 'READY', 1, 'SHARE', 'image/jpeg', 10, X'01', 10, 10, 'NORMAL', X'02', 1),
+                   ('00000000-0000-4000-8000-000000000002', 'STAGED', 2, 'PHOTO_PICKER', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
             """.trimIndent(),
         )
         v3.close()
@@ -66,7 +66,7 @@ class SourceDatabaseTest {
                     "assessmentMethodVersion FROM sources ORDER BY id",
             ).use { cursor ->
                 assertTrue(cursor.moveToFirst())
-                assertEquals("s1", cursor.getString(0))
+                assertEquals("00000000-0000-4000-8000-000000000001", cursor.getString(0))
                 assertEquals("READY", cursor.getString(1))
                 assertEquals(listOf<Byte>(1), cursor.getBlob(2).toList())
                 assertEquals("NOT_ASSESSED", cursor.getString(3))
@@ -74,7 +74,7 @@ class SourceDatabaseTest {
                 assertTrue(cursor.isNull(5))
                 assertTrue(cursor.isNull(6))
                 assertTrue(cursor.moveToNext())
-                assertEquals("s2", cursor.getString(0))
+                assertEquals("00000000-0000-4000-8000-000000000002", cursor.getString(0))
                 assertEquals("STAGED", cursor.getString(1))
                 assertEquals("NOT_ASSESSED", cursor.getString(3))
                 assertTrue(cursor.isNull(4))
@@ -84,10 +84,10 @@ class SourceDatabaseTest {
                 """
                 INSERT INTO sources(id, state, importedAt, intakeKind, mimeType, byteCount, sha256, width, height,
                     orientation, wrappedDek, artefactVersion)
-                VALUES ('s3', 'READY', 3, 'SHARE', 'image/png', 30, X'03', 30, 30, 'NORMAL', X'04', 1)
+                VALUES ('00000000-0000-4000-8000-000000000003', 'READY', 3, 'SHARE', 'image/png', 30, X'03', 30, 30, 'NORMAL', X'04', 1)
                 """.trimIndent(),
             )
-            migrated.query("SELECT assessmentState FROM sources WHERE id = 's3'").use {
+            migrated.query("SELECT assessmentState FROM sources WHERE id = '00000000-0000-4000-8000-000000000003'").use {
                 assertTrue(it.moveToFirst())
                 assertEquals("NOT_ASSESSED", it.getString(0))
             }
@@ -123,24 +123,24 @@ class SourceDatabaseTest {
         try {
             runBlocking {
                 val dao = reopened.sourceDao()
-                val before = dao.findById("s1")!!.toDomain()
+                val before = dao.findById("00000000-0000-4000-8000-000000000001")!!.toDomain()
                 assertEquals(AssessmentState.NOT_ASSESSED, before.assessmentState)
 
-                assertEquals(1, dao.setUserContentKind("s1", UserContentKind.COMMUNICATION.name, 500))
-                val labelled = dao.findById("s1")!!.toDomain()
+                assertEquals(1, dao.setUserContentKind("00000000-0000-4000-8000-000000000001", UserContentKind.COMMUNICATION.name, 500))
+                val labelled = dao.findById("00000000-0000-4000-8000-000000000001")!!.toDomain()
                 assertEquals(UserContentKind.COMMUNICATION, labelled.userContentKind)
                 assertEquals(500L, labelled.userContentKindAt)
                 assertEquals("the label never changes the assessment", AssessmentState.NOT_ASSESSED, labelled.assessmentState)
                 assertEquals(before.copy(userContentKind = UserContentKind.COMMUNICATION, userContentKindAt = 500), labelled)
 
                 // "Not sure": no kind, but the answer is attributed.
-                assertEquals(1, dao.setUserContentKind("s1", null, 600))
-                val notSure = dao.findById("s1")!!.toDomain()
+                assertEquals(1, dao.setUserContentKind("00000000-0000-4000-8000-000000000001", null, 600))
+                val notSure = dao.findById("00000000-0000-4000-8000-000000000001")!!.toDomain()
                 assertNull(notSure.userContentKind)
                 assertEquals(600L, notSure.userContentKindAt)
 
-                assertEquals("a STAGED row is not labelled", 0, dao.setUserContentKind("s2", "COMMUNICATION", 700))
-                assertNull(dao.findById("s2")!!.userContentKindAt)
+                assertEquals("a STAGED row is not labelled", 0, dao.setUserContentKind("00000000-0000-4000-8000-000000000002", "COMMUNICATION", 700))
+                assertNull(dao.findById("00000000-0000-4000-8000-000000000002")!!.userContentKindAt)
                 assertEquals("a missing row is not labelled", 0, dao.setUserContentKind("missing", null, 700))
             }
         } finally {

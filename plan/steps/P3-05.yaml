@@ -51,6 +51,12 @@ docs_to_update: [docs/capabilities/C2.md]
 risks: []
 rollback: "Hide panel."
 notes: >
+  Brief from the P3-03 review (2026-11-26, coordinating session). C2-R38
+  needs a single-value validation and normalisation entry point for a
+  value the user types or chooses (one date, time, amount, URL, email or
+  phone). P3-03 did not build it because it is not trivial: the
+  extractors scan a line and claim characters rather than validate one
+  value. Build it here, reusing the per-kind rules and TypedValue.
   P3-02 review M-08 (2026-11-26): FactRepository.addUserFact and correct
   check a user value's shape per kind (UserValueShape). DATE, TIME and
   DATETIME are checked completely (canonical JSON, a real date or time,

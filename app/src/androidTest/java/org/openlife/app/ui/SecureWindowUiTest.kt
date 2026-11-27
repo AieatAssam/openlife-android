@@ -6,6 +6,7 @@ import android.view.inspector.WindowInspector
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -28,7 +29,8 @@ import org.openlife.app.test.deleteSyntheticSource
  * P1-20-R6 (replaces the source-grep SecureWindowTest unit test once it has
  * run on a device): every window this process shows — the activities, the
  * overflow menu popup and the delete dialog — carries FLAG_SECURE.
- * WindowInspector lists the process's own root views (API 29, the minSdk).
+ * WindowInspector lists the process's own root views. It is API 29+, so on
+ * API 26-28 this test is skipped and FLAG_SECURE is not checked (a device gap).
  *
  * Status: implemented; unverified (gap — pending physical-device run).
  */
@@ -53,7 +55,12 @@ class SecureWindowUiTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = android.os.Build.VERSION_CODES.Q)
     fun everyContentWindowAndDialogIsSecure() {
+        org.junit.Assume.assumeTrue(
+            "WindowInspector needs API 29; this device is API ${android.os.Build.VERSION.SDK_INT}",
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q,
+        )
         sourceId = application.createReadySource()
         ActivityScenario.launch(MainActivity::class.java).use {
             assertTrue(device.wait(Until.hasObject(By.text("Import from photos")), WAIT_MS))
@@ -75,6 +82,7 @@ class SecureWindowUiTest {
         }
     }
 
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.Q)
     private fun assertAllWindowsSecure(where: String, expectedAtLeast: Int) {
         instrumentation.waitForIdleSync()
         var views: List<View> = emptyList()

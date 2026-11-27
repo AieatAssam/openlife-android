@@ -1,6 +1,5 @@
 package org.openlife.app.ui.search
 
-import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
@@ -15,29 +14,19 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import org.junit.After
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.openlife.app.MainActivity
 import org.openlife.app.R
-import org.openlife.app.lock.AppLockPolicyStore
 import org.openlife.app.navigation.OpenLifeNavHost
 import org.openlife.app.test.FakeAppContainer
 import org.openlife.app.test.StrictModeRule
-import org.openlife.app.ui.FirstRunPreferences
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
@@ -62,9 +51,9 @@ import org.openlife.vault.search.SearchHit
  * full screen whose Back returns to the results and at expanded width as the
  * list's detail pane; and the search field is empty after the activity stops.
  *
- * Review W-06 (safe on a personally owned tablet): the activity test restores
- * the first-run flag it sets, in `finally`, and is skipped, not hung, when app
- * lock is on. Not exercised here: the real vault query (SearchRepositoryTest).
+ * The real-activity "field is empty after stop" check lives in
+ * [SearchFieldResetTest]: a compose rule in this class stops the real list from
+ * recomposing. Not exercised here: the real vault query (SearchRepositoryTest).
  * P1-20: the host is the real graph over a [FakeAppContainer]; the query is
  * typed into the entry-scoped SearchViewModel instead of being injected.
  *
@@ -103,49 +92,6 @@ class SearchScreenTest {
         // The viewer route popped back to the list; the viewer is its detail pane.
         composeRule.onNodeWithText("Import from photos").assertIsDisplayed()
         composeRule.onNodeWithTag("search_result").assertDoesNotExist()
-    }
-
-    /** The real activity: type, stop, come back, reopen search: the field is empty. */
-    @Test
-    fun fieldIsEmptyAfterTheActivityStops() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        assumeFalse(
-            "app lock is on for this install; this test would stop at the lock screen, so it is skipped",
-            AppLockPolicyStore.read(context).enabled,
-        )
-        val wasAcknowledged = FirstRunPreferences.isAcknowledged(context)
-        try {
-            FirstRunPreferences.setAcknowledged(context)
-            typeStopAndReopen(context)
-        } finally {
-            if (!wasAcknowledged) {
-                context.getSharedPreferences(FIRST_RUN_PREFERENCES, Context.MODE_PRIVATE)
-                    .edit()
-                    .remove(FIRST_RUN_ACKNOWLEDGED)
-                    .commit()
-            }
-        }
-    }
-
-    private fun typeStopAndReopen(context: Context) {
-        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val searchLabel = context.getString(R.string.list_search_content_description)
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            assertTrue(device.wait(Until.hasObject(By.desc(searchLabel)), WAIT_MS))
-            device.findObject(By.desc(searchLabel)).click()
-            assertTrue(device.wait(Until.hasObject(By.clazz("android.widget.EditText")), WAIT_MS))
-            device.findObject(By.clazz("android.widget.EditText")).text = "synthetic query"
-            assertTrue(device.wait(Until.hasObject(By.text("synthetic query")), WAIT_MS))
-
-            scenario.moveToState(Lifecycle.State.CREATED)
-            scenario.moveToState(Lifecycle.State.RESUMED)
-
-            assertTrue(device.wait(Until.hasObject(By.desc(searchLabel)), WAIT_MS))
-            device.findObject(By.desc(searchLabel)).click()
-            assertTrue(device.wait(Until.hasObject(By.clazz("android.widget.EditText")), WAIT_MS))
-            assertFalse("the query survived onStop", device.hasObject(By.text("synthetic query")))
-        }
     }
 
     private fun openTheResultFromSearch() {
@@ -243,9 +189,5 @@ class SearchScreenTest {
 
     private companion object {
         const val WAIT_MS = 10_000L
-
-        // FirstRunPreferences has no setter that clears the flag; these mirror its private names.
-        const val FIRST_RUN_PREFERENCES = "first_run"
-        const val FIRST_RUN_ACKNOWLEDGED = "acknowledged"
     }
 }

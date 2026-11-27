@@ -51,3 +51,11 @@ acceptance_criteria: ["Facts appear for a synthetic receipt with evidence; stale
 docs_to_update: [docs/capabilities/C2.md]
 risks: []
 rollback: "Disable auto-run."
+notes: >
+  Brief from the P3-03 review (2026-11-26, coordinating session). Map
+  ExtractedKind to FactKind with an exhaustive when (no else branch), so a
+  new kind fails to compile. Do not apply UserValueShape to extracted
+  candidate sets: it validates what a user types, while extracted values
+  are already normalised by the rules-*-v1 extractors (TypedValue). Pass
+  CurrencyContextIndex the spans of exactly one reading of a Source with
+  unique ordinals; it now fails loudly (require) on duplicate ordinals.

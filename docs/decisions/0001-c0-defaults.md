@@ -127,3 +127,13 @@ environment this repository was built in, on 2026-09-13.
 - Anyone continuing this work in an environment with a writable SDK should
   add the API 29/30 system image, re-run the instrumented suite there, and
   update this record and `docs/verification/C0.md` accordingly.
+
+## Amendment 2026-11-27: minSdk 26 (ADR-0019, P1-21)
+
+Item 2 above (minSdk 29) is superseded. The app and vault modules now set
+`minSdk = 26` (Android 8.0), by owner decision of 2026-11-27, because the
+owner's test device runs API 26. `compileSdk` and `targetSdk` are unchanged at
+37. The API-29 gap in item 4 and the API-29 wording in item 2's consequences
+remain true as history; the lowest supported level is now API 26, and no API 26
+emulator or CI leg exists (the physical-device checklist is
+`docs/verification/P1-21-min-sdk-26.md`).
