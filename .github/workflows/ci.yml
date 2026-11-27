@@ -20,6 +20,9 @@ permissions:
 jobs:
   build-lint-unit-test:
     name: Build, lint, unit tests
+    # The vault host tests run on a pinned SQLite (sqlite-jdbc, a test-only
+    # Gradle dependency; ADR-0017), not on the image's python3, so the image's
+    # SQLite does not matter. OPENLIFE_HOST_SQLITE must stay unset here.
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     steps:

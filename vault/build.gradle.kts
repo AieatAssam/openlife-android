@@ -96,6 +96,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // ADR-0017: the host-test SQLite, pinned to the SQLite inside SQLCipher.
+    // Test-only: it bundles host native libraries, which must never reach an
+    // APK (DependencyBoundaryTest checks every non-unit-test classpath).
+    testImplementation(libs.sqlite.jdbc)
     // P2-04-R5: the stray-glyph policy cost on ground truth, with the production classifier.
     testImplementation(project(":eval"))
     detektPlugins(libs.detekt.rules.ktlint.wrapper)
@@ -128,4 +132,36 @@ detekt {
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
     autoCorrect = false
+}
+
+// ADR-0017: a test-only dependency (sqlite-jdbc bundles host native libraries)
+// must reach no release, debug or instrumented classpath. This report lists the
+// resolved coordinates of those classpaths, plus the unit-test classpath as
+// the positive control; DependencyBoundaryTest (app) reads it.
+val classpathBoundaryReport = layout.buildDirectory.file("reports/classpath-boundary.txt")
+tasks.register("writeClasspathBoundaryReport") {
+    notCompatibleWithConfigurationCache("resolves Android variant configurations during task execution")
+    outputs.file(classpathBoundaryReport)
+    outputs.upToDateWhen { false }
+    doLast {
+        val text = buildString {
+            listOf(
+                "releaseRuntimeClasspath",
+                "debugRuntimeClasspath",
+                "debugAndroidTestRuntimeClasspath",
+                "debugUnitTestRuntimeClasspath",
+            ).forEach { name ->
+                appendLine("## $name")
+                configurations.getByName(name).incoming.resolutionResult.allComponents
+                    .mapNotNull { component -> component.moduleVersion?.let { "${it.group}:${it.name}:${it.version}" } }
+                    .distinct()
+                    .sorted()
+                    .forEach(::appendLine)
+            }
+        }
+        classpathBoundaryReport.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(text)
+        }
+    }
 }

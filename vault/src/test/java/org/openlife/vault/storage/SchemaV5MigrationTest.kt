@@ -1,5 +1,6 @@
 package org.openlife.vault.storage
 
+import android.database.Cursor
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -92,11 +93,32 @@ class SchemaV5MigrationTest {
             SupportSQLiteDatabase::class.java.classLoader,
             arrayOf(SupportSQLiteDatabase::class.java),
         ) { _, method, args ->
+            // SearchIndex's engine gate reads the version; answer as the bundled SQLCipher's SQLite.
+            if (method.name == "query" && args?.singleOrNull() == "SELECT sqlite_version()") {
+                return@newProxyInstance versionCursor(BUNDLED_SQLITE)
+            }
             require(method.name == "execSQL" && args?.size == 1) { "unexpected call ${method.name}" }
             statements += (args[0] as String).trim()
             null
         } as SupportSQLiteDatabase
         migration.migrate(db)
         return statements
+    }
+
+    private fun versionCursor(version: String): Cursor = Proxy.newProxyInstance(
+        Cursor::class.java.classLoader,
+        arrayOf(Cursor::class.java),
+    ) { _, method, _ ->
+        when (method.name) {
+            "moveToFirst" -> true
+            "getString" -> version
+            "close" -> null
+            else -> error("unexpected cursor call ${method.name}")
+        }
+    } as Cursor
+
+    private companion object {
+        /** SQLite in the pinned sqlcipher-android 4.19.0 (static read of the AAR). */
+        const val BUNDLED_SQLITE = "3.53.4"
     }
 }
