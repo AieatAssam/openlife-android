@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,10 +135,7 @@ private val LocalStatusChannel = staticCompositionLocalOf<StatusChannel?> { null
  * shown as visible text only.
  */
 @Composable
-fun StatusHost(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
+fun StatusHost(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val channel = remember { StatusChannel() }
     val resources = LocalResources.current
     val held = channel.current

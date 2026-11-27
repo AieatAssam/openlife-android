@@ -364,7 +364,9 @@ class AccessibilitySourceRulesTest {
         val ANNOUNCE = Regex("""\bAnnounce\(""")
         val LIVE_OUTSIDE_HOST = Regex("""liveRegion\s*=|LiveRegionMode\.""")
         val ANNOUNCE_STATUS_LEGACY = Regex("""announceStatus\(""")
-        val DOCUMENT_CONTENT = Regex("""evidenceSpanPreview|\.text\b|spanText|selectedSpan|fileName|displayName|\bquery\b""")
+        val DOCUMENT_CONTENT = Regex(
+            """evidenceSpanPreview|\.text\b|spanText|selectedSpan|fileName|displayName|\bquery\b""",
+        )
         val FUN_DECLARATION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w.]+\.)?(\w+)\s*\(""")
         val STRING_HELPERS = setOf("stringResource", "pluralStringResource", "listOf", "localizedList", "withDataSpan")
 
