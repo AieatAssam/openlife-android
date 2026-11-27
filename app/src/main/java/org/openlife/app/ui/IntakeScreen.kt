@@ -175,7 +175,7 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
                         bitmap != null -> Image(
                             bitmap = bitmap.asImageBitmap(),
                             contentDescription = stringResource(R.string.intake_selected_image_content_description),
-                            modifier = Modifier.fillMaxWidth().height(320.dp),
+                            modifier = Modifier.fillMaxWidth().height(320.dp).testTag("intake_preview_image"),
                         )
 
                         current == PreviewImage.Loading -> {

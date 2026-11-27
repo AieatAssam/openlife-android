@@ -11,23 +11,25 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.ByteArrayOutputStream
 import java.util.UUID
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
+import org.openlife.app.R
 import org.openlife.app.lock.AppLockOfferScreen
 import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.AppLockPolicy
@@ -106,8 +108,9 @@ class ScreenSemanticsTest {
                 composeRule.runOnIdle { current.value = case to size }
                 composeRule.waitForIdle()
                 val where = "${case.name} @ ${size.name}"
+                val keyed = awaitKey(case)
                 failures += accessibility.findIssues().map { "$where: $it" }
-                failures += expectations(case).map { "$where: $it" }
+                failures += expectations(case, keyed).map { "$where: $it" }
                 if (size != SizeConfig.DEFAULT) {
                     failures += unreachableActions().map { "$where: $it" }
                     failures += accessibility.findClippedText().map { "$where: $it" }
@@ -135,15 +138,38 @@ class ScreenSemanticsTest {
                 )
             }
         }
-        val node = composeRule.onNodeWithTag("viewer_span_announcement").fetchSemanticsNode()
-        assertEquals(LiveRegionMode.Polite, node.config.getOrNull(SemanticsProperties.LiveRegion))
+        // Tolerant of more than one node: a two-pane layout may carry a second announcer.
+        composeRule.waitUntil(KEY_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes().isNotEmpty()
+        }
+        val nodes = composeRule.onAllNodesWithTag("viewer_span_announcement").fetchSemanticsNodes()
+        assertTrue("no span announcement node", nodes.isNotEmpty())
+        assertTrue(
+            "span announcement is not a polite live region",
+            nodes.any { it.config.getOrNull(SemanticsProperties.LiveRegion) == LiveRegionMode.Polite },
+        )
         accessibility.check("viewer with a selected span")
     }
 
-    /** Pane title, heading and (for status states) a polite live region on the current screen. */
-    private fun expectations(case: ScreenCase): List<String> {
+    /**
+     * Images decode off the main thread, so a state with a key node waits for
+     * that node (state-based, not a sleep). Returns false if it never appears.
+     */
+    private fun awaitKey(case: ScreenCase): Boolean {
+        val key = case.key ?: return true
+        return runCatching { composeRule.waitUntil(KEY_TIMEOUT_MS) { keyPresent(key) } }.isSuccess
+    }
+
+    private fun keyPresent(key: SemanticsMatcher): Boolean =
+        composeRule.onAllNodes(key, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** Pane title, heading, key node and (for status states) a polite live region on the current screen. */
+    private fun expectations(case: ScreenCase, keyed: Boolean): List<String> {
         val all = composeRule.onAllNodes(SemanticsMatcher("any") { true }, useUnmergedTree = true).fetchSemanticsNodes()
         return buildList {
+            // No state may pass against an empty tree: the root alone is not a screen.
+            if (all.size < 2) add("empty semantics tree")
+            if (case.key != null && !keyed) add("key node never appeared")
             if (case.paneTitle && all.none { it.config.contains(SemanticsProperties.PaneTitle) }) add("no pane title")
             if (case.heading && composeRule.onAllNodes(isHeading(), useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
                 add("no heading")
@@ -174,6 +200,8 @@ class ScreenSemanticsTest {
         val paneTitle: Boolean = true,
         val heading: Boolean = true,
         val liveRegion: Boolean = false,
+        /** A node the state shows once its content is ready (for decoded images, the decoded image). */
+        val key: SemanticsMatcher? = null,
         val content: @Composable () -> Unit,
     )
 
@@ -232,25 +260,26 @@ class ScreenSemanticsTest {
             intakeKind = IntakeKind.PHOTO_PICKER,
         )
         return listOf(
-            ScreenCase("list-empty", content = list(SourceListUiState.Loaded(emptyList()))),
-            ScreenCase("list-items", content = list(SourceListUiState.Loaded(listOf(ready, corrupt, deleting)))),
-            ScreenCase("list-loading", heading = true, liveRegion = true, content = list(SourceListUiState.Loading)),
+            ScreenCase("list-empty", key = hasText(text(R.string.list_empty_title)), content = list(SourceListUiState.Loaded(emptyList()))),
+            ScreenCase("list-items", key = hasTestTag("source_row_label"), content = list(SourceListUiState.Loaded(listOf(ready, corrupt, deleting)))),
+            ScreenCase("list-loading", key = hasText(text(R.string.list_loading)), heading = true, liveRegion = true, content = list(SourceListUiState.Loading)),
             ScreenCase("vault-unavailable", paneTitle = false) {
                 VaultUnavailableScreen(VaultUnavailableCause.KEYSTORE_TEMPORARILY_UNAVAILABLE, onRetry = {}, onOpenResetSettings = {})
             },
-            ScreenCase("viewer-ocr-ready", content = viewer(ready, ocrReady)),
-            ScreenCase("viewer-ocr-idle", content = viewer(ready, OcrUiState.Idle)),
-            ScreenCase("viewer-ocr-running", liveRegion = true, content = viewer(ready, OcrUiState.Running(ready.id))),
+            ScreenCase("viewer-ocr-ready", key = hasTestTag("viewer_evidence_image"), content = viewer(ready, ocrReady)),
+            ScreenCase("viewer-ocr-idle", key = hasTestTag("viewer_evidence_image"), content = viewer(ready, OcrUiState.Idle)),
+            ScreenCase("viewer-ocr-running", key = hasTestTag("viewer_evidence_image"), liveRegion = true, content = viewer(ready, OcrUiState.Running(ready.id))),
             ScreenCase(
                 "viewer-ocr-failed",
+                key = hasTestTag("viewer_evidence_image"),
                 liveRegion = true,
                 content = viewer(ready, OcrUiState.Failed(ready.id, OcrFailureReason.TIMEOUT)),
             ),
-            ScreenCase("viewer-ocr-stale", liveRegion = true, content = viewer(ready, OcrUiState.Stale(ready.id))),
+            ScreenCase("viewer-ocr-stale", key = hasTestTag("viewer_evidence_image"), liveRegion = true, content = viewer(ready, OcrUiState.Stale(ready.id))),
             ScreenCase("viewer-transient", content = viewer(ready, OcrUiState.Idle, ReadyReadResult.Transient)),
-            ScreenCase("viewer-unreadable", content = viewer(corrupt, OcrUiState.Idle)),
-            ScreenCase("intake-preparing", heading = false, liveRegion = true, content = intake(IntakeUiState.Preparing)),
-            ScreenCase("intake-preview", heading = false, content = intake(preview)),
+            ScreenCase("viewer-unreadable", key = hasTestTag("viewer_unreadable_delete"), content = viewer(corrupt, OcrUiState.Idle)),
+            ScreenCase("intake-preparing", key = hasText(text(R.string.intake_preparing)), heading = false, liveRegion = true, content = intake(IntakeUiState.Preparing)),
+            ScreenCase("intake-preview", key = hasTestTag("intake_preview_image"), heading = false, content = intake(preview)),
             ScreenCase("intake-saving", heading = false, liveRegion = true, content = intake(IntakeUiState.Saving(preview.sourceId))),
             ScreenCase("intake-saved", heading = false, liveRegion = true, content = intake(IntakeUiState.Saved(preview.sourceId))),
             ScreenCase(
@@ -284,10 +313,10 @@ class ScreenSemanticsTest {
                     state = AboutState(identity = BuildIdentity("0.0.0-synthetic", 1, "synthetic", listOf("AA:BB"))),
                 )
             },
-            ScreenCase("search-idle", liveRegion = true) {
+            ScreenCase("search-idle", key = hasTestTag("search_input"), liveRegion = true) {
                 SearchScreen(query = "", state = SearchUiState.Idle, onQueryChange = {}, onOpenResult = {}, onBack = {})
             },
-            ScreenCase("search-results") {
+            ScreenCase("search-results", key = hasTestTag("search_result")) {
                 SearchScreen(
                     query = "synthetic",
                     state = SearchUiState.Results(
@@ -298,7 +327,7 @@ class ScreenSemanticsTest {
                     onBack = {},
                 )
             },
-            ScreenCase("delete-dialog", paneTitle = false) {
+            ScreenCase("delete-dialog", key = hasTestTag("delete_confirm"), paneTitle = false) {
                 DeleteConfirmationDialog(itemLabel = "Imported 1 Jan 1970", onConfirm = {}, onDismiss = {})
             },
         )
@@ -329,6 +358,8 @@ class ScreenSemanticsTest {
         artefactVersion = 1,
     )
 
+    private fun text(id: Int): String = composeRule.activity.getString(id)
+
     private fun tinyJpeg(): ByteArray {
         val bitmap = Bitmap.createBitmap(32, 24, Bitmap.Config.ARGB_8888)
         val output = ByteArrayOutputStream()
@@ -340,6 +371,7 @@ class ScreenSemanticsTest {
     private companion object {
         /** Android's "Largest" display-size step is about 1.3x the default density. */
         const val LARGEST_DISPLAY_SIZE = 1.3f
+        const val KEY_TIMEOUT_MS = 10_000L
         val REVISION: UUID = UUID.randomUUID()
         val SIZES = SizeConfig.entries
     }
