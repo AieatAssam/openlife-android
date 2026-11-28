@@ -39,11 +39,24 @@ interface FactsGateway {
 
     suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult
 
+    /** C2-R37: a user:correct revision that supersedes [revisionId]; the repository checks the status. */
+    suspend fun correct(revisionId: UUID, value: FactValue): FactWriteResult
+
     suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult
 
     /** P3-05-R4: "Find facts again" for the source; true when the extraction finished. */
     suspend fun findAgain(sourceId: UUID): Boolean
 }
+
+/** The kinds the correction and add forms take. */
+val CORRECTABLE_KINDS = setOf(
+    FactKind.DATE,
+    FactKind.TIME,
+    FactKind.MONEY,
+    FactKind.URL,
+    FactKind.EMAIL,
+    FactKind.PHONE,
+)
 
 /** What a typed user value did: saved through the repository, or refused with the reason shown to the user (R2). */
 sealed interface UserFactOutcome {
@@ -66,6 +79,9 @@ class FactItem(
 ) {
     val needsClarification: Boolean get() = status == FactStatus.CLARIFICATION_NEEDED
     val isStale: Boolean get() = status == FactStatus.STALE
+
+    /** C2-R37: a non-stale fact of a kind the add-fact form takes can be corrected (DATETIME has no form yet). */
+    val isCorrectable: Boolean get() = !isStale && kind in CORRECTABLE_KINDS
 
     /** Ids, kind, origin and status only: a fact value must not reach a log or a test message. */
     override fun toString(): String = "FactItem(kind=$kind, origin=$origin, status=$status)"
@@ -151,11 +167,28 @@ class FactsPresenter(
         saveResult(FactKind.MONEY, UserValueNormaliser.money(amount, currencyCode))
 
     /** Routes one form submission to the normaliser for its kind; nothing else reaches the repository. */
-    suspend fun addUserInput(input: UserFactInput): UserFactOutcome = when (input) {
-        is UserFactInput.Typed -> addUserText(input.kind, input.text)
-        is UserFactInput.Date -> addUserDate(input.date)
-        is UserFactInput.Time -> addUserTime(input.hour, input.minute)
-        is UserFactInput.Money -> addUserMoney(input.amount, input.currency)
+    suspend fun addUserInput(input: UserFactInput): UserFactOutcome {
+        val (kind, result) = normalise(input)
+        return saveResult(kind, result)
+    }
+
+    /**
+     * C2-R37: corrects one revision with the same typed input as Add a fact. A refused input never
+     * reaches the gateway; the stored revision is kept as it is and a new one supersedes it.
+     */
+    suspend fun correct(item: FactItem, input: UserFactInput): UserFactOutcome {
+        val (_, result) = normalise(input)
+        return when (result) {
+            is UserValueResult.Accepted -> UserFactOutcome.Saved(gateway.correct(item.revisionId, result.value))
+            is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
+        }
+    }
+
+    private fun normalise(input: UserFactInput): Pair<FactKind, UserValueResult> = when (input) {
+        is UserFactInput.Typed -> input.kind to UserValueNormaliser.text(input.kind, input.text)
+        is UserFactInput.Date -> FactKind.DATE to UserValueNormaliser.date(input.date)
+        is UserFactInput.Time -> FactKind.TIME to UserValueNormaliser.time(input.hour, input.minute, null)
+        is UserFactInput.Money -> FactKind.MONEY to UserValueNormaliser.money(input.amount, input.currency)
     }
 }
 

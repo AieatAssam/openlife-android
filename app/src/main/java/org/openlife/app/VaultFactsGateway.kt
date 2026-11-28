@@ -43,6 +43,9 @@ internal class VaultFactsGateway(private val app: OpenLifeApp) : FactsGateway {
     override suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult =
         withFacts(FactWriteResult.Failed) { it.clarify(revisionId, chosen) }
 
+    override suspend fun correct(revisionId: UUID, value: FactValue): FactWriteResult =
+        withFacts(FactWriteResult.Failed) { it.correct(revisionId, value) }
+
     override suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult =
         withFacts(FactWriteResult.Failed) { it.addUserFact(sourceId, kind, value) }
 

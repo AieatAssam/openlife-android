@@ -63,17 +63,26 @@ internal fun AddFactForm(onAdd: (UserFactInput) -> Unit) {
                 )
             }
         }
-        when (kind) {
-            FactKind.DATE -> DateInput(onAdd)
-            FactKind.TIME -> TimeInput(onAdd)
-            FactKind.MONEY -> MoneyInput(onAdd)
-            else -> TypedInput(kind, onAdd)
-        }
+        FactValueInput(kind, R.string.facts_add_save, onAdd)
+    }
+}
+
+/**
+ * P3-05-R2 and C2-R37: the typed input for one kind, shared by Add a fact and Correct this value. The kind decides
+ * the input; nothing is submitted until the save button is pressed.
+ */
+@Composable
+internal fun FactValueInput(kind: FactKind, saveLabel: Int, onSubmit: (UserFactInput) -> Unit) {
+    when (kind) {
+        FactKind.DATE -> DateInput(saveLabel, onSubmit)
+        FactKind.TIME -> TimeInput(saveLabel, onSubmit)
+        FactKind.MONEY -> MoneyInput(saveLabel, onSubmit)
+        else -> TypedInput(kind, saveLabel, onSubmit)
     }
 }
 
 @Composable
-private fun TypedInput(kind: FactKind, onAdd: (UserFactInput) -> Unit) {
+private fun TypedInput(kind: FactKind, saveLabel: Int, onAdd: (UserFactInput) -> Unit) {
     var input by remember(kind) { mutableStateOf("") }
     ContentTextField(
         value = input,
@@ -82,13 +91,13 @@ private fun TypedInput(kind: FactKind, onAdd: (UserFactInput) -> Unit) {
         label = { Text(stringResource(R.string.facts_add_input_label)) },
         singleLine = true,
     )
-    SaveButton { onAdd(UserFactInput.Typed(kind, input)) }
+    SaveButton(saveLabel) { onAdd(UserFactInput.Typed(kind, input)) }
 }
 
 /** P3-05-R2: a day is chosen in the Material date picker only; there is no free text for a date. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateInput(onAdd: (UserFactInput) -> Unit) {
+private fun DateInput(saveLabel: Int, onAdd: (UserFactInput) -> Unit) {
     val locale = LocalConfiguration.current.locales[0]
     // remember, not rememberSaveable: a picked day is a fact value and must not reach saved instance state.
     val pickerState = remember(locale) { DatePickerState(locale = locale) }
@@ -118,7 +127,7 @@ private fun DateInput(onAdd: (UserFactInput) -> Unit) {
             DatePicker(state = pickerState, showModeToggle = false)
         }
     }
-    SaveButton { onAdd(UserFactInput.Date(chosen)) }
+    SaveButton(saveLabel) { onAdd(UserFactInput.Date(chosen)) }
 }
 
 /**
@@ -127,7 +136,7 @@ private fun DateInput(onAdd: (UserFactInput) -> Unit) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MoneyInput(onAdd: (UserFactInput) -> Unit) {
+private fun MoneyInput(saveLabel: Int, onAdd: (UserFactInput) -> Unit) {
     var amount by remember { mutableStateOf("") }
     var currency by remember { mutableStateOf<String?>(null) }
     ContentTextField(
@@ -149,13 +158,13 @@ private fun MoneyInput(onAdd: (UserFactInput) -> Unit) {
             )
         }
     }
-    SaveButton { onAdd(UserFactInput.Money(amount, currency)) }
+    SaveButton(saveLabel) { onAdd(UserFactInput.Money(amount, currency)) }
 }
 
 /** P3-05-R2: a time is chosen in the Material time picker only; there is no free text for a time. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimeInput(onAdd: (UserFactInput) -> Unit) {
+private fun TimeInput(saveLabel: Int, onAdd: (UserFactInput) -> Unit) {
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     // remember, not rememberSaveable: a picked time is a fact value and must not reach saved instance state.
     val pickerState = remember(is24Hour) { TimePickerState(initialHour = 12, initialMinute = 0, is24Hour = is24Hour) }
@@ -189,15 +198,15 @@ private fun TimeInput(onAdd: (UserFactInput) -> Unit) {
             TimePicker(state = pickerState)
         }
     }
-    SaveButton {
+    SaveButton(saveLabel) {
         val (hour, minute) = chosen ?: (null to null)
         onAdd(UserFactInput.Time(hour, minute))
     }
 }
 
 @Composable
-private fun SaveButton(onClick: () -> Unit) {
+private fun SaveButton(labelRes: Int, onClick: () -> Unit) {
     OpenLifeButton(onClick = onClick, modifier = Modifier.heightIn(min = 48.dp)) {
-        Text(stringResource(R.string.facts_add_save), modifier = Modifier.fillMaxWidth())
+        Text(stringResource(labelRes), modifier = Modifier.fillMaxWidth())
     }
 }

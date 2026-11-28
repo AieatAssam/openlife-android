@@ -365,6 +365,8 @@
     <string name="facts_add">Add a fact</string>
     <string name="facts_add_input_label">Value to add</string>
     <string name="facts_add_save">Save fact</string>
+    <string name="facts_correct">Correct this value</string>
+    <string name="facts_correct_save">Save correction</string>
     <string name="facts_message_saved">Fact added</string>
     <string name="facts_refused_blank">Enter a value to add.</string>
     <string name="facts_refused_too_long">This value is too long.</string>

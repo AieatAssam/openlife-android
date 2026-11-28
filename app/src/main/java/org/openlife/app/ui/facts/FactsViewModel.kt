@@ -59,15 +59,20 @@ class FactsViewModel(container: AppContainer, sourceId: UUID) : ViewModel() {
         viewModelScope.launch { presenter.chooseCandidate(item, index) }
     }
 
-    fun add(input: UserFactInput) {
+    fun add(input: UserFactInput) = report { presenter.addUserInput(input) }
+
+    /** C2-R37: a correction reports the same messages as an add. */
+    fun correct(item: FactItem, input: UserFactInput) = report { presenter.correct(item, input) }
+
+    private fun report(outcome: suspend () -> UserFactOutcome) {
         viewModelScope.launch {
-            mutableMessage.value = when (val outcome = presenter.addUserInput(input)) {
-                is UserFactOutcome.Saved -> when (outcome.result) {
+            mutableMessage.value = when (val result = outcome()) {
+                is UserFactOutcome.Saved -> when (result.result) {
                     is FactWriteResult.Written -> FactMessage.SAVED
                     else -> FactMessage.NOT_SAVED
                 }
 
-                is UserFactOutcome.Refused -> outcome.reason.toMessage()
+                is UserFactOutcome.Refused -> result.reason.toMessage()
             }
         }
     }

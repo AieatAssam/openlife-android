@@ -175,6 +175,7 @@ private fun FactsDestination(
             },
             onReview = facts::review,
             onChoose = facts::choose,
+            onCorrect = facts::correct,
             onFindAgain = facts::findAgain,
         ),
         onAdd = facts::add,
