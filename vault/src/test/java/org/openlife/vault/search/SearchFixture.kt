@@ -61,10 +61,14 @@ class SearchFixture(val host: HostSqlite) {
     fun migrateToV6WithoutFts5() {
         OpenLifeDatabase.MIGRATION_5_6.migrate(host.asSupportDatabase())
         listOf(
-            "DROP TRIGGER IF EXISTS ocr_text_fts_ai", "DROP TRIGGER IF EXISTS ocr_text_fts_au",
-            "DROP TRIGGER IF EXISTS ocr_text_fts_ad", "DROP TRIGGER IF EXISTS ocr_correction_fts_ai",
-            "DROP TRIGGER IF EXISTS ocr_correction_fts_au", "DROP TRIGGER IF EXISTS ocr_correction_fts_ad",
-            "DROP TABLE IF EXISTS ocr_text_fts", "DROP TABLE IF EXISTS ocr_correction_fts",
+            "DROP TRIGGER IF EXISTS ocr_text_fts_ai",
+            "DROP TRIGGER IF EXISTS ocr_text_fts_au",
+            "DROP TRIGGER IF EXISTS ocr_text_fts_ad",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_ai",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_au",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_ad",
+            "DROP TABLE IF EXISTS ocr_text_fts",
+            "DROP TABLE IF EXISTS ocr_correction_fts",
         ).forEach(host::exec)
     }
 

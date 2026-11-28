@@ -103,7 +103,10 @@ class SearchScreenTest {
     @Test
     fun factHitOpensFactsPanelHighlighted() {
         val fact = SearchFact(UUID.randomUUID(), "DATE", "UNREVIEWED", "EXTRACTED")
-        setHost(DpSize(400.dp, 800.dp), listOf(SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3), fact)))
+        setHost(
+            DpSize(400.dp, 800.dp),
+            listOf(SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3), fact)),
+        )
         val searchLabel = InstrumentationRegistry.getInstrumentation().targetContext
             .getString(R.string.list_search_content_description)
         composeRule.onNodeWithContentDescription(searchLabel).performClick()
@@ -136,7 +139,10 @@ class SearchScreenTest {
         composeRule.onNodeWithText("Selected: Pick up by Friday").performScrollTo().assertIsDisplayed()
     }
 
-    private fun setHost(size: DpSize, hits: List<SearchHit> = listOf(SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3)))) {
+    private fun setHost(
+        size: DpSize,
+        hits: List<SearchHit> = listOf(SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3))),
+    ) {
         val container = FakeAppContainer(
             initialSources = listOf(readySource(sourceId)),
             readContent = { ReadyReadResult.Loaded(jpeg()) },

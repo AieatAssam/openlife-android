@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.repository.SearchRepository
@@ -77,7 +78,7 @@ class FactSearchHostTest {
         rows.setState(SOURCE, "DELETING")
         val dao = HostSourceRowRemovalDao(host)
         runBlocking { SourceRowRemoval.remove(dao, SOURCE, dao::deleteSource) }
-        assertTrue(!fixture.dataContains(FactSearchIndex.TABLE, "2026"))
+        assertFalse(fixture.dataContains(FactSearchIndex.TABLE, "2026"))
         fixture.integrityCheck(FactSearchIndex.TABLE)
         assertEquals(emptyList<SearchHit>(), factHits("2026-11-26"))
     }

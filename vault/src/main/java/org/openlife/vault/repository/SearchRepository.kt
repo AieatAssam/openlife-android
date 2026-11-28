@@ -64,6 +64,7 @@ class SearchRepository(private val dao: SearchDao, private val ioDispatcher: Cor
 
     companion object {
         const val DEFAULT_LIMIT = 50
+
         /** The two OCR tables and the fact table: all three must exist for the FTS5 path. */
         private const val INDEX_TABLES = 3
 
@@ -82,7 +83,13 @@ class SearchRepository(private val dao: SearchDao, private val ioDispatcher: Cor
             }
             val snippet = SearchSnippet.of(row.text, tokens, wholeWords)
             return SearchHit(
-                sourceId, revisionId, spanId, snippet.text, row.isCorrection != 0, snippet.highlights, fact,
+                sourceId,
+                revisionId,
+                spanId,
+                snippet.text,
+                row.isCorrection != 0,
+                snippet.highlights,
+                fact,
             )
         }
 

@@ -256,7 +256,8 @@ class SearchRepositoryTest {
         sql.execSQL(
             "INSERT INTO fact_revisions(id, factId, revisionNo, origin, kind, valueJson, canonicalText, rawText, " +
                 "status, staleReason, staleAt, confidence, methodId, methodVersion, locale, createdAt, " +
-                "supersedesRevisionId) VALUES (?, ?, 1, ?, 'DATE', '{}', ?, NULL, ?, ?, ?, NULL, 'test', NULL, NULL, ?, NULL)",
+                "supersedesRevisionId) VALUES (?, ?, 1, ?, 'DATE', '{}', ?, NULL, ?, ?, ?, NULL, 'test', NULL, NULL, " +
+                "?, NULL)",
             arrayOf<Any?>(
                 revisionId, factId, origin, canonical, status,
                 if (stale) "READING_REPLACED" else null, if (stale) 2L else null, clock++,

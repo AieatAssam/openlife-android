@@ -24,9 +24,4 @@ data class SearchHit(
  * hit carries it so the UI can open that fact); [kind] and [status] are the
  * stored enum names, [origin] is EXTRACTED or USER.
  */
-data class SearchFact(
-    val revisionId: UUID,
-    val kind: String,
-    val status: String,
-    val origin: String,
-)
+data class SearchFact(val revisionId: UUID, val kind: String, val status: String, val origin: String)

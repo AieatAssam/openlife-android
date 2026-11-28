@@ -10,12 +10,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.storage.FactHost
+import org.openlife.vault.storage.HostSourceRowRemovalDao
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
-import org.openlife.vault.storage.HostSourceRowRemovalDao
-import org.openlife.vault.storage.OpenLifeDatabase
-import org.openlife.vault.storage.SourceRowRemoval
 import org.openlife.vault.storage.SearchIndex
+import org.openlife.vault.storage.SourceRowRemoval
 import java.io.File
 import java.util.UUID
 
