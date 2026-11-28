@@ -331,6 +331,7 @@ class FactsFlowTest {
         awaitText(context.getString(R.string.facts_picker_confirm))
         composeRule.onNodeWithText(context.getString(R.string.facts_picker_confirm)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
+        composeRule.waitForIdle()
         composeRule.waitUntil(WAIT_MS) { facts.additions.isNotEmpty() }
         val (_, kind, value) = facts.additions.single()
         assertEquals(FactKind.TIME, kind)

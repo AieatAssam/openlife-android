@@ -17,6 +17,10 @@ sealed interface UserFactInput {
     class Date(val date: LocalDate?) : UserFactInput {
         override fun toString(): String = "UserFactInput.Date"
     }
+
+    class Time(val hour: Int?, val minute: Int?) : UserFactInput {
+        override fun toString(): String = "UserFactInput.Time"
+    }
 }
 
 /**

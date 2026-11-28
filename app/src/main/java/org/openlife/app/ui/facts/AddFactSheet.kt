@@ -1,5 +1,6 @@
 package org.openlife.app.ui.facts
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -12,6 +13,9 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -30,7 +35,7 @@ import org.openlife.vault.facts.FactKind
 import java.time.LocalDate
 
 /** The kinds the add-fact form offers (P3-05-R2). Money and time are added in their own steps of P3-05. */
-private val FORM_KINDS = listOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.DATE)
+private val FORM_KINDS = listOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.DATE, FactKind.TIME)
 
 /** P3-05-R2: a kind picker, then the input that kind takes. Nothing is saved until the user presses Save. */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -48,7 +53,11 @@ internal fun AddFactForm(onAdd: (UserFactInput) -> Unit) {
                 )
             }
         }
-        if (kind == FactKind.DATE) DateInput(onAdd) else TypedInput(kind, onAdd)
+        when (kind) {
+            FactKind.DATE -> DateInput(onAdd)
+            FactKind.TIME -> TimeInput(onAdd)
+            else -> TypedInput(kind, onAdd)
+        }
     }
 }
 
@@ -99,6 +108,49 @@ private fun DateInput(onAdd: (UserFactInput) -> Unit) {
         }
     }
     SaveButton { onAdd(UserFactInput.Date(chosen)) }
+}
+
+/** P3-05-R2: a time is chosen in the Material time picker only; there is no free text for a time. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeInput(onAdd: (UserFactInput) -> Unit) {
+    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    // remember, not rememberSaveable: a picked time is a fact value and must not reach saved instance state.
+    val pickerState = remember(is24Hour) { TimePickerState(initialHour = 12, initialMinute = 0, is24Hour = is24Hour) }
+    var open by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val locale = LocalConfiguration.current.locales[0]
+    OpenLifeTextButton(onClick = { open = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+        val shown = chosen?.let { (hour, minute) ->
+            FactDisplay.value(FactKind.TIME, "%02d:%02d".format(hour, minute), locale)
+        }
+        Text(text = shown ?: stringResource(R.string.facts_pick_time), modifier = Modifier.fillMaxWidth())
+    }
+    if (open) {
+        TimePickerDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.facts_pick_time)) },
+            confirmButton = {
+                OpenLifeTextButton(onClick = {
+                    chosen = pickerState.hour to pickerState.minute
+                    open = false
+                }) {
+                    Text(stringResource(R.string.facts_picker_confirm))
+                }
+            },
+            dismissButton = {
+                OpenLifeTextButton(onClick = { open = false }) {
+                    Text(stringResource(R.string.facts_picker_dismiss))
+                }
+            },
+        ) {
+            TimePicker(state = pickerState)
+        }
+    }
+    SaveButton {
+        val (hour, minute) = chosen ?: (null to null)
+        onAdd(UserFactInput.Time(hour, minute))
+    }
 }
 
 @Composable
