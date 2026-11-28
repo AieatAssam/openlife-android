@@ -815,5 +815,5 @@ follows the proposal.
 
 | Ref | Finding | Change | Section |
 | --- | --- | --- | --- |
-| A-14 (proposed) | F3 (P3-06 image eval) | A lone `-` directly after a preceding letter or attached mark (`Coffee-€3.50`, `x-€3.50`, `Item-3.50 EUR`, `EUR-5.00`) is read as a separator, not a sign. The sign is then unclaimed, so the amount abstains with `SIGN_OR_CREDIT` (neither a negative nor a positive definite value). Signs after a space, after a symbol (`€-5`) or at the start (`-€5`) keep the A-4 reading. A `-` after a digit keeps the A-4 rule (never a sign). The Unicode dash forms already abstain (A-4). | §5.1 |
+| A-14 (accepted 2026-11-28 by the coordinating session under the owner delegation of 2026-11-24) | F3 (P3-06 image eval) | A lone `-` directly after a preceding letter or attached mark (`Coffee-€3.50`, `x-€3.50`, `Item-3.50 EUR`, `EUR-5.00`) is read as a separator, not a sign. The sign is then unclaimed, so the amount abstains with `SIGN_OR_CREDIT` (neither a negative nor a positive definite value). Signs after a space, after a symbol (`€-5`) or at the start (`-€5`) keep the A-4 reading. A `-` after a digit keeps the A-4 rule (never a sign). The Unicode dash forms already abstain (A-4). | §5.1 |
 
