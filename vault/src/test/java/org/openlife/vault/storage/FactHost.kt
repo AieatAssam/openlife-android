@@ -209,13 +209,18 @@ class FactRows(val host: HostSqlite) {
 
 /** [FactDao] over the host database: FactSql runs unchanged. */
 @Suppress("TooManyFunctions") // mirrors FactDao
-class HostFactDao(private val host: HostSqlite) : FactDao {
+open class HostFactDao(private val host: HostSqlite) : FactDao {
     private fun q(sql: String, vararg params: Pair<String, Any?>) = with(FactHost) { host.named(sql, *params) }
 
+    /** A write: the number of rows it changed. */
     private fun count(sql: String, vararg params: Pair<String, Any?>): Int = with(FactHost) {
         q(sql, *params)
         host.changes()
     }
+
+    /** A SELECT COUNT(*): its result, not the changes() of the last write on the connection. */
+    private fun selectCount(sql: String, vararg params: Pair<String, Any?>): Int =
+        (q(sql, *params).single().single() as Long).toInt()
 
     override suspend fun insertFact(id: String, sourceId: String, kind: String, createdAt: Long) {
         q(FactSql.INSERT_FACT, "id" to id, "sourceId" to sourceId, "kind" to kind, "createdAt" to createdAt)
@@ -342,6 +347,96 @@ class HostFactDao(private val host: HostSqlite) : FactDao {
             },
         )
     }
+
+    @Suppress("LongParameterList") // one column per parameter
+    override suspend fun insertRun(
+        id: String,
+        sourceId: String,
+        ocrRevisionId: String,
+        trigger: String,
+        rulesVersion: String,
+        startedAt: Long,
+        finishedAt: Long,
+        outcome: String,
+        skippedKinds: String?,
+        candidateCount: Int?,
+        createdRevisionCount: Int?,
+        skippedLineCount: Int?,
+    ) {
+        q(
+            FactSql.INSERT_RUN,
+            "id" to id,
+            "sourceId" to sourceId,
+            "ocrRevisionId" to ocrRevisionId,
+            "trigger" to trigger,
+            "rulesVersion" to rulesVersion,
+            "startedAt" to startedAt,
+            "finishedAt" to finishedAt,
+            "outcome" to outcome,
+            "skippedKinds" to skippedKinds,
+            "candidateCount" to candidateCount,
+            "createdRevisionCount" to createdRevisionCount,
+            "skippedLineCount" to skippedLineCount,
+        )
+    }
+
+    override suspend fun sourceEpoch(sourceId: String): Long? =
+        q(FactSql.SOURCE_EPOCH, "sourceId" to sourceId).singleOrNull()?.single() as Long?
+
+    override suspend fun readingOfSource(sourceId: String): ReadingRow? =
+        q(FactSql.READING_OF_SOURCE, "sourceId" to sourceId).singleOrNull()?.let { r ->
+            ReadingRow(r[0] as String, r[1] as String, r[2] as String, (r[3] as Long) != 0L)
+        }
+
+    override suspend fun spanRowsOfReading(revisionId: String): List<SpanRow> =
+        q(FactSql.SPAN_ROWS_OF_READING, "revisionId" to revisionId).map { r ->
+            SpanRow(
+                spanId = r[0] as String,
+                ordinal = (r[1] as Long).toInt(),
+                text = r[2] as String,
+                hasEvidenceRegion = (r[3] as Long) != 0L,
+                scriptStatus = r[4] as String,
+                left = (r[5] as Long?)?.toInt(),
+                top = (r[6] as Long?)?.toInt(),
+                right = (r[7] as Long?)?.toInt(),
+                bottom = (r[8] as Long?)?.toInt(),
+                latestReview = r[9] as String?,
+                correctionId = r[10] as String?,
+                correctionText = r[11] as String?,
+            )
+        }
+
+    override suspend fun revisionHistoryOfSource(sourceId: String): List<HistoryRow> =
+        q(FactSql.REVISION_HISTORY_OF_SOURCE, "sourceId" to sourceId).map { r ->
+            HistoryRow(
+                revisionId = r[0] as String,
+                factId = r[1] as String,
+                factOrdinal = (r[2] as Long).toInt(),
+                kind = r[3] as String,
+                valueJson = r[4] as String,
+                canonicalText = r[5] as String,
+                origin = r[6] as String,
+                status = r[7] as String,
+                supersedesRevisionId = r[8] as String?,
+                isCurrent = (r[9] as Long) != 0L,
+                ocrSpanId = r[10] as String?,
+                ocrUserRevisionId = r[11] as String?,
+                textStart = (r[12] as Long?)?.toInt(),
+                regionLeft = (r[13] as Long?)?.toInt(),
+                regionTop = (r[14] as Long?)?.toInt(),
+                regionRight = (r[15] as Long?)?.toInt(),
+                regionBottom = (r[16] as Long?)?.toInt(),
+            )
+        }
+
+    override suspend fun factPointers(sourceId: String): List<FactPointer> =
+        q(FactSql.FACT_POINTERS, "sourceId" to sourceId).map { FactPointer(it[0] as String, it[1] as String?) }
+
+    override suspend fun runCountForReading(ocrRevisionId: String): Int =
+        selectCount(FactSql.RUN_COUNT_FOR_READING, "ocrRevisionId" to ocrRevisionId)
+
+    override suspend fun extractedCountOfSource(sourceId: String): Int =
+        selectCount(FactSql.EXTRACTED_COUNT_OF_SOURCE, "sourceId" to sourceId)
 
     private fun nodeOf(row: List<Any?>) = DependencyNode(row[0] as String, row[1] as String)
 

@@ -16,6 +16,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.openlife.vault.crypto.KeystoreWrapper
+import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrCoordinateSystem
 import org.openlife.vault.ocr.OcrEngineInput
@@ -49,6 +50,7 @@ import java.util.UUID
  * mutation queue, OCR runs outside the queue so deletion can proceed, and the
  * final commit is serialized and guarded by a RUNNING/READY recheck.
  */
+@Suppress("TooManyFunctions") // the OCR lifecycle: run, completion, review and the fact hooks (C2-R40)
 class OcrRepository(
     private val paths: VaultPaths,
     private val database: OpenLifeDatabase,
@@ -59,6 +61,11 @@ class OcrRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val ocrDao: OcrDao = database.ocrDao(),
     private val deadlineMillis: Long = org.openlife.vault.ocr.OcrLimits.DEADLINE_MILLIS,
+    /**
+     * P3-04-R4: called with the Source after its reading is READY, outside the mutation queue, so the extraction
+     * run can take its own locks. Null (the default) runs nothing.
+     */
+    private val onReady: (suspend (UUID) -> Unit)? = null,
 ) {
     private val authenticator = ArtefactAuthenticator(keystoreWrapper)
 
@@ -68,7 +75,10 @@ class OcrRepository(
         prepared as Capture.Ready
         try {
             when (val decision = OcrRunStateMachine.decide(extract(prepared))) {
-                is OcrRunStateMachine.Decision.Persist -> persist(sourceId, prepared.revision, decision.spans)
+                is OcrRunStateMachine.Decision.Persist ->
+                    persist(sourceId, prepared.revision, decision.spans).also { result ->
+                        if (result is OcrRunResult.Completed) notifyReady(sourceId)
+                    }
 
                 is OcrRunStateMachine.Decision.Terminal -> {
                     markTerminal(mutationQueue, ocrDao, prepared.revision.id, decision.state, decision.reason)
@@ -78,6 +88,21 @@ class OcrRepository(
         } finally {
             // P2-02-R5: the captured plaintext is not kept past the run.
             prepared.input.close()
+        }
+    }
+
+    /**
+     * P3-04-R4 and P-05: the OCR result is already committed, so a failing hook does not turn it into a failure. A
+     * cancellation still propagates.
+     */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun notifyReady(sourceId: UUID) {
+        try {
+            onReady?.invoke(sourceId)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            // The OCR revision is READY and its spans are stored; the automatic run stays due for a later attempt.
         }
     }
 
@@ -196,6 +221,8 @@ class OcrRepository(
                     // Compare-and-set (P1-18-R13): spans are written only if this
                     // run still owns a RUNNING revision; a lost race writes nothing.
                     val committed = database.withTransaction {
+                        // P3-04-R5: the previous reading's facts go STALE in this transaction, with an epoch bump.
+                        val previousReading = database.factDao().readingOfSource(sourceId.toString())?.id
                         val moved = ocrDao.completeRunning(
                             completed.id.toString(),
                             checkNotNull(completed.extractedAt),
@@ -206,7 +233,15 @@ class OcrRepository(
                             ocrDao.insertSpans(persistedSpans.map { it.toEntity() })
                             // C2-R14: the pointer moves only to a later-started reading,
                             // so a late finisher stays history (F-69).
-                            ocrDao.moveCurrentReading(sourceId.toString(), completed.id.toString())
+                            val pointerMoved = ocrDao.moveCurrentReading(
+                                sourceId.toString(),
+                                completed.id.toString(),
+                            ) == 1
+                            // P-01: a late finisher that did not take the pointer leaves the current facts alone.
+                            if (pointerMoved && previousReading != null && previousReading != completed.id.toString()) {
+                                FactStaleMarker(database.factDao(), clock)
+                                    .markForReading(previousReading, StaleReason.READING_REPLACED)
+                            }
                         }
                         moved == 1
                     }
@@ -272,6 +307,13 @@ class OcrRepository(
                             supersedesId = head?.let(UUID::fromString),
                         ).toEntity(),
                     )
+                    // P3-04-R5: a span correction stales that span's facts; a whole-reading one stales the reading.
+                    val marker = FactStaleMarker(database.factDao(), clock)
+                    if (spanId != null) {
+                        marker.markForSpan(spanId.toString(), StaleReason.SPAN_CORRECTED)
+                    } else {
+                        marker.markForReading(revisionId.toString(), StaleReason.READING_CORRECTED)
+                    }
                 }
                 true
             }
@@ -293,6 +335,13 @@ class OcrRepository(
                     val reviews = database.ocrSpanReviewDao().findForSpan(span.id).map { it.toDomain() }
                     val next = OcrSpanReviewRules.next(reviews, revision.state, action) ?: return@withTransaction false
                     database.ocrSpanReviewDao().append(UUID.randomUUID().toString(), span.id, next.name, clock())
+                    // P3-04-R5: rejecting a span stales its facts; undoing a rejection never un-stales (C2 §9).
+                    if (action == OcrSpanReviewAction.REJECT) {
+                        FactStaleMarker(database.factDao(), clock).markForSpan(span.id, StaleReason.SPAN_REJECTED)
+                    } else {
+                        // P-04: an undo changes the fact inputs too, so an in-flight run is superseded.
+                        database.factDao().sourceOfSpan(span.id)?.let { database.factDao().bumpFactInputEpoch(it) }
+                    }
                     true
                 }
             }
@@ -302,7 +351,22 @@ class OcrRepository(
         check(reviewState != OcrReviewState.UNRECOGNISED) { "an unrecognised review state is never written" }
         mutationQueue.withMutation {
             // READY-only compare-and-set; a missing or non-READY revision changes nothing.
-            database.ocrDao().setReviewState(revisionId.toString(), reviewState.name) == 1
+            database.withTransaction {
+                val wasRejected = database.ocrDao().findRevision(revisionId.toString())?.toDomain()
+                    ?.reviewState == OcrReviewState.REJECTED
+                val moved = database.ocrDao().setReviewState(revisionId.toString(), reviewState.name) == 1
+                // P3-04-R5: a rejected reading stales its facts in the same transaction.
+                if (moved && reviewState == OcrReviewState.REJECTED) {
+                    FactStaleMarker(database.factDao(), clock)
+                        .markForReading(revisionId.toString(), StaleReason.READING_REJECTED)
+                } else if (moved && wasRejected) {
+                    // P-04: leaving REJECTED changes the fact inputs, so an in-flight run is superseded.
+                    database.factDao().sourceOfReading(revisionId.toString())?.let {
+                        database.factDao().bumpFactInputEpoch(it)
+                    }
+                }
+                moved
+            }
         }
     }
 

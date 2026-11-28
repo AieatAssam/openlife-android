@@ -103,7 +103,114 @@ object FactSql {
             JOIN sources s ON s.id = f.sourceId
         WHERE f.sourceId = :sourceId AND s.state <> 'DELETING' ORDER BY f.kind ASC, f.ordinal ASC
         """
+
+    /** C2 §7.4: the run row is written last, in the commit transaction (C2-R32). */
+    const val INSERT_RUN = """
+        INSERT INTO fact_extraction_runs(id, sourceId, ocrRevisionId, `trigger`, rulesVersion, startedAt, finishedAt,
+            outcome, skippedKinds, candidateCount, createdRevisionCount, skippedLineCount)
+        VALUES (:id, :sourceId, :ocrRevisionId, :trigger, :rulesVersion, :startedAt, :finishedAt, :outcome,
+            :skippedKinds, :candidateCount, :createdRevisionCount, :skippedLineCount)
+        """
+
+    const val SOURCE_EPOCH = "SELECT factInputEpoch FROM sources WHERE id = :sourceId"
+
+    /** The current reading of the Source (C2-R14 pointer), with its whole-reading correction, if any (C2-R15). */
+    const val READING_OF_SOURCE = """
+        SELECT r.id AS id, r.state AS state, r.reviewState AS reviewState,
+            EXISTS (
+                SELECT 1 FROM ocr_user_revisions u WHERE u.revisionId = r.id AND u.spanId IS NULL
+                AND NOT EXISTS (SELECT 1 FROM ocr_user_revisions n WHERE n.supersedesId = u.id)
+            ) AS wholeCorrected
+        FROM sources s JOIN ocr_revisions r ON r.id = s.currentOcrRevisionId
+        WHERE s.id = :sourceId
+        """
+
+    /**
+     * The spans of [revisionId] with the stored evidence fields, the latest span review, and the head of the
+     * correction chain (C2-R15): the chain head is the one no other correction supersedes, never the latest
+     * createdAt (VS-3).
+     */
+    const val SPAN_ROWS_OF_READING = """
+        SELECT s.id AS spanId, s.ordinal AS ordinal, s.text AS text, s.hasEvidenceRegion AS hasEvidenceRegion,
+            s.scriptStatus AS scriptStatus, s.`left` AS `left`, s.top AS top, s.`right` AS `right`,
+            s.bottom AS bottom,
+            (SELECT v.reviewState FROM ocr_span_reviews v WHERE v.spanId = s.id ORDER BY v.sequence DESC LIMIT 1)
+                AS latestReview,
+            (SELECT u.id FROM ocr_user_revisions u WHERE u.spanId = s.id
+                AND NOT EXISTS (SELECT 1 FROM ocr_user_revisions n WHERE n.supersedesId = u.id) LIMIT 1)
+                AS correctionId,
+            (SELECT u.correctedText FROM ocr_user_revisions u WHERE u.spanId = s.id
+                AND NOT EXISTS (SELECT 1 FROM ocr_user_revisions n WHERE n.supersedesId = u.id) LIMIT 1)
+                AS correctionText
+        FROM ocr_spans s WHERE s.revisionId = :revisionId ORDER BY s.ordinal ASC
+        """
+
+    /** Every revision of the Source's facts with its single VALUE evidence row, for idempotency and matching. */
+    const val REVISION_HISTORY_OF_SOURCE = """
+        SELECT r.id AS revisionId, r.factId AS factId, f.ordinal AS factOrdinal, r.kind AS kind,
+            r.valueJson AS valueJson, r.canonicalText AS canonicalText, r.origin AS origin, r.status AS status,
+            r.supersedesRevisionId AS supersedesRevisionId, (f.currentRevisionId = r.id) AS isCurrent,
+            e.ocrSpanId AS ocrSpanId, e.ocrUserRevisionId AS ocrUserRevisionId, e.textStart AS textStart,
+            e.regionLeft AS regionLeft, e.regionTop AS regionTop, e.regionRight AS regionRight,
+            e.regionBottom AS regionBottom
+        FROM facts f JOIN fact_revisions r ON r.factId = f.id
+            LEFT JOIN fact_evidence e ON e.revisionId = r.id AND e.role = 'VALUE'
+        WHERE f.sourceId = :sourceId
+        """
+
+    const val FACT_POINTERS =
+        "SELECT id AS factId, currentRevisionId AS currentRevisionId FROM facts WHERE sourceId = :sourceId ORDER BY id"
+
+    const val RUN_COUNT_FOR_READING = "SELECT COUNT(*) FROM fact_extraction_runs WHERE ocrRevisionId = :ocrRevisionId"
+
+    const val EXTRACTED_COUNT_OF_SOURCE = """
+        SELECT COUNT(*) FROM fact_revisions r JOIN facts f ON f.id = r.factId
+        WHERE f.sourceId = :sourceId AND r.origin = 'EXTRACTED'
+        """
 }
+
+/** The current reading of a Source (C2-R30, C2-R31). */
+data class ReadingRow(val id: String, val state: String, val reviewState: String, val wholeCorrected: Boolean)
+
+/** One span of the current reading, as stored (C2 §1, §4.7). */
+data class SpanRow(
+    val spanId: String,
+    val ordinal: Int,
+    val text: String,
+    val hasEvidenceRegion: Boolean,
+    val scriptStatus: String,
+    val left: Int?,
+    val top: Int?,
+    val right: Int?,
+    val bottom: Int?,
+    val latestReview: String?,
+    val correctionId: String?,
+    val correctionText: String?,
+)
+
+/** One revision of a fact of the Source, with its VALUE evidence row when it has one. */
+data class HistoryRow(
+    val revisionId: String,
+    val factId: String,
+    val factOrdinal: Int,
+    val kind: String,
+    val valueJson: String,
+    val canonicalText: String,
+    val origin: String,
+    val status: String,
+    val supersedesRevisionId: String?,
+    val isCurrent: Boolean,
+    val ocrSpanId: String?,
+    val ocrUserRevisionId: String?,
+    val textStart: Int?,
+    val regionLeft: Int?,
+    val regionTop: Int?,
+    val regionRight: Int?,
+    val regionBottom: Int?,
+)
+
+/** A fact and its current revision id, for the commit's fingerprint (C2-R31). */
+data class FactPointer(val factId: String, val currentRevisionId: String?)
 
 /** One node reached over `dependency_edges` (C2-R19). */
 data class DependencyNode(val kind: String, val id: String)
@@ -213,4 +320,42 @@ interface FactDao {
 
     @Query(FactSql.OBSERVE_CURRENT_FACTS)
     fun observeCurrentFacts(sourceId: String): Flow<List<CurrentFactRow>>
+
+    @Suppress("LongParameterList") // one column per parameter
+    @Query(FactSql.INSERT_RUN)
+    suspend fun insertRun(
+        id: String,
+        sourceId: String,
+        ocrRevisionId: String,
+        trigger: String,
+        rulesVersion: String,
+        startedAt: Long,
+        finishedAt: Long,
+        outcome: String,
+        skippedKinds: String?,
+        candidateCount: Int?,
+        createdRevisionCount: Int?,
+        skippedLineCount: Int?,
+    )
+
+    @Query(FactSql.SOURCE_EPOCH)
+    suspend fun sourceEpoch(sourceId: String): Long?
+
+    @Query(FactSql.READING_OF_SOURCE)
+    suspend fun readingOfSource(sourceId: String): ReadingRow?
+
+    @Query(FactSql.SPAN_ROWS_OF_READING)
+    suspend fun spanRowsOfReading(revisionId: String): List<SpanRow>
+
+    @Query(FactSql.REVISION_HISTORY_OF_SOURCE)
+    suspend fun revisionHistoryOfSource(sourceId: String): List<HistoryRow>
+
+    @Query(FactSql.FACT_POINTERS)
+    suspend fun factPointers(sourceId: String): List<FactPointer>
+
+    @Query(FactSql.RUN_COUNT_FOR_READING)
+    suspend fun runCountForReading(ocrRevisionId: String): Int
+
+    @Query(FactSql.EXTRACTED_COUNT_OF_SOURCE)
+    suspend fun extractedCountOfSource(sourceId: String): Int
 }

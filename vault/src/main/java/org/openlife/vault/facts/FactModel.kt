@@ -122,6 +122,9 @@ object FactLimits {
     /** C2-R62: current revisions per Source. */
     const val MAX_CURRENT_REVISIONS = 500
 
+    /** C2-R29: the cooperative deadline of one extraction run, from its start to its last check. */
+    const val DEADLINE_MILLIS = 5_000L
+
     /** C2-R19: edge traversal depth; deeper is refused. */
     const val MAX_TRAVERSAL_DEPTH = 32
 
