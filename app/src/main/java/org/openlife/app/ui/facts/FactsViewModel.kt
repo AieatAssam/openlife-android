@@ -24,6 +24,7 @@ enum class FactMessage {
     REFUSED_CONTROL_CHARACTER,
     REFUSED_NOT_ONE_VALUE,
     REFUSED_NOT_CHOSEN,
+    REFUSED_MONEY_CODE,
     NOT_SAVED,
 }
 
@@ -90,5 +91,6 @@ private fun UserValueRefusal.toMessage(): FactMessage = when (this) {
     UserValueRefusal.TOO_LONG -> FactMessage.REFUSED_TOO_LONG
     UserValueRefusal.CONTROL_CHARACTER -> FactMessage.REFUSED_CONTROL_CHARACTER
     UserValueRefusal.NOT_CHOSEN -> FactMessage.REFUSED_NOT_CHOSEN
-    UserValueRefusal.MONEY_NEEDS_CODE, UserValueRefusal.NOT_ONE_VALUE -> FactMessage.REFUSED_NOT_ONE_VALUE
+    UserValueRefusal.MONEY_NEEDS_CODE -> FactMessage.REFUSED_MONEY_CODE
+    UserValueRefusal.NOT_ONE_VALUE -> FactMessage.REFUSED_NOT_ONE_VALUE
 }

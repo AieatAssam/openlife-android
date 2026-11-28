@@ -26,16 +26,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.ContentTextField
 import org.openlife.app.ui.brand.OpenLifeButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.vault.facts.FactKind
+import org.openlife.vault.facts.extract.UserValueNormaliser
 import java.time.LocalDate
 
 /** The kinds the add-fact form offers (P3-05-R2). Money and time are added in their own steps of P3-05. */
-private val FORM_KINDS = listOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.DATE, FactKind.TIME)
+private val FORM_KINDS = listOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.DATE, FactKind.TIME, FactKind.MONEY)
 
 /** P3-05-R2: a kind picker, then the input that kind takes. Nothing is saved until the user presses Save. */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -56,6 +58,7 @@ internal fun AddFactForm(onAdd: (UserFactInput) -> Unit) {
         when (kind) {
             FactKind.DATE -> DateInput(onAdd)
             FactKind.TIME -> TimeInput(onAdd)
+            FactKind.MONEY -> MoneyInput(onAdd)
             else -> TypedInput(kind, onAdd)
         }
     }
@@ -108,6 +111,37 @@ private fun DateInput(onAdd: (UserFactInput) -> Unit) {
         }
     }
     SaveButton { onAdd(UserFactInput.Date(chosen)) }
+}
+
+/**
+ * P3-05-R2: an amount typed on a decimal keyboard and a currency chosen from the list. There is no "not stated"
+ * choice: a currency is required, and a missing one is refused with a visible message.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MoneyInput(onAdd: (UserFactInput) -> Unit) {
+    var amount by remember { mutableStateOf("") }
+    var currency by remember { mutableStateOf<String?>(null) }
+    ContentTextField(
+        value = amount,
+        onValueChange = { amount = it },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.facts_money_amount)) },
+        singleLine = true,
+        keyboardType = KeyboardType.Decimal,
+    )
+    Text(stringResource(R.string.facts_money_currency), modifier = Modifier.padding(top = 8.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        UserValueNormaliser.CURRENCY_CHOICES.forEach { code ->
+            FilterChip(
+                selected = currency == code,
+                onClick = { currency = code },
+                label = { Text(code) },
+                modifier = Modifier.heightIn(min = 48.dp),
+            )
+        }
+    }
+    SaveButton { onAdd(UserFactInput.Money(amount, currency)) }
 }
 
 /** P3-05-R2: a time is chosen in the Material time picker only; there is no free text for a time. */

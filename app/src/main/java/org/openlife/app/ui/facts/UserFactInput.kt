@@ -21,6 +21,10 @@ sealed interface UserFactInput {
     class Time(val hour: Int?, val minute: Int?) : UserFactInput {
         override fun toString(): String = "UserFactInput.Time"
     }
+
+    class Money(val amount: String, val currency: String?) : UserFactInput {
+        override fun toString(): String = "UserFactInput.Money"
+    }
 }
 
 /**

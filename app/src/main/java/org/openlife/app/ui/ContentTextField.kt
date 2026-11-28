@@ -77,6 +77,7 @@ fun ContentTextField(
     singleLine: Boolean = false,
     minLines: Int = 1,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
     val view = LocalView.current
     DisposableEffect(view) {
@@ -110,7 +111,7 @@ fun ContentTextField(
                 singleLine = singleLine,
                 minLines = minLines,
                 maxLines = maxLines,
-                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Text),
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = keyboardType),
             )
         }
     }
