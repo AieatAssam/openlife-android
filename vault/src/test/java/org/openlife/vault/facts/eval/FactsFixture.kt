@@ -48,21 +48,29 @@ internal object FactsFixture {
         return FactRow(id, cells[1], text, items, parseAbstain(id, text, decode(cells[4])), truth)
     }
 
-    private fun parseItems(id: String, text: String, cell: String): List<ExpectedItem> =
-        if (cell.isEmpty()) emptyList() else cell.split(ITEM_SEP).map { item ->
+    private fun parseItems(id: String, text: String, cell: String): List<ExpectedItem> {
+        if (cell.isEmpty()) {
+            return emptyList()
+        }
+        return cell.split(ITEM_SEP).map { item ->
             val parts = item.split(PART_SEP)
             require(parts.size == 3) { "$id: item needs KIND, raw and canonical: $item" }
             requireInText(id, text, parts[1])
             ExpectedItem(ExtractedKind.valueOf(parts[0]), parts[1], parts[2])
         }
+    }
 
-    private fun parseAbstain(id: String, text: String, cell: String): List<ExpectedAbstention> =
-        if (cell.isEmpty()) emptyList() else cell.split(ITEM_SEP).map { item ->
+    private fun parseAbstain(id: String, text: String, cell: String): List<ExpectedAbstention> {
+        if (cell.isEmpty()) {
+            return emptyList()
+        }
+        return cell.split(ITEM_SEP).map { item ->
             val parts = item.split(PART_SEP)
             require(parts.size == 2) { "$id: abstention needs KIND and raw: $item" }
             requireInText(id, text, parts[1])
             ExpectedAbstention(if (parts[0] == "*") null else ExtractedKind.valueOf(parts[0]), parts[1])
         }
+    }
 
     private fun requireInText(id: String, text: String, raw: String) =
         require(text.contains(raw)) { "$id: raw '$raw' is not a slice of the text" }

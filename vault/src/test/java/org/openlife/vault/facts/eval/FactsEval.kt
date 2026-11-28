@@ -241,10 +241,10 @@ internal object FactsEval {
     private fun writeSummary(file: File, report: FactsReport) {
         file.parentFile.mkdirs()
         val lines = mutableListOf<String>()
-        report.precision.forEach { (k, r) -> lines += "precision\t$k\t${r.hits}/${r.total}\t${value(r)}" }
-        report.recall.forEach { (k, r) -> lines += "recall\t$k\t${r.hits}/${r.total}\t${value(r)}" }
-        report.precisionByRule.forEach { (k, r) -> lines += "precision-by-rule\t$k\t${r.hits}/${r.total}\t${value(r)}" }
-        lines += "ambiguous-dm-flagged\t-\t${report.ambiguousDmFlagged.hits}/${report.ambiguousDmFlagged.total}\t${value(report.ambiguousDmFlagged)}"
+        report.precision.forEach { (k, r) -> lines += rateLine("precision", k, r) }
+        report.recall.forEach { (k, r) -> lines += rateLine("recall", k, r) }
+        report.precisionByRule.forEach { (k, r) -> lines += rateLine("precision-by-rule", k, r) }
+        lines += rateLine("ambiguous-dm-flagged", "-", report.ambiguousDmFlagged)
         lines += "bare-currency-inferred\t-\t${report.bareCurrencyInferred}"
         lines += "wrong-actionable-dates\t-\t${report.wrongActionableDates}"
         lines += "abstention-expected\t-\t${report.abstentionExpected.hits}/${report.abstentionExpected.total}"
@@ -255,5 +255,8 @@ internal object FactsEval {
         file.writeText(lines.joinToString("\n", postfix = "\n"))
     }
 
-    private fun value(rate: Rate): String = rate.value?.let { "%.4f".format(it) } ?: "no-measurement"
+    private fun rateLine(label: String, key: String, rate: Rate): String {
+        val value = rate.value?.let { "%.4f".format(it) } ?: "no-measurement"
+        return "$label\t$key\t${rate.hits}/${rate.total}\t$value"
+    }
 }
