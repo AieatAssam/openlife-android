@@ -6,7 +6,10 @@ package org.openlife.eval.facts.core
  */
 data class TruthUnit(val kind: String, val raw: String, val readings: Set<String>, val clarification: Boolean)
 
-/** One emitted candidate reduced to what scoring reads: kind, raw slice, readings, and whether it is a clarification. */
+/**
+ * One emitted candidate reduced to what scoring reads: kind, raw slice, readings, and whether it is a
+ * clarification.
+ */
 data class EmittedValue(val kind: String, val raw: String, val readings: Set<String>, val clarification: Boolean)
 
 /** How one emitted candidate compares with the truth units of its row. */
@@ -45,7 +48,9 @@ object FactValueScorer {
                 status[exact] = TruthStatus.EXACT
                 ScoredValue(ValueOutcome.EXACT, rawDiffers = truth[exact].raw != candidate.raw)
             } else {
-                val wrong = truth.indices.firstOrNull { i -> status[i] == TruthStatus.OPEN && sameRaw(truth[i], candidate) }
+                val wrong = truth.indices.firstOrNull { i ->
+                    status[i] == TruthStatus.OPEN && sameRaw(truth[i], candidate)
+                }
                 if (wrong == null) {
                     ScoredValue(ValueOutcome.UNEXPECTED, rawDiffers = false)
                 } else {
@@ -57,12 +62,16 @@ object FactValueScorer {
         return ScoredRow(values, status.toList())
     }
 
-    private fun sameValue(unit: TruthUnit, candidate: EmittedValue): Boolean =
-        unit.kind == candidate.kind && unit.clarification == candidate.clarification && unit.readings == candidate.readings
+    private fun sameValue(unit: TruthUnit, candidate: EmittedValue): Boolean {
+        if (unit.kind != candidate.kind || unit.clarification != candidate.clarification) return false
+        return unit.readings == candidate.readings
+    }
 
     /** Same kind and raw text, exactly or with every whitespace character removed from both sides. */
-    private fun sameRaw(unit: TruthUnit, candidate: EmittedValue): Boolean =
-        unit.kind == candidate.kind && (unit.raw == candidate.raw || squeezed(unit.raw) == squeezed(candidate.raw))
+    private fun sameRaw(unit: TruthUnit, candidate: EmittedValue): Boolean {
+        if (unit.kind != candidate.kind) return false
+        return unit.raw == candidate.raw || squeezed(unit.raw) == squeezed(candidate.raw)
+    }
 
     private fun squeezed(text: String): String = text.filterNot { it.isWhitespace() }
 

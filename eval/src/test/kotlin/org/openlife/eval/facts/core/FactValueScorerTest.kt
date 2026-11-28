@@ -17,7 +17,10 @@ class FactValueScorerTest {
     @Test
     fun droppedSpaceWithTheTrueValueIsExactAndCountedAsRawDifference() {
         // Tesseract img-16: "9:15 am" read "9:15am", canonical 09:15 is correct.
-        val row = FactValueScorer.score(listOf(truth("TIME", "9:15 am", "09:15")), listOf(emit("TIME", "9:15am", "09:15")))
+        val row = FactValueScorer.score(
+            listOf(truth("TIME", "9:15 am", "09:15")),
+            listOf(emit("TIME", "9:15am", "09:15")),
+        )
         assertEquals(ValueOutcome.EXACT, row.values.single().outcome)
         assertEquals(true, row.values.single().rawDiffers)
         assertEquals(listOf(TruthStatus.EXACT), row.units)
@@ -36,14 +39,20 @@ class FactValueScorerTest {
 
     @Test
     fun identicalRawAndValueIsExactWithoutRawDifference() {
-        val row = FactValueScorer.score(listOf(truth("MONEY", "€12.50", "12.50 EUR")), listOf(emit("MONEY", "€12.50", "12.50 EUR")))
+        val row = FactValueScorer.score(
+            listOf(truth("MONEY", "€12.50", "12.50 EUR")),
+            listOf(emit("MONEY", "€12.50", "12.50 EUR")),
+        )
         assertEquals(ValueOutcome.EXACT, row.values.single().outcome)
         assertEquals(false, row.values.single().rawDiffers)
     }
 
     @Test
     fun wrongValueWithTheSameRawIsWrongValue() {
-        val row = FactValueScorer.score(listOf(truth("MONEY", "€3.50", "3.50 EUR")), listOf(emit("MONEY", "€3.50", "-3.50 EUR")))
+        val row = FactValueScorer.score(
+            listOf(truth("MONEY", "€3.50", "3.50 EUR")),
+            listOf(emit("MONEY", "€3.50", "-3.50 EUR")),
+        )
         assertEquals(ValueOutcome.WRONG_VALUE, row.values.single().outcome)
         assertEquals(false, row.values.single().rawDiffers)
         assertEquals(listOf(TruthStatus.WRONG), row.units)
@@ -64,7 +73,12 @@ class FactValueScorerTest {
     @Test
     fun clarificationWithTheTruthAsASupersetIsSuperset() {
         val truthUnit = TruthUnit("DATE", "10-11-2026", setOf("2026-10-11", "2026-11-10"), clarification = true)
-        val emitted = EmittedValue("DATE", "10-11-2026", setOf("2026-10-11", "2026-11-10", "2026-12-10"), clarification = true)
+        val emitted = EmittedValue(
+            "DATE",
+            "10-11-2026",
+            setOf("2026-10-11", "2026-11-10", "2026-12-10"),
+            clarification = true,
+        )
         val row = FactValueScorer.score(listOf(truthUnit), listOf(emitted))
         assertEquals(ValueOutcome.SUPERSET, row.values.single().outcome)
     }
@@ -80,7 +94,10 @@ class FactValueScorerTest {
 
     @Test
     fun kindMismatchNeverPairsAndIsUnexpected() {
-        val row = FactValueScorer.score(listOf(truth("DATE", "5.00", "5.00 EUR")), listOf(emit("MONEY", "5.00", "5.00 EUR")))
+        val row = FactValueScorer.score(
+            listOf(truth("DATE", "5.00", "5.00 EUR")),
+            listOf(emit("MONEY", "5.00", "5.00 EUR")),
+        )
         assertEquals(ValueOutcome.UNEXPECTED, row.values.single().outcome)
         assertEquals(listOf(TruthStatus.OPEN), row.units)
     }

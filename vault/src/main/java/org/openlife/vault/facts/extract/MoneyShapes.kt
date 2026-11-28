@@ -117,7 +117,7 @@ internal object MoneySigns {
         val signs = if (outer) inner + line.text[dash] else inner
         val doubled = outer && LineScan.isSignLike(line.ch(dash - 1))
         val spaced = outer && (dash < core - 1 || doubled)
-        val attached = (outer && letterBefore(line, dash)) || letterDashBefore(line, beforeDigits)
+        val attached = attachedToLetter(line, outer, dash, beforeDigits)
         val start = when {
             doubled -> dash - 1
             outer -> dash
@@ -138,6 +138,9 @@ internal object MoneySigns {
      * separator in running text, not a sign (proposed A-14). The sign is
      * unclaimed, so the amount abstains rather than read as negative.
      */
+    private fun attachedToLetter(line: LineScan, outer: Boolean, dash: Int, beforeDigits: IntRange): Boolean =
+        (outer && letterBefore(line, dash)) || letterDashBefore(line, beforeDigits)
+
     private fun letterDashBefore(line: LineScan, range: IntRange): Boolean =
         (range.first until range.last).any { LineScan.isDashLike(line.ch(it)) && letterBefore(line, it) }
 
