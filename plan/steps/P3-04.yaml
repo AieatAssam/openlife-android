@@ -1,7 +1,7 @@
 id: P3-04
 title: Extraction pipeline from OCR revisions with evidence links and staleness
 phase: P3
-status: in_progress
+status: review
 started: 2026-11-27
 depends_on: [P3-02, P3-03]
 estimate: M
@@ -43,7 +43,7 @@ tdd:
     - name: FactExtractionRepositoryTest.ungroundedAndOutOfScriptSpansYieldNoFacts (VS-3)
     - name: FactExtractionRepositoryTest.usesCurrentRevisionPointerAndCorrectionChain (VS-3)
   green: ["Implement."]
-  refactor: []
+  refactor: ["detekt cleanup: helpers moved to FactExtractionMatching.kt and EvidenceBox.kt (3300ede)"]
 
 verification:
   commands: ["./gradlew :vault:connectedDebugAndroidTest"]
@@ -60,3 +60,21 @@ notes: >
   are already normalised by the rules-*-v1 extractors (TypedValue). Pass
   CurrencyContextIndex the spans of exactly one reading of a Source with
   unique ordinals; it now fails loudly (require) on duplicate ordinals.
+  Dependencies P3-02 and P3-03 were review, not done, when this step began (P3-03 was
+  review in plan.yaml; the coordinator delegated under the P3-01 precedent). Date note:
+  started 2026-11-27, work completed 2026-11-28. Spec gaps: the SUPERSEDED path (C2-R31)
+  and the markStale throw rollback have no test; the per-kind 64 skip (C2-R57) has no test;
+  per-trigger C2-R40 rows are not individually tested; the auto-run (C2-R30) is wired through
+  OpenLifeApp but not exercised on device. Device gap: only FactExtractionRepositoryTest was
+  run on the tablet, not the full connectedDebugAndroidTest suite.
+
+evidence: >
+  Claim 3319c6a; RED df14add (eight host and androidTest cases); GREEN ffc162e;
+  REFACTOR 3300ede. Gate (foreground re-run, scratchpad p304-gate2.log):
+  ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
+  :app:compileDebugAndroidTestKotlin :eval:test -> BUILD SUCCESSFUL in 5m 2s.
+  Host FactExtractionCoreTest 8/8. Tablet U8BBB20806201256 (AGS2-W09, Android 8.0.0):
+  :vault:connectedDebugAndroidTest with class FactExtractionRepositoryTest -> 8 tests, 0 failures,
+  BUILD SUCCESSFUL in 1m 9s; stay_on_while_plugged_in restored to 0. scripts/plan-check.sh
+  steps=83 errors=0; scripts/tests/run.sh 51 passed, 0 failed. Full record:
+  docs/verification/P3-04-extraction-pipeline.md.
