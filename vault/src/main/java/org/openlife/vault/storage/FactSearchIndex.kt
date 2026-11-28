@@ -25,6 +25,9 @@ object FactSearchIndex {
 
     val tables: List<String> = listOf(TABLE)
 
+    /** The FTS5 shadow tables of [tables]; with them, the only non-entity tables from v7. */
+    val shadowTables: List<String> = listOf("${TABLE}_data", "${TABLE}_idx", "${TABLE}_docsize", "${TABLE}_config")
+
     fun statements(): List<String> = listOf(
         "CREATE VIRTUAL TABLE IF NOT EXISTS $TABLE USING fts5(canonicalText, rawText, " +
             "content='fact_revisions', content_rowid='rowid', tokenize='${SearchIndex.TOKENIZER}')",
