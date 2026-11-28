@@ -1,64 +1,78 @@
 # P3-05 verification: facts UI, user-provided facts, inert values
 
-Branch `plan/P3-05-facts-ui` (worktree). Commits on the branch after `943a006`:
-item 1 title and fill-width `4413df0`; DATE red `97c591d`, green `ddb3268`; TIME red `7bb5cf9`, green `9798e40`; MONEY red `cb02280`, green `46358b7`; host tests for item 3 `66946ce`; detekt and heading-rule fixes `a38f7ff`; review action row `01180c1`.
-Date of run: 2026-11-28. Final code: `01180c1`. Not pushed.
+Branch `plan/P3-05-facts-ui` (worktree). Not pushed. Status stays `review`.
+HEAD after this run: `5488566`. Date of run: 2026-11-28.
+
+Commits on the branch after `01180c1` (the previous verified code):
+
+| Item | Commits |
+| --- | --- |
+| A, Correct this value (C2-R37) | `7c7c2d3` RED, `ee3d88d` GREEN |
+| B, earlier reading read-only viewer and evidence routing (C2-R39) | `64925cc` RED, `1351d4a` RED stub, `ba13ff8` GREEN state, `5ffd3b0` RED routing, `c2664bc` GREEN |
+| C, clarification re-choice (C2-R36) | `0f5c767` RED vault, `d9b428c` RED app, `3dcdef4` GREEN |
+| Detekt fixes for A to C | `0bccd96` |
+| Device test fixture order (C2-R36 test) | `5488566` |
+
+Earlier history (`943a006` to `01180c1`): item 1 title and fill-width, DATE, TIME and MONEY input with red and green commits, host tests `66946ce`, heading-rule fixes `a38f7ff`, review action row `01180c1`.
 
 ## Commands and real results
 
 | Command | Result |
 | --- | --- |
-| `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test` on `01180c1` (log `scratchpad/gate6.log`) | `BUILD SUCCESSFUL in 3m 2s`, exit 0 |
-| Same gate on `a38f7ff` (log `scratchpad/gate5.log`) | `BUILD SUCCESSFUL in 3m 46s` |
-| `scripts/plan-check.sh` (in the worktree) | `steps=83 errors=0`, `runnable now: []` |
-| `bash scripts/tests/run.sh` | `51 passed, 0 failed` |
-| `./gradlew :vault:testDebugUnitTest --tests '...FactWriterTest' --tests '...FactExtractionCoreTest'` (before `66946ce`) | FactWriterTest 8 tests, 0 failures; FactExtractionCoreTest 9 tests, 0 failures |
+| `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test` on the tree of `0bccd96` (log `scratchpad/gate-d2.log`) | `BUILD SUCCESSFUL in 4m 47s`, exit 0 |
+| `scripts/plan-check.sh` (log `scratchpad/plan-check.log`) | `steps=83 errors=0`, `runnable now: []`, exit 0 |
+| `bash scripts/tests/run.sh` (log `scratchpad/tests-run.log`) | `51 passed, 0 failed`, exit 0 |
 
-Gate history: the first gate run failed on detekt (line length, import order, `TooManyFunctions` in `FactsPresenter`, unused imports, brace-less `if`). `AccessibilitySourceRulesTest.titlesAreMarkedAsHeadings` then flagged two title slots; fixed in `a38f7ff`.
+The only change after the gate is the androidTest fixture in `5488566`, which does not touch production code or any `src/main` source. The gate was not re-run for it.
+
+Gate history for this session: the first run of the gate failed on detekt (16 findings: `MultiLineIfElse` in OcrPanel, ViewerImage and ViewerScreen; `FunctionSignature` in VaultFactsGateway and FactsPresenter; `MaxLineLength` in FactsPresenterTest; `TooManyFunctions` in FactWriter, FactsPresenter, OcrPresenter, ViewerSession and FactsPanel). Those were fixed in `0bccd96`, and the gate then passed.
 
 ## Requirement to test
 
-| Req | Host / JVM tests | Device tests (tablet `U8BBB20806201256`, Android 8.0.0) |
+| Req | Host / JVM tests | Device tests (tablet `U8BBB20806201256`, Android 8.0.0, API 26) |
 | --- | --- | --- |
-| R1 panel, origin and status badges, Show evidence, clarification chooser | `FactsPresenterTest` (JVM, 16 cases incl. candidate choice); `FactWriterTest` (existing clarify path) | `FactsScreenTest.showsOriginAndStatusBadgesAndEvidenceNavigation`; `FactsFlowTest.clarifyChoosingACandidateSendsThatCandidateOnly`, `rejectSendsTheRejectDecisionForThatRevision`, `evidenceActionOpensTheViewerWithTheSpanSelected`, `viewerFactsEntryOpensTheFactsOfThatSource` |
-| R2 Add a fact (date, time, amount with code, text) creates a USER revision with createdAt and no evidence | `FactWriterTest.addingAUserFactOfEachKindCreatesAConfirmedUserRevisionWithNoEvidence` (added `66946ce`; URL, EMAIL, PHONE, DATE, TIME, MONEY); `UserValueNormaliserTest.noDateChosenIsRefusedWithNoValue`; `FactsPresenterTest`: picked date, no date, same day in every zone, picked time, no time, amount with currency, amount without currency | `FactsFlowTest.addingAUserDateSavesTheChosenDayWithNoEvidence`, `addingAUserTimeSavesTheChosenTimeWithNoEvidence`, `addingAUserAmountSavesTheAmountAndCurrencyWithNoEvidence`, `addingAUserUrlSendsTheNormalisedValueToTheGateway`, `addingABlankUserValueIsRefusedAndNeverReachesTheGateway` |
-| R3 URLs, emails, phones inert, with the no-open note | source check: `ui/facts` contains no `ClickableText`, `LinkAnnotation`, `SelectionContainer`, `textSelectable` or `clickable` (grep, this step) | `FactsInertValuesTest` (1 case) |
-| R4 stale greyed with its sentence, Find facts again | `FactDisplayTest.aStaleFactSaysWhyInItsOwnWords`; `FactExtractionCoreTest.findAgainRunsOnTheCurrentReadingAndNeverOnAnOlderOne` (added `66946ce`) | `FactsFlowTest.staleFactIsGreyedWithItsSentenceAndFindFactsAgainRunsExtraction` |
-| R5 accessibility and large-font | `ThemeContrastTest`, `AccessibilitySourceRulesTest` (incl. heading rule, passing after `a38f7ff`) | `LargeFontUiTest` (facts route passes); `ScreenSemanticsTest` (see device totals) |
-| R6 locale formatting, canonical value unchanged | `FactDisplayTest.aDateIsFormattedForTheLocaleAndTheStoredValueIsUnchanged` and three further `FactDisplayTest` cases (time, amount, unparseable value) | none |
+| R1 panel, badges, Show evidence, chooser | `FactsPresenterTest` (JVM, cases for candidate choice, correction and evidence); `FactWriterTest` (clarify, correct, candidatesOf) | `FactsScreenTest`, `FactsFlowTest` (see device table below) |
+| R1, C2-R37 Correct this value | `FactsPresenterTest` correction cases (same input as Add a fact, refusal never reaches the gateway); `FactWriterTest` correction cases | `FactsFlowTest.correctingAUserUrlSendsTheRevisionAndTheNormalisedValue` |
+| R1, C2-R39 earlier reading, read-only | `ViewerSessionTest`, `OcrViewModelTest` (readingState, readOnly) | `EarlierReadingViewerTest` (2 tests); `FactsFlowTest.anEarlierReadingEvidenceOpensThatReadingAndNoOther` |
+| R1, C2-R36 re-choice | `FactWriterTest.candidatesAreReadForTheExtractedRevisionAndEveryClarificationOfIt` (candidates read for the extracted revision and for each clarification; null once superseded or STALE); `FactsPresenterTest.aClarifiedValueOffersItsCandidatesAndRechoosingSendsOneOfThem`; `FactWriterTest.clarificationChoosesOneCandidateByteForByte` (existing) | `FactsFlowTest.aClarifiedChoiceOffersTheOtherCandidatesAndSendsTheChosenOne`, `FactsFlowTest.clarifyChoosingACandidateSendsThatCandidateOnly` |
+| R2 Add a fact | `FactWriterTest.addingAUserFactOfEachKindCreatesAConfirmedUserRevisionWithNoEvidence`; `UserValueNormaliserTest`; `FactsPresenterTest` picker cases | `FactsFlowTest` add cases (date, time, amount, URL, blank refused) |
+| R3 inert values | source check: no `ClickableText`, `LinkAnnotation`, `SelectionContainer`, `textSelectable` or `clickable` in `ui/facts` | `FactsInertValuesTest` (run on `01180c1`, not re-run here) |
+| R4 stale and Find facts again | `FactDisplayTest.aStaleFactSaysWhyInItsOwnWords`; `FactExtractionCoreTest.findAgainRunsOnTheCurrentReadingAndNeverOnAnOlderOne` | `FactsFlowTest.staleFactIsGreyedWithItsSentenceAndFindFactsAgainRunsExtraction` |
+| R5 accessibility and large font | `ThemeContrastTest`, `AccessibilitySourceRulesTest` | `LargeFontUiTest`, `ScreenSemanticsTest` (run on `01180c1`, not re-run here; see gaps) |
+| R6 locale | `FactDisplayTest` (locale formatting, canonical value unchanged) | none |
 
-Picker state is held with `remember`, not `rememberSaveable` (source check: `AddFactSheet.kt` lines 93-94 and 160-161). The two comments there say why, so a picked value never reaches saved instance state.
+## Device totals (this session, one class per invocation, XML read after each)
 
-## Device totals (final code `01180c1`)
+All runs used `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=<fqcn>` on the tablet. The XML is under `app/build/outputs/androidTest-results/connected/debug/`. Before each run, `stay_on_while_plugged_in` was set to 3 and the tablet was woken and the keyguard dismissed. It was set back to 0 after the last run and read back as 0.
 
-Each class was run alone with `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=<fqcn>` and its XML read after each run.
-
-| Class | Run on | Result |
+| Class | Code | Result (XML) |
 | --- | --- | --- |
-| FactsFlowTest | `01180c1` (06:00) | 10 tests, 0 failures. Before the fix in `01180c1` the first run had 1 failure (`rejectSendsTheRejectDecisionForThatRevision`, `waitUntil` timeout): the second button of the Confirm/Reject row had no bounds. |
-| FactsInertValuesTest | `01180c1` (06:01) | 1 test, 0 failures |
-| LargeFontUiTest | `01180c1` (06:02) | 2 tests, 1 failure. Known: `noControlIsClippedAtFontScaleTwoOn320x640`, list route ("a control is clipped horizontally"). The facts case passes. |
-| ScreenSemanticsTest | `01180c1` (06:03) | 2 tests, 1 failure. Known: `everyScreenPassesAccessibilityChecks`. The facts-related findings are listed below. |
-| FactsScreenTest | `a38f7ff` (05:57): 1 pass. `01180c1`: blocked (see gaps). | Final-code run not obtained |
+| FactsFlowTest | `5488566` | 13 tests, 0 failures, 0 errors. Second run. The first run on `0bccd96` had 12 passing and 1 failing: `aClarifiedChoiceOffersTheOtherCandidatesAndSendsTheChosenOne` timed out at line 216 (`waitUntil` on the clarify call). Cause: the test fixture paired the text `2026-04-03` with the entry `2026-03-04`, which is the value in use, so that button was disabled. The fixture text order was corrected in `5488566`. |
+| FactsScreenTest | `5488566` | 1 test, 0 failures |
+| EarlierReadingViewerTest | `5488566` | 2 tests, 0 failures |
+| ViewerScreenTest | `5488566` | 3 tests, 0 failures |
+| ViewerScreenC1Test | `5488566` | 10 tests, 0 failures |
+| EvidenceNavigationTest | `5488566` | 8 tests, 0 failures |
 
-Totals on `01180c1`: 15 tests executed (FactsFlowTest 10, FactsInertValuesTest 1, LargeFontUiTest 2, ScreenSemanticsTest 2); 13 passed, 2 failed (both known, not facts-specific), 1 class (FactsScreenTest) blocked.
+Totals this session: 37 device tests, 37 passed, 0 failed.
 
-Facts-route findings in ScreenSemanticsTest (all `[clipped-text]`, text overflows its bounds, unchanged by this step):
-- `facts-ready @ FONT_2X`: 15 findings. Web address; https://example.org; OpenLife does not open links or copy them; Found in the text; Confirmed; Date; 3 Apr 2026; The text this came from changed; Found in the text; Out of date; Date; 2026-04-03 | 2026-03-04; Found in the text; Needs clarification; Which value is right?
-- `facts-ready @ FONT_2X_LARGEST_DISPLAY`: 9 findings. Web address; https://example.org; Found in the text; Confirmed; Date; 3 Apr 2026; The text this came from changed; Found in the text; Out of date.
+Not re-run this session: `FactsInertValuesTest`, `LargeFontUiTest` and `ScreenSemanticsTest`. On `01180c1` they gave 1 pass, 2 tests with 1 known failure (`noControlIsClippedAtFontScaleTwoOn320x640`, list route), and 2 tests with 1 known failure (`everyScreenPassesAccessibilityChecks`; 24 facts-route clipped-text findings, listed below).
 
-The 200 % title fix (item 1) is confirmed by the facts case of LargeFontUiTest; the title does not appear in the findings.
+Facts-route findings in ScreenSemanticsTest (all `[clipped-text]`, from `01180c1`, not fixed in this step):
+- `facts-ready @ FONT_2X`: 15 findings.
+- `facts-ready @ FONT_2X_LARGEST_DISPLAY`: 9 findings.
+
+Device RED: the instrumented RED for items B and C was written, and the androidTest sources compile, but the RED commits were not run on the tablet before their GREEN commits. The C device test first failed for the fixture reason above, not for a missing behaviour, so it did not serve as RED evidence. The behaviour is proven by the JVM and host tests in the table.
 
 ## Gaps and open questions
 
-1. **FactsScreenTest on the final code is not verified.** It passed at 05:57 on `a38f7ff`. Later runs failed with `No compose hierarchies found` (06:08, 06:08 again, 06:11). The cause is device state, not code: the screen had gone to sleep after `stay_on_while_plugged_in` was set to 0, and the keyguard was then showing (`isStatusBarKeyguard=true`). The same failure occurred with the pre-`01180c1` FactsPanel. The lock was not dismissed because the lock credentials are out of scope. The class must be re-run on the tablet when it is unlocked.
-2. **Earlier-reading evidence cannot be opened (Q-15).** The read-only viewer mode is not built. An evidence row on an earlier reading shows the note "From an earlier reading of this source, so it cannot be shown in the text" and no Show evidence button (`FactsPanel.kt`). No test covers that branch.
-3. **"Correct this value" (C2-R37) is not offered.** The UI has no such action.
-4. **CAD is not offered** in the money chooser. The line scanner gives no single value for "10 CAD" (C2 normalisation limit). The other 10 codes are offered.
-5. **Money without a code is refused** (`MONEY_NEEDS_CODE`). ADR-0008 stores a null currency only with a printed symbol, so "Not stated" cannot be stored. OPEN QUESTION for the owner: allow a typed symbol, or remove "Not stated" from C2-R38.
-6. **UI tests use `FakeFactsGateway`.** Persistence is proven by the host tests in item 3 (`FactWriterTest`, `FactExtractionCoreTest`). The Room repository wrapper (`FactRepository`, `MutationQueue`) is covered on device only by `FactExtractionRepositoryTest`, which was not re-run in this step.
-7. **Inert values and selection** are checked at source level only (no link or selection API in `ui/facts`). No device test covers text selection.
-8. **Remaining 2x clipped-text findings:** 24 on the facts route (listed above), plus the known list-route failures. These are not fixed in this step.
-9. **R6 locale** is covered by JVM tests only. No device test switches locale.
-10. **Dependency order.** `depends_on` P3-04 and P1-20 are both `review`, not `done`. The coordinating session directed this step to proceed. The owner should confirm the order before review.
-11. **Test-environment note.** `stay_on_while_plugged_in` was set to 7 for the late FactsScreenTest reruns and reset to 0 afterwards. The screen timed out after the reset, which caused gap 1.
+1. **Not re-run on the tablet this session**: `FactsInertValuesTest`, `LargeFontUiTest`, `ScreenSemanticsTest`. The facts-route clipped-text findings stand from `01180c1`.
+2. **DATETIME has no input form**, so "Correct this value" is not offered for DATETIME.
+3. **USER BASIS "You chose this from:"** is not implemented (out of scope for this step).
+4. **No DB-level host test** for `OcrRepository.observeOcrViewOfRevision`. The earlier-reading path is proven at JVM and device level only.
+5. **Money without a currency code** is refused (`MONEY_NEEDS_CODE`). ADR-0008 stores a null currency only with a printed symbol, so "Not stated" cannot be stored. OPEN QUESTION for the owner: allow a typed symbol, or remove "Not stated" from C2-R38.
+6. **CAD is not offered** in the money chooser (the line scanner gives no single value for "10 CAD").
+7. **UI tests use `FakeFactsGateway`.** Persistence is proven by host tests. The Room wrapper `FactRepository` is covered on device only by `FactExtractionRepositoryTest`, not re-run here.
+8. **Dependency order.** `depends_on` P3-04 and P1-20 are both `review`, not `done`. The coordinating session directed this step to proceed. The owner should confirm before review.
+9. **Locale (R6)** is covered by JVM tests only. No device test switches locale.
+10. **Viewer and search** (handed-over findings a and b in the step notes) are not changed here; they belong to P3-07.
