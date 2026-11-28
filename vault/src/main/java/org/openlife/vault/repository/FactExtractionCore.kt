@@ -1,6 +1,8 @@
 package org.openlife.vault.repository
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.openlife.vault.facts.ExtractionOutcome
 import org.openlife.vault.facts.ExtractionTrigger
 import org.openlife.vault.facts.FactExtractionResult
@@ -106,6 +108,7 @@ internal class FactExtractionCore(
         val due = gate.read {
             val reading = dao.readingOfSource(sourceId) ?: return@read false
             dao.sourceState(sourceId) == READY &&
+                reading.reviewState != REJECTED &&
                 dao.runCountForReading(reading.id) == 0 &&
                 dao.extractedCountOfSource(sourceId) == 0
         }
@@ -182,8 +185,10 @@ internal class FactExtractionCore(
             .keys
         val kept = result.candidates.filter { it.kind !in skipped }
 
+        // C2-R32 step 1: a value already written for this span is never written again, even if a USER revision
+        // has since superseded it. Only a current STALE revision stays open for continuation.
         val existing = snapshot.history
-            .filter { it.isCurrent && it.origin == FactOrigin.EXTRACTED.name && it.status != STALE }
+            .filter { it.origin == FactOrigin.EXTRACTED.name && !(it.isCurrent && it.status == STALE) }
             .map { Triple(it.kind, it.canonicalText, it.ocrSpanId) }
             .toSet()
         val stale = snapshot.history
@@ -197,7 +202,7 @@ internal class FactExtractionCore(
             if (Triple(kind, canonicalTextOf(candidate), candidate.spanId) in existing) continue
             val own = snapshot.boxes[candidate.spanId]?.let { boxOf(it.left, it.top, it.right, it.bottom) }
             val pair = own?.let { box ->
-                stale.filter { it.kind == kind }
+                stale.filter { it.kind == kind && it.canonicalText == canonicalTextOf(candidate) }
                     .map { it to overlapRatio(box, it.evidenceBox()) }
                     .filter { it.second > 0.0 }
                     .maxByOrNull { it.second }
@@ -226,7 +231,7 @@ internal class FactExtractionCore(
         started: Long,
     ): FactExtractionResult {
         val now = clock()
-        return try {
+        return withContext(NonCancellable) { try {
             gate.commit {
                 if (fingerprint(sourceId) != snapshot.fingerprint) {
                     FactExtractionResult.Superseded
@@ -252,10 +257,29 @@ internal class FactExtractionCore(
         } catch (failure: CancellationException) {
             throw failure
         } catch (failure: Exception) {
-            // The transaction rolled back, so no fact row survives. Only the run row is recorded.
+            // The transaction rolled back, so no fact row survives. Only the run row is recorded, and a failure
+            // to record it still returns the outcome (P-05).
             val summary = RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet())
-            gate.commit { writeRun(sourceId, snapshot.reading.id, trigger, started, summary) }
+            recordRunQuietly(sourceId, snapshot.reading.id, trigger, started, summary)
             FactExtractionResult.Finished(ExtractionOutcome.STORAGE_FAILURE, 0, 0, emptySet())
+        } }
+    }
+
+    /** P-05: a run row that cannot be written does not replace the outcome already decided. */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun recordRunQuietly(
+        sourceId: String,
+        ocrRevisionId: String,
+        trigger: ExtractionTrigger,
+        started: Long,
+        summary: RunSummary,
+    ) {
+        try {
+            gate.commit { writeRun(sourceId, ocrRevisionId, trigger, started, summary) }
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            // Recorded as no run row; the caller still returns its outcome.
         }
     }
 
@@ -269,7 +293,7 @@ internal class FactExtractionCore(
         // With no reading there is no ocr_revision_id for a run row (C2 §7.6), so nothing is recorded.
         if (reading != null) {
             val summary = RunSummary(outcome, null, null, emptySet())
-            gate.commit { writeRun(sourceId, reading.id, trigger, started, summary) }
+            withContext(NonCancellable) { recordRunQuietly(sourceId, reading.id, trigger, started, summary) }
         }
         return FactExtractionResult.Finished(outcome, 0, 0, emptySet())
     }
