@@ -48,11 +48,14 @@ The implementation orders by `rowid` only (F-71). See "Open questions".
 | STALE fact status | `SearchRepositoryTest.findsConfirmedAndUnreviewedFactsButNotRejectedOrStale` (device) | 9/9 class run |
 | Non-current reading (EXTRACTED fact on an older reading) | `SearchRepositoryTest.findsConfirmedAndUnreviewedFactsButNotRejectedOrStale` (device) | 9/9 class run |
 | Deleted Source (no text left; secure-delete) | `FactSearchHostTest.deletedSourceLeavesNoFactTextAndTheIndexStaysIntact` (host) | passes |
-| `UNRECOGNISED` | none | **not testable**: the schema trigger rejects it (see below) |
+| `UNRECOGNISED` (C2-R51 decode fallback; no stored row can hold it) | `FactSearchHostTest.unrecognisedStatusIsRejectedByTheSchemaSoNoSuchRevisionIsSearchable` (host) | passes: the schema rejects the status |
 
-`UNRECOGNISED`: an attempt to set `fact_revisions.status = 'UNRECOGNISED'` aborted with
-`SQLITE_CONSTRAINT_TRIGGER: C2 §4.2: unknown status`. The state therefore cannot be stored,
-and no test can reach it. C2-13 names it, so the C2 status list and the trigger should be reconciled (open question 4).
+`UNRECOGNISED` is the tolerant-decoding fallback of C2-R51 (`FactWriter`, `FactMappers`), not a stored value. C2-R49 excludes it from hits. No stored row can hold it, because the C2 triggers in `vault/src/main/java/org/openlife/vault/storage/FactSchemaTriggers.kt` reject unknown values:
+- fact kind: `c2_facts_insert`, line 46 (`NEW.kind NOT IN $KINDS`), on insert;
+- revision origin: `c2_fact_revisions_insert`, line 67 (`NEW.origin NOT IN ('EXTRACTED', 'USER')`);
+- revision status: `c2_fact_revisions_insert`, line 71, and `c2_fact_revisions_status`, line 108 (`NEW.status NOT IN $STATUSES`), on insert and on update.
+
+The host test sets the status to `UNRECOGNISED` and expects the schema to abort the update. `SHOWN_FACT` checks status only, so it would not filter an unknown kind or origin; that case is also unreachable, for the reason above.
 
 The host test for superseded revisions needed a helper change: `FactHost.revision` now
 takes `rawText`, because `fact_fts` also indexes `rawText`, and the fixture's default
@@ -74,9 +77,10 @@ classes was overwritten by later runs and was not re-read in this pass.
 
 Host (JVM):
 
-- `:vault:test`: 304 tests, 0 failures, 0 errors (`FactSearchHostTest` 5/5, `SearchIndexHostTest` included).
+- `:vault:test`: 305 tests, 0 failures, 0 errors (`FactSearchHostTest` 6/6, `SearchIndexHostTest` included).
+- `./gradlew --offline detekt` on HEAD: `BUILD SUCCESSFUL`, exit 0 (`:vault` test sources changed after the gate).
 - `:app:test`: 241 tests, 0 failures. `:eval:test`: 26 tests, 0 failures.
-- Gate `./gradlew --offline detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`: `BUILD SUCCESSFUL`, exit 0 (`scratchpad/gate4.log`). The vault suite was re-run after that gate, with the superseded test added, and is green.
+- Gate `./gradlew --offline detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`: `BUILD SUCCESSFUL`, exit 0 (`scratchpad/gate4.log`). The gate predates three test-only commits (superseded test, schema-rejection test, helper change). Those were checked by `:vault:test` (305, green) and `detekt` (green) on HEAD. `:app` and `:eval` code has not changed since the gate.
 
 ## Behaviour delivered
 
@@ -105,4 +109,4 @@ Host (JVM):
 3. **F-71 and C2-R14 wording.** C2-R14 says the moving pointer uses `(startedAt, rowid)`.
    The implementation uses `rowid` only, so the device clock cannot move the current reading
    backwards. A dated C2-R14 amendment is needed from the owner. The shipped v6 backfill still uses `startedAt`.
-4. **`UNRECOGNISED` in C2-13.** The schema rejects this status (C2 §4.2). The C2-13 row should be reconciled with the schema.
+4. **C2-13 wording.** C2-13 lists `UNRECOGNISED` as a state to test. The schema triggers make it unstorable, so the test proves the trigger rejects it. The owner may reword C2-13 to say so.

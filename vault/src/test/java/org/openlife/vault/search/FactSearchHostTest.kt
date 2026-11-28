@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.repository.SearchRepository
@@ -14,6 +15,7 @@ import org.openlife.vault.storage.FactRows
 import org.openlife.vault.storage.FactSearchIndex
 import org.openlife.vault.storage.HostSourceRowRemovalDao
 import org.openlife.vault.storage.HostSqlite
+import org.openlife.vault.storage.HostSqlite.Failure
 import org.openlife.vault.storage.SourceRowRemoval
 
 /**
@@ -113,6 +115,21 @@ class FactSearchHostTest {
         val shown = factHits("2027-01-05")
         assertEquals(listOf(NEWER_FACT_REVISION), shown.map { it.fact?.revisionId?.toString() })
         assertTrue(fixture.dataContains(FactSearchIndex.TABLE, "2026"))
+        fixture.integrityCheck(FactSearchIndex.TABLE)
+    }
+
+    /**
+     * C2-13 lists UNRECOGNISED. The C2 triggers reject an unknown stored status (FactSchemaTriggers,
+     * on insert and on update), so no UNRECOGNISED revision can reach the search filter.
+     */
+    @Test
+    fun unrecognisedStatusIsRejectedByTheSchemaSoNoSuchRevisionIsSearchable() {
+        val fixture = FactHost.fresh(host)
+        seedFact(fixture)
+        assertThrows(Failure::class.java) {
+            host.exec("UPDATE fact_revisions SET status = 'UNRECOGNISED' WHERE id = '$FACT_REVISION'")
+        }
+        assertEquals(1, factHits("2026-11-26").size)
         fixture.integrityCheck(FactSearchIndex.TABLE)
     }
 }
