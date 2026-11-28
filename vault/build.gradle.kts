@@ -54,6 +54,8 @@ android {
         getByName("androidTest") {
             java.srcDir(rootProject.file("eval/src/core/kotlin"))
             assets.srcDir(rootProject.file("eval/ocr"))
+            // P3-06-R1: the facts image set (rendered by :eval:generateFactsImages), androidTest APK only.
+            assets.srcDir(rootProject.file("eval/facts/v1/images"))
         }
     }
 
