@@ -188,10 +188,11 @@ internal class FactExtractionCore(
         val kept = result.candidates.filter { it.kind !in skipped }
 
         // C2-R32 step 1: a value already written for this span is never written again, even if a USER revision
-        // has since superseded it. Only a current STALE revision stays open for continuation.
+        // has since superseded it. A fact whose current revision is STALE stays open for continuation instead.
+        val staleFacts = snapshot.history.filter { it.isCurrent && it.status == STALE }.map { it.factId }.toSet()
         val existing = snapshot.history
-            .filter { it.origin == FactOrigin.EXTRACTED.name && !(it.isCurrent && it.status == STALE) }
-            .map { Triple(it.kind, it.canonicalText, it.ocrSpanId) }
+            .filter { it.origin == FactOrigin.EXTRACTED.name && it.factId !in staleFacts }
+            .map { listOf<Any?>(it.kind, it.valueJson, it.ocrSpanId, it.ocrUserRevisionId, it.textStart) }
             .toSet()
         val stale = snapshot.history
             .filter { it.isCurrent && it.origin == FactOrigin.EXTRACTED.name && it.status == STALE }
@@ -201,7 +202,14 @@ internal class FactExtractionCore(
         val continues = mutableListOf<Pair<ExtractedCandidate, HistoryRow>>()
         for (candidate in kept) {
             val kind = mapKind(candidate.kind).name
-            if (Triple(kind, canonicalTextOf(candidate), candidate.spanId) in existing) continue
+            val key = listOf<Any?>(
+                kind,
+                CanonicalJson.of(candidate.canonicalValue, candidate.ambiguity),
+                candidate.spanId,
+                candidate.correctionId,
+                candidate.startOffset,
+            )
+            if (key in existing) continue
             val own = snapshot.boxes[candidate.spanId]?.let { boxOf(it.left, it.top, it.right, it.bottom) }
             val pair = own?.let { box ->
                 stale.filter { it.kind == kind && it.canonicalText == canonicalTextOf(candidate) }

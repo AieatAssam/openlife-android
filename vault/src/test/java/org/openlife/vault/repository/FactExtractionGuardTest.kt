@@ -7,7 +7,6 @@ import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -176,13 +175,16 @@ class FactExtractionGuardTest {
 
         val rerun = finished(extract())
 
-        // The DATE fact takes a new extracted revision: its current revision is EXTRACTED and not STALE.
-        val current = host.query(
-            "SELECT r.origin, r.status FROM facts f JOIN fact_revisions r ON r.id = f.currentRevisionId " +
-                "WHERE f.id = '$factId'",
-        ).single()
-        assertEquals("the DATE value is extracted again: $rerun", "EXTRACTED", current[0])
-        assertNotEquals("the new revision is not stale", "STALE", current[1])
+        // The value is written again as a new fact (the stale USER fact is not an EXTRACTED continuation target):
+        // one DATE fact has an EXTRACTED current revision that is not STALE.
+        assertEquals(
+            "the DATE value is extracted again: $rerun",
+            1L,
+            count(
+                "SELECT COUNT(*) FROM facts f JOIN fact_revisions r ON r.id = f.currentRevisionId " +
+                    "WHERE f.sourceId = 'a' AND f.kind = 'DATE' AND r.origin = 'EXTRACTED' AND r.status <> 'STALE'",
+            ),
+        )
     }
 
     // P-02 (C2-R32 step 1): the key includes textStart, so a second occurrence of an already extracted value is written.
