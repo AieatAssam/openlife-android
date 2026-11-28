@@ -29,6 +29,8 @@ class FactSearchHostTest {
         const val FACT = "d0000000-0000-0000-0000-000000000001"
         const val FACT_REVISION = "e0000000-0000-0000-0000-000000000001"
         const val EVIDENCE = "f0000000-0000-0000-0000-000000000001"
+        const val NEWER_FACT_REVISION = "e0000000-0000-0000-0000-000000000002"
+        const val NEWER_EVIDENCE = "f0000000-0000-0000-0000-000000000002"
     }
 
     private val host = HostSqlite()
@@ -89,6 +91,27 @@ class FactSearchHostTest {
         seedFact(fixture)
         host.exec("UPDATE fact_revisions SET status = 'REJECTED' WHERE id = '$FACT_REVISION'")
         assertEquals(emptyList<SearchHit>(), factHits("2026-11-26"))
+        assertTrue(fixture.dataContains(FactSearchIndex.TABLE, "2026"))
+        fixture.integrityCheck(FactSearchIndex.TABLE)
+    }
+
+    @Test
+    fun supersededRevisionIsNotShownButItsTextStaysIndexedForQueryTimeFiltering() {
+        val fixture = FactHost.fresh(host)
+        seedFact(fixture)
+        // FTS indexes rawText as well as canonicalText, so the newer raw text must not contain 2026.
+        rows.revision(
+            NEWER_FACT_REVISION,
+            FACT,
+            supersedes = FACT_REVISION,
+            canonicalText = "2027-01-05",
+            rawText = "05.01.2027",
+        )
+        rows.evidence(NEWER_EVIDENCE, NEWER_FACT_REVISION, SOURCE, SPAN)
+        assertEquals(1, rows.current(FACT, NEWER_FACT_REVISION, expected = FACT_REVISION))
+        assertEquals(emptyList<SearchHit>(), factHits("2026-11-26"))
+        val shown = factHits("2027-01-05")
+        assertEquals(listOf(NEWER_FACT_REVISION), shown.map { it.fact?.revisionId?.toString() })
         assertTrue(fixture.dataContains(FactSearchIndex.TABLE, "2026"))
         fixture.integrityCheck(FactSearchIndex.TABLE)
     }
