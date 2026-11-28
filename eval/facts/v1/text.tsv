@@ -71,14 +71,14 @@ T-16	TIME	12:75		TIME¦12:75		negative	§4.2 minute over 59
 T-17	TIME	08:15:99		TIME¦08:15:99		negative	§4.2 second over 59
 T-18	TIME	08:15:30,5		TIME¦08:15:30,5		negative	§4.2 fractional seconds abstain the token (A-2)
 T-19	TIME	11:30 - 1:30 pm	TIME¦11:30¦11:30 ‖ TIME¦11:30¦23:30 ‖ TIME¦1:30 pm¦13:30			range,clarify	§4.2 each time is read from its own text (Z-05)
-T-20	TIME	09:30 TO 11:30	TIME¦09:30¦09:30 ‖ TIME¦09:30¦21:30 ‖ TIME¦11:30¦11:30 ‖ TIME¦11:30¦23:30			range,allowlist,clarify	§4.2 and §4.3: TO is allowlisted, both times are read
+T-20	TIME	09:30 TO 11:30	TIME¦09:30¦09:30 ‖ TIME¦11:30¦11:30 ‖ TIME¦11:30¦23:30			range,allowlist,clarify	§4.2 and §4.3: TO is allowlisted. 09:30 has a leading zero, so it is one definite reading (no-marker rule, ADR-0008 lines 290-292, Q-5); 11:30 gives 11:30 | 23:30
 T-21	TIME	9am-5pm	TIME¦9am¦09:00 ‖ TIME¦5pm¦17:00			range,positive	§4.2 a dash joins two markers
 T-22	TIME	Doors 6:00 pm - 11:00 pm	TIME¦6:00 pm¦18:00 ‖ TIME¦11:00 pm¦23:00			range,positive	§4.2 each time from its own text
 T-23	TIME	14:45 - 16:45 CET		TIME¦14:45 - 16:45 CET		range,zone,negative	§4.2 ZZ-03: a zone after T2 abstains the whole range
 T-24	TIME	10:15 - 25:15		TIME¦10:15 - 25:15		range,negative	§4.2 A-11: any abstention of T1 or T2 abstains the range
 T-25	TIME	08:45 CEST		TIME¦08:45 CEST		zone,negative	§4.3 2 to 5 uppercase letters are a zone
 T-26	TIME	09:00 Uhr	TIME¦09:00¦09:00			positive,mixedcase	§4.3 a mixed-case word is not a zone
-T-27	TIME	10:00 and 11:00 UTC	TIME¦10:00¦10:00 ‖ TIME¦10:00¦22:00		TIME¦11:00 UTC	residual,zone	§4.2 and §4.3: only the second time abstains (zone after 11:00)
+T-27	TIME	10:00 and 11:00 UTC	TIME¦10:00¦10:00 ‖ TIME¦10:00¦22:00	TIME¦11:00 UTC		residual,zone	§4.2 and §4.3: only the second time abstains (zone after 11:00)
 T-31	TIME	09:20 (local)		TIME¦09:20 (local)		zone,negative	§4.3 a parenthesised group starting with a letter
 T-32	TIME	10:30 −05:00		TIME¦10:30 −05:00		zone,lookalike,negative	§4.3 an offset with U+2212 abstains
 DT-01	DATETIME	2026-09-16 14:30	DATETIME¦2026-09-16 14:30¦2026-09-16 14:30			positive,iso	§4.3 both parts unambiguous
@@ -106,7 +106,7 @@ M-13	MONEY	kr250	MONEY¦kr250¦250 kr			bare,positive	§5.3 kr is a multi-code s
 M-14	MONEY	$15 USD	MONEY¦$15 USD¦15 USD			positive,code	§5.1 the code takes the symbol's digits
 M-15	MONEY	£ 20 EUR		MONEY¦£ 20 EUR		negative,hostile	§5.1 EUR is not among the symbol's codes: abstained
 M-16	MONEY	SSP £84.10	MONEY¦£84.10¦84.10 £ ‖ MONEY¦£84.10¦84.10 SSP			context,clarify	§5.4 SSP is a context code (§5.5 deliberately not listed)
-M-17	MONEY	Prices in AUD $9.50	MONEY¦$9.50¦9.50 $ ‖ MONEY¦$9.50¦9.50 AUD		9.50 AUD	context,clarify	§5.4 a context code beside the symbol
+M-17	MONEY	Prices in AUD $9.50	MONEY¦$9.50¦9.50 $ ‖ MONEY¦$9.50¦9.50 AUD			context,clarify	§5.4 a context code beside the symbol
 M-18	MONEY	Prices in CAD $9.50	MONEY¦$9.50¦9.50 $			context,englishword	§5.5 CAD is never context
 M-19	MONEY	TEA CUP $4.20	MONEY¦$4.20¦4.20 $			context,englishword	§5.5 CUP is never context
 M-20	MONEY	Total $45.00 USD 33.10	MONEY¦$45.00¦45.00 $ ‖ MONEY¦USD 33.10¦33.10 USD			context,hostile	§5.4 Z-10: another amount's marker is not context
@@ -114,12 +114,12 @@ M-21	MONEY	TRY 12.90	MONEY¦TRY 12.90¦12.90 TRY			positive,englishword	§5.1 an
 M-22	MONEY	MAD 4				negative,englishword	§5.1 an English-word code alone needs fraction digits (Q-13)
 M-23	MONEY	€9876543210987654		MONEY¦€9876543210987654		negative,limit	§5.2 limit: more than 15 integer digits
 M-24	MONEY	€100000000000000	MONEY¦€100000000000000¦100000000000000 EUR			positive,limit	§5.2 15 integer digits are within the limit
-M-25	MONEY	1,234 €	MONEY¦1,234 €¦1.234 EUR ‖ MONEY¦1,234 €¦1234 EUR		1234 EUR	grouping,clarify	§5.2 one separator before exactly 3 digits
+M-25	MONEY	1,234 €	MONEY¦1,234 €¦1.234 EUR ‖ MONEY¦1,234 €¦1234 EUR			grouping,clarify	§5.2 one separator before exactly 3 digits
 M-26	MONEY	2.500,75 €	MONEY¦2.500,75 €¦2500.75 EUR			grouping,positive	§5.2 both separators present
 M-27	MONEY	1,234.56 $	MONEY¦1,234.56 $¦1234.56 $			grouping,bare	§5.2 both separators present, currency null
 M-28	MONEY	2'050.00 CHF	MONEY¦2'050.00 CHF¦2050.00 CHF			grouping,positive	§5.2 apostrophe is grouping only
-M-29	MONEY	2 500 €	MONEY¦2 500 €¦500 EUR ‖ MONEY¦2 500 €¦2500 EUR		2500 EUR	grouping,clarify	§5.2 space grouping: the adjacent group and the grouped reading
-M-30	MONEY	€8 000	MONEY¦€8 000¦8 EUR ‖ MONEY¦€8 000¦8000 EUR		8000 EUR	grouping,clarify	§5.2 space grouping with the marker before
+M-29	MONEY	2 500 €	MONEY¦2 500 €¦500 EUR ‖ MONEY¦2 500 €¦2500 EUR			grouping,clarify	§5.2 space grouping: the adjacent group and the grouped reading
+M-30	MONEY	€8 000	MONEY¦€8 000¦8 EUR ‖ MONEY¦€8 000¦8000 EUR			grouping,clarify	§5.2 space grouping with the marker before
 M-31	MONEY	3 000 000 €	MONEY¦3 000 000 €¦3 EUR ‖ MONEY¦3 000 000 €¦3000000 EUR			grouping,clarify	§5.2 EE-06: a zero-led adjacent group takes the first group's reading
 M-32	MONEY	0 500 €		MONEY¦0 500 €		negative,grouping	§5.2 a zero-led first group is abstained
 M-33	MONEY	12 345.67 €		MONEY¦12 345.67 €		negative,grouping	§5.2 a fraction after space groups is abstained (EE-02)
