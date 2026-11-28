@@ -23,6 +23,8 @@ object TimeExtractor {
     internal val RULE = RuleRef(RULE_ID, RULES_VERSION)
 
     private const val SHORT = 2
+    private const val BARE_HHMM = 4
+    private const val ALONE_END = ".;!?)"
     private const val MAX_PARTS = 3
     private const val MAX_MINUTE = 59
     private const val MAX_HOUR = 23
@@ -51,6 +53,7 @@ object TimeExtractor {
     }
 
     private fun parse(line: LineScan, start: Int): TimeToken? {
+        if (line.digits(start, SHORT) > SHORT) return bareHhmm(line, start)
         val hourDigits = line.digits(start, SHORT)
         if (hourDigits !in 1..SHORT) return null
         val parts = mutableListOf(number(line, start, hourDigits))
@@ -95,6 +98,30 @@ object TimeExtractor {
         if (marker == null && !line.boundaryAfter(end)) return null
         return TimeToken(start, tokenEnd, emptyList(), marker != null, AbstentionReason.AMBIGUOUS_FORM)
     }
+
+    /**
+     * A bare four-digit clock value (`1430`) is abstained, claimed, never dropped (ADR-0008 §4.2 "Abstained";
+     * P3-06 follow-up D-2). Only a valid HHMM standing alone (line start or one space before; line end or `.;!?)`
+     * after) is claimed, so phone groups, money and other digit runs are left alone.
+     */
+    private fun bareHhmm(line: LineScan, start: Int): TimeToken? {
+        val end = start + BARE_HHMM
+        val digits = line.digits(start, BARE_HHMM) == BARE_HHMM
+        if (!digits || !aloneBefore(line, start) || !aloneAfter(line, end)) return null
+        val hour = line.text.substring(start, start + SHORT).toInt()
+        val minute = line.text.substring(start + SHORT, start + BARE_HHMM).toInt()
+        if (hour > MAX_HOUR || minute > MAX_MINUTE) return null
+        return TimeToken(start, end, emptyList(), english = false, reason = AbstentionReason.AMBIGUOUS_FORM)
+    }
+
+    /** Line start or one space, and not the tail of a space-grouped number (`7946 0018`). */
+    private fun aloneBefore(line: LineScan, start: Int): Boolean {
+        if (start == 0) return true
+        if (!LineScan.isSpace(line.raw(start - 1))) return false
+        return start < 2 || !LineScan.isAsciiDigit(line.raw(start - 2))
+    }
+
+    private fun aloneAfter(line: LineScan, end: Int): Boolean = end >= line.length || line.raw(end) in ALONE_END
 
     private fun withValues(token: TimeToken, parts: List<Int>, pm: Boolean?, leadingZero: Boolean): TimeToken {
         val hour = parts[0]

@@ -252,3 +252,14 @@ $5␤EUR/USD ‖ MONEY¦$5¦5 $
 €5.00\u00A0CR ‖ !MONEY¦€5.00\u00A0CR
 €5.00\u0009Dr ‖ !MONEY¦€5.00\u0009Dr
 €5.00 Credit ‖ MONEY¦€5.00¦5.00 EUR
+# P3-06 follow-up F3 (proposed A-14): a dash attached to a preceding letter is a separator, not a sign.
+# The sign is unclaimed, so the amount abstains (SIGN_OR_CREDIT); no negative or positive definite value.
+Coffee-€3.50 ‖ !MONEY¦-€3.50
+Coffee–€3.50 ‖ !MONEY¦–€3.50
+Item-3.50 EUR ‖ !MONEY¦-3.50 EUR
+x-€3.50 ‖ !MONEY¦-€3.50
+EUR-5.00 ‖ !MONEY¦EUR-5.00
+# Controls: a sign after space, a symbol or at the start stays a sign (unchanged)
+-€3.50 ‖ MONEY¦-€3.50¦-3.50 EUR
+Total: -3.50 EUR ‖ MONEY¦-3.50 EUR¦-3.50 EUR
+(3.50 EUR) ‖ !MONEY¦(3.50 EUR)

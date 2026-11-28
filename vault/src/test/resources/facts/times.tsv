@@ -38,11 +38,13 @@ Arrive at 18:45. ‖ TIME¦18:45¦18:45
 # Not time shapes: nothing at all
 14.30 ‖ -
 14h30 ‖ -
-1430 ‖ -
 2 ‖ -
 a14:30 ‖ -
 ١٤:٣٠ ‖ -
 14:3٠ ‖ -
+#
+# A bare four-digit HHMM is abstained, not dropped (ADR-0008 §4.2 "Abstained"; P3-06 follow-up D-2)
+1430 ‖ !TIME¦1430
 #
 # Ranges: two separate times, each read from its own text (Z-05)
 11:30 - 1:30 pm ‖ TIME¦11:30¦11:30 | 23:30 ‖ TIME¦1:30 pm¦13:30

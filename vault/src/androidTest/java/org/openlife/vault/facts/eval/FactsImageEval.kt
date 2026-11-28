@@ -17,6 +17,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openlife.eval.facts.core.EmittedValue
+import org.openlife.eval.facts.core.FactValueScorer
+import org.openlife.eval.facts.core.ScoredValue
+import org.openlife.eval.facts.core.TruthStatus
+import org.openlife.eval.facts.core.TruthUnit
+import org.openlife.eval.facts.core.ValueOutcome
 import org.openlife.eval.ocr.core.Digests
 import org.openlife.eval.ocr.core.Utf8Chunks
 import org.openlife.vault.facts.extract.ExtractedCandidate
@@ -44,9 +50,10 @@ import java.util.UUID
  * :eval:generateFactsImages) goes through the production OCR engine, then the production extractor
  * ([FactExtractor.extract]) over the OCR spans, then is scored against the truth written from ADR-0008.
  *
- * Opt-in: `-Pandroid.testInstrumentationRunnerArguments.p306FactsImage=true`. The scoring mirrors the JVM
- * scorer (vault/src/test .../facts/eval/FactsEval.kt): same unit grouping, same match rules, same currency
- * predicate. Results go to the additional output directory and to logcat tag P306Facts.
+ * Opt-in: `-Pandroid.testInstrumentationRunnerArguments.p306FactsImage=true`. Pairing and outcomes come from
+ * the pure scorer in eval/src/core (FactValueScorer, JVM-tested in :eval:test): correctness is kind and canonical
+ * value only; raw-text differences are counted separately. The currency predicate is unchanged. Results go to the
+ * additional output directory and to logcat tag P306Facts.
  *
  * The run fails only when the set is invalid or an image cannot be processed; a gate miss is recorded as
  * measured, never tuned away.
@@ -154,11 +161,13 @@ class FactsImageEval {
         val dmFlagged: List<Boolean>,
     )
 
+    /** [rawDiffers]: the raw text is not the truth raw text (informational; correctness is kind and value only). */
     private class Emitted(
         val family: String,
         val kind: ExtractedKind,
         val rule: String,
-        val outcome: Outcome,
+        val outcome: ValueOutcome,
+        val rawDiffers: Boolean,
         val definite: Boolean,
         val bare: Boolean,
         val raw: String,
@@ -180,15 +189,9 @@ class FactsImageEval {
         val causeWs: String,
     )
 
-    private enum class Outcome { EXACT, SUBSET, SUPERSET, WRONG_VALUE, UNEXPECTED }
-
     private enum class UnitStatus { EXACT, WRONG, ABSTAINED, SILENT }
 
-    private class ExpectedUnit(val kind: ExtractedKind, val raw: String, val canonicals: Set<String>, val clarification: Boolean) {
-        var state = State.OPEN
-    }
-
-    private enum class State { OPEN, EXACT, WRONG }
+    private class ExpectedUnit(val kind: ExtractedKind, val raw: String, val canonicals: Set<String>, val clarification: Boolean)
 
     private suspend fun measure(engine: OcrEngine, case: Case): Run {
         val decision = recognise(engine, case)
@@ -212,12 +215,16 @@ class FactsImageEval {
             val text = extractorSpans.first { it.spanId == a.spanId }.text
             Triple(a.kind, text.substring(a.startOffset, a.endOffset), a.spanId)
         }
-        val emitted = result.candidates.map { emit(it, units) }
-        val unitRuns = units.map { unit ->
-            val status = when (unit.state) {
-                State.EXACT -> UnitStatus.EXACT
-                State.WRONG -> UnitStatus.WRONG
-                State.OPEN -> if (abstained.any { (k, raw, _) -> k == unit.kind && raw == unit.raw }) {
+        val scored = FactValueScorer.score(
+            units.map { TruthUnit(it.kind.name, it.raw, it.canonicals, it.clarification) },
+            result.candidates.map { EmittedValue(it.kind.name, it.rawText, readingsOf(it), it.needsClarification) },
+        )
+        val emitted = result.candidates.mapIndexed { i, cand -> emit(cand, scored.values[i]) }
+        val unitRuns = units.mapIndexed { i, unit ->
+            val status = when (scored.units[i]) {
+                TruthStatus.EXACT -> UnitStatus.EXACT
+                TruthStatus.WRONG -> UnitStatus.WRONG
+                TruthStatus.OPEN -> if (abstained.any { (k, raw, _) -> k == unit.kind && raw == unit.raw }) {
                     UnitStatus.ABSTAINED
                 } else {
                     UnitStatus.SILENT
@@ -234,36 +241,17 @@ class FactsImageEval {
         return Run(case.id, ocrState, ocrText, emitted, unitRuns, unexpected, dmFlags(case, result.candidates))
     }
 
-    private fun emit(cand: ExtractedCandidate, units: List<ExpectedUnit>): Emitted {
-        val readings = readingsOf(cand)
-        val outcome = match(cand, readings, units)
-        return Emitted(
-            family = familyOf(cand.kind),
-            kind = cand.kind,
-            rule = "${cand.ruleId}-${cand.ruleVersion}",
-            outcome = outcome,
-            definite = cand.canonicalValue != null,
-            bare = bareCurrency(cand),
-            raw = cand.rawText,
-            canonical = cand.canonicalText,
-        )
-    }
-
-    private fun match(cand: ExtractedCandidate, readings: Set<String>, units: List<ExpectedUnit>): Outcome {
-        val unit = units.firstOrNull { it.state == State.OPEN && it.kind == cand.kind && it.raw == cand.rawText }
-            ?: return Outcome.UNEXPECTED
-        if (cand.needsClarification == unit.clarification && readings == unit.canonicals) {
-            unit.state = State.EXACT
-            return Outcome.EXACT
-        }
-        unit.state = State.WRONG
-        return when {
-            !cand.needsClarification || !unit.clarification -> Outcome.WRONG_VALUE
-            readings.containsAll(unit.canonicals) -> Outcome.SUPERSET
-            unit.canonicals.containsAll(readings) -> Outcome.SUBSET
-            else -> Outcome.WRONG_VALUE
-        }
-    }
+    private fun emit(cand: ExtractedCandidate, value: ScoredValue): Emitted = Emitted(
+        family = familyOf(cand.kind),
+        kind = cand.kind,
+        rule = "${cand.ruleId}-${cand.ruleVersion}",
+        outcome = value.outcome,
+        rawDiffers = value.rawDiffers,
+        definite = cand.canonicalValue != null,
+        bare = bareCurrency(cand),
+        raw = cand.rawText,
+        canonical = cand.canonicalText,
+    )
 
     private fun expectedUnits(items: List<Item>): List<ExpectedUnit> =
         items.groupBy { it.kind to it.raw }.map { (key, group) ->
@@ -337,6 +325,7 @@ class FactsImageEval {
         val misses: Map<String, Int>,
         val missesWs: Map<String, Int>,
         val unexpectedAbstentions: Int,
+        val rawDiffers: Int,
     )
 
     private fun aggregate(runs: List<Run>): Summary {
@@ -345,19 +334,20 @@ class FactsImageEval {
         val dm = runs.flatMap { it.dmFlagged }
         return Summary(
             precision = GATED.associateWith { family ->
-                Rate(emitted.count { it.family == family && it.outcome == Outcome.EXACT }, emitted.count { it.family == family })
+                Rate(emitted.count { it.family == family && it.outcome == ValueOutcome.EXACT }, emitted.count { it.family == family })
             },
             recall = GATED.associateWith { family ->
                 Rate(units.count { it.family == family && it.status == UnitStatus.EXACT }, units.count { it.family == family })
             },
             dmFlagged = Rate(dm.count { it }, dm.size),
             bareCurrency = emitted.count { it.bare },
-            wrongDefinite = emitted.filter { it.definite && it.outcome != Outcome.EXACT }.groupingBy { it.family }.eachCount(),
-            wrongDefiniteTotal = emitted.count { it.definite && it.outcome != Outcome.EXACT },
-            unexpectedEmitted = emitted.filter { it.outcome == Outcome.UNEXPECTED }.groupingBy { it.family }.eachCount(),
+            wrongDefinite = emitted.filter { it.definite && it.outcome != ValueOutcome.EXACT }.groupingBy { it.family }.eachCount(),
+            wrongDefiniteTotal = emitted.count { it.definite && it.outcome != ValueOutcome.EXACT },
+            unexpectedEmitted = emitted.filter { it.outcome == ValueOutcome.UNEXPECTED }.groupingBy { it.family }.eachCount(),
             misses = units.filter { it.status != UnitStatus.EXACT }.groupingBy { it.cause }.eachCount(),
             missesWs = units.filter { it.status != UnitStatus.EXACT }.groupingBy { it.causeWs }.eachCount(),
             unexpectedAbstentions = runs.sumOf { it.unexpectedAbstain },
+            rawDiffers = emitted.count { it.rawDiffers },
         )
     }
 
@@ -401,6 +391,7 @@ class FactsImageEval {
         appendLine("misses_exact\t${s.misses}")
         appendLine("misses_ws_insensitive\t${s.missesWs}")
         appendLine("unexpected_abstentions\t${s.unexpectedAbstentions}")
+        appendLine("raw_text_differs\t${s.rawDiffers}\t(informational: matched candidates whose raw text is not the truth raw text)")
         runs.forEach { r ->
             appendLine("image\t${r.id}\t${r.ocrState}\tocr=${r.ocrText.replace('\n', '|')}")
             r.emitted.forEach { e ->
