@@ -8,4 +8,6 @@ class FactActions(
     val onOpenEvidence: (FactEvidence) -> Unit,
     val onReview: (FactItem, ReviewDecision) -> Unit,
     val onChoose: (FactItem, Int) -> Unit,
+    /** P3-05-R4: re-runs extraction for the source; offered when a fact is stale. */
+    val onFindAgain: () -> Unit = {},
 )

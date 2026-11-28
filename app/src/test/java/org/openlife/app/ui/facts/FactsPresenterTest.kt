@@ -55,8 +55,14 @@ class FactsPresenterTest {
         val reviews = mutableListOf<Pair<UUID, ReviewDecision>>()
         val clarifications = mutableListOf<Pair<UUID, FactValue>>()
         val additions = mutableListOf<Triple<UUID, FactKind, FactValue>>()
+        val findAgainSources = mutableListOf<UUID>()
 
         override fun facts(sourceId: UUID) = rows
+
+        override suspend fun findAgain(sourceId: UUID): Boolean {
+            findAgainSources += sourceId
+            return true
+        }
         override suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = ExtractionCheck.Completed
         override suspend fun currentReadingId(sourceId: UUID): UUID? = null
         override suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> = emptyList()
@@ -156,6 +162,15 @@ class FactsPresenterTest {
         val item = (presenter.state.value as FactsUiState.Ready).items.single()
         assertEquals(FactStatus.CLARIFICATION_NEEDED, item.status)
         assertTrue(item.needsClarification)
+    }
+
+    @Test
+    fun findAgainAsksTheExtractionPortForThisSource() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+
+        assertTrue(presenter.findAgain())
+        assertEquals(listOf(sourceId), gateway.findAgainSources)
     }
 
     @Test

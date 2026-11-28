@@ -371,6 +371,10 @@
     <string name="facts_refused_control">This value has a character that is not allowed.</string>
     <string name="facts_refused_not_one">Enter one value of the kind you chose.</string>
     <string name="facts_inert_note">OpenLife does not open links or copy them</string>
+    <string name="facts_stale_changed">The text this came from changed</string>
+    <string name="facts_stale_rejected_reading">You rejected this reading</string>
+    <string name="facts_stale_rejected_line">You rejected this line</string>
+    <string name="facts_find_again">Find facts again</string>
     <string name="facts_not_saved">The fact could not be saved.</string>
     <string name="viewer_open_facts">Facts</string>
 </resources>

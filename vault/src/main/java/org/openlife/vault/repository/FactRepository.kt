@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.openlife.vault.facts.ExtractionCheck
+import org.openlife.vault.facts.ExtractionTrigger
 import org.openlife.vault.facts.FactEvidence
+import org.openlife.vault.facts.FactExtractionResult
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.FactWithLatestRevision
@@ -64,6 +66,10 @@ class FactRepository(
     }
 
     /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
+    /** P3-05-R4 "Find facts again": one USER-triggered extraction of the current reading, under the C2-R30 protocol. */
+    suspend fun findAgain(sourceId: UUID): FactExtractionResult =
+        FactExtractionRepository(database, mutationQueue).extract(sourceId, ExtractionTrigger.USER)
+
     suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = withContext(ioDispatcher) {
         database.factDao().extractionOutcomeOfCurrentReading(sourceId.toString()).toExtractionCheck()
     }

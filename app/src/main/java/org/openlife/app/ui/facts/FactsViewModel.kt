@@ -50,6 +50,10 @@ class FactsViewModel(container: AppContainer, sourceId: UUID) : ViewModel() {
         viewModelScope.launch { presenter.review(item, decision) }
     }
 
+    fun findAgain() {
+        viewModelScope.launch { presenter.findAgain() }
+    }
+
     fun choose(item: FactItem, index: Int) {
         viewModelScope.launch { presenter.chooseCandidate(item, index) }
     }

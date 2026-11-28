@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.flow
 import org.openlife.app.ui.facts.FactsGateway
 import org.openlife.vault.facts.ExtractionCheck
 import org.openlife.vault.facts.FactEvidence
+import org.openlife.vault.facts.FactExtractionResult
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.FactWithLatestRevision
@@ -44,6 +45,10 @@ internal class VaultFactsGateway(private val app: OpenLifeApp) : FactsGateway {
 
     override suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult =
         withFacts(FactWriteResult.Failed) { it.addUserFact(sourceId, kind, value) }
+
+    override suspend fun findAgain(sourceId: UUID): Boolean = withFacts(false) { repository ->
+        repository.findAgain(sourceId) is FactExtractionResult.Finished
+    }
 
     private suspend fun <T> withFacts(fallback: T, block: suspend (FactRepository) -> T): T {
         app.appLock.awaitContentAccess()

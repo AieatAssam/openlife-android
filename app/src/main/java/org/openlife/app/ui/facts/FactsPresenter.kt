@@ -39,6 +39,9 @@ interface FactsGateway {
     suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult
 
     suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult
+
+    /** P3-05-R4: "Find facts again" for the source; true when the extraction finished. */
+    suspend fun findAgain(sourceId: UUID): Boolean
 }
 
 /** What a typed user value did: saved through the repository, or refused with the reason shown to the user (R2). */
@@ -118,6 +121,9 @@ class FactsPresenter(
         }
         return gateway.clarify(item.revisionId, FactValue(entries[index], texts[index]))
     }
+
+    /** P3-05-R4: asks the extraction port to run again for this source; the list updates from its own flow. */
+    suspend fun findAgain(): Boolean = gateway.findAgain(sourceId)
 
     /**
      * Adds a user-typed URL, email or phone through the vault's single-value normaliser. A refused input is

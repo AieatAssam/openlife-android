@@ -20,6 +20,7 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.toRoute
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.util.Locale
 import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -145,8 +146,10 @@ class FactsFlowTest {
         val facts = FakeFactsGateway(rows = listOf(row), readingId = READING)
         openFacts(source, facts)
 
-        awaitText("2026-03-04")
-        composeRule.onNodeWithText("2026-03-04").performClick()
+        // P3-05-R6: the candidate button shows the locale's date; the chosen entry stays canonical.
+        val shown = FactDisplay.value(FactKind.DATE, "2026-03-04", Locale.getDefault())
+        awaitText(shown)
+        composeRule.onNodeWithText(shown).performClick()
 
         composeRule.waitUntil(WAIT_MS) { facts.clarifications.isNotEmpty() }
         val (revisionId, chosen) = facts.clarifications.single()
@@ -204,6 +207,28 @@ class FactsFlowTest {
 
         awaitText(context.getString(R.string.facts_refused_blank))
         assertTrue("a refused value must not reach the repository", facts.additions.isEmpty())
+    }
+
+    @Test
+    fun staleFactIsGreyedWithItsSentenceAndFindFactsAgainRunsExtraction() {
+        val source = source(UUID(0L, 45L))
+        val row = FakeFactsGateway.row(
+            source.id,
+            FactKind.URL,
+            FactOrigin.EXTRACTED,
+            FactStatus.STALE,
+            FactValue("{\"url\":\"https://example.org/old\"}", "https://example.org/old"),
+        )
+        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING)
+        openFacts(source, facts)
+
+        val changed = context.getString(R.string.facts_stale_changed)
+        awaitText(changed)
+        val again = context.getString(R.string.facts_find_again)
+        composeRule.onNodeWithText(again).performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.findAgainSources.isNotEmpty() }
+        assertEquals(listOf(source.id), facts.findAgainSources)
     }
 
     private fun openFacts(source: Source, facts: FakeFactsGateway) {

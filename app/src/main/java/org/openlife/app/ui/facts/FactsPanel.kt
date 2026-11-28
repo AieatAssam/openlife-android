@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -60,6 +61,13 @@ private fun FactsList(state: FactsUiState.Ready, actions: FactActions, modifier:
                 modifier = Modifier.semantics { heading() },
             )
         }
+        if (state.items.any { it.isStale }) {
+            item {
+                OpenLifeTextButton(onClick = actions.onFindAgain, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(text = stringResource(R.string.facts_find_again))
+                }
+            }
+        }
         val note = checkNote(state.check)
         if (note != null) item { Text(text = stringResource(note)) }
         if (state.items.isEmpty() && state.check == ExtractionCheck.Completed) {
@@ -84,7 +92,20 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(text = stringResource(kindLabel(item.kind)), style = MaterialTheme.typography.labelLarge)
         // Plain text on purpose: no link, selection or copy action on a fact value (C2 inert values, R3).
-        Text(text = item.value.canonicalText, style = MaterialTheme.typography.bodyLarge)
+        val locale = LocalConfiguration.current.locales[0]
+        Text(
+            text = FactDisplay.value(item.kind, item.value.canonicalText, locale),
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (item.isStale) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+        )
+        if (item.isStale) {
+            // P3-05-R4: a stale fact is greyed and says why, in words as well as in colour.
+            Text(
+                text = stringResource(FactDisplay.staleSentence(item.staleReason)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (item.kind in INERT_KINDS) {
             // P3-05-R3: the note says what the value does not do; the value itself stays plain text.
             Text(text = stringResource(R.string.facts_inert_note), style = MaterialTheme.typography.bodySmall)
@@ -128,7 +149,7 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
                     onClick = { actions.onChoose(item, index) },
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
-                    Text(text = text)
+                    Text(text = FactDisplay.value(item.kind, text, locale))
                 }
             }
         }
