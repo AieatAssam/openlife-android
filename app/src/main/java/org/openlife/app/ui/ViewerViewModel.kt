@@ -100,7 +100,8 @@ private class BitmapViewerPorts(private val container: AppContainer) : ViewerPor
 
     override fun ocrState(sourceId: UUID): StateFlow<OcrUiState> = container.ocr.state(sourceId)
 
-    override fun readingState(revisionId: UUID): StateFlow<OcrUiState> = container.ocr.readingState(revisionId)
+    override fun readingState(sourceId: UUID, revisionId: UUID): StateFlow<OcrUiState> =
+        container.ocr.readingState(sourceId, revisionId)
 
     override fun delete(sourceId: UUID, onDeleted: (Boolean) -> Unit) {
         container.sources.delete(sourceId) { result -> onDeleted(result is DeleteResult.Deleted) }

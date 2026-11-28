@@ -123,6 +123,9 @@ internal fun OcrSection(
                 )
 
             is OcrUiState.Stale -> StaleOutcome(state.history, runAgain)
+
+            // P3-05 review U-01: a reading that is not this source's is named as unavailable, never shown.
+            OcrUiState.Unavailable -> Text(stringResource(R.string.content_unavailable))
         }
         Spacer(Modifier.height(4.dp))
         Text(

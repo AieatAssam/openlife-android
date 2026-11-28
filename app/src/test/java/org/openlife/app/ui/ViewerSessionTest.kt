@@ -333,7 +333,7 @@ class ViewerSessionTest {
         val reading = MutableStateFlow<OcrUiState>(OcrUiState.Idle)
         var readingRequested: UUID? = null
 
-        override fun readingState(revisionId: UUID): StateFlow<OcrUiState> {
+        override fun readingState(sourceId: UUID, revisionId: UUID): StateFlow<OcrUiState> {
             readingRequested = revisionId
             return reading
         }

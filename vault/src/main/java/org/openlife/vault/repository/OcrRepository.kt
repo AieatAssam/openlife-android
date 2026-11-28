@@ -290,10 +290,10 @@ class OcrRepository(
      * history of its own here; it is shown as it was recorded. Emits null when the reading does not exist.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun observeOcrViewOfRevision(revisionId: UUID): Flow<OcrView?> {
+    fun observeOcrViewOfRevision(sourceId: UUID, revisionId: UUID): Flow<OcrView?> {
         val views = database.ocrViewDao()
         val id = revisionId.toString()
-        return flow { emit(database.ocrDao().findRevision(id)) }
+        return flow { emit(database.ocrDao().findRevisionOfSource(id, sourceId.toString())) }
             .flatMapLatest { revision ->
                 if (revision == null) {
                     flowOf(null)

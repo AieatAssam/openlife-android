@@ -72,9 +72,19 @@ class OcrViewModelTest {
     fun aReadingStateShowsThatReadingAndNotTheSourceLatest() = runBlocking {
         backend.view.value = readyView("Latest text")
         backend.readingView.value = readyView("Earlier text")
-        val state = presenter.readingState(backend.revisionId)
+        val state = presenter.readingState(sourceId, backend.revisionId)
         val collector = scope.launch { state.collect {} }
         assertEquals("Earlier text", (state.value as OcrUiState.Ready).spans.single().text)
+        collector.cancel()
+    }
+
+    /** P3-05 review U-01: the store is asked for the reading of [sourceId]; a view of another source is never shown. */
+    @Test
+    fun aReadingOfAnotherSourceIsUnavailableNotShown() = runBlocking {
+        backend.readingView.value = readyView("Text of the other source")
+        val state = presenter.readingState(UUID.randomUUID(), backend.revisionId)
+        val collector = scope.launch { state.collect {} }
+        assertEquals(OcrUiState.Unavailable, state.value)
         collector.cancel()
     }
 
@@ -185,7 +195,7 @@ class OcrViewModelTest {
             view.flow.collect { if (it !== ViewSource.PENDING) emit(it as OcrView?) }
         }.onStart { observations++ }
 
-        override fun observeReading(revisionId: UUID): Flow<OcrView?> = kotlinx.coroutines.flow.flow {
+        override fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?> = kotlinx.coroutines.flow.flow {
             readingView.flow.collect { if (it !== ViewSource.PENDING) emit(it as OcrView?) }
         }
 

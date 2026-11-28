@@ -58,8 +58,8 @@ interface ViewerPorts<T : Any> {
 
     fun ocrState(sourceId: UUID): StateFlow<OcrUiState>
 
-    /** P3-05-R3 (C2-R39): the state of the reading [revisionId], never the source's latest. */
-    fun readingState(revisionId: UUID): StateFlow<OcrUiState>
+    /** P3-05-R3 (C2-R39): the state of the reading [revisionId] of [sourceId], never the source's latest. */
+    fun readingState(sourceId: UUID, revisionId: UUID): StateFlow<OcrUiState>
 
     /** Runs beyond the screen (application scope); [onDeleted] reports whether the source is gone. */
     fun delete(sourceId: UUID, onDeleted: (Boolean) -> Unit)
@@ -197,7 +197,7 @@ class ViewerSession<T : Any>(
     }
 
     private fun currentOcr(): StateFlow<OcrUiState> =
-        readingId?.let { ports.readingState(it) } ?: ports.ocrState(sourceId)
+        readingId?.let { ports.readingState(sourceId, it) } ?: ports.ocrState(sourceId)
 
     private fun drop(release: Boolean) {
         contentJob?.cancel()

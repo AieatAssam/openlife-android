@@ -27,8 +27,8 @@ interface OcrBackend {
 
     suspend fun run(sourceId: UUID): OcrRunResult
 
-    /** P3-05-R3 (C2-R39): the reading [revisionId] names, whether or not it is the source's latest. */
-    fun observeReading(revisionId: UUID): Flow<OcrView?>
+    /** P3-05-R3 (C2-R39): the reading [revisionId] names, if it belongs to [sourceId]; null otherwise. */
+    fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?>
 
     suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String)
 
@@ -50,7 +50,7 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     private class Entry(val state: MutableStateFlow<OcrUiState>, val job: Job)
 
     private val entries = mutableMapOf<UUID, Entry>()
-    private val readings = mutableMapOf<UUID, Entry>()
+    private val readings = mutableMapOf<Pair<UUID, UUID>, Entry>()
     private val running = MutableStateFlow<Set<UUID>>(emptySet())
     private val runs = mutableMapOf<UUID, Job>()
 
@@ -82,18 +82,22 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
      * "running"; its source id comes from the reading itself.
      */
     @Synchronized
-    fun readingState(revisionId: UUID): StateFlow<OcrUiState> =
-        readings.getOrPut(revisionId) { startReading(revisionId) }.state
+    fun readingState(sourceId: UUID, revisionId: UUID): StateFlow<OcrUiState> =
+        readings.getOrPut(sourceId to revisionId) { startReading(sourceId, revisionId) }.state
 
-    private fun startReading(revisionId: UUID): Entry {
-        val upstream = backend.observeReading(revisionId)
+    private fun startReading(sourceId: UUID, revisionId: UUID): Entry {
+        val upstream = backend.observeReading(sourceId, revisionId)
             .map<OcrView?, Persisted> { Persisted.Loaded(it) }
             .onStart { emit(Persisted.Pending) }
-            .map { persisted ->
-                val sourceId = (persisted as? Persisted.Loaded)?.view?.revision?.sourceId ?: NO_SOURCE
-                OcrStateMapper.map(sourceId, persisted, false, null)
-            }
+            .map { persisted -> readingUiState(sourceId, persisted) }
         return watched(upstream)
+    }
+
+    /** P3-05 review U-01: a reading that does not belong to [sourceId] is never shown, even if the store returns it. */
+    private fun readingUiState(sourceId: UUID, persisted: Persisted): OcrUiState {
+        val owner = (persisted as? Persisted.Loaded)?.view?.revision?.sourceId
+        if (owner != null && owner != sourceId) return OcrUiState.Unavailable
+        return OcrStateMapper.map(sourceId, persisted, false, null)
     }
 
     private fun watched(upstream: Flow<OcrUiState>): Entry {
@@ -181,8 +185,6 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
         scope.launch { backend.undoRejectSpan(spanId) }
     }
 }
-
-private val NO_SOURCE = UUID(0L, 0L)
 
 /** Whether the database has answered yet, and with what. */
 sealed interface Persisted {

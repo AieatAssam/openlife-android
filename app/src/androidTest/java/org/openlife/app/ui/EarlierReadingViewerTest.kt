@@ -1,6 +1,8 @@
 package org.openlife.app.ui
 
 import android.graphics.Bitmap
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -11,6 +13,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -26,8 +33,14 @@ import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
 import org.openlife.vault.ocr.OcrCoordinateSystem
 import org.openlife.vault.ocr.OcrEvidenceRegion
+import org.openlife.vault.ocr.OcrFailureReason
 import org.openlife.vault.ocr.OcrReviewState
+import org.openlife.vault.ocr.OcrRevision
+import org.openlife.vault.ocr.OcrRevisionState
+import org.openlife.vault.ocr.OcrRunResult
 import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanView
+import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.ReadyReadResult
 
 /**
@@ -99,6 +112,55 @@ class EarlierReadingViewerTest {
         assertEquals(0, composeRule.onAllNodesWithText(label).fetchSemanticsNodes().size)
     }
 
+    /**
+     * P3-05 review U-01: a route that names a reading of another source shows "unavailable" and never that
+     * reading's text over this source's image.
+     */
+    @Test
+    fun readingOfAnotherSourceIsRejected() {
+        val source = source()
+        val otherRevision = UUID(0L, 80L)
+        val otherSpan = OcrSpan(UUID(0L, 81L), otherRevision, 0, OTHER_TEXT, null, OcrCoordinateSystem.SOURCE_PIXELS, null)
+        val otherSourceId = UUID(0L, 82L)
+        val revision = OcrRevision(
+            id = otherRevision,
+            sourceId = otherSourceId,
+            state = OcrRevisionState.READY,
+            engineId = "test-engine",
+            modelVersion = "1",
+            orientation = Orientation.NORMAL,
+            sourceDigest = ByteArray(32) { 1 },
+            startedAt = 1L,
+            extractedAt = 2L,
+            reviewState = OcrReviewState.UNREVIEWED,
+            failureReason = null,
+            charCount = 4,
+            spanCount = 1,
+        )
+        val backend = FixedReadingBackend(OcrView(revision, listOf(OcrSpanView(otherSpan, null)), null, emptyList()))
+        val presenter = OcrPresenter(backend, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
+        composeRule.setContent {
+            OpenLifeTheme {
+                val state by presenter.readingState(source.id, otherRevision).collectAsState()
+                ViewerScreen(
+                    source = source,
+                    loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
+                    onBack = {},
+                    onDeleteRequested = {},
+                    ocrState = state,
+                    readOnly = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.content_unavailable)).assertIsDisplayed()
+        assertEquals(
+            "another source's text must not be shown",
+            0,
+            composeRule.onAllNodesWithText(OTHER_TEXT).fetchSemanticsNodes().size,
+        )
+    }
+
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     private fun source() = Source(
@@ -136,7 +198,25 @@ class EarlierReadingViewerTest {
         return out.toByteArray()
     }
 
+    /** Serves one fixed reading whatever the request names: the store's answer is what the presenter must check. */
+    private class FixedReadingBackend(private val view: OcrView) : OcrBackend {
+        override fun observe(sourceId: UUID): Flow<OcrView?> = flowOf(null)
+
+        override suspend fun run(sourceId: UUID): OcrRunResult = OcrRunResult.Failed(null, OcrFailureReason.SOURCE_NOT_READY)
+
+        override fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?> = flowOf(view)
+
+        override suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String) = Unit
+
+        override suspend fun review(revisionId: UUID, reviewState: OcrReviewState) = Unit
+
+        override suspend fun rejectSpan(spanId: UUID) = Unit
+
+        override suspend fun undoRejectSpan(spanId: UUID) = Unit
+    }
+
     private companion object {
+        const val OTHER_TEXT = "Other source appointment 3 May"
         val MUTATING_TEXTS = listOf(
             "Extract text on this device",
             "Run again",

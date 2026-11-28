@@ -73,7 +73,7 @@ class FakeAppContainer(
         object : OcrBackend {
             override fun observe(sourceId: UUID): Flow<OcrView?> = flowOf(ocrView(sourceId))
 
-            override fun observeReading(revisionId: UUID): Flow<OcrView?> = flowOf(readingView(revisionId))
+            override fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?> = flowOf(readingView(revisionId))
 
             override suspend fun run(sourceId: UUID): OcrRunResult =
                 OcrRunResult.Failed(null, OcrFailureReason.SOURCE_NOT_READY)
