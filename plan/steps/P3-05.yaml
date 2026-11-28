@@ -1,7 +1,8 @@
 id: P3-05
 title: Facts UI with origin badges, review, user-provided facts, inert values
 phase: P3
-status: todo
+status: in_progress
+started: 2026-11-28
 depends_on: [P3-04, P1-20]
 estimate: L
 owner: agent
