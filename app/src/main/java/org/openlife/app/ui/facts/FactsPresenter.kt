@@ -11,16 +11,16 @@ import org.openlife.vault.facts.ExtractionCheck
 import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactOrigin
-import org.openlife.vault.facts.FactStatus
 import org.openlife.vault.facts.FactRefusal
+import org.openlife.vault.facts.FactStatus
 import org.openlife.vault.facts.FactValue
+import org.openlife.vault.facts.FactWithLatestRevision
 import org.openlife.vault.facts.FactWriteResult
 import org.openlife.vault.facts.ReviewDecision
+import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.facts.extract.UserValueNormaliser
 import org.openlife.vault.facts.extract.UserValueRefusal
 import org.openlife.vault.facts.extract.UserValueResult
-import org.openlife.vault.facts.FactWithLatestRevision
-import org.openlife.vault.facts.StaleReason
 import java.util.UUID
 
 /** The app-side port the facts presenter reads through; the app container implements it over FactRepository. */
@@ -28,6 +28,11 @@ interface FactsGateway {
     fun facts(sourceId: UUID): Flow<List<FactWithLatestRevision>>
 
     suspend fun extractionCheck(sourceId: UUID): ExtractionCheck
+
+    /** The reading the source currently shows; evidence on any other reading cannot be opened (P3-05-R1). */
+    suspend fun currentReadingId(sourceId: UUID): UUID?
+
+    suspend fun evidenceOf(revisionId: UUID): List<FactEvidence>
 
     suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult
 
@@ -66,7 +71,7 @@ sealed interface FactsUiState {
     /** Nothing held: before the first load, and after [FactsPresenter.clear]. */
     data object Loading : FactsUiState
 
-    data class Ready(val items: List<FactItem>, val check: ExtractionCheck) : FactsUiState
+    data class Ready(val items: List<FactItem>, val check: ExtractionCheck, val currentReadingId: UUID?) : FactsUiState
 }
 
 /**
@@ -87,7 +92,9 @@ class FactsPresenter(
         job = scope.launch {
             gateway.facts(sourceId).collect { rows ->
                 val check = gateway.extractionCheck(sourceId)
-                mutableState.value = FactsUiState.Ready(rows.map(::toItem), check)
+                val current = gateway.currentReadingId(sourceId)
+                val items = rows.map { row -> toItem(row, gateway.evidenceOf(row.revision.id)) }
+                mutableState.value = FactsUiState.Ready(items, check, current)
             }
         }
     }
@@ -120,10 +127,11 @@ class FactsPresenter(
         when (val result = UserValueNormaliser.text(kind, input)) {
             is UserValueResult.Accepted ->
                 UserFactOutcome.Saved(gateway.addUserFact(sourceId, kind, result.value))
+
             is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
         }
 
-    private fun toItem(row: FactWithLatestRevision): FactItem = FactItem(
+    private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): FactItem = FactItem(
         factId = row.fact.id,
         revisionId = row.revision.id,
         kind = row.revision.kind,
@@ -132,5 +140,6 @@ class FactsPresenter(
         staleReason = row.revision.staleReason,
         value = row.revision.value,
         candidateTexts = row.revision.value.candidateTexts(),
+        evidence = evidence,
     )
 }

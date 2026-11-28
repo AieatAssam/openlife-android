@@ -1,6 +1,7 @@
 package org.openlife.app
 
 import org.openlife.vault.repository.DeletionRepository
+import org.openlife.vault.repository.FactRepository
 import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.OcrRepository
 import org.openlife.vault.repository.RecoveryReport
@@ -18,6 +19,7 @@ sealed interface VaultAccess {
         val lastRecovery: RecoveryReport,
         val recoveryRepository: RecoveryRepository,
         val searchRepository: SearchRepository,
+        val factRepository: FactRepository,
     ) : VaultAccess
 
     data class Unavailable(val cause: VaultUnavailableCause) : VaultAccess

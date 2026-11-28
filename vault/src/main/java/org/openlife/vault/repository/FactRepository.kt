@@ -35,6 +35,7 @@ import java.util.UUID
  * until then [markStaleForSpan] and [markStaleForRevision] are the entry
  * points. A caller already inside a mutation uses [FactStaleMarker].
  */
+@Suppress("TooManyFunctions") // one entry point per fact operation (C2-R29..R40); a split would scatter the gate
 class FactRepository(
     private val database: OpenLifeDatabase,
     private val mutationQueue: MutationQueue,
@@ -57,12 +58,12 @@ class FactRepository(
         database.factDao().latestDecision(revisionId.toString()).toReviewDecision()
     }
 
-    /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
     /** P3-05-R1: the reading [sourceId] currently shows, or null when it has none. */
     suspend fun currentReadingId(sourceId: UUID): UUID? = withContext(ioDispatcher) {
         database.factDao().currentReadingId(sourceId.toString())?.let(UUID::fromString)
     }
 
+    /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
     suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = withContext(ioDispatcher) {
         database.factDao().extractionOutcomeOfCurrentReading(sourceId.toString()).toExtractionCheck()
     }

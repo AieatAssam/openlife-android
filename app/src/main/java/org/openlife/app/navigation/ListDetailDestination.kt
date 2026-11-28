@@ -136,14 +136,26 @@ private fun DetailPane(container: AppContainer, navController: NavHostController
     }
     val lookup by session.source.collectAsState()
     when (val found = lookup) {
-        is SourceLookup.Found -> ViewerFor(found, viewer) { navController.popBackStack() }
+        is SourceLookup.Found -> ViewerFor(
+            found = found,
+            viewer = viewer,
+            onOpenFacts = { navController.navigate(Routes.Facts(found.source.id.toString())) },
+            onBack = { navController.popBackStack() },
+        )
+
         SourceLookup.Missing -> CenteredNote(stringResource(R.string.content_unavailable), "viewer_unavailable")
+
         SourceLookup.Loading -> CenteredNote(stringResource(R.string.viewer_verifying), "viewer_loading")
     }
 }
 
 @Composable
-private fun ViewerFor(found: SourceLookup.Found, viewer: ViewerViewModel, onBack: () -> Unit) {
+private fun ViewerFor(
+    found: SourceLookup.Found,
+    viewer: ViewerViewModel,
+    onOpenFacts: () -> Unit,
+    onBack: () -> Unit,
+) {
     val session = viewer.session
     val decoded by session.content.collectAsState()
     val ocr by session.ocr.collectAsState()
@@ -172,6 +184,7 @@ private fun ViewerFor(found: SourceLookup.Found, viewer: ViewerViewModel, onBack
             onRejectSpan = { span -> viewer.rejectSpan(span.id) },
             onUndoRejectSpan = { span -> viewer.undoRejectSpan(span.id) },
             onSetUserContentKind = viewer::setUserContentKind,
+            onOpenFacts = onOpenFacts,
         ),
         viewport = viewport,
     )

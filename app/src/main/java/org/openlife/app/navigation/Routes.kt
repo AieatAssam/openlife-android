@@ -18,6 +18,10 @@ sealed interface Routes {
     @Serializable
     data object Search : Routes
 
+    /** P3-05-R1: the facts of one source. The source id is the only argument; no fact value is in the route. */
+    @Serializable
+    data class Facts(val sourceId: String) : Routes
+
     @Serializable
     data object Settings : Routes
 

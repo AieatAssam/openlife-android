@@ -109,6 +109,7 @@ internal class ViewerActions(
     val onRejectSpan: (OcrSpan) -> Unit = {},
     val onUndoRejectSpan: (OcrSpan) -> Unit = {},
     val onSetUserContentKind: (UserContentKind?) -> Unit = {},
+    val onOpenFacts: () -> Unit = {},
 )
 
 /**
@@ -163,6 +164,7 @@ internal fun ViewerBody(
             },
             onUndoRejectSpan = actions.onUndoRejectSpan,
             onSetUserContentKind = actions.onSetUserContentKind,
+            onOpenFacts = actions.onOpenFacts,
             viewport = viewport,
         )
     }
@@ -235,6 +237,7 @@ private fun ViewerContent(
     onRejectSpan: (OcrSpan) -> Unit,
     onUndoRejectSpan: (OcrSpan) -> Unit,
     onSetUserContentKind: (UserContentKind?) -> Unit,
+    onOpenFacts: () -> Unit,
     viewport: EvidenceViewport?,
 ) {
     val ready = ocrState as? OcrUiState.Ready
@@ -265,7 +268,15 @@ private fun ViewerContent(
                     )
                 }
                 // What the user came for (the text and its evidence) comes before
-                // the bookkeeping about the saved copy.
+                // the bookkeeping about the saved copy. Facts are offered once the text is read (P3-05-R1).
+                if (ocrState is OcrUiState.Ready) {
+                    OpenLifeTextButton(
+                        onClick = onOpenFacts,
+                        modifier = Modifier.padding(horizontal = 16.dp).testTag("viewer_open_facts"),
+                    ) {
+                        Text(stringResource(R.string.viewer_open_facts))
+                    }
+                }
                 OcrSection(
                     source = source,
                     state = ocrState,

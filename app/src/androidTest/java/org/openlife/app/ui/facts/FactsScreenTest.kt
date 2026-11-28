@@ -28,7 +28,7 @@ class FactsScreenTest {
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
-    private val evidence = FactEvidence(EvidenceRole.VALUE, "a-r", "a-s1", 4, 14)
+    private val evidence = FactEvidence(EvidenceRole.VALUE, READING.toString(), SPAN.toString(), 4, 14)
 
     @Test
     fun showsOriginAndStatusBadgesAndEvidenceNavigation() {
@@ -59,8 +59,12 @@ class FactsScreenTest {
         composeRule.setContent {
             OpenLifeTheme {
                 FactsPanel(
-                    state = FactsUiState.Ready(items, ExtractionCheck.Completed),
-                    onOpenEvidence = { opened = it },
+                    state = FactsUiState.Ready(items, ExtractionCheck.Completed, currentReadingId = READING),
+                    actions = FactActions(
+                        onOpenEvidence = { opened = it },
+                        onReview = { _, _ -> },
+                        onChoose = { _, _ -> },
+                    ),
                 )
             }
         }
@@ -70,5 +74,10 @@ class FactsScreenTest {
         composeRule.onNodeWithText(context.getString(R.string.facts_status_stale)).assertIsDisplayed()
         composeRule.onAllNodesWithText(context.getString(R.string.facts_show_evidence)).onFirst().performClick()
         assertEquals(evidence, opened)
+    }
+
+    private companion object {
+        val READING: UUID = UUID.fromString("11111111-1111-4111-8111-111111111111")
+        val SPAN: UUID = UUID.fromString("22222222-2222-4222-8222-222222222222")
     }
 }

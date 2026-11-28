@@ -15,6 +15,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -22,6 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import androidx.window.core.layout.WindowSizeClass
 import androidx.window.core.layout.computeWindowSizeClass
 import kotlinx.coroutines.flow.first
@@ -33,6 +35,9 @@ import org.openlife.app.settings.AppLockSettings
 import org.openlife.app.settings.SettingsScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.SourceListViewModel
+import org.openlife.app.ui.facts.FactActions
+import org.openlife.app.ui.facts.FactsScreen
+import org.openlife.app.ui.facts.FactsViewModel
 import org.openlife.app.ui.search.SearchScreen
 import org.openlife.app.ui.search.SearchViewModel
 import org.openlife.app.ui.sourceLabel
@@ -65,6 +70,7 @@ fun OpenLifeNavHost(container: AppContainer, navController: NavHostController = 
             composable<Routes.List> { entry -> ListDetailDestination(container, navController, entry, expanded) }
             composable<Routes.ListDetail> { entry -> ListDetailDestination(container, navController, entry, expanded) }
             composable<Routes.Search> { entry -> SearchDestination(container, navController, entry, expanded) }
+            composable<Routes.Facts> { entry -> FactsDestination(container, navController, entry, expanded) }
             composable<Routes.Settings> { entry -> SettingsDestination(container, navController, entry) }
             composable<Routes.About> { entry -> AboutDestination(container, navController, entry) }
         }
@@ -135,6 +141,43 @@ private fun SearchDestination(
         labelFor = { id ->
             (listState as? SourceListUiState.Loaded)?.sources?.find { it.id == id }?.let { sourceLabel(it) }
         },
+    )
+}
+
+@Composable
+private fun FactsDestination(
+    container: AppContainer,
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+    expanded: Boolean,
+) {
+    val sourceId = entry.toRoute<Routes.Facts>().sourceId.let { runCatching { UUID.fromString(it) }.getOrNull() }
+        ?: return
+    val facts: FactsViewModel = viewModel(
+        viewModelStoreOwner = entry,
+        factory = FactsViewModel.factory(container, sourceId),
+    )
+    // The facts are read while this entry is started and dropped when it stops (P3-05-R1).
+    LifecycleStartEffect(facts) {
+        facts.start()
+        onStopOrDispose { facts.clear() }
+    }
+    val state by facts.state.collectAsState()
+    val message by facts.message.collectAsState()
+    FactsScreen(
+        state = state,
+        message = message,
+        actions = FactActions(
+            // P3-05-R1: a tap opens the viewer with the evidence span selected, through the search path.
+            onOpenEvidence = { evidence ->
+                runCatching { UUID.fromString(evidence.ocrSpanId) }.getOrNull()
+                    ?.let { navController.openSource(sourceId, it, expanded) }
+            },
+            onReview = facts::review,
+            onChoose = facts::choose,
+        ),
+        onAddText = facts::addText,
+        onBack = { navController.popBackStack() },
     )
 }
 

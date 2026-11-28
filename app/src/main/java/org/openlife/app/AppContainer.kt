@@ -21,6 +21,7 @@ import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SampledBitmapDecoder
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.SourceLookup
+import org.openlife.app.ui.facts.FactsGateway
 import org.openlife.app.ui.forgetSourcesLeavingTheList
 import org.openlife.app.ui.search.SearchBackend
 import org.openlife.vault.model.Orientation
@@ -48,6 +49,9 @@ interface AppContainer {
     val sources: SourceStore
     val ocr: OcrPresenter
     val searchBackend: SearchBackend
+
+    /** P3-05: the facts of a source and the writes the facts UI asks for. */
+    val facts: FactsGateway
     val scrubber: ContentScrubber
     val internalLinks: InternalLinks
     val settings: SettingsPort
@@ -106,6 +110,7 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
     override val internalLinks = InternalLinks()
     override val sources: SourceStore = VaultSourceStore(app, uiScope)
     override val searchBackend: SearchBackend = AppSearchBackend(app)
+    override val facts: FactsGateway = VaultFactsGateway(app)
 
     override val ocr: OcrPresenter = appOcrPresenter(app, uiScope).also { presenter ->
         app.registerPreResetCallback(presenter::forgetAll)

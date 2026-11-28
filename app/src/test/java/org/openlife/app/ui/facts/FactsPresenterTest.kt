@@ -8,9 +8,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlinx.coroutines.runBlocking
 import org.openlife.vault.facts.ExtractionCheck
 import org.openlife.vault.facts.Fact
+import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactOrigin
 import org.openlife.vault.facts.FactRevision
@@ -58,6 +58,8 @@ class FactsPresenterTest {
 
         override fun facts(sourceId: UUID) = rows
         override suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = ExtractionCheck.Completed
+        override suspend fun currentReadingId(sourceId: UUID): UUID? = null
+        override suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> = emptyList()
 
         override suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult {
             reviews += revisionId to decision
@@ -125,7 +127,8 @@ class FactsPresenterTest {
     }
 
     private fun toItemFor(row: FactWithLatestRevision): FactItem {
-        val presenter = FactsPresenter(FakeGateway(MutableStateFlow(listOf(row))), sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val gateway = FakeGateway(MutableStateFlow(listOf(row)))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
         presenter.start()
         return (presenter.state.value as FactsUiState.Ready).items.single()
     }
