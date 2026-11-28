@@ -93,7 +93,7 @@ class FactExtractionCoreTest {
             finished(extract()).outcome,
         )
         assertEquals(0L, factCount())
-        assertEquals(listOf(listOf<Any?>("READING_REJECTED")), runOutcomes())
+        assertEquals(listOf<Any?>("READING_REJECTED"), runOutcomes())
     }
 
     @Test
@@ -147,7 +147,7 @@ class FactExtractionCoreTest {
         assertEquals(ExtractionOutcome.LIMIT_EXCEEDED, result.outcome)
         assertEquals(499L, factCount())
         assertEquals(499L, count("SELECT COUNT(*) FROM fact_revisions WHERE origin = 'USER'"))
-        assertEquals(listOf(listOf<Any?>("LIMIT_EXCEEDED")), runOutcomes())
+        assertEquals(listOf<Any?>("LIMIT_EXCEEDED"), runOutcomes())
     }
 
     @Test
@@ -158,7 +158,7 @@ class FactExtractionCoreTest {
         assertEquals(0L, factCount())
         assertEquals(0L, count("SELECT COUNT(*) FROM fact_revisions"))
         assertEquals(0L, count("SELECT COUNT(*) FROM fact_evidence"))
-        assertEquals(listOf(listOf<Any?>("TIMEOUT")), runOutcomes())
+        assertEquals(listOf<Any?>("TIMEOUT"), runOutcomes())
     }
 
     @Test

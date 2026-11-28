@@ -23,6 +23,7 @@ import org.openlife.vault.ocr.TessdataInstaller
 import org.openlife.vault.ocr.TesseractOcrEngine
 import org.openlife.vault.repository.AndroidBitmapSampler
 import org.openlife.vault.repository.DeletionRepository
+import org.openlife.vault.repository.FactExtractionRepository
 import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
@@ -160,6 +161,8 @@ class OpenLifeApp : Application() {
                     SELECTED_OCR_ENGINE,
                 ),
                 mutationQueue = mutationQueue,
+                // P3-04-R4: a READY reading proposes facts (state-based, C2-R30); nothing is confirmed.
+                onReady = { sourceId -> FactExtractionRepository(database, mutationQueue).extractIfDue(sourceId) },
             ),
             lastRecovery = report,
             recoveryRepository = recoveryRepository,
