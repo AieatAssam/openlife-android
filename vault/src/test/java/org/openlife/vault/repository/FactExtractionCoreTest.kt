@@ -10,11 +10,11 @@ import org.openlife.vault.facts.ExtractionTrigger
 import org.openlife.vault.facts.FactExtractionResult
 import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.StaleReason
+import org.openlife.vault.search.SearchFixture
 import org.openlife.vault.storage.FactHost
 import org.openlife.vault.storage.FactRows
 import org.openlife.vault.storage.HostFactDao
 import org.openlife.vault.storage.HostSqlite
-import org.openlife.vault.search.SearchFixture
 
 /**
  * P3-04 on host SQLite: the eight cases of P3-04-R1..R6, through the production
@@ -125,12 +125,12 @@ class FactExtractionCoreTest {
         val result = finished(extract(ExtractionTrigger.USER))
         assertEquals(2, result.createdRevisionCount)
         assertEquals(2L, factCount())
-        assertEquals(
-            "each stale fact continues with a new current revision (C2-R33)",
-            2L,
-            count("SELECT COUNT(*) FROM fact_revisions r JOIN facts f ON f.currentRevisionId = r.id " +
-                "WHERE r.supersedesRevisionId IS NOT NULL AND r.status = 'UNREVIEWED' AND f.sourceId = 'a'"),
+        val continued = count(
+            "SELECT COUNT(*) FROM fact_revisions r JOIN facts f ON f.currentRevisionId = r.id " +
+                "WHERE r.supersedesRevisionId IS NOT NULL AND r.status = 'UNREVIEWED' AND f.sourceId = 'a'",
         )
+        // C2-R33: each stale fact continues with a new current revision.
+        assertEquals(2L, continued)
     }
 
     @Test

@@ -4,7 +4,6 @@ import kotlinx.coroutines.CancellationException
 import org.openlife.vault.facts.ExtractionOutcome
 import org.openlife.vault.facts.ExtractionTrigger
 import org.openlife.vault.facts.FactExtractionResult
-import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.FactOrigin
 import org.openlife.vault.facts.FactStatusRules
@@ -21,8 +20,6 @@ import org.openlife.vault.storage.FactPointer
 import org.openlife.vault.storage.HistoryRow
 import org.openlife.vault.storage.ReadingRow
 import org.openlife.vault.storage.SpanRow
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * The lock boundary of C2-R31. [read] runs the snapshot read under a read lease; [commit] runs the commit under
@@ -50,10 +47,6 @@ internal class FactExtractionCore(
 ) {
     /** Thrown by the cooperative deadline (C2-R29). Carries no document content. */
     private class DeadlineExceeded : RuntimeException()
-
-    private data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
-        val area: Long get() = (right - left).toLong() * (bottom - top).toLong()
-    }
 
     private data class Fingerprint(
         val sourceState: String?,
@@ -100,6 +93,7 @@ internal class FactExtractionCore(
         val started = clock()
         return when (val snapshot = gate.read { snapshot(sourceId) }) {
             is Snapshot.Terminal -> terminal(sourceId, snapshot.reading, trigger, started, snapshot.outcome)
+
             is Snapshot.Ready -> when (val plan = plan(snapshot, started)) {
                 is Plan.Terminal -> terminal(sourceId, snapshot.reading, trigger, started, plan.outcome)
                 is Plan.Write -> commit(sourceId, snapshot, plan, trigger, started)
@@ -110,9 +104,8 @@ internal class FactExtractionCore(
     /** C2-R30: runs only when the Source's current reading has no run row and no extracted fact exists yet. */
     suspend fun extractIfDue(sourceId: String): FactExtractionResult? {
         val due = gate.read {
-            val reading = dao.readingOfSource(sourceId)
-            reading != null &&
-                dao.sourceState(sourceId) == READY &&
+            val reading = dao.readingOfSource(sourceId) ?: return@read false
+            dao.sourceState(sourceId) == READY &&
                 dao.runCountForReading(reading.id) == 0 &&
                 dao.extractedCountOfSource(sourceId) == 0
         }
@@ -131,18 +124,16 @@ internal class FactExtractionCore(
         val spans = mutableListOf<ExtractionSpan>()
         val boxes = mutableMapOf<String, SpanRow>()
         for (row in dao.spanRowsOfReading(reading.id)) {
-            val eligible = SpanEligibility.isEligible(
-                SpanEligibilityInput(
-                    readingState = reading.state,
-                    readingReviewState = reading.reviewState,
-                    readingHasWholeCorrection = reading.wholeCorrected,
-                    hasEvidenceRegion = row.hasEvidenceRegion,
-                    latestSpanReview = row.latestReview,
-                    storedScriptStatus = row.scriptStatus,
-                    currentCorrectionText = row.correctionText,
-                ),
+            val input = SpanEligibilityInput(
+                readingState = reading.state,
+                readingReviewState = reading.reviewState,
+                readingHasWholeCorrection = reading.wholeCorrected,
+                hasEvidenceRegion = row.hasEvidenceRegion,
+                latestSpanReview = row.latestReview,
+                storedScriptStatus = row.scriptStatus,
+                currentCorrectionText = row.correctionText,
             )
-            if (eligible) {
+            if (SpanEligibility.isEligible(input)) {
                 spans += ExtractionSpan(row.spanId, row.correctionId, row.ordinal, row.correctionText ?: row.text)
                 boxes[row.spanId] = row
             }
@@ -170,7 +161,11 @@ internal class FactExtractionCore(
         )
     }
 
-    /** Matching runs outside the lock: the deadline is checked before and during extraction (C2-R29). */
+    /**
+     * Matching runs outside the lock. The deadline is checked before and during extraction (C2-R29); the
+     * exception is this run's own control flow, and the outcome it becomes is TIMEOUT.
+     */
+    @Suppress("SwallowedException")
     private fun plan(snapshot: Snapshot.Ready, started: Long): Plan {
         val deadline = ExtractionDeadline {
             if (clock() - started >= deadlineMillis) throw DeadlineExceeded()
@@ -200,10 +195,10 @@ internal class FactExtractionCore(
         for (candidate in kept) {
             val kind = mapKind(candidate.kind).name
             if (Triple(kind, canonicalTextOf(candidate), candidate.spanId) in existing) continue
-            val box = snapshot.boxes[candidate.spanId]?.let { boxOf(it.left, it.top, it.right, it.bottom) }
-            val pair = box?.let { own ->
+            val own = snapshot.boxes[candidate.spanId]?.let { boxOf(it.left, it.top, it.right, it.bottom) }
+            val pair = own?.let { box ->
                 stale.filter { it.kind == kind }
-                    .map { it to overlapRatio(own, boxOf(it.regionLeft, it.regionTop, it.regionRight, it.regionBottom)) }
+                    .map { it to overlapRatio(box, it.evidenceBox()) }
                     .filter { it.second > 0.0 }
                     .maxByOrNull { it.second }
                     ?.first
@@ -221,7 +216,8 @@ internal class FactExtractionCore(
         return Plan.Write(creates, continues, result.candidates.size, skipped)
     }
 
-    @Suppress("TooGenericExceptionCaught")
+    /** Every write of the run happens here, or none does. A thrown storage error rolls the whole run back. */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private suspend fun commit(
         sourceId: String,
         snapshot: Snapshot.Ready,
@@ -245,16 +241,20 @@ internal class FactExtractionCore(
                         started,
                         RunSummary(ExtractionOutcome.COMPLETED, plan.candidateCount, created, plan.skipped),
                     )
-                    FactExtractionResult.Finished(ExtractionOutcome.COMPLETED, plan.candidateCount, created, plan.skipped)
+                    FactExtractionResult.Finished(
+                        ExtractionOutcome.COMPLETED,
+                        plan.candidateCount,
+                        created,
+                        plan.skipped,
+                    )
                 }
             }
         } catch (failure: CancellationException) {
             throw failure
         } catch (failure: Exception) {
             // The transaction rolled back, so no fact row survives. Only the run row is recorded.
-            gate.commit {
-                writeRun(sourceId, snapshot.reading.id, trigger, started, RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet()))
-            }
+            val summary = RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet())
+            gate.commit { writeRun(sourceId, snapshot.reading.id, trigger, started, summary) }
             FactExtractionResult.Finished(ExtractionOutcome.STORAGE_FAILURE, 0, 0, emptySet())
         }
     }
@@ -268,9 +268,8 @@ internal class FactExtractionCore(
     ): FactExtractionResult.Finished {
         // With no reading there is no ocr_revision_id for a run row (C2 §7.6), so nothing is recorded.
         if (reading != null) {
-            gate.commit {
-                writeRun(sourceId, reading.id, trigger, started, RunSummary(outcome, null, null, emptySet()))
-            }
+            val summary = RunSummary(outcome, null, null, emptySet())
+            gate.commit { writeRun(sourceId, reading.id, trigger, started, summary) }
         }
         return FactExtractionResult.Finished(outcome, 0, 0, emptySet())
     }
@@ -303,17 +302,15 @@ internal class FactExtractionCore(
         val fromCorrection = candidate.correctionId != null ||
             candidate.currencyContext.any { it.correctionId != null && it.codeStart != null }
         val methodId = candidate.ruleId + if (fromCorrection) CORRECTION_SUFFIX else ""
-        val single = candidate.canonicalValue
-        val status = FactStatusRules.initial(FactOrigin.EXTRACTED, candidate.needsClarification).name
         dao.insertRevision(
             id = revisionId,
             factId = factId,
             origin = FactOrigin.EXTRACTED.name,
             kind = mapKind(candidate.kind).name,
-            valueJson = CanonicalJson.of(single, candidate.ambiguity),
+            valueJson = CanonicalJson.of(candidate.canonicalValue, candidate.ambiguity),
             canonicalText = canonicalTextOf(candidate),
             rawText = candidate.rawText,
-            status = status,
+            status = FactStatusRules.initial(FactOrigin.EXTRACTED, candidate.needsClarification).name,
             methodId = methodId,
             methodVersion = candidate.ruleVersion,
             locale = candidate.locale,
@@ -330,9 +327,8 @@ internal class FactExtractionCore(
             textStart = candidate.startOffset,
             textEnd = candidate.endOffset,
         )
-        for (context in candidate.currencyContext) {
-            val start = context.codeStart ?: continue
-            val end = context.codeEnd ?: continue
+        // Only context codes with stored offsets become evidence (C2 §4.7).
+        for (context in candidate.currencyContext.filter { it.codeStart != null && it.codeEnd != null }) {
             dao.insertEvidence(
                 id = newId(),
                 revisionId = revisionId,
@@ -340,8 +336,8 @@ internal class FactExtractionCore(
                 sourceId = sourceId,
                 ocrSpanId = context.spanId,
                 ocrUserRevisionId = context.correctionId,
-                textStart = start,
-                textEnd = end,
+                textStart = checkNotNull(context.codeStart),
+                textEnd = checkNotNull(context.codeEnd),
             )
         }
         return revisionId
@@ -370,35 +366,6 @@ internal class FactExtractionCore(
         )
     }
 
-    private fun canonicalTextOf(candidate: ExtractedCandidate): String =
-        candidate.canonicalValue?.canonicalText()
-            ?: candidate.ambiguity.joinToString(CANDIDATE_SEPARATOR) { it.canonicalText() }
-
-    private fun boxOf(left: Int?, top: Int?, right: Int?, bottom: Int?): Box? =
-        if (left != null && top != null && right != null && bottom != null) Box(left, top, right, bottom) else null
-
-    /** Overlap ratio (IoU, C2 §1): intersection area over union area; 0 when either box is missing. */
-    private fun overlapRatio(a: Box, b: Box?): Double {
-        if (b == null) return 0.0
-        val width = min(a.right, b.right) - max(a.left, b.left)
-        val height = min(a.bottom, b.bottom) - max(a.top, b.top)
-        if (width <= 0 || height <= 0) return 0.0
-        val intersection = width.toLong() * height.toLong()
-        val union = a.area + b.area - intersection
-        return if (union <= 0L) 0.0 else intersection.toDouble() / union.toDouble()
-    }
-
-    /** Exhaustive on purpose: a new extracted kind fails to compile until it has a fact kind (P3-03 brief). */
-    private fun mapKind(kind: ExtractedKind): FactKind = when (kind) {
-        ExtractedKind.DATE -> FactKind.DATE
-        ExtractedKind.TIME -> FactKind.TIME
-        ExtractedKind.DATETIME -> FactKind.DATETIME
-        ExtractedKind.MONEY -> FactKind.MONEY
-        ExtractedKind.URL -> FactKind.URL
-        ExtractedKind.EMAIL -> FactKind.EMAIL
-        ExtractedKind.PHONE -> FactKind.PHONE
-    }
-
     private companion object {
         const val READY = "READY"
         const val REJECTED = "REJECTED"
@@ -406,7 +373,6 @@ internal class FactExtractionCore(
         const val VALUE_ROLE = "VALUE"
         const val CURRENCY_ROLE = "CURRENCY_CONTEXT"
         const val CORRECTION_SUFFIX = "+correction"
-        const val CANDIDATE_SEPARATOR = " | "
         const val MAX_CANDIDATES_PER_KIND = 64
         const val POINTER_MOVED = "current revision moved during the commit"
     }

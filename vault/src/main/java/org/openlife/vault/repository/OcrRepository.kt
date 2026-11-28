@@ -287,7 +287,7 @@ class OcrRepository(
                             supersedesId = head?.let(UUID::fromString),
                         ).toEntity(),
                     )
-                    // P3-04-R5: a span correction stales its span's facts; a whole-reading correction stales the reading's.
+                    // P3-04-R5: a span correction stales that span's facts; a whole-reading one stales the reading.
                     val marker = FactStaleMarker(database.factDao(), clock)
                     if (spanId != null) {
                         marker.markForSpan(spanId.toString(), StaleReason.SPAN_CORRECTED)
@@ -315,7 +315,7 @@ class OcrRepository(
                     val reviews = database.ocrSpanReviewDao().findForSpan(span.id).map { it.toDomain() }
                     val next = OcrSpanReviewRules.next(reviews, revision.state, action) ?: return@withTransaction false
                     database.ocrSpanReviewDao().append(UUID.randomUUID().toString(), span.id, next.name, clock())
-                    // P3-04-R5: rejecting a span stales its facts; undoing a rejection never un-stales them (C2 §9).
+                    // P3-04-R5: rejecting a span stales its facts; undoing a rejection never un-stales (C2 §9).
                     if (action == OcrSpanReviewAction.REJECT) {
                         FactStaleMarker(database.factDao(), clock).markForSpan(span.id, StaleReason.SPAN_REJECTED)
                     }
