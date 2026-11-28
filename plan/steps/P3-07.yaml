@@ -1,7 +1,7 @@
 id: P3-07
 title: Facts in local search
 phase: P3
-status: in_progress
+status: review
 started: 2026-11-28
 depends_on: [P3-04, P2-08]
 estimate: S
@@ -16,12 +16,32 @@ files_touched: [vault storage migration, SearchRepository, app search UI]
 tdd:
   red:
     - name: SearchRepositoryTest.findsConfirmedAndUnreviewedFactsButNotRejectedOrStale
-    - name: SearchScreenTest.factHitOpensFactsPanelHighlighted
+    - name: SearchScreenTest.factHitShowsKindAndStatusAndOpensTheViewerWithTheSpanSelected
   green: ["Implement."]
   refactor: []
 verification:
   commands: ["./gradlew :vault:connectedDebugAndroidTest :app:connectedDebugAndroidTest"]
   evidence_required: ["Tests"]
+evidence: >
+  Schema v7 (fact_fts, insert and delete triggers, secure-delete, 'rebuild'
+  backfill). Device (physical tablet U8BBB20806201256): FactSearchMigrationSqlCipherTest
+  2/2; SearchRepositoryTest 9/9; SearchScreenTest 3/3 (XML 02:42:23); FtsAvailabilityTest
+  2/2 (XML 02:43:48). Host: :vault:test 304 tests, 0 failures (FactSearchHostTest 5/5);
+  :app:test 241; :eval:test 26. Gate (detekt lint :app:test :vault:test assembleDebug
+  compile androidTest :eval:test) BUILD SUCCESSFUL, exit 0. Full record:
+  docs/verification/P3-07-facts-search.md.
+notes: >
+  Viewer versus search divergence, a finding for P3-05: the viewer shows the latest
+  revision in any state (P2-01-R1); search shows the READY pointer reading. For a STALE
+  latest reading, search shows the older READY reading. Not changed here, per the
+  coordinator. Tap-to-viewer is accepted until P3-05 (the Facts panel does not exist);
+  the test is named for what it checks. F-71 proposal for C2-R14 (not edited here; C2.md
+  is not in docs_to_update): C2-R14 orders the moving pointer by (startedAt, rowid); the
+  implementation orders by rowid only, so a device clock set back cannot move the
+  current reading backwards. The owner needs a dated C2-R14 amendment. The shipped v6
+  backfill still uses startedAt and is unchanged. UNRECOGNISED (C2-13) cannot be stored:
+  the schema trigger (C2 section 4.2) rejects it, so C2-13 should be reconciled with the
+  schema. Index-every-revision (C2-R49, ZZ-09) was kept over the brief's remove-on-stale.
 acceptance_criteria: ["Fact search works and respects status."]
 docs_to_update: [docs/decisions/0010-local-search.md]
 risks: []
