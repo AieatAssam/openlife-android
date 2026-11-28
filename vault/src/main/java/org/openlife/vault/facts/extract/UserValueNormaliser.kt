@@ -21,6 +21,9 @@ enum class UserValueRefusal {
 
     /** The rules do not accept exactly one value of the kind covering the whole input. */
     NOT_ONE_VALUE,
+
+    /** P3-05 review U-06: the input is of another kind than the fact it would correct. */
+    KIND_MISMATCH,
 }
 
 /** A user-entered value: accepted with its stored form, or refused with a reason and no value (C2-R38). */

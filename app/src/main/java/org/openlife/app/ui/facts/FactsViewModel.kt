@@ -97,4 +97,5 @@ private fun UserValueRefusal.toMessage(): FactMessage = when (this) {
     UserValueRefusal.NOT_CHOSEN -> FactMessage.REFUSED_NOT_CHOSEN
     UserValueRefusal.MONEY_NEEDS_CODE -> FactMessage.REFUSED_MONEY_CODE
     UserValueRefusal.NOT_ONE_VALUE -> FactMessage.REFUSED_NOT_ONE_VALUE
+    UserValueRefusal.KIND_MISMATCH -> FactMessage.NOT_SAVED
 }

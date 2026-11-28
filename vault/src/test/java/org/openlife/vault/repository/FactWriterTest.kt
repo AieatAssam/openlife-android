@@ -281,6 +281,22 @@ class FactWriterTest {
         assertEquals("a correction keeps the kind", invalid, writer.correct("x2", timeValue))
     }
 
+    /** P3-05 review U-06: the storage check is the normaliser's fixed point, so a URL-shaped value is not an email. */
+    @Test
+    fun correctRefusesUnnormalisedUrlForEmailKind() = runBlocking {
+        rows.readySourceWithReading(FactHost.fresh(host), "a")
+        rows.fact("f3", "a", kind = "EMAIL")
+        rows.revision("x3", "f3", kind = "EMAIL")
+        rows.current("f3", "x3")
+        rows.evidence("e3", "x3", "a", "a-s2")
+        val unnormalised = FactValue(
+            "{\"normalized\":\"HTTPS://Example.org/A\",\"raw\":\"HTTPS://Example.org/A\"}",
+            "HTTPS://Example.org/A",
+        )
+        assertEquals(FactWrite.Refused(FactRefusal.INVALID_VALUE), writer.correct("x3", unnormalised))
+        assertEquals(1L, host.long("SELECT COUNT(*) FROM fact_revisions WHERE factId = 'f3'"))
+    }
+
     private fun extractedOn(factId: String) {
         rows.fact(factId, "a")
         rows.revision("x2", factId)

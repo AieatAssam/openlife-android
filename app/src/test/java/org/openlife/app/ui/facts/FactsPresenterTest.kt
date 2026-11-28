@@ -165,6 +165,17 @@ class FactsPresenterTest {
         assertEquals(1, gateway.corrections.size)
     }
 
+    /** P3-05 review U-06: a correction takes an input of the fact's own kind only; another kind is refused. */
+    @Test
+    fun correctRefusesInputOfAnotherKind() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val item = toItemFor(row(FactOrigin.EXTRACTED, FactStatus.UNREVIEWED, "2026-04-03"))
+        val outcome = presenter.correct(item, UserFactInput.Typed(FactKind.EMAIL, "name@example.org"))
+        assertEquals(UserFactOutcome.Refused(UserValueRefusal.KIND_MISMATCH), outcome)
+        assertTrue(gateway.corrections.isEmpty())
+    }
+
     @Test
     fun aBlankUserValueIsRefusedAndNeverSaved() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))

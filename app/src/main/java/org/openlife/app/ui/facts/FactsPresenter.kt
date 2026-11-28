@@ -186,7 +186,9 @@ class FactsPresenter(
      * reaches the gateway; the stored revision is kept as it is and a new one supersedes it.
      */
     suspend fun correct(item: FactItem, input: UserFactInput): UserFactOutcome {
-        val (_, result) = normalise(input)
+        val (kind, result) = normalise(input)
+        // P3-05 review U-06: an input of another kind would change the fact's kind; it is refused here.
+        if (kind != item.kind) return UserFactOutcome.Refused(UserValueRefusal.KIND_MISMATCH)
         return when (result) {
             is UserValueResult.Accepted -> UserFactOutcome.Saved(gateway.correct(item.revisionId, result.value))
             is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)

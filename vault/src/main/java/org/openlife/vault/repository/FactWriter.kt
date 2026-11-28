@@ -10,6 +10,8 @@ import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.UserMethod
 import org.openlife.vault.facts.UserValueShape
+import org.openlife.vault.facts.extract.UserValueNormaliser
+import org.openlife.vault.facts.extract.UserValueResult
 import org.openlife.vault.storage.FactDao
 import org.openlife.vault.storage.FactRevisionEntity
 import org.openlife.vault.storage.decodeStored
@@ -134,7 +136,20 @@ internal class FactWriter(
     private fun isUserValue(kind: FactKind, value: FactValue): Boolean = value.isWithinBounds &&
         !value.isCandidates &&
         value.canonicalText.length <= FactLimits.MAX_USER_TEXT_CHARS &&
-        UserValueShape.matches(kind, value)
+        UserValueShape.matches(kind, value) &&
+        isNormalisedText(kind, value)
+
+    /**
+     * P3-05 review U-06: a text kind's stored text must be a fixed point of the single-value normaliser. A value
+     * whose text the normaliser would change (or that it would refuse, or read as another kind) is not written.
+     */
+    private fun isNormalisedText(kind: FactKind, value: FactValue): Boolean = when (kind) {
+        FactKind.URL, FactKind.EMAIL, FactKind.PHONE ->
+            (UserValueNormaliser.text(kind, value.canonicalText) as? UserValueResult.Accepted)
+                ?.value?.canonicalText == value.canonicalText
+
+        else -> true
+    }
 
     private suspend fun hasValueEvidence(revision: Revision): Boolean =
         revision.origin != FactOrigin.EXTRACTED || dao.countValueEvidence(revision.id) == 1
