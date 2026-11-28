@@ -387,4 +387,5 @@
     <string name="facts_refused_money_code">Choose a currency for this amount.</string>
     <string name="facts_not_saved">The fact could not be saved.</string>
     <string name="viewer_open_facts">Facts</string>
+    <string name="viewer_earlier_reading">An earlier reading of this item</string>
 </resources>

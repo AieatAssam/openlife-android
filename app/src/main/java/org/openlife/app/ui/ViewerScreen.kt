@@ -73,6 +73,8 @@ fun ViewerScreen(
     // P2-08-R4: a search result opens the viewer with its span selected. Selection
     // rules still apply: a span that is ungrounded or rejected is not selected.
     initialSelectedSpanId: java.util.UUID? = null,
+    // P3-05-R3 (C2-R39): stub for RED; the earlier-reading viewer is not implemented yet.
+    readOnly: Boolean = false,
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
     val content = rememberViewerContent(source, loadContent, loadAttempt)
