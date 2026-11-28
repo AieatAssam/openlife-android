@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-23","image":"img-23.png","width":1080,"height":265,"rows":["DT-03","P-07"],"lines":["2026-09-16T14:30","Call 0800 123 456"],"items":[{"row":"DT-03","kind":"DATETIME","raw":"2026-09-16T14:30","canonical":"2026-09-16 14:30"},{"row":"P-07","kind":"PHONE","raw":"0800 123 456","canonical":"0800123456"}],"abstain":[],"truth":[]}

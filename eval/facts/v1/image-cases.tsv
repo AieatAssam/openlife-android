@@ -1,0 +1,32 @@
+# P3-06 image cases: each image draws the listed text-fixture rows (eval/facts/v1/text.tsv), one per line, top to bottom.
+# The truth of an image is the union of its rows' truth. No real data.
+img-01	D-01+M-01
+img-02	D-02+U-01
+img-03	D-03+E-01
+img-04	D-04+P-01
+img-05	D-09+M-02
+img-06	D-10+T-01
+img-07	D-13+M-04
+img-08	D-14+E-02
+img-09	D-15+U-03
+img-10	D-16+P-02
+img-11	D-17+M-09
+img-12	D-18+T-04
+img-13	D-22+DT-01
+img-14	D-24+U-04
+img-15	D-31+M-10
+img-16	D-37+T-05
+img-17	D-35+M-11
+img-18	T-08+E-04
+img-19	T-19+M-26
+img-20	T-21+P-03
+img-21	T-22+M-14
+img-22	DT-02+M-27
+img-23	DT-03+P-07
+img-24	DT-09+E-13
+img-25	M-40+N-02
+img-26	M-47+U-02
+img-27	M-28+P-10
+img-28	N-01+N-12
+img-29	N-05+N-18
+img-30	N-23+N-13

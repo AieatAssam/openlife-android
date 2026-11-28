@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-05","image":"img-05.png","width":1080,"height":265,"rows":["D-09","M-02"],"lines":["13/04/2026","8,40 €"],"items":[{"row":"D-09","kind":"DATE","raw":"13/04/2026","canonical":"2026-04-13"},{"row":"M-02","kind":"MONEY","raw":"8,40 €","canonical":"8.40 EUR"}],"abstain":[],"truth":[]}

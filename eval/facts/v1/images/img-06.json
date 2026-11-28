@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-06","image":"img-06.png","width":1080,"height":265,"rows":["D-10","T-01"],"lines":["04/13/2026","14:30"],"items":[{"row":"D-10","kind":"DATE","raw":"04/13/2026","canonical":"2026-04-13"},{"row":"T-01","kind":"TIME","raw":"14:30","canonical":"14:30"}],"abstain":[],"truth":[]}
