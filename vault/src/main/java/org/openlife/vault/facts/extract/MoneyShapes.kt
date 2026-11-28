@@ -117,6 +117,7 @@ internal object MoneySigns {
         val signs = if (outer) inner + line.text[dash] else inner
         val doubled = outer && LineScan.isSignLike(line.ch(dash - 1))
         val spaced = outer && (dash < core - 1 || doubled)
+        val attached = attachedToLetter(line, outer, dash, beforeDigits)
         val start = when {
             doubled -> dash - 1
             outer -> dash
@@ -124,13 +125,27 @@ internal object MoneySigns {
         }
         return when {
             signs.isEmpty() -> Sign(start, negative = false, problem = false)
-            signs == READ && !spaced -> Sign(start, negative = true, problem = false)
+            signs == READ && !spaced && !attached -> Sign(start, negative = true, problem = false)
             else -> Sign(start, negative = false, problem = true)
         }
     }
 
     /** A dash-like character or `±` in sign position; only a lone `-` is read (finding EE-05). */
     private fun isSign(char: Char): Boolean = LineScan.isDashLike(char) || char == PLUS_MINUS
+
+    /**
+     * A dash attached to a preceding letter (`Coffee-€3.50`, `EUR-5.00`) is a
+     * separator in running text, not a sign (proposed A-14). The sign is
+     * unclaimed, so the amount abstains rather than read as negative.
+     */
+    private fun attachedToLetter(line: LineScan, outer: Boolean, dash: Int, beforeDigits: IntRange): Boolean =
+        (outer && letterBefore(line, dash)) || letterDashBefore(line, beforeDigits)
+
+    private fun letterDashBefore(line: LineScan, range: IntRange): Boolean =
+        (range.first until range.last).any { LineScan.isDashLike(line.ch(it)) && letterBefore(line, it) }
+
+    private fun letterBefore(line: LineScan, at: Int): Boolean =
+        at > 0 && at <= line.length && LineScan.isLetterLike(line.text.codePointBefore(at))
 
     /** The dash-like characters in `[range.first, range.last)`; a lone `-` stays readable, anything else does not. */
     private fun between(line: LineScan, range: IntRange): String {
