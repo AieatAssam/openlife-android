@@ -86,6 +86,10 @@ object SearchSql {
         fun matches(column: String) = patterns.indices.joinToString(" AND ") { index ->
             "lower($column) LIKE ?${index + 1} ESCAPE '\\'"
         }
+        // A fact matches when each term is in its canonical or its raw text, as the FTS index does (S-05).
+        fun matchesCanonicalOrRaw() = patterns.indices.joinToString(" AND ") { index ->
+            "(lower(r.canonicalText) LIKE ?${index + 1} ESCAPE '\\' OR lower(r.rawText) LIKE ?${index + 1} ESCAPE '\\')"
+        }
         val sql = OUTER +
             "SELECT r.sourceId AS sourceId, s.revisionId AS revisionId, s.id AS spanId, s.text AS text, " +
             "0 AS isCorrection, 0.0 AS score, s.ordinal AS ordinal, $NO_FACT " +
@@ -101,7 +105,7 @@ object SearchSql {
             "SELECT f.sourceId, src.currentOcrRevisionId, $FACT_SPAN, r.canonicalText, 0, 0.0, f.ordinal, " +
             "r.id, r.kind, r.status, r.origin " +
             "FROM fact_revisions r JOIN facts f ON f.id = r.factId JOIN sources src ON src.id = f.sourceId " +
-            "WHERE ${matches("r.canonicalText")} AND $SHOWN_FACT)" + ORDER + "?${patterns.size + 1}"
+            "WHERE ${matchesCanonicalOrRaw()} AND $SHOWN_FACT)" + ORDER + "?${patterns.size + 1}"
         return Statement(sql, patterns + bounded(limit))
     }
 
