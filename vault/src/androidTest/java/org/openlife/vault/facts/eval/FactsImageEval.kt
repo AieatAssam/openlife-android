@@ -165,7 +165,20 @@ class FactsImageEval {
         val canonical: String,
     )
 
-    private class UnitRun(val family: String, val kind: ExtractedKind, val raw: String, val status: UnitStatus, val cause: String)
+    /**
+     * [cause] classifies a miss by the exact surface form: the raw text is absent from the OCR text (OCR_MISREAD)
+     * or present (an extractor cause). [causeWs] is the same test with whitespace removed from both sides, so a
+     * dropped or inserted space is not an OCR misread. Both are recorded because the first run classified with
+     * [causeWs] only and hid OCR spacing errors; the gate does not depend on either.
+     */
+    private class UnitRun(
+        val family: String,
+        val kind: ExtractedKind,
+        val raw: String,
+        val status: UnitStatus,
+        val cause: String,
+        val causeWs: String,
+    )
 
     private enum class Outcome { EXACT, SUBSET, SUPERSET, WRONG_VALUE, UNEXPECTED }
 
@@ -188,7 +201,9 @@ class FactsImageEval {
         val units = expectedUnits(case.items)
         if (spans == null) {
             // No OCR output: every expected unit is a miss with cause OCR (there is no text to extract from).
-            val unitRuns = units.map { UnitRun(familyOf(it.kind), it.kind, it.raw, UnitStatus.SILENT, "OCR_NO_OUTPUT") }
+            val unitRuns = units.map {
+                UnitRun(familyOf(it.kind), it.kind, it.raw, UnitStatus.SILENT, "OCR_NO_OUTPUT", "OCR_NO_OUTPUT")
+            }
             return Run(case.id, ocrState, ocrText, emptyList(), unitRuns, 0, dmFlags(case, emptyList()))
         }
         val extractorSpans = spans.mapIndexed { i, s -> ExtractionSpan("s$i", null, i, s.text) }
@@ -208,13 +223,11 @@ class FactsImageEval {
                     UnitStatus.SILENT
                 }
             }
-            val cause = when (status) {
-                UnitStatus.EXACT -> "-"
-                UnitStatus.WRONG -> "EXTRACTOR_WRONG_VALUE"
-                UnitStatus.ABSTAINED -> if (normalised(unit.raw) in normalised(ocrText)) "EXTRACTOR_ABSTAINED" else "OCR_MISREAD"
-                UnitStatus.SILENT -> if (normalised(unit.raw) in normalised(ocrText)) "EXTRACTOR_MISS" else "OCR_MISREAD"
-            }
-            UnitRun(familyOf(unit.kind), unit.kind, unit.raw, status, cause)
+            val inOcrExact = unit.raw in ocrText
+            val inOcrWs = normalised(unit.raw) in normalised(ocrText)
+            val cause = causeOf(status, inOcrExact)
+            val causeWs = causeOf(status, inOcrWs)
+            UnitRun(familyOf(unit.kind), unit.kind, unit.raw, status, cause, causeWs)
         }
         val expectedAbstain = case.abstain
         val unexpected = abstained.count { (k, raw, _) -> expectedAbstain.none { it.first == k && it.second == raw } }
@@ -280,6 +293,13 @@ class FactsImageEval {
 
     private fun normalised(text: String): String = text.filterNot { it.isWhitespace() }
 
+    private fun causeOf(status: UnitStatus, rawInOcr: Boolean): String = when (status) {
+        UnitStatus.EXACT -> "-"
+        UnitStatus.WRONG -> "EXTRACTOR_WRONG_VALUE"
+        UnitStatus.ABSTAINED -> if (rawInOcr) "EXTRACTOR_ABSTAINED" else "OCR_MISREAD"
+        UnitStatus.SILENT -> if (rawInOcr) "EXTRACTOR_MISS" else "OCR_MISREAD"
+    }
+
     private suspend fun recognise(engine: OcrEngine, case: Case): OcrRunStateMachine.Decision {
         val input = OcrEngineInput(case.png.copyOf(), case.width, case.height, Orientation.NORMAL, ImageFormat.PNG)
         val outcome = try {
@@ -315,6 +335,7 @@ class FactsImageEval {
         val wrongDefiniteTotal: Int,
         val unexpectedEmitted: Map<String, Int>,
         val misses: Map<String, Int>,
+        val missesWs: Map<String, Int>,
         val unexpectedAbstentions: Int,
     )
 
@@ -335,6 +356,7 @@ class FactsImageEval {
             wrongDefiniteTotal = emitted.count { it.definite && it.outcome != Outcome.EXACT },
             unexpectedEmitted = emitted.filter { it.outcome == Outcome.UNEXPECTED }.groupingBy { it.family }.eachCount(),
             misses = units.filter { it.status != UnitStatus.EXACT }.groupingBy { it.cause }.eachCount(),
+            missesWs = units.filter { it.status != UnitStatus.EXACT }.groupingBy { it.causeWs }.eachCount(),
             unexpectedAbstentions = runs.sumOf { it.unexpectedAbstain },
         )
     }
@@ -376,7 +398,8 @@ class FactsImageEval {
         appendLine("bare_currency\t${s.bareCurrency}")
         appendLine("wrong_definite\t${s.wrongDefiniteTotal}\t${s.wrongDefinite}")
         appendLine("unexpected_emitted\t${s.unexpectedEmitted}")
-        appendLine("misses\t${s.misses}")
+        appendLine("misses_exact\t${s.misses}")
+        appendLine("misses_ws_insensitive\t${s.missesWs}")
         appendLine("unexpected_abstentions\t${s.unexpectedAbstentions}")
         runs.forEach { r ->
             appendLine("image\t${r.id}\t${r.ocrState}\tocr=${r.ocrText.replace('\n', '|')}")
@@ -384,7 +407,7 @@ class FactsImageEval {
                 appendLine("emit\t${r.id}\t${e.outcome}\t${e.family}\t${e.kind}\t${e.rule}\t${e.raw}\t${e.canonical}")
             }
             r.units.filter { it.status != UnitStatus.EXACT }.forEach { u ->
-                appendLine("miss\t${r.id}\t${u.status}\t${u.cause}\t${u.kind}\t${u.raw}")
+                appendLine("miss\t${r.id}\t${u.status}\t${u.cause}\t${u.causeWs}\t${u.kind}\t${u.raw}")
             }
         }
     }
