@@ -8,12 +8,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import org.openlife.vault.facts.ExtractionCheck
+import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.FactWithLatestRevision
 import org.openlife.vault.facts.FactWriteResult
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.StaleReason
+import org.openlife.vault.facts.toExtractionCheck
+import org.openlife.vault.facts.toFactEvidence
+import org.openlife.vault.facts.toReviewDecision
 import org.openlife.vault.storage.OpenLifeDatabase
 import org.openlife.vault.storage.toDomain
 import java.util.UUID
@@ -41,6 +46,21 @@ class FactRepository(
         database.factDao().observeCurrentFacts(sourceId.toString())
             .map { rows -> rows.map { it.toDomain() } }
             .flowOn(ioDispatcher)
+
+    /** The evidence rows of [revisionId] in stored order (C2-R34); empty for a USER revision. */
+    suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> = withContext(ioDispatcher) {
+        database.factDao().evidenceOfRevision(revisionId.toString()).map { it.toFactEvidence() }
+    }
+
+    /** The latest review decision of [revisionId], or null if it was never reviewed. */
+    suspend fun latestDecision(revisionId: UUID): ReviewDecision? = withContext(ioDispatcher) {
+        database.factDao().latestDecision(revisionId.toString()).toReviewDecision()
+    }
+
+    /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
+    suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = withContext(ioDispatcher) {
+        database.factDao().extractionOutcomeOfCurrentReading(sourceId.toString()).toExtractionCheck()
+    }
 
     suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult =
         write { it.addUserFact(sourceId.toString(), kind, value) }
