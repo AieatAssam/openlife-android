@@ -12,7 +12,9 @@ import org.openlife.vault.repository.SearchRepository
 import org.openlife.vault.storage.FactHost
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Companion.createFromExportedSchema
+import org.openlife.vault.storage.HostSourceRowRemovalDao
 import org.openlife.vault.storage.OpenLifeDatabase
+import org.openlife.vault.storage.SourceRowRemoval
 import org.openlife.vault.storage.SearchIndex
 import java.io.File
 import java.util.UUID
@@ -112,7 +114,8 @@ class SearchIndexHostTest {
                 reviewState = "REJECTED",
             )
             span("30000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000001", 0, "walrus rejected")
-            // Latest revision STALE; an older READY one has the word.
+            // Latest revision STALE: C2-R14 keeps the current reading on a READY one (the pointer),
+            // so the older READY reading is the current one and its word is found (see the report).
             source("10000000-0000-0000-0000-000000000002")
             revision("20000000-0000-0000-0000-000000000002", "10000000-0000-0000-0000-000000000002")
             span("30000000-0000-0000-0000-000000000002", "20000000-0000-0000-0000-000000000002", 0, "walrus stale")
@@ -159,7 +162,11 @@ class SearchIndexHostTest {
         }
 
         assertEquals(
-            setOf("30000000-0000-0000-0000-000000000006", "30000000-0000-0000-0000-000000000008"),
+            setOf(
+                "30000000-0000-0000-0000-000000000002",
+                "30000000-0000-0000-0000-000000000006",
+                "30000000-0000-0000-0000-000000000008",
+            ),
             search("walrus").map { it.spanId.toString() }.toSet(),
         )
         assertEquals(emptyList<SearchHit>(), search("zebra"))
@@ -248,7 +255,10 @@ class SearchIndexHostTest {
         fixture.integrityCheck(SearchIndex.TEXT_TABLE)
         fixture.integrityCheck(SearchIndex.CORRECTION_TABLE)
 
-        host.exec("DELETE FROM ocr_revisions WHERE id = ?", RA)
+        // C2-R20: the current reading goes only with its Source, through the one removal routine.
+        host.exec("UPDATE sources SET state = 'DELETING' WHERE id = ?", A)
+        val dao = HostSourceRowRemovalDao(host)
+        runBlocking { SourceRowRemoval.remove(dao, A, dao::deleteSource) }
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.TEXT_TABLE))
         assertEquals(0L, fixture.indexedDocuments(SearchIndex.CORRECTION_TABLE))
         assertFalse(fixture.dataContains(SearchIndex.TEXT_TABLE, "harbour"))
@@ -279,9 +289,8 @@ class SearchIndexHostTest {
         }
         HostSqlite().use { migrated ->
             val fixture = SearchFixture.migrated(migrated, seed)
-            OpenLifeDatabase.MIGRATION_5_6.migrate(migrated.asSupportDatabase())
             assertTrue(SearchIndex.isComplete(migrated.asSupportDatabase()))
-            triggerPaths("migrated v6", fixture, migrated)
+            triggerPaths("migrated to v7", fixture, migrated)
         }
     }
 
@@ -453,6 +462,7 @@ class SearchIndexHostTest {
             revision(RB, B)
             span(S3, RB, 0, "Dentist staged")
         }
+        SearchFixture(host).migrateToV6WithoutFts5()
         assertEquals(0L, host.long("SELECT COUNT(*) FROM sqlite_master WHERE name LIKE '%fts%'"))
 
         val hits = search("dentist appoint")
@@ -497,6 +507,7 @@ class SearchIndexHostTest {
                 span(UUID(3L, i.toLong()).toString(), RA, i, "line $i of a synthetic receipt total ${i * 7} item w$i")
             }
         }
+        SearchFixture(host).migrateToV6WithoutFts5()
         search("synthetic")
         val started = System.nanoTime()
         val hits = search("receipt total")
@@ -508,7 +519,7 @@ class SearchIndexHostTest {
 
     private fun indexSchema(db: HostSqlite): List<String> = db.query(
         "SELECT type || ' ' || name || ' ' || COALESCE(sql, '') FROM sqlite_master " +
-            "WHERE name LIKE '%fts%' ORDER BY type, name",
+            "WHERE name LIKE '%fts%' AND name NOT LIKE 'fact%' ORDER BY type, name",
     ).map { it.single() as String }
 
     private fun id(value: String) = UUID.fromString(value)

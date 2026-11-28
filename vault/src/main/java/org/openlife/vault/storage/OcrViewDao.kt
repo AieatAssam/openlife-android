@@ -11,7 +11,7 @@ interface OcrViewDao {
      * P2-01-R1: newest first. startedAt can tie when two runs start in the same
      * millisecond, so the insertion order (rowid) breaks the tie.
      */
-    @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY startedAt DESC, rowid DESC")
+    @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY rowid DESC")
     fun observeRevisionsNewestFirst(sourceId: String): Flow<List<OcrRevisionEntity>>
 
     @Query("SELECT * FROM ocr_spans WHERE revisionId = :revisionId ORDER BY ordinal ASC")

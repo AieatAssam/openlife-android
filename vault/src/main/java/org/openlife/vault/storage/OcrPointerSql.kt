@@ -20,8 +20,7 @@ object OcrPointerSql {
           AND EXISTS (SELECT 1 FROM ocr_revisions WHERE id = :revisionId AND sourceId = :sourceId AND state = 'READY')
           AND (currentOcrRevisionId IS NULL OR EXISTS (
             SELECT 1 FROM ocr_revisions n JOIN ocr_revisions c ON c.id = sources.currentOcrRevisionId
-            WHERE n.id = :revisionId
-              AND (n.startedAt > c.startedAt OR (n.startedAt = c.startedAt AND n.rowid > c.rowid))))
+            WHERE n.id = :revisionId AND n.rowid > c.rowid))
         """
 
     /** The head of a span's (or, with a null span, a reading's) correction chain; none if uncorrected. */

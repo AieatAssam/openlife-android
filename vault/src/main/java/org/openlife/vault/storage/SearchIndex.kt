@@ -167,6 +167,8 @@ object SearchIndex {
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
             attempt { ensure(db) }
+            // P3-07: the fact index is checked at every open too.
+            attempt { FactSearchIndex.ensure(db) }
         }
     }
 
@@ -220,7 +222,7 @@ object SearchIndex {
     }
 
     /** A supported engine with FTS5 and its secure-delete option, tried on a temp table that is always removed. */
-    private fun capable(db: SupportSQLiteDatabase): Boolean = isSupportedEngine(db) && attempt {
+    internal fun capable(db: SupportSQLiteDatabase): Boolean = isSupportedEngine(db) && attempt {
         db.execSQL("DROP TABLE IF EXISTS temp.fts5_probe")
         db.execSQL("CREATE VIRTUAL TABLE temp.fts5_probe USING fts5(x)")
         try {
@@ -234,7 +236,7 @@ object SearchIndex {
     // SQLite < 3.42) surface as the platform's or SQLCipher's SQLiteException,
     // a RuntimeException. The exception is dropped unread: it can quote SQL.
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private inline fun attempt(block: () -> Unit): Boolean = try {
+    internal inline fun attempt(block: () -> Unit): Boolean = try {
         block()
         true
     } catch (e: RuntimeException) {

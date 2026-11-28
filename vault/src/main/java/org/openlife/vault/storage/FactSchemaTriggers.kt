@@ -293,9 +293,11 @@ object FactSchemaTriggers {
             ) +
             raise(
                 "C2-R14: the current reading moves only to a later reading",
+                // P3-07 (F-71): the order is the reading's rowid, assigned when the reading row is
+                // created, never the wall clock (startedAt can move backwards).
                 "OLD.currentOcrRevisionId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ocr_revisions n " +
                     "JOIN ocr_revisions c ON c.id = OLD.currentOcrRevisionId WHERE n.id = NEW.currentOcrRevisionId " +
-                    "AND (n.startedAt > c.startedAt OR (n.startedAt = c.startedAt AND n.rowid > c.rowid)))",
+                    "AND n.rowid > c.rowid)",
             ) +
             " END",
     )

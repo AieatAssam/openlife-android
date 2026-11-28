@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import org.openlife.vault.search.SearchFact
 import org.openlife.vault.search.SearchHit
 import org.openlife.vault.search.SearchQuery
 import org.openlife.vault.search.SearchSnippet
@@ -63,15 +64,26 @@ class SearchRepository(private val dao: SearchDao, private val ioDispatcher: Cor
 
     companion object {
         const val DEFAULT_LIMIT = 50
-        private const val INDEX_TABLES = 2
+        /** The two OCR tables and the fact table: all three must exist for the FTS5 path. */
+        private const val INDEX_TABLES = 3
 
         /** Tolerant decoding: a row whose ids are not UUIDs (another build) is skipped, never shown half-linked. */
         internal fun hitOf(row: SearchRow, tokens: List<String>, wholeWords: Boolean = true): SearchHit? {
             val sourceId = row.sourceId.toUuidOrNull() ?: return null
             val revisionId = row.revisionId.toUuidOrNull() ?: return null
             val spanId = row.spanId?.let { it.toUuidOrNull() ?: return null }
+            val fact = row.factRevisionId?.let { id ->
+                SearchFact(
+                    revisionId = id.toUuidOrNull() ?: return null,
+                    kind = row.factKind.orEmpty(),
+                    status = row.factStatus.orEmpty(),
+                    origin = row.factOrigin.orEmpty(),
+                )
+            }
             val snippet = SearchSnippet.of(row.text, tokens, wholeWords)
-            return SearchHit(sourceId, revisionId, spanId, snippet.text, row.isCorrection != 0, snippet.highlights)
+            return SearchHit(
+                sourceId, revisionId, spanId, snippet.text, row.isCorrection != 0, snippet.highlights, fact,
+            )
         }
 
         private fun String.toUuidOrNull(): UUID? = runCatching { UUID.fromString(this) }.getOrNull()
