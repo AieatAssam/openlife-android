@@ -107,6 +107,33 @@ class SearchRepositoryTest {
         assertFalse(dataContains(SearchIndex.CORRECTION_TABLE, "jicama"))
     }
 
+    /**
+     * P3-07-R1 (C2-R49): facts are found in the current revisions of a READY Source only. A confirmed or
+     * unreviewed VALUE that names the current reading is found; a rejected, stale, or earlier-reading value
+     * is not.
+     */
+    @Test
+    fun findsConfirmedAndUnreviewedFactsButNotRejectedOrStale() = runBlocking {
+        source(A)
+        revision(RX, A)
+        revision(RA, A)
+        sql.execSQL("UPDATE sources SET currentOcrRevisionId = ? WHERE id = ?", arrayOf<Any?>(RA, A))
+        span(S1, RA, 0, "Due 2026-10-08")
+        span(S2, RX, 0, "Old 2026-10-12")
+        fact(1, A, "EXTRACTED", "UNREVIEWED", "2026-10-08", RA to S1)
+        fact(2, A, "USER", "CONFIRMED", "2026-10-09", null)
+        fact(3, A, "EXTRACTED", "REJECTED", "2026-10-10", RA to S1)
+        fact(4, A, "EXTRACTED", "STALE", "2026-10-11", RA to S1)
+        fact(5, A, "EXTRACTED", "UNREVIEWED", "2026-10-12", RX to S2)
+
+        val hits = repository.search("2026").first()
+        assertEquals(setOf(RF1, RF2), hits.mapNotNull { it.fact?.revisionId?.toString() }.toSet())
+        val user = hits.single { it.fact?.revisionId == UUID.fromString(RF2) }.fact!!
+        assertEquals("DATE", user.kind)
+        assertEquals("CONFIRMED", user.status)
+        assertEquals("USER", user.origin)
+    }
+
     /** W-01: both tables carry the persisted secure-delete option on a fresh SQLCipher vault. */
     @Test
     fun secureDeleteIsOnForBothTables() {
@@ -206,6 +233,48 @@ class SearchRepositoryTest {
         }
     }
 
+    /**
+     * Inserts fact [n] with one revision as its current revision. [evidence] is the VALUE row's
+     * (ocrRevisionId to ocrSpanId); null for a USER revision. STALE gets its staleReason and staleAt.
+     */
+    private fun fact(
+        n: Int,
+        sourceId: String,
+        origin: String,
+        status: String,
+        canonical: String,
+        evidence: Pair<String, String>?,
+    ) {
+        val factId = "fa000000-0000-0000-0000-00000000000$n"
+        val revisionId = "f1000000-0000-0000-0000-00000000000$n"
+        sql.execSQL(
+            "INSERT INTO facts(id, sourceId, kind, ordinal, currentRevisionId, createdAt) " +
+                "VALUES (?, ?, 'DATE', ?, NULL, 1)",
+            arrayOf<Any?>(factId, sourceId, n),
+        )
+        val stale = status == "STALE"
+        sql.execSQL(
+            "INSERT INTO fact_revisions(id, factId, revisionNo, origin, kind, valueJson, canonicalText, rawText, " +
+                "status, staleReason, staleAt, confidence, methodId, methodVersion, locale, createdAt, " +
+                "supersedesRevisionId) VALUES (?, ?, 1, ?, 'DATE', '{}', ?, NULL, ?, ?, ?, NULL, 'test', NULL, NULL, ?, NULL)",
+            arrayOf<Any?>(
+                revisionId, factId, origin, canonical, status,
+                if (stale) "READING_REPLACED" else null, if (stale) 2L else null, clock++,
+            ),
+        )
+        if (evidence != null) {
+            sql.execSQL(
+                "INSERT INTO fact_evidence(id, revisionId, ordinal, role, sourceId, ocrRevisionId, ocrSpanId, " +
+                    "ocrUserRevisionId, textStart, textEnd, regionLeft, regionTop, regionRight, regionBottom, " +
+                    "regionCoordinateSystem) VALUES (?, ?, 0, 'VALUE', ?, ?, ?, NULL, 0, 4, 1, 1, 5, 5, " +
+                    "'SOURCE_PIXELS')",
+                arrayOf<Any?>("e0000000-0000-0000-0000-00000000000$n", revisionId, sourceId,
+                    evidence.first, evidence.second),
+            )
+        }
+        sql.execSQL("UPDATE facts SET currentRevisionId = ? WHERE id = ?", arrayOf<Any?>(revisionId, factId))
+    }
+
     private fun dataContains(table: String, term: String): Boolean {
         val needle = term.toByteArray(Charsets.UTF_8)
         sql.query("SELECT block FROM ${table}_data").use { cursor ->
@@ -275,5 +344,8 @@ class SearchRepositoryTest {
         const val S2 = "52000000-0000-0000-0000-000000000002"
         const val S3 = "53000000-0000-0000-0000-000000000003"
         const val C1 = "c1000000-0000-0000-0000-000000000001"
+        const val RX = "a2000000-0000-0000-0000-00000000000a"
+        const val RF1 = "f1000000-0000-0000-0000-000000000001"
+        const val RF2 = "f1000000-0000-0000-0000-000000000002"
     }
 }

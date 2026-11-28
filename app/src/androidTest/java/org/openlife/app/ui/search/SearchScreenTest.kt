@@ -43,6 +43,7 @@ import org.openlife.vault.ocr.OcrSpan
 import org.openlife.vault.ocr.OcrSpanView
 import org.openlife.vault.ocr.OcrView
 import org.openlife.vault.repository.ReadyReadResult
+import org.openlife.vault.search.SearchFact
 import org.openlife.vault.search.SearchHit
 
 /**
@@ -95,6 +96,29 @@ class SearchScreenTest {
         composeRule.onNodeWithTag("search_result").assertDoesNotExist()
     }
 
+    /**
+     * P3-07-R2: a fact result shows its kind and status in words, and tapping it opens the viewer with the
+     * fact's evidence span selected (the Facts panel is P3-05; see docs/verification/P3-07-facts-search.md).
+     */
+    @Test
+    fun factHitOpensFactsPanelHighlighted() {
+        val fact = SearchFact(UUID.randomUUID(), "DATE", "UNREVIEWED", "EXTRACTED")
+        setHost(DpSize(400.dp, 800.dp), listOf(SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3), fact)))
+        val searchLabel = InstrumentationRegistry.getInstrumentation().targetContext
+            .getString(R.string.list_search_content_description)
+        composeRule.onNodeWithContentDescription(searchLabel).performClick()
+        composeRule.onNodeWithTag("search_input").performTextInput("pick")
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.onAllNodesWithTag("search_result").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Date").assertIsDisplayed()
+        composeRule.onNodeWithText("Unreviewed").assertIsDisplayed()
+        composeRule.onNodeWithTag("search_result").performClick()
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.onAllNodesWithText("Selected: Pick up by Friday").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun openTheResultFromSearch() {
         val searchLabel = InstrumentationRegistry.getInstrumentation().targetContext
             .getString(R.string.list_search_content_description)
@@ -112,12 +136,11 @@ class SearchScreenTest {
         composeRule.onNodeWithText("Selected: Pick up by Friday").performScrollTo().assertIsDisplayed()
     }
 
-    private fun setHost(size: DpSize) {
-        val hit = SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3))
+    private fun setHost(size: DpSize, hits: List<SearchHit> = listOf(SearchHit(sourceId, revisionId, target.id, target.text, false, listOf(0..3)))) {
         val container = FakeAppContainer(
             initialSources = listOf(readySource(sourceId)),
             readContent = { ReadyReadResult.Loaded(jpeg()) },
-            searchHits = listOf(hit),
+            searchHits = hits,
             ocrView = { ocrView() },
         ).also { fake = it }
         composeRule.setContent {
