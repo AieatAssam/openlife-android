@@ -1,7 +1,8 @@
 id: P3-05
 title: Facts UI with origin badges, review, user-provided facts, inert values
 phase: P3
-status: todo
+status: review
+started: 2026-11-28
 depends_on: [P3-04, P1-20]
 estimate: L
 owner: agent
@@ -65,3 +66,54 @@ notes: >
   normalisers (C2-R38, C2-R5) belongs to this step's input screens, using
   P3-03's normalisers, and must refuse an input they reject before calling
   the repository.
+  P3-05 implementation notes (2026-11-28, Haiku agent under the coordinating session):
+  - Dependency deviation: depends_on P3-04 and P1-20 are both status review, not done (plan-status lists nothing runnable). The coordinating session directed this step; it proceeds on that instruction and the owner should confirm the order before review.
+  - Money "not stated" (C2-R38 vs ADR-0008 §3, §5): ADR-0008 stores a null currency only with a printed symbol (rawSymbol required), and MoneyValue requires a code or a symbol. A "Not stated" amount with no symbol therefore cannot be stored. The normaliser refuses it (MONEY_NEEDS_CODE) with a visible message. OPEN QUESTION for the owner: allow a user-typed symbol, or drop "Not stated" from C2-R38.
+  - Money chooser: CAD is not offered. The line scanner gives no single value for "10 CAD" (ADR-0008 §5.5 English-word code list); the other 10 codes accept whole and fraction amounts (UserValueNormaliserTest.everyChooserCodeAcceptsPlainIntegerAndFractionAmounts).
+  - Handed-over finding (a), viewer shows the latest reading while search and facts use the READY pointer: NOT changed in P3-05. C2 decision Q-6 assigns moving the viewer and search onto the pointer to P3-07.
+  - Handed-over finding (b), fact hit in search opens the viewer without a facts panel: NOT routed in P3-05. P3-07-R2 owns "tapping opens the Facts panel with the fact highlighted"; P3-05's requirements do not mention search.
+  - Earlier-reading viewer mode (Q-15, C2-R39): NOT implemented in P3-05. The viewer loads only the current reading (OcrRepository.observeOcrView, ViewerSession); a reading-by-id mode needs new viewer state across ViewerSession, ViewerPorts and OcrPresenter. Recorded as a stated R1 gap.
+
+  P3-05 close-out (2026-11-28):
+  Item 1 (200 % title) fixed by an autosizing title (16 sp floor); item 2 kinds DATE, TIME, MONEY each red then green with
+  JVM presenter tests and one FactsFlowTest case; item 3 host tests added in 66946ce. The review action row
+  (Confirm/Reject) was broken by item 1's fillMaxWidth labels (a zero-bounds second button, caught on the tablet);
+  fixed in 01180c1 by weighting the buttons. Open: FactsScreenTest final-code run (device locked; the lock was not
+  touched). Not built: earlier-reading viewer mode (Q-15), "Correct this value" (C2-R37), CAD in the currency chooser.
+  Owner decisions still needed: money with no currency code (ADR-0008 vs C2-R38), and the dependency order (P3-04
+  and P1-20 are review, not done). Device gaps recorded in docs/verification/P3-05-facts-ui.md.
+
+  P3-05 close-out 2 (2026-11-28, coordinating session directed A, B, C, device runs):
+  A (C2-R37) "Correct this value" committed (7c7c2d3, ee3d88d): the same typed input as Add a fact, refusal before the gateway.
+  B (C2-R39) earlier reading opens read-only with a label and no mutating action; "Show evidence" on an earlier reading
+  routes to that reading (64925cc, 1351d4a, ba13ff8, 5ffd3b0, c2664bc). The earlier "not implemented (Q-15)" gap is closed.
+  C (C2-R36) a clarified value can be re-chosen from its candidates; the writer exposes candidatesOf with the same checks as
+  clarify, and the panel labels the value in use as the current choice (0f5c767, d9b428c, 3dcdef4).
+  Detekt for A to C in 0bccd96; device fixture order fixed in 5488566 (FactsFlowTest 13/13 after the fix, 12/13 before it).
+  Device totals on 5488566: FactsFlowTest 13/0, FactsScreenTest 1/0, EarlierReadingViewerTest 2/0, ViewerScreenTest 3/0,
+  ViewerScreenC1Test 10/0, EvidenceNavigationTest 8/0 (37 of 37). Not re-run this session: FactsInertValuesTest,
+  LargeFontUiTest, ScreenSemanticsTest (known failures from 01180c1 stand). Open: DATETIME has no input form, so Correct is
+  not offered for it; USER BASIS "You chose this from:" not implemented; owner decisions on money with no currency code and
+  on the dependency order (P3-04, P1-20 are review). Status stays review. Not pushed.
+
+  Review fixes U-01..U-06 and cleanup (branch commits b2e8441, eb9757d, 39e1251, a9dd719, 6fedd04, 872c558, edddeae):
+  each finding has a JVM or host test that passes on the final tree. RED was observed for U-05 and U-06 and for the
+  coordinator follow-ups 1, 2 and 4; the RED runs for U-01 to U-04 are not recorded. Facts writes run in the
+  application scope. Open: the U-03 read-only guard has no instrumented test; see
+  docs/verification/P3-05-facts-ui.md "Review fixes U-01..U-06 and cleanup".
+
+
+evidence: >
+  docs/verification/P3-05-facts-ui.md (requirement to test, device totals, gaps). HEAD 5488566.
+  Gate `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
+  :app:compileDebugAndroidTestKotlin :eval:test` BUILD SUCCESSFUL in 4m 47s on the tree of 0bccd96 (log
+  scratchpad/gate-d2.log, exit 0). `scripts/plan-check.sh` steps=83 errors=0, runnable now []. `bash
+  scripts/tests/run.sh` 51 passed, 0 failed. Tablet U8BBB20806201256 (AGS2-W09, Android 8.0.0), one class per run,
+  XML read after each: FactsFlowTest 13/0 (on 5488566), FactsScreenTest 1/0, EarlierReadingViewerTest 2/0,
+  ViewerScreenTest 3/0, ViewerScreenC1Test 10/0, EvidenceNavigationTest 8/0. Host and JVM coverage for C2-R37, C2-R39
+  and C2-R36 is listed in the doc.
+  Review fixes U-01..U-06, cleanup and coordinator follow-ups (HEAD 7cc6b8d): gate (one foreground command) gradle exit 0,
+  BUILD SUCCESSFUL in 4m 11s; plan-check steps=83 errors=0; scripts/tests/run.sh 51 passed, 0 failed. Device, one class
+  per run: EarlierReadingViewerTest 3/0, FactsFlowTest 13/0, ViewerScreenC1Test 10/0, vault OcrRepositoryTest 19/0.
+  Earlier device runs (before the follow-ups): FactsScreenTest 2/0, FactsInertValuesTest 1/0, ViewerScreenTest 3/0,
+  EvidenceNavigationTest 8/0. Details and gaps in docs/verification/P3-05-facts-ui.md. Status stays review. Not pushed.

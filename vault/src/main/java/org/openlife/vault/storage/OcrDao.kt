@@ -43,6 +43,10 @@ interface OcrDao {
     @Query("SELECT * FROM ocr_revisions WHERE id = :id")
     suspend fun findRevision(id: String): OcrRevisionEntity?
 
+    /** P3-05 review U-01: a revision only when it belongs to [sourceId]; another source's reading is not found. */
+    @Query("SELECT * FROM ocr_revisions WHERE id = :id AND sourceId = :sourceId")
+    suspend fun findRevisionOfSource(id: String, sourceId: String): OcrRevisionEntity?
+
     /** Oldest first by rowid (insertion order); startedAt is display data only (C2-R14, S-01). */
     @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY rowid ASC")
     suspend fun findRevisionsForSource(sourceId: String): List<OcrRevisionEntity>

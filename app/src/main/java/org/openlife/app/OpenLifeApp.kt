@@ -24,6 +24,7 @@ import org.openlife.vault.ocr.TesseractOcrEngine
 import org.openlife.vault.repository.AndroidBitmapSampler
 import org.openlife.vault.repository.DeletionRepository
 import org.openlife.vault.repository.FactExtractionRepository
+import org.openlife.vault.repository.FactRepository
 import org.openlife.vault.repository.ImportRepository
 import org.openlife.vault.repository.MutationQueue
 import org.openlife.vault.repository.OcrRepository
@@ -167,6 +168,7 @@ class OpenLifeApp : Application() {
             lastRecovery = report,
             recoveryRepository = recoveryRepository,
             searchRepository = SearchRepository(database),
+            factRepository = FactRepository(database, mutationQueue),
         )
     }
 

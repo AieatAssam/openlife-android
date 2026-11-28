@@ -43,5 +43,11 @@ sealed interface OcrUiState {
     ) : OcrUiState
 
     data class Cancelled(val sourceId: UUID, val history: List<OcrHistoryItem> = emptyList()) : OcrUiState
+
+    /**
+     * P3-05 review U-01: the reading a route names is not a reading of this source (or does not exist). Nothing
+     * from any reading is shown; the viewer says the content is unavailable.
+     */
+    data object Unavailable : OcrUiState
     data class Stale(val sourceId: UUID, val history: List<OcrHistoryItem> = emptyList()) : OcrUiState
 }

@@ -21,6 +21,7 @@ import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SampledBitmapDecoder
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.SourceLookup
+import org.openlife.app.ui.facts.FactsGateway
 import org.openlife.app.ui.forgetSourcesLeavingTheList
 import org.openlife.app.ui.search.SearchBackend
 import org.openlife.vault.model.Orientation
@@ -48,6 +49,12 @@ interface AppContainer {
     val sources: SourceStore
     val ocr: OcrPresenter
     val searchBackend: SearchBackend
+
+    /** P3-05: the facts of a source and the writes the facts UI asks for. */
+    val facts: FactsGateway
+
+    /** P3-05 review U-05: the scope a facts write runs in, so leaving the screen does not cancel it. */
+    val writeScope: CoroutineScope
     val scrubber: ContentScrubber
     val internalLinks: InternalLinks
     val settings: SettingsPort
@@ -106,6 +113,8 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
     override val internalLinks = InternalLinks()
     override val sources: SourceStore = VaultSourceStore(app, uiScope)
     override val searchBackend: SearchBackend = AppSearchBackend(app)
+    override val facts: FactsGateway = VaultFactsGateway(app)
+    override val writeScope: CoroutineScope get() = uiScope
 
     override val ocr: OcrPresenter = appOcrPresenter(app, uiScope).also { presenter ->
         app.registerPreResetCallback(presenter::forgetAll)
@@ -236,6 +245,14 @@ internal class AppOcrBackend(private val app: OpenLifeApp) : OcrBackend {
         app.appLock.awaitContentAccess()
         when (val access = app.vault()) {
             is VaultAccess.Ready -> emitAll(access.ocrRepository.observeOcrView(sourceId))
+            is VaultAccess.Unavailable -> emit(null)
+        }
+    }
+
+    override fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?> = flow {
+        app.appLock.awaitContentAccess()
+        when (val access = app.vault()) {
+            is VaultAccess.Ready -> emitAll(access.ocrRepository.observeOcrViewOfRevision(sourceId, revisionId))
             is VaultAccess.Unavailable -> emit(null)
         }
     }

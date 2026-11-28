@@ -67,6 +67,29 @@ class OcrViewModelTest {
         assertFalse("nothing is retained once nobody observes", second.value is OcrUiState.Ready)
     }
 
+    /** P3-05-R3 (C2-R39): a reading's state is the named reading's view, never the source's latest. */
+    @Test
+    fun aReadingStateShowsThatReadingAndNotTheSourceLatest() = runBlocking {
+        backend.view.value = readyView("Latest text")
+        backend.readingView.value = readyView("Earlier text")
+        val state = presenter.readingState(sourceId, backend.revisionId)
+        val collector = scope.launch { state.collect {} }
+        assertEquals("Earlier text", (state.value as OcrUiState.Ready).spans.single().text)
+        collector.cancel()
+    }
+
+    /** P3-05 review U-01: the store is asked for the reading of [sourceId]; a view of another source is never shown. */
+    @Test
+    fun aReadingOfAnotherSourceIsUnavailableNotShown() = runBlocking {
+        backend.readingView.value = readyView("Text of the other source")
+        val state = presenter.readingState(UUID.randomUUID(), backend.revisionId)
+        val collector = scope.launch { state.collect {} }
+        assertEquals(OcrUiState.Unavailable, state.value)
+        backend.readingView.value = null
+        assertEquals("the store's null for another source is not an empty panel", OcrUiState.Unavailable, state.value)
+        collector.cancel()
+    }
+
     @Test
     fun startsLoadingNotIdleUntilThePersistedStateIsKnown() {
         val state = presenter.state(sourceId)
@@ -165,6 +188,7 @@ class OcrViewModelTest {
 
     private class FakeBackend : OcrBackend {
         val view = ViewSource()
+        val readingView = ViewSource()
         val revisionId: UUID = UUID.randomUUID()
         var observations = 0
         val finishRun = CompletableDeferred<OcrRunResult>()
@@ -172,6 +196,10 @@ class OcrViewModelTest {
         override fun observe(sourceId: UUID): Flow<OcrView?> = kotlinx.coroutines.flow.flow {
             view.flow.collect { if (it !== ViewSource.PENDING) emit(it as OcrView?) }
         }.onStart { observations++ }
+
+        override fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?> = kotlinx.coroutines.flow.flow {
+            readingView.flow.collect { if (it !== ViewSource.PENDING) emit(it as OcrView?) }
+        }
 
         override suspend fun run(sourceId: UUID): OcrRunResult = finishRun.await()
 

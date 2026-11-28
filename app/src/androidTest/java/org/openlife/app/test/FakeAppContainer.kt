@@ -25,6 +25,7 @@ import org.openlife.app.ui.OcrPresenter
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.SourceLookup
 import org.openlife.app.ui.search.SearchBackend
+import org.openlife.app.ui.facts.FactsGateway
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.ocr.OcrFailureReason
@@ -54,8 +55,10 @@ class FakeAppContainer(
     private val readContent: suspend (UUID) -> ReadyReadResult = { awaitCancellation() },
     private val searchHits: List<SearchHit> = emptyList(),
     private val ocrView: (UUID) -> OcrView? = { null },
+    private val readingView: (UUID) -> OcrView? = { null },
     private val listed: (List<Source>) -> SourceListUiState? = { SourceListUiState.Loaded(it) },
     override val about: AboutPort = FakeAboutPort(),
+    factsGateway: FactsGateway = FakeFactsGateway(),
 ) : AppContainer {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val sourceList = MutableStateFlow(initialSources)
@@ -64,9 +67,14 @@ class FakeAppContainer(
     override val internalLinks = InternalLinks()
     override val searchBackend = SearchBackend { flowOf(searchHits) }
 
+    override val facts: FactsGateway = factsGateway
+    override val writeScope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)
+
     override val ocr = OcrPresenter(
         object : OcrBackend {
             override fun observe(sourceId: UUID): Flow<OcrView?> = flowOf(ocrView(sourceId))
+
+            override fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?> = flowOf(readingView(revisionId))
 
             override suspend fun run(sourceId: UUID): OcrRunResult =
                 OcrRunResult.Failed(null, OcrFailureReason.SOURCE_NOT_READY)

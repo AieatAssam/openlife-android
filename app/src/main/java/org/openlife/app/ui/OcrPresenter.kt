@@ -27,6 +27,9 @@ interface OcrBackend {
 
     suspend fun run(sourceId: UUID): OcrRunResult
 
+    /** P3-05-R3 (C2-R39): the reading [revisionId] names, if it belongs to [sourceId]; null otherwise. */
+    fun observeReading(sourceId: UUID, revisionId: UUID): Flow<OcrView?>
+
     suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String)
 
     suspend fun review(revisionId: UUID, reviewState: OcrReviewState)
@@ -42,10 +45,12 @@ interface OcrBackend {
  * the last observer leaves, or [clearTransient] runs, the state returns to
  * [OcrUiState.Loading] and the next observer re-reads the database.
  */
+@Suppress("TooManyFunctions") // the OCR reading state per source and per earlier reading (P3-05-R3, C2-R39)
 class OcrPresenter(private val backend: OcrBackend, private val scope: CoroutineScope) {
     private class Entry(val state: MutableStateFlow<OcrUiState>, val job: Job)
 
     private val entries = mutableMapOf<UUID, Entry>()
+    private val readings = mutableMapOf<Pair<UUID, UUID>, Entry>()
     private val running = MutableStateFlow<Set<UUID>>(emptySet())
     private val runs = mutableMapOf<UUID, Job>()
 
@@ -60,7 +65,6 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     fun state(sourceId: UUID): StateFlow<OcrUiState> = entries.getOrPut(sourceId) { start(sourceId) }.state
 
     private fun start(sourceId: UUID): Entry {
-        val state = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
         val upstream = combine(
             backend.observe(sourceId)
                 .map<OcrView?, Persisted> { Persisted.Loaded(it) }
@@ -70,6 +74,36 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
         ) { persisted, runningIds, failures ->
             OcrStateMapper.map(sourceId, persisted, sourceId in runningIds, failures[sourceId])
         }
+        return watched(upstream)
+    }
+
+    /**
+     * P3-05-R3 (C2-R39): the state of one named reading. A reading has no run of its own, so it is never
+     * "running"; its source id comes from the reading itself.
+     */
+    @Synchronized
+    fun readingState(sourceId: UUID, revisionId: UUID): StateFlow<OcrUiState> =
+        readings.getOrPut(sourceId to revisionId) { startReading(sourceId, revisionId) }.state
+
+    private fun startReading(sourceId: UUID, revisionId: UUID): Entry {
+        val upstream = backend.observeReading(sourceId, revisionId)
+            .map<OcrView?, Persisted> { Persisted.Loaded(it) }
+            .onStart { emit(Persisted.Pending) }
+            .map { persisted -> readingUiState(sourceId, persisted) }
+        return watched(upstream)
+    }
+
+    /** P3-05 review U-01: a reading that does not belong to [sourceId] is never shown, even if the store returns it. */
+    private fun readingUiState(sourceId: UUID, persisted: Persisted): OcrUiState {
+        // P3-05 review U-01: the store answers null for a reading of another source, and that is not an empty panel.
+        if (persisted is Persisted.Loaded && persisted.view == null) return OcrUiState.Unavailable
+        val owner = (persisted as? Persisted.Loaded)?.view?.revision?.sourceId
+        if (owner != null && owner != sourceId) return OcrUiState.Unavailable
+        return OcrStateMapper.map(sourceId, persisted, false, null)
+    }
+
+    private fun watched(upstream: Flow<OcrUiState>): Entry {
+        val state = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
         val job = scope.launch {
             // Read only while observed; drop the text as soon as nobody is looking.
             state.subscriptionCount.map { it > 0 }.distinctUntilChanged().collectLatest { observed ->
@@ -107,11 +141,12 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     /** P2-01-R4: drop every held OCR text; running extractions continue and are recorded. */
     @Synchronized
     fun clearTransient() {
-        entries.values.forEach { entry ->
+        (entries.values + readings.values).forEach { entry ->
             entry.job.cancel()
             entry.state.value = OcrUiState.Loading
         }
         entries.clear()
+        readings.clear()
         mutableGeneration.update { it + 1 }
     }
 

@@ -404,6 +404,7 @@ class AccessibilitySourceRulesTest {
             "settings/AboutScreen.kt" to "AboutScreen",
             "lock/LockScreen.kt" to "LockScreen",
             "lock/LockScreen.kt" to "AppLockOfferScreen",
+            "ui/facts/FactsScreen.kt" to "FactsScreen",
         )
         val PANE_TITLE = Regex("""paneTitle\s*=\s*([\w(.]+)""")
         val HARDCODED_A11Y_TEXT = listOf(

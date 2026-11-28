@@ -59,8 +59,9 @@ internal fun OcrSection(
     onReview: (OcrReviewState) -> Unit,
     onRejectSpan: (OcrSpan) -> Unit,
     onUndoRejectSpan: (OcrSpan) -> Unit = {},
+    readOnly: Boolean = false,
 ) {
-    val spanActions = SpanActions(onSelectSpan, onCorrect, onRejectSpan, onUndoRejectSpan)
+    val spanActions = SpanActions(onSelectSpan, onCorrect, onRejectSpan, onUndoRejectSpan, readOnly)
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             stringResource(R.string.viewer_extracted_text_title),
@@ -68,20 +69,24 @@ internal fun OcrSection(
             modifier = Modifier.asHeading(),
         )
         val runAgain = @Composable {
-            OpenLifeTextButton(
-                onClick = onExtractText,
-                modifier = Modifier.minimumInteractiveComponentSize(),
-                enabled = source.state == SourceState.READY,
-            ) {
-                Text(stringResource(R.string.viewer_run_again))
+            if (!readOnly) {
+                OpenLifeTextButton(
+                    onClick = onExtractText,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                    enabled = source.state == SourceState.READY,
+                ) {
+                    Text(stringResource(R.string.viewer_run_again))
+                }
             }
         }
         when (state) {
             // Nothing to offer until the persisted state is known (P2-01).
             OcrUiState.Loading -> Unit
 
-            OcrUiState.Idle -> OpenLifeButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
-                Text(stringResource(R.string.viewer_extract_text_action))
+            OcrUiState.Idle -> if (!readOnly) {
+                OpenLifeButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
+                    Text(stringResource(R.string.viewer_extract_text_action))
+                }
             }
 
             is OcrUiState.Running -> {
@@ -89,7 +94,9 @@ internal fun OcrSection(
                     Announce(Announcement.statusOf(R.string.viewer_extracting))
                     Text(stringResource(R.string.viewer_extracting))
                     Spacer(Modifier.width(8.dp))
-                    OpenLifeTextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
+                    if (!readOnly) {
+                        OpenLifeTextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
+                    }
                 }
                 OcrHistory(state.history)
             }
@@ -116,6 +123,9 @@ internal fun OcrSection(
                 )
 
             is OcrUiState.Stale -> StaleOutcome(state.history, runAgain)
+
+            // P3-05 review U-01: a reading that is not this source's is named as unavailable, never shown.
+            OcrUiState.Unavailable -> Text(stringResource(R.string.content_unavailable))
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -131,6 +141,7 @@ private class SpanActions(
     val onCorrect: (OcrSpan) -> Unit,
     val onReject: (OcrSpan) -> Unit,
     val onUndoReject: (OcrSpan) -> Unit,
+    val readOnly: Boolean = false,
 )
 
 /**
@@ -183,18 +194,20 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
         ungrounded.forEach { span -> SpanRow(span, state, actions) }
     }
     state.revisionCorrection?.let { CorrectionLine(it) }
-    Row {
-        OpenLifeTextButton(
-            onClick = { onReview(OcrReviewState.ACCEPTED) },
-            modifier = Modifier.minimumInteractiveComponentSize(),
-        ) {
-            Text(stringResource(R.string.viewer_accept_text))
-        }
-        OpenLifeTextButton(
-            onClick = { onReview(OcrReviewState.REJECTED) },
-            modifier = Modifier.minimumInteractiveComponentSize(),
-        ) {
-            Text(stringResource(R.string.viewer_reject_text))
+    if (!actions.readOnly) {
+        Row {
+            OpenLifeTextButton(
+                onClick = { onReview(OcrReviewState.ACCEPTED) },
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(stringResource(R.string.viewer_accept_text))
+            }
+            OpenLifeTextButton(
+                onClick = { onReview(OcrReviewState.REJECTED) },
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(stringResource(R.string.viewer_reject_text))
+            }
         }
     }
 }
@@ -249,16 +262,21 @@ private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions
                     Text(stringResource(R.string.viewer_show_region))
                 }
             }
-            SpanAction(stringResource(R.string.viewer_correct_for, preview), { actions.onCorrect(span) }) {
-                Text(stringResource(R.string.viewer_correct))
-            }
-            if (rejected) {
-                SpanAction(stringResource(R.string.viewer_undo_reject_for, preview), { actions.onUndoReject(span) }) {
-                    Text(stringResource(R.string.viewer_undo_reject))
+            if (!actions.readOnly) {
+                SpanAction(stringResource(R.string.viewer_correct_for, preview), { actions.onCorrect(span) }) {
+                    Text(stringResource(R.string.viewer_correct))
                 }
-            } else {
-                SpanAction(stringResource(R.string.viewer_reject_span_for, preview), { actions.onReject(span) }) {
-                    Text(stringResource(R.string.viewer_reject_span))
+                if (rejected) {
+                    SpanAction(
+                        stringResource(R.string.viewer_undo_reject_for, preview),
+                        { actions.onUndoReject(span) },
+                    ) {
+                        Text(stringResource(R.string.viewer_undo_reject))
+                    }
+                } else {
+                    SpanAction(stringResource(R.string.viewer_reject_span_for, preview), { actions.onReject(span) }) {
+                        Text(stringResource(R.string.viewer_reject_span))
+                    }
                 }
             }
         }

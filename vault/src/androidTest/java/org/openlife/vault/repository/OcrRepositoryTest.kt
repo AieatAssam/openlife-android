@@ -386,6 +386,27 @@ class OcrRepositoryTest {
     }
 
     /**
+     * P3-05 review U-01: a reading id from a route is looked up with its Source. A reading of another Source is
+     * never returned, even though the id exists; an id that does not exist is never returned either.
+     */
+    @Test
+    fun observeOcrViewOfRevisionRefusesAReadingOfAnotherSource(): Unit = runBlocking {
+        val sourceA = prepareAndSave(colour = 0xFF0000FF.toInt())
+        val sourceB = prepareAndSave(colour = 0xFF00FF00.toInt())
+        val repository = repository(TestEngine { OcrEngineOutput(listOf(OcrSpanDraft("reading of B", null, null))) })
+        val readingOfB = repository.runOcr(sourceB) as OcrRunResult.Completed
+        kotlinx.coroutines.withTimeout(VIEW_TIMEOUT_MS) { repository.observeOcrView(sourceB).first { it != null } }
+
+        assertEquals(
+            "the owning Source gets its reading",
+            readingOfB.revisionId,
+            repository.observeOcrViewOfRevision(sourceB, readingOfB.revisionId).first()?.revision?.id,
+        )
+        assertNull("another Source gets nothing", repository.observeOcrViewOfRevision(sourceA, readingOfB.revisionId).first())
+        assertNull("an unknown reading gets nothing", repository.observeOcrViewOfRevision(sourceA, UUID.randomUUID()).first())
+    }
+
+    /**
      * P2-06-R13/R14 (E-06, E-07): reject and undo only append review rows, never
      * touch the span text, are refused unless the revision is READY or the
      * span is in the right state, and reach the viewer through the flow.
@@ -461,9 +482,9 @@ class OcrRepositoryTest {
     private fun nullOrRevision(result: OcrRunResult): UUID? =
         (result as? OcrRunResult.Failed)?.revisionId
 
-    private suspend fun prepareAndSave(): UUID {
+    private suspend fun prepareAndSave(colour: Int = 0): UUID {
         val prepared = importRepository.prepareImport(
-            ByteArrayInputStream(syntheticJpegBytes()), "image/jpeg", IntakeKind.SHARE,
+            ByteArrayInputStream(syntheticJpegBytes(colour)), "image/jpeg", IntakeKind.SHARE,
         ) as PrepareResult.Prepared
         importRepository.saveImport(prepared.sourceId)
         return prepared.sourceId
@@ -484,8 +505,9 @@ class OcrRepositoryTest {
         deadlineMillis = deadlineMillis,
     )
 
-    private fun syntheticJpegBytes(): ByteArray {
+    private fun syntheticJpegBytes(colour: Int = 0): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 48, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(colour)
         val out = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
         bitmap.recycle()

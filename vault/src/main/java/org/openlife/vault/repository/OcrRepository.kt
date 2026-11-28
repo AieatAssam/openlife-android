@@ -10,6 +10,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
@@ -283,6 +284,31 @@ class OcrRepository(
 
     suspend fun findRevision(revisionId: UUID): OcrRevision? =
         database.ocrDao().findRevision(revisionId.toString())?.toDomain()
+
+    /**
+     * P3-05-R3 (C2-R39): the reading [revisionId] names, not the source's latest. An earlier reading has no
+     * history of its own here; it is shown as it was recorded. Emits null when the reading does not exist.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeOcrViewOfRevision(sourceId: UUID, revisionId: UUID): Flow<OcrView?> {
+        val views = database.ocrViewDao()
+        val id = revisionId.toString()
+        return flow { emit(database.ocrDao().findRevisionOfSource(id, sourceId.toString())) }
+            .flatMapLatest { revision ->
+                if (revision == null) {
+                    flowOf(null)
+                } else {
+                    combine(
+                        views.observeSpans(id),
+                        views.observeUserRevisions(id),
+                        database.ocrSpanReviewDao().observeForRevision(id),
+                    ) { spans, corrections, reviews ->
+                        ocrViewOf(revision, emptyList(), spans, corrections, reviews)
+                    }
+                }
+            }
+            .flowOn(ioDispatcher)
+    }
 
     suspend fun addCorrection(revisionId: UUID, spanId: UUID?, correctedText: String): Boolean =
         withContext(ioDispatcher) {

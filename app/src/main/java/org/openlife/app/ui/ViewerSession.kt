@@ -58,6 +58,9 @@ interface ViewerPorts<T : Any> {
 
     fun ocrState(sourceId: UUID): StateFlow<OcrUiState>
 
+    /** P3-05-R3 (C2-R39): the state of the reading [revisionId] of [sourceId], never the source's latest. */
+    fun readingState(sourceId: UUID, revisionId: UUID): StateFlow<OcrUiState>
+
     /** Runs beyond the screen (application scope); [onDeleted] reports whether the source is gone. */
     fun delete(sourceId: UUID, onDeleted: (Boolean) -> Unit)
 }
@@ -80,16 +83,22 @@ interface SavedValues {
  * pan are saved as a UUID string and floats; nothing else is saved.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("TooManyFunctions") // one viewer session: OCR, earlier reading, facts and delete (P3-05-R3)
 class ViewerSession<T : Any>(
     val sourceId: UUID,
     initialSpanId: UUID?,
     private val ports: ViewerPorts<T>,
     private val saved: SavedValues,
     private val scope: CoroutineScope,
+    /** Set when the viewer shows an earlier reading (C2-R39): read-only, named by id only. */
+    private val readingId: UUID? = null,
+    /** P3-05 review U-02: the route asked for an earlier reading, even when its id did not parse. */
+    private val earlierReading: Boolean = readingId != null,
 ) {
     private val mutableSource = MutableStateFlow<SourceLookup>(SourceLookup.Loading)
     private val slot = ContentSlot<T>(ports::release)
     private val mutableOcr = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
+    private val unavailableOcr = MutableStateFlow<OcrUiState>(OcrUiState.Unavailable)
     private val mutableSelected = MutableStateFlow(saved.restoredSelection(initialSpanId))
     private val mutableExit = MutableStateFlow(false)
     private val exitConsumed = AtomicBoolean(false)
@@ -102,6 +111,9 @@ class ViewerSession<T : Any>(
     val content: StateFlow<DecodedContent<T>> = slot.state
     val ocr: StateFlow<OcrUiState> = mutableOcr.asStateFlow()
     val selectedSpanId: StateFlow<UUID?> = mutableSelected.asStateFlow()
+
+    /** P3-05-R3: an earlier reading is read-only; the current reading is not. */
+    val readOnly: Boolean get() = earlierReading
 
     /** The source is gone (deleted here or elsewhere): the destination returns to the list once. */
     val exitRequested: StateFlow<Boolean> = mutableExit.asStateFlow()
@@ -157,7 +169,9 @@ class ViewerSession<T : Any>(
         saved[KEY_PAN_Y] = panY
     }
 
+    /** P3-05 review U-03: an earlier reading is read-only and never asks the store to delete its source. */
     fun delete() {
+        if (readOnly) return
         ports.delete(sourceId) { deleted -> if (deleted) mutableExit.value = true }
     }
 
@@ -183,8 +197,15 @@ class ViewerSession<T : Any>(
             }
         }
         ocrJob = scope.launch {
-            ports.ocrGeneration.flatMapLatest { ports.ocrState(sourceId) }.collect { mutableOcr.value = it }
+            ports.ocrGeneration.flatMapLatest { currentOcr() }.collect { mutableOcr.value = it }
         }
+    }
+
+    /** P3-05 review U-02: an earlier reading whose id did not parse shows Unavailable, never the latest text. */
+    private fun currentOcr(): StateFlow<OcrUiState> = when {
+        readingId != null -> ports.readingState(sourceId, readingId)
+        earlierReading -> unavailableOcr
+        else -> ports.ocrState(sourceId)
     }
 
     private fun drop(release: Boolean) {

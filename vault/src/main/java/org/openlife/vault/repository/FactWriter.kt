@@ -10,6 +10,8 @@ import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.UserMethod
 import org.openlife.vault.facts.UserValueShape
+import org.openlife.vault.facts.extract.UserValueNormaliser
+import org.openlife.vault.facts.extract.UserValueResult
 import org.openlife.vault.storage.FactDao
 import org.openlife.vault.storage.FactRevisionEntity
 import org.openlife.vault.storage.decodeStored
@@ -29,6 +31,7 @@ internal sealed interface FactWrite {
  * compare-and-set after a write throws, so the transaction rolls back
  * (C2-R23). The C2 triggers check the same rules a second time.
  */
+@Suppress("TooManyFunctions") // one method per write and read rule (C2-R23..R37); a split would scatter the gate
 internal class FactWriter(
     private val dao: FactDao,
     private val clock: () -> Long,
@@ -58,6 +61,13 @@ internal class FactWriter(
         check(dao.setStatus(revisionId, revision.status.name, next.name) == 1) { "status changed under the mutation" }
         dao.appendReviewEvent(newId(), revisionId, decision.name, clock())
         return FactWrite.Written(target.factId, revisionId)
+    }
+
+    /** C2-R36: the candidate set a clarification may choose from, for a current revision of a ready source. */
+    suspend fun candidatesOf(revisionId: String): FactValue? {
+        val target = currentTarget(revisionId) ?: return null
+        if (!target.sourceReady) return null
+        return candidatesBasis(target.revision)?.value
     }
 
     /** C2-R36: choose (or re-choose) one candidate of the extracted revision, byte for byte. */
@@ -126,7 +136,25 @@ internal class FactWriter(
     private fun isUserValue(kind: FactKind, value: FactValue): Boolean = value.isWithinBounds &&
         !value.isCandidates &&
         value.canonicalText.length <= FactLimits.MAX_USER_TEXT_CHARS &&
-        UserValueShape.matches(kind, value)
+        UserValueShape.matches(kind, value) &&
+        isNormalisedText(kind, value)
+
+    /**
+     * P3-05 review U-06: a URL, email, phone or money value is kept only when the single-value normaliser gives back
+     * its canonical text and its stored form from that text. A money value must match exactly. A text value's
+     * `normalized` part must match, and its `raw` part (the printed input, which the canonical text cannot restore)
+     * may be any JSON string. A value that disagrees with its text, or that the normaliser would change, refuse or
+     * read as another kind, is not written.
+     */
+    private fun isNormalisedText(kind: FactKind, value: FactValue): Boolean {
+        if (kind !in NORMALISED_KINDS) return true
+        val restored = (UserValueNormaliser.restore(kind, value.canonicalText) as? UserValueResult.Accepted)?.value
+            ?: return false
+        if (restored.canonicalText != value.canonicalText) return false
+        if (kind == FactKind.MONEY) return restored.valueJson == value.valueJson
+        val head = restored.valueJson.substringBefore(RAW_KEY) + RAW_KEY
+        return value.valueJson.startsWith(head) && RAW_TAIL.matches(value.valueJson.removePrefix(head))
+    }
 
     private suspend fun hasValueEvidence(revision: Revision): Boolean =
         revision.origin != FactOrigin.EXTRACTED || dao.countValueEvidence(revision.id) == 1
@@ -167,5 +195,12 @@ internal class FactWriter(
 
     private companion object {
         const val READY = "READY"
+
+        /** P3-05 review U-06: the kinds whose stored form the normaliser restores (see isNormalisedText). */
+        val NORMALISED_KINDS = setOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.MONEY)
+        const val RAW_KEY = ",\"raw\":\""
+
+        /** The printed `raw` JSON string and the object's closing brace. */
+        val RAW_TAIL = Regex("""(?:[^"\\]|\\.)*"\}""")
     }
 }

@@ -308,6 +308,36 @@ open class HostFactDao(private val host: HostSqlite) : FactDao {
     override suspend fun findRevision(id: String): FactRevisionEntity? =
         q(FactSql.FIND_REVISION, "id" to id).singleOrNull()?.let(::revisionOf)
 
+    override suspend fun evidenceOfRevision(revisionId: String): List<FactEvidenceEntity> =
+        q(FactSql.EVIDENCE_OF_REVISION, "revisionId" to revisionId).map { r ->
+            FactEvidenceEntity(
+                id = r[0] as String,
+                revisionId = r[1] as String,
+                ordinal = (r[2] as Long).toInt(),
+                role = r[3] as String,
+                sourceId = r[4] as String,
+                ocrRevisionId = r[5] as String,
+                ocrSpanId = r[6] as String,
+                ocrUserRevisionId = r[7] as String?,
+                textStart = (r[8] as Long?)?.toInt(),
+                textEnd = (r[9] as Long?)?.toInt(),
+                regionLeft = (r[10] as Long?)?.toInt(),
+                regionTop = (r[11] as Long?)?.toInt(),
+                regionRight = (r[12] as Long?)?.toInt(),
+                regionBottom = (r[13] as Long?)?.toInt(),
+                regionCoordinateSystem = r[14] as String?,
+            )
+        }
+
+    override suspend fun latestDecision(revisionId: String): String? =
+        q(FactSql.LATEST_DECISION, "revisionId" to revisionId).singleOrNull()?.single() as String?
+
+    override suspend fun extractionOutcomeOfCurrentReading(sourceId: String): String? =
+        q(FactSql.EXTRACTION_OUTCOME_OF_CURRENT_READING, "sourceId" to sourceId).singleOrNull()?.single() as String?
+
+    override suspend fun currentReadingId(sourceId: String): String? =
+        q(FactSql.CURRENT_READING_OF_SOURCE, "sourceId" to sourceId).singleOrNull()?.single() as String?
+
     override suspend fun sourceState(sourceId: String): String? =
         q(FactSql.SOURCE_STATE, "sourceId" to sourceId).singleOrNull()?.single() as String?
 
