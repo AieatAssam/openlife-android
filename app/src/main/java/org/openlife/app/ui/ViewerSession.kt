@@ -92,10 +92,13 @@ class ViewerSession<T : Any>(
     private val scope: CoroutineScope,
     /** Set when the viewer shows an earlier reading (C2-R39): read-only, named by id only. */
     private val readingId: UUID? = null,
+    /** P3-05 review U-02: the route asked for an earlier reading, even when its id did not parse. */
+    private val earlierReading: Boolean = readingId != null,
 ) {
     private val mutableSource = MutableStateFlow<SourceLookup>(SourceLookup.Loading)
     private val slot = ContentSlot<T>(ports::release)
     private val mutableOcr = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
+    private val unavailableOcr = MutableStateFlow<OcrUiState>(OcrUiState.Unavailable)
     private val mutableSelected = MutableStateFlow(saved.restoredSelection(initialSpanId))
     private val mutableExit = MutableStateFlow(false)
     private val exitConsumed = AtomicBoolean(false)
@@ -110,7 +113,7 @@ class ViewerSession<T : Any>(
     val selectedSpanId: StateFlow<UUID?> = mutableSelected.asStateFlow()
 
     /** P3-05-R3: an earlier reading is read-only; the current reading is not. */
-    val readOnly: Boolean get() = readingId != null
+    val readOnly: Boolean get() = earlierReading
 
     /** The source is gone (deleted here or elsewhere): the destination returns to the list once. */
     val exitRequested: StateFlow<Boolean> = mutableExit.asStateFlow()
@@ -166,7 +169,9 @@ class ViewerSession<T : Any>(
         saved[KEY_PAN_Y] = panY
     }
 
+    /** P3-05 review U-03: an earlier reading is read-only and never asks the store to delete its source. */
     fun delete() {
+        if (readOnly) return
         ports.delete(sourceId) { deleted -> if (deleted) mutableExit.value = true }
     }
 
@@ -196,8 +201,12 @@ class ViewerSession<T : Any>(
         }
     }
 
-    private fun currentOcr(): StateFlow<OcrUiState> =
-        readingId?.let { ports.readingState(sourceId, it) } ?: ports.ocrState(sourceId)
+    /** P3-05 review U-02: an earlier reading whose id did not parse shows Unavailable, never the latest text. */
+    private fun currentOcr(): StateFlow<OcrUiState> = when {
+        readingId != null -> ports.readingState(sourceId, readingId)
+        earlierReading -> unavailableOcr
+        else -> ports.ocrState(sourceId)
+    }
 
     private fun drop(release: Boolean) {
         contentJob?.cancel()

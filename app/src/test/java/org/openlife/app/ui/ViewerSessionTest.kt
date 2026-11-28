@@ -263,6 +263,28 @@ class ViewerSessionTest {
         assertEquals(readyOcr(), session.ocr.value)
     }
 
+    /** P3-05 review U-02: an earlier reading whose id does not parse stays read-only and shows no latest text. */
+    @Test
+    fun malformedReadingIdStaysReadOnly() {
+        ports.ocr.value = OcrUiState.Idle
+        ports.reading.value = readyOcr()
+        ports.sources.value = SourceLookup.Found(source())
+        val session = ViewerSession(sourceId, null, ports, saved, scope, readingId = null, earlierReading = true)
+        session.onVisible()
+
+        assertTrue(session.readOnly)
+        assertEquals(null, ports.readingRequested)
+        assertEquals(OcrUiState.Unavailable, session.ocr.value)
+    }
+
+    /** P3-05 review U-03: an earlier reading never asks the store to delete its source. */
+    @Test
+    fun deleteIsANoOpWhenReadOnly() {
+        val session = newSession(readingId = UUID(0L, 55L))
+        session.delete()
+        assertNull(ports.deleteCallback)
+    }
+
     @Test
     fun aCurrentReadingSessionIsNotReadOnly() {
         val session = newSession()

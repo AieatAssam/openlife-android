@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import org.openlife.app.AppContainer
+import org.openlife.app.SourceStore
 import org.openlife.app.navigation.Routes
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.UserContentKind
@@ -39,7 +40,11 @@ class ViewerViewModel(private val container: AppContainer, handle: SavedStateHan
         saved = HandleSavedValues(handle),
         scope = viewModelScope,
         readingId = route.readingId?.toUuidOrNull(),
+        earlierReading = route.readingId != null,
     )
+
+    /** P3-05 review U-03: every write from this viewer goes through the read-only guard. */
+    private val writes = ViewerWrites(session.sourceId, session.readOnly, container.ocr, container.sources)
 
     // Hidden: drop now and stay dropped until visible again; trim: drop and reload if visible.
     private val unregisterScrub = container.scrubber.register { hidden ->
@@ -48,20 +53,20 @@ class ViewerViewModel(private val container: AppContainer, handle: SavedStateHan
 
     val sourceId: UUID get() = session.sourceId
 
-    fun extractText() = container.ocr.run(sourceId)
+    fun extractText() = writes.extractText()
 
-    fun cancelOcr() = container.ocr.cancel(sourceId)
+    fun cancelOcr() = writes.cancelOcr()
 
     fun correct(revisionId: UUID, spanId: UUID, correctedText: String) =
-        container.ocr.correct(revisionId, spanId, correctedText)
+        writes.correct(revisionId, spanId, correctedText)
 
-    fun review(revisionId: UUID, reviewState: OcrReviewState) = container.ocr.review(revisionId, reviewState)
+    fun review(revisionId: UUID, reviewState: OcrReviewState) = writes.review(revisionId, reviewState)
 
-    fun rejectSpan(spanId: UUID) = container.ocr.rejectSpan(spanId)
+    fun rejectSpan(spanId: UUID) = writes.rejectSpan(spanId)
 
-    fun undoRejectSpan(spanId: UUID) = container.ocr.undoRejectSpan(spanId)
+    fun undoRejectSpan(spanId: UUID) = writes.undoRejectSpan(spanId)
 
-    fun setUserContentKind(kind: UserContentKind?) = container.sources.setUserContentKind(sourceId, kind)
+    fun setUserContentKind(kind: UserContentKind?) = writes.setUserContentKind(kind)
 
     override fun onCleared() {
         unregisterScrub()
@@ -75,6 +80,45 @@ class ViewerViewModel(private val container: AppContainer, handle: SavedStateHan
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer { ViewerViewModel(container, createSavedStateHandle()) }
         }
+    }
+}
+
+/**
+ * P3-05 review U-03: the writes a viewer asks for. RED stub: the read-only flag is not yet applied, so every
+ * write reaches the store even when the viewer shows an earlier reading.
+ */
+internal class ViewerWrites(
+    private val sourceId: UUID,
+    private val readOnly: Boolean,
+    private val ocr: OcrPresenter,
+    private val sources: SourceStore,
+) {
+    fun extractText() {
+        if (!readOnly) ocr.run(sourceId)
+    }
+
+    fun cancelOcr() {
+        if (!readOnly) ocr.cancel(sourceId)
+    }
+
+    fun correct(revisionId: UUID, spanId: UUID, correctedText: String) {
+        if (!readOnly) ocr.correct(revisionId, spanId, correctedText)
+    }
+
+    fun review(revisionId: UUID, reviewState: OcrReviewState) {
+        if (!readOnly) ocr.review(revisionId, reviewState)
+    }
+
+    fun rejectSpan(spanId: UUID) {
+        if (!readOnly) ocr.rejectSpan(spanId)
+    }
+
+    fun undoRejectSpan(spanId: UUID) {
+        if (!readOnly) ocr.undoRejectSpan(spanId)
+    }
+
+    fun setUserContentKind(kind: UserContentKind?) {
+        if (!readOnly) sources.setUserContentKind(sourceId, kind)
     }
 }
 
