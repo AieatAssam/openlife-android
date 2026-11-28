@@ -108,3 +108,66 @@ Their failure elements carry no message, and each takes under 10 ms, so they fai
 3. Per-kind 64 skip (C2-R57): tested by `kindOver64IsSkippedOthersCommit` and `kindAtExactly64IsCommittedInFull`.
 4. Auto-run from OCR READY (C2-R30): tested on device by `autoRunAfterReadyCreatesFactsOnce`.
 5. Full suite: run on the tablet as above (191 tests, the three opt-in failures expected).
+
+## Verification fixes (2026-11-28)
+
+Commits on `plan/P3-04-extraction-pipeline`, in order (RED before GREEN for each item):
+
+- `39e99d0 P3-04: detekt fixes in the guard tests (line length, import order)`
+- `22fa3b9 P-06: cancellation writes nothing before the commit; NonCancellable only inside the transaction`
+- `15df3b4 P-06: RED test for a run cancelled before its commit`
+- `1740521 P-03: break continuation ties by fact ordinal (C2-R33)`
+- `64ed29d P-03: RED test for the continuation tie-break by fact ordinal`
+- `6510058 P-02: key the duplicate check on the full extraction key`
+- `5378b50 P-02: RED tests for the stale-clarification and textStart duplicate key`
+
+### P-02: duplicate key (C2-R32 step 1)
+
+The key is `(kind, valueJson, ocrSpanId, ocrUserRevisionId, textStart)` over EXTRACTED history rows of facts whose current revision is not STALE. Two RED tests failed on the previous key, as intended:
+
+- `rerunAfterStaleClarificationExtractsTheValueAgain`: a USER clarification goes STALE through the production marker (BASIS). The re-run must extract the value again. RED: the value was skipped.
+- `sameValueAtAnotherOffsetIsWrittenAgain`: the same date at a second `textStart` in the same span is written. RED: it was skipped.
+
+Decision: the stale USER fact is not an EXTRACTED continuation target, so the re-extracted value becomes a new fact, not a revision of the old one. The first test asserts that one DATE fact has an EXTRACTED, non-STALE current revision, not the original fact id.
+
+Mutations (run on the GREEN code, file restored after each):
+
+- M7, `textStart` removed from the key: `sameValueAtAnotherOffsetIsWrittenAgain` fails, and `rerunAfterClarifyCreatesNothing` fails too.
+- M8, stale-fact exclusion removed: `rerunAfterStaleClarificationExtractsTheValueAgain` fails.
+
+### P-03: continuation tie-break (C2-R33)
+
+`continuationTieFollowsFactOrdinalWhateverTheRowOrder` puts two stale DATE facts on an equal overlap and returns the history rows in reverse. The lower ordinal must continue. RED: the higher ordinal continued. GREEN: `sortedBy { it.first.factOrdinal }` before `maxByOrNull`.
+
+The test uses a `HostFactDao` subclass that reverses `revisionHistoryOfSource`. This is test-side only. The production SQL has no ORDER BY, by decision, and a fact ordinal is assigned as MAX+1 on insert, so no legal insert sequence produces the reversed order. The subclass is the only way to reach this branch. `HostFactDao` is now `open` for it.
+
+Mutation M9, sort removed: `continuationTieFollowsFactOrdinalWhateverTheRowOrder` fails.
+
+The earlier test `continuationTieBreakIsOverlapThenFactOrdinal` passes by insertion order, which matches ordinal order, so it does not exercise the tie-break on its own.
+
+### P-06: cancellation
+
+- `cancelledBeforeCommitWritesNothing` cancels the job inside the gate's `read`. RED: two facts were written. GREEN: `currentCoroutineContext().ensureActive()` before the commit, so the run writes no fact and no run row.
+- `cancellationDuringTransactionDoesNotTearTheCommit` replaces `commitIsNotInterruptedByCancellation`. It cancels inside the first `insertFact`, during the transaction, and the commit must still finish with `COMPLETED`, 2 facts and 1 run row. It passed before the change, as a boundary test. `NonCancellable` now wraps only the gate's commit body. The terminal run row keeps `NonCancellable`, after the same check.
+
+Mutations (GREEN code, file restored after each):
+
+- M10, commit body made cancellable (`NonCancellable` removed): `cancellationDuringTransactionDoesNotTearTheCommit` fails.
+- M11, pre-commit check removed: `cancelledBeforeCommitWritesNothing` fails.
+
+Decision for the coordinator: a cancelled run throws `CancellationException` and writes nothing. `ExtractionOutcome` has no `CANCELLED` value, and none was added.
+
+### Gate and device results
+
+- `./gradlew :vault:testDebugUnitTest`: 299 tests, 0 failures, 0 errors.
+- Full gate, one foreground run (`./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`). It first failed detekt on line length and import order in the guard test, fixed in `39e99d0`. The last line of the passing run: `BUILD SUCCESSFUL in 3m 55s`.
+- `scripts/plan-check.sh`: `steps=83 errors=0`, `runnable now: []`.
+- Tablet `U8BBB20806201256`, `stay_on_while_plugged_in` set to 3 for the runs and read back as `0` afterwards:
+  - `FactExtractionRepositoryTest`: 8 tests, 0 failures, 0 errors, 0 skipped (XML from the run).
+  - `OcrFactHooksTest`: 11 tests, 0 failures, 0 errors, 0 skipped (XML timestamp 01:19:38, from the run).
+
+### Open after these fixes
+
+1. C2-R33 specifies a global greedy pairing: take the greatest overlap across all candidates and stale facts, remove the pair, repeat. The code pairs candidate by candidate. Not changed here; for the coordinator.
+2. P-07 has no dedicated failing test.
+3. The three opt-in measurement tests (`OcrEngineMeasurementTest`, `OcrEvaluationTest`, `RecoveryTimingTest`) fail without their argument, and Gradle still reports `BUILD SUCCESSFUL` for the full connected run. Not re-run in this pass; the XML is the authority.
