@@ -24,6 +24,7 @@ class FakeFactsGateway(
     private val rows: List<FactWithLatestRevision> = emptyList(),
     private val evidence: List<FactEvidence> = emptyList(),
     private val readingId: UUID? = null,
+    private val candidates: Map<UUID, FactValue> = emptyMap(),
 ) : FactsGateway {
     val reviews = mutableListOf<Pair<UUID, ReviewDecision>>()
     val clarifications = mutableListOf<Pair<UUID, FactValue>>()
@@ -38,6 +39,8 @@ class FakeFactsGateway(
     override suspend fun currentReadingId(sourceId: UUID): UUID? = readingId
 
     override suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> = evidence
+
+    override suspend fun candidatesOf(revisionId: UUID): FactValue? = candidates[revisionId]
 
     override suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult {
         reviews += revisionId to decision

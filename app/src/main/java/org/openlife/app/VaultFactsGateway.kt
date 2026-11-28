@@ -37,6 +37,8 @@ internal class VaultFactsGateway(private val app: OpenLifeApp) : FactsGateway {
     override suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> =
         withFacts(emptyList()) { it.evidenceOf(revisionId) }
 
+    override suspend fun candidatesOf(revisionId: UUID): FactValue? = TODO("P3-05 C2-R36 RED stub")
+
     override suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult =
         withFacts(FactWriteResult.Failed) { it.review(revisionId, decision) }
 

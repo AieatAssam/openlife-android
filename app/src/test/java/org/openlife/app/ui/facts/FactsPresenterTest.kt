@@ -61,6 +61,7 @@ class FactsPresenterTest {
         val additions = mutableListOf<Triple<UUID, FactKind, FactValue>>()
         val corrections = mutableListOf<Pair<UUID, FactValue>>()
         val findAgainSources = mutableListOf<UUID>()
+        val candidateSets = mutableMapOf<UUID, FactValue>()
 
         override fun facts(sourceId: UUID) = rows
 
@@ -71,6 +72,8 @@ class FactsPresenterTest {
         override suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = ExtractionCheck.Completed
         override suspend fun currentReadingId(sourceId: UUID): UUID? = null
         override suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> = emptyList()
+
+        override suspend fun candidatesOf(revisionId: UUID): FactValue? = candidateSets[revisionId]
 
         override suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult {
             reviews += revisionId to decision
@@ -113,9 +116,12 @@ class FactsPresenterTest {
 
     @Test
     fun chooseCandidateSendsTheChosenEntryAndItsText() = runBlocking {
-        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val row = candidateRow()
+        val gateway = FakeGateway(MutableStateFlow(listOf(row)))
+        gateway.candidateSets[row.revision.id] = row.revision.value
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        val item = toItemFor(candidateRow())
+        presenter.start()
+        val item = (presenter.state.value as FactsUiState.Ready).items.single()
         presenter.chooseCandidate(item, 1)
         assertEquals(
             listOf(item.revisionId to FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03")),
@@ -124,6 +130,23 @@ class FactsPresenterTest {
     }
 
     /** P3-05-R1 (C2-R37): a correction goes through the same input as Add a fact; a refusal never reaches the gateway. */
+    @Test
+    fun aClarifiedValueOffersItsCandidatesAndRechoosingSendsOneOfThem() = runBlocking {
+        val candidates = "{\"candidates\":[{\"date\":\"2026-03-04\"},{\"date\":\"2026-04-03\"}]}"
+        val clarified = row(FactOrigin.USER, FactStatus.CONFIRMED, "2026-04-03")
+        val gateway = FakeGateway(MutableStateFlow(listOf(clarified)))
+        gateway.candidateSets[clarified.revision.id] = FactValue(candidates, "2026-03-04 | 2026-04-03")
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        presenter.start()
+        val item = (presenter.state.value as FactsUiState.Ready).items.single()
+        assertEquals(candidates, item.candidates?.valueJson)
+        presenter.chooseCandidate(item, 0)
+        assertEquals(
+            listOf(item.revisionId to FactValue("{\"date\":\"2026-03-04\"}", "2026-03-04")),
+            gateway.clarifications,
+        )
+    }
+
     @Test
     fun correctSendsTheNormalisedValueForThatRevisionAndNeverARefusedOne() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))

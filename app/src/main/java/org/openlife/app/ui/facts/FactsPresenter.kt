@@ -35,6 +35,9 @@ interface FactsGateway {
 
     suspend fun evidenceOf(revisionId: UUID): List<FactEvidence>
 
+    /** C2-R36: the candidate set a clarification may choose from for this revision; null when it offers none. */
+    suspend fun candidatesOf(revisionId: UUID): FactValue?
+
     suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult
 
     suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult
@@ -76,6 +79,8 @@ class FactItem(
     val value: FactValue,
     val candidateTexts: List<String>,
     val evidence: List<FactEvidence> = emptyList(),
+    /** C2-R36: the candidates this value may be re-chosen from; null when none. */
+    val candidates: FactValue? = null,
 ) {
     val needsClarification: Boolean get() = status == FactStatus.CLARIFICATION_NEEDED
     val isStale: Boolean get() = status == FactStatus.STALE

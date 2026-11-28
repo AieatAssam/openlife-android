@@ -2,6 +2,7 @@ package org.openlife.app.ui.facts
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -192,6 +193,29 @@ class FactsFlowTest {
         assertEquals("the choice must name the revision shown", row.revision.id, revisionId)
         assertEquals("the chosen candidate keeps its stored entry", "{\"date\":\"2026-03-04\"}", chosen.valueJson)
         assertEquals("2026-03-04", chosen.canonicalText)
+    }
+
+    @Test
+    fun aClarifiedChoiceOffersTheOtherCandidatesAndSendsTheChosenOne() {
+        val source = source(UUID(0L, 43L))
+        val chosen = FactValue("{\"date\":\"2026-03-04\"}", "2026-03-04")
+        val row = FakeFactsGateway.row(source.id, FactKind.DATE, FactOrigin.USER, FactStatus.CONFIRMED, chosen)
+        val candidates = mapOf(row.revision.id to FactValue(CANDIDATES_JSON, "2026-03-04 | 2026-04-03"))
+        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING, candidates = candidates)
+        openFacts(source, facts)
+
+        // P3-05-R7 (C2-R36): a clarified value can be re-chosen from the candidates it was chosen from.
+        val other = FactDisplay.value(FactKind.DATE, "2026-04-03", Locale.getDefault())
+        awaitText(other)
+        val current = InstrumentationRegistry.getInstrumentation().targetContext
+            .getString(R.string.facts_choice_current)
+        composeRule.onNodeWithText(current).assertIsDisplayed()
+        composeRule.onNodeWithText(other).performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.clarifications.isNotEmpty() }
+        val (revisionId, picked) = facts.clarifications.single()
+        assertEquals("the re-choice must name the revision shown", row.revision.id, revisionId)
+        assertEquals("the re-chosen candidate keeps its stored entry", "{\"date\":\"2026-04-03\"}", picked.valueJson)
     }
 
     @Test

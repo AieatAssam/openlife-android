@@ -361,6 +361,7 @@
     <string name="facts_reject">Reject</string>
     <string name="facts_reopen">Reopen</string>
     <string name="facts_choose_heading">Which value is right?</string>
+    <string name="facts_choice_current">Current choice</string>
     <string name="facts_add">Add a fact</string>
     <string name="facts_add_input_label">Value to add</string>
     <string name="facts_add_save">Save fact</string>
