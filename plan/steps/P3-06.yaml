@@ -20,45 +20,87 @@ requirements:
   - id: P3-06-R3
     text: "MUST run the JVM part in `:vault:test` (fast) so every change checks it; the image part is @Slow on main-branch CI."
 
-files_touched: [eval/facts/v1/*, vault/src/test/.../facts/eval/*, docs/verification/facts-eval.md]
+files_touched: [eval/facts/v1/*, vault/src/test/.../facts/eval/*, vault/src/androidTest/.../facts/eval/*, docs/verification/facts-eval.md]
 tdd:
   red:
     - name: FactsEvalTest.gateThresholdsAreMet (RED until extractors reach the bar)
   green: ["Tune extractors within the conservative rules; never loosen thresholds without an ADR."]
   refactor: []
 verification:
-  commands: ["./gradlew :vault:test", "./gradlew :vault:connectedDebugAndroidTest --tests '*FactsImageEval*'"]
+  commands: ["./gradlew :vault:test", "./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.facts.eval.FactsImageEval -Pandroid.testInstrumentationRunnerArguments.p306FactsImage=true"]
   evidence_required: ["Metrics table"]
 acceptance_criteria: ["Gate met and recorded."]
 docs_to_update: [docs/verification/facts-eval.md, docs/capabilities/C2.md]
 risks: []
 rollback: "Eval remains."
 evidence: >
-  RED a5043c3 (gate, gate pin and the failing gate test); GREEN 67847c2
-  (fixture parser, scorer; gate passes on the JVM text part); REFACTOR 4f66788
-  (detekt only, no behaviour change). Gate (summary.tsv of the :vault:test run):
-  DATE precision 54/54 = 1.0000 and recall 54/54 = 1.0000; MONEY precision
-  34/34; URL 10/10; EMAIL 8/8; PHONE 10/10 (all precision 1.0000); ambiguous
-  d/m flagged 11/11; bare currency inferred 0. Full table in
-  docs/verification/facts-eval.md. Verify (docs/verification/P3-06-facts-eval.md):
-  ./gradlew detekt lint :vault:test :eval:test -> BUILD SUCCESSFUL 2m 12s
-  (after the EvalBoundaryTest allowlist fix); ./gradlew detekt lint
-  assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
-  -> BUILD SUCCESSFUL 2m 1s; ./gradlew :app:test -> BUILD SUCCESSFUL 5s;
-  scripts/plan-check.sh -> steps=83 errors=0; bash scripts/tests/run.sh ->
-  51 passed, 0 failed.
+  RED a5043c3; GREEN 67847c2; REFACTOR 4f66788 (text part). JVM gate met
+  (summary.tsv of the :vault:test run): DATE precision 54/54 = 1.0000 and
+  recall 54/54 = 1.0000; MONEY 34/34; URL 10/10; EMAIL 8/8; PHONE 10/10;
+  ambiguous d/m flagged 11/11; bare currency inferred 0.
+  Image part: fixtures and generator b3a47c2 and c36f0d2 (30 PNG, truth JSON,
+  manifest.tsv, gate copy; FactsImageSetTest 2 tests pass); androidTest
+  wiring and EvalBoundaryTest 1346f9f; classification by surface form 3f76a56.
+  Tablet run (HUAWEI AGS2-W09, Android 8.0.0, sdk 26, arm64-v8a, adb serial
+  U8BBB20806201256, 2026-11-28): FactsImageEval.measureBothEnginesOverTheFactsImages
+  with the p306FactsImage opt-in. Test passed: 1 test, 0 failures, 0 errors,
+  0 skipped, about 26.5 s. R2 image gate FAIL on both engines, as measured:
+  Tesseract eng-fast DATE precision 28/29 = 0.9655 (min 0.97) and PHONE
+  4/5 = 0.8000 (min 0.95); ML Kit latin DATE precision 26/27 = 0.9630, MONEY
+  12/13 = 0.9231, URL 3/4 = 0.7500. Full table in docs/verification/facts-eval.md;
+  reports in docs/verification/facts-image-results/. Verification commands and
+  output: docs/verification/P3-06-facts-eval.md.
 notes: >
-  Synthetic text fixture only: eval/facts/v1/text.tsv (200 rows, expectations
+  Synthetic only. Text part: eval/facts/v1/text.tsv (200 rows, expectations
   written from ADR-0008 and amendments, never from extractor output). Image
-  cases (P3-06-R1, 30 cases) deferred under Q-12 until the OCR gate is measured.
-  Gap: the step's command ./gradlew :vault:connectedDebugAndroidTest --tests
-  '*FactsImageEval*' cannot run because no class FactsImageEval exists; no
-  instrumented run and no tablet run (device gap). Known deviations: D-1 M-20
-  (two silent MONEY misses, ADR-0008 5.4 lines 521 and 549) and D-2 T-14 (bare
-  1430 abstention not recorded, ADR-0008 line 314); both kept, both reported,
-  gate not loosened. Edited test-side only: eval/src/test/.../EvalBoundaryTest.kt
-  allowlist for the factsSet input in vault/build.gradle.kts. Unexplained: a
-  background :app:testDebugUnitTest failure with no test name in its log; a
-  foreground rerun passed (5s on :app:test). Dependency P3-04 is at review.
-  Adversarial review is not required by this step (not in the owner's list of
-  specification steps) and was not run.
+  part (P3-06-R1): eval/facts/v1/image-cases.tsv and images/ (30 PNG, truth JSON,
+  manifest), rendered by ./gradlew :eval:generateFactsImages.
+  The step's command was written as --tests '*FactsImageEval*'. The tablet run
+  used the class argument with the p306FactsImage opt-in (one class per run).
+  The instrumented test does not assert the gate. It fails only for an invalid
+  set or an unprocessed image (FactsImageEval.kt header). The image gate is a
+  recorded measurement; the JVM gate is the enforced one.
+  Status: review, set after the gate command passed. Acceptance "Gate met and
+  recorded" is NOT met for the image part (R2 FAILS on both engines). The
+  reviewer decides whether that blocks P3-08.
+  Known deviations and findings (follow-ups, not fixed here):
+  D-1 (M-20): two silent MONEY misses in the text part (ADR-0008 5.4 lines 521
+  and 549); also an extension in the single-line form. Kept, reported.
+  D-2 (T-14): bare 1430 abstention not recorded (ADR-0008 line 314). Kept, reported.
+  F1 OCR space drops: Tesseract img-16 "9:15 am" read "9:15am" (TIME, canonical
+  09:15 correct, scored UNEXPECTED); Tesseract img-20 "+1 555 123 4567" read
+  "+1555 123 4567" (PHONE, canonical correct, scored UNEXPECTED); ML Kit img-14
+  URL read with a space before "#top", truncating the URL to
+  https://example.org/a?b=1&c=2 (a wrong value). Matching is exact on the raw
+  slice (README), so the extractor cannot recover a dropped space. Owner
+  decision: OCR-side normalisation or a stated matching rule.
+  F2 img-21 extractor gap (ML Kit): "Doors 6:00 pm -11:00 pm" gives no candidate
+  and no abstention for either time. Check the time-range rules (ADR-0008 4.2).
+  F3 img-30 en dash (ML Kit): "Coffee – €3.50" read "Coffee-€3.50", producing a
+  wrong MONEY -€3.50 (-3.50 EUR) on the negative row. Check the sign rule
+  (ADR-0008 5.1 to 5.2) and whether OCR should normalise the dash.
+  F4 img-19 (ML Kit): "1:30 pm" read "1:30 pmn". The result is an UNEXPECTED
+  clarification DATE 01:30 | 13:30, which lowers DATE precision (it is not a
+  definite value and is not in wrong_definite), and a silent miss on "1:30 pm".
+  The classifier calls the miss EXTRACTOR_MISS; the cause is borderline because
+  the OCR text is not clean.
+  F5 deviation: the image path does not use the Room / FactExtractionCore path
+  from P3-04. It runs FactExtractor.extract on the OCR spans. Follow-up: run the
+  image set through the repository path when P3-05 or P3-07 need it.
+  F6 conflict: the brief said images are rendered to a bitmap on the device.
+  They are host-rendered PNG assets, reusing the P2-04 renderer and IBM Plex,
+  packaged into the androidTest APK. Owner decision.
+  F7 gap: abstention and evidence-location correctness per kind are not reported
+  for the image part (R1 asks for them).
+  Surface-form miss split (the classifier reports both):
+  Tesseract 2 misses, OCR_MISREAD 2 (img-16, img-20). Whitespace-insensitive:
+  EXTRACTOR_MISS 2. The first tablet run classified whitespace-insensitively
+  only; the metrics were the same, and the classifier now records both (3f76a56).
+  ML Kit 5 misses, OCR_MISREAD 2 (img-14, img-17 "¥500" read "500"),
+  EXTRACTOR_MISS 3 (img-19, img-21 x2). Whitespace-insensitive: EXTRACTOR_MISS 4,
+  OCR_MISREAD 1.
+  Open: a background :app:testDebugUnitTest run reported BUILD FAILED with no
+  test name in its log. A foreground rerun passed (5s). The cause is not found.
+  Dependency P3-04 was at review when this step started. Adversarial review is
+  not required by this step (not in the owner's list of specification steps)
+  and was not run.
