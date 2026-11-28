@@ -280,3 +280,25 @@ an engine that supports it (`SearchIndex.ensure`).
   `Routes.Viewer.spanId`, the list-detail `selectedSpanId`, the
   pop-to-List behaviour when a result opens at expanded width, and
   `searchViewModel.clear()` in `onStop`.
+
+## Facts in search (P3-07, schema v7)
+
+- **Schema v7.** `fact_fts` is an FTS5 external-content table over
+  `fact_revisions(canonicalText, rawText)`, with `secure-delete` on, the
+  `unicode61 remove_diacritics 2` tokenizer, and insert and delete triggers only
+  (`fact_fts_ai`, `fact_fts_ad`). Every revision is indexed (C2-R49). There is no update
+  trigger, because the indexed columns are immutable. Migration 6 to 7 runs `'rebuild'`,
+  which backfills existing revisions. The migration is `MIGRATION_6_7`, and it also runs
+  `FactSchemaTriggers.create`.
+- **Query-time filter.** A hit is a current revision (`facts.currentRevisionId`) with status
+  `UNREVIEWED`, `CONFIRMED` or `CLARIFICATION_NEEDED`, in a READY Source. An EXTRACTED
+  revision also needs a VALUE evidence row that names the Source's current reading. A USER
+  revision is matched by its fact's Source. REJECTED, STALE and superseded revisions never
+  return a hit, though their text stays indexed.
+- **Current reading (C2-R14, F-71).** Search and the viewer use the READY pointer reading
+  (`sources.currentOcrRevisionId`). Readings are ordered by `rowid` in the trigger,
+  `MOVE_CURRENT_READING` and the viewer. The shipped v6 backfill is not edited.
+- **Hits.** `SearchHit.fact` carries `factRevisionId`, `kind`, `status` and `origin`.
+  The UI labels kind, status and origin, and tapping opens the viewer with the evidence
+  span selected until the Facts panel (P3-05) exists.
+- Evidence and open questions: `docs/verification/P3-07-facts-search.md`.

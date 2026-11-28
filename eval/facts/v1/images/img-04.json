@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-04","image":"img-04.png","width":1080,"height":265,"rows":["D-04","P-01"],"lines":["16 September 2026","Tel: 01632 960123"],"items":[{"row":"D-04","kind":"DATE","raw":"16 September 2026","canonical":"2026-09-16"},{"row":"P-01","kind":"PHONE","raw":"01632 960123","canonical":"01632960123"}],"abstain":[],"truth":[]}

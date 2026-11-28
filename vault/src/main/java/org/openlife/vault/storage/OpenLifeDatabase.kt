@@ -25,7 +25,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FactExtractionRunEntity::class,
         DependencyEdgeEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class OpenLifeDatabase : RoomDatabase() {
@@ -62,12 +62,14 @@ abstract class OpenLifeDatabase : RoomDatabase() {
                 FactSchemaTriggers.create(db)
                 // P2-08: a fresh database gets the same search index a migrated one has.
                 SearchIndex.create(db)
+                // P3-07: and the same fact index.
+                FactSearchIndex.create(db)
             }
         }
 
         /** Every migration, in order; never destructive (design §10). */
         val MIGRATIONS: List<androidx.room.migration.Migration> by lazy {
-            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
         }
 
         /**
@@ -77,6 +79,19 @@ abstract class OpenLifeDatabase : RoomDatabase() {
          */
         val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) = FactMigration.migrate(db)
+        }
+
+        /**
+         * P3-07-R1, C2-R14 (F-71): the fact search index, and every C2 trigger
+         * re-created from [FactSchemaTriggers] so the current-reading trigger
+         * orders readings by rowid. Additive: no table or column changes.
+         * Fail-closed like the OCR index: an engine without FTS5 keeps search on LIKE.
+         */
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                FactSchemaTriggers.create(db)
+                FactSearchIndex.create(db)
+            }
         }
 
         /**

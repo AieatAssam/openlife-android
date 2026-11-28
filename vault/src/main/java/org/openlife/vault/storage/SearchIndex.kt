@@ -26,7 +26,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *
  * The index is keyed on the content tables' implicit rowid. VACUUM may
  * renumber implicit rowids, so OpenLife never runs VACUUM; any future VACUUM
- * must be followed by the 'rebuild' commands in [statements].
+ * must be followed by the 'rebuild' commands in [statements]. No VACUUM is a
+ * correctness rule for two things: the FTS rowid mapping above, and the
+ * current-reading order (C2-R14, amendment 2026-11-28, S-01), which also
+ * orders by rowid. `NoVacuumTest` fails if a production source runs VACUUM.
  *
  * Rule: one definition, used by [OpenLifeDatabase.MIGRATION_4_5], by
  * [OpenLifeDatabase.readyInvariantCallback] for a fresh database and by
@@ -167,6 +170,8 @@ object SearchIndex {
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
             attempt { ensure(db) }
+            // P3-07: the fact index is checked at every open too.
+            attempt { FactSearchIndex.ensure(db) }
         }
     }
 
@@ -220,7 +225,7 @@ object SearchIndex {
     }
 
     /** A supported engine with FTS5 and its secure-delete option, tried on a temp table that is always removed. */
-    private fun capable(db: SupportSQLiteDatabase): Boolean = isSupportedEngine(db) && attempt {
+    internal fun capable(db: SupportSQLiteDatabase): Boolean = isSupportedEngine(db) && attempt {
         db.execSQL("DROP TABLE IF EXISTS temp.fts5_probe")
         db.execSQL("CREATE VIRTUAL TABLE temp.fts5_probe USING fts5(x)")
         try {
@@ -234,7 +239,7 @@ object SearchIndex {
     // SQLite < 3.42) surface as the platform's or SQLCipher's SQLiteException,
     // a RuntimeException. The exception is dropped unread: it can quote SQL.
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private inline fun attempt(block: () -> Unit): Boolean = try {
+    internal inline fun attempt(block: () -> Unit): Boolean = try {
         block()
         true
     } catch (e: RuntimeException) {

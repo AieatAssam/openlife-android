@@ -53,6 +53,25 @@ class SearchFixture(val host: HostSqlite) {
         )
     }
 
+    /**
+     * For a v5 database seeded without migrating, on an engine without FTS5 (the LIKE tests): runs the v6
+     * migration (the fact tables and the current-reading pointer, which the search SQL joins), then removes
+     * the OCR FTS5 tables and their triggers, as an engine without FTS5 would have none.
+     */
+    fun migrateToV6WithoutFts5() {
+        OpenLifeDatabase.MIGRATION_5_6.migrate(host.asSupportDatabase())
+        listOf(
+            "DROP TRIGGER IF EXISTS ocr_text_fts_ai",
+            "DROP TRIGGER IF EXISTS ocr_text_fts_au",
+            "DROP TRIGGER IF EXISTS ocr_text_fts_ad",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_ai",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_au",
+            "DROP TRIGGER IF EXISTS ocr_correction_fts_ad",
+            "DROP TABLE IF EXISTS ocr_text_fts",
+            "DROP TABLE IF EXISTS ocr_correction_fts",
+        ).forEach(host::exec)
+    }
+
     fun span(id: String, revisionId: String, ordinal: Int, text: String) {
         host.exec(
             "INSERT INTO ocr_spans(id, revisionId, ordinal, text, confidence, coordinateSystem, " +
@@ -145,6 +164,9 @@ class SearchFixture(val host: HostSqlite) {
             fixture.seed()
             OpenLifeDatabase.MIGRATION_4_5.migrate(host.asSupportDatabase())
             assumeIndexed(host)
+            // The rest of the shipped chain (the v6 current-reading backfill, then v7): search reads the
+            // Source's current reading pointer (C2-R14), which exists only from v6.
+            OpenLifeDatabase.MIGRATIONS.filter { it.startVersion > 4 }.forEach { it.migrate(host.asSupportDatabase()) }
             return fixture
         }
 
@@ -194,13 +216,18 @@ class HostSearchDao(private val host: HostSqlite) : SearchDao {
                     isCorrection = (row[4] as Long).toInt(),
                     score = (row[5] as Number).toDouble(),
                     ordinal = (row[6] as Long).toInt(),
+                    factRevisionId = row[7] as String?,
+                    factKind = row[8] as String?,
+                    factStatus = row[9] as String?,
+                    factOrigin = row[10] as String?,
                 )
             },
         )
     }
 
     override suspend fun countIndexTables(): Int = host.long(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('ocr_text_fts', 'ocr_correction_fts')",
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' " +
+            "AND name IN ('ocr_text_fts', 'ocr_correction_fts', 'fact_fts')",
     ).toInt()
 
     private fun recordingProgram(args: Array<Any?>): SupportSQLiteProgram = Proxy.newProxyInstance(

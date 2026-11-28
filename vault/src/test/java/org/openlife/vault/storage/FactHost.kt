@@ -86,6 +86,7 @@ class FactRows(val host: HostSqlite) {
         supersedes: String? = null,
         valueJson: String = "{\"date\":\"2026-11-26\"}",
         canonicalText: String = "2026-11-26",
+        rawText: String = "26.11.2026",
     ) {
         val user = origin == "USER"
         with(FactHost) {
@@ -97,7 +98,7 @@ class FactRows(val host: HostSqlite) {
                 "kind" to kind,
                 "valueJson" to valueJson,
                 "canonicalText" to canonicalText,
-                "rawText" to if (user) null else "26.11.2026",
+                "rawText" to if (user) null else rawText,
                 "status" to status,
                 "methodId" to if (user) "user:correct" else "date:numeric",
                 "methodVersion" to if (user) null else "1",

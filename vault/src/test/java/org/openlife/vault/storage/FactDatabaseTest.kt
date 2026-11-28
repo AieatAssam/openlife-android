@@ -42,7 +42,12 @@ class FactDatabaseTest {
         (1..5).forEach { from ->
             val migrated = host()
             FactHost.migrated(migrated, from) { seed(from) }
-            assertEquals("v$from -> v6 equals a fresh v6", expected, shape(migrated))
+            // The v7 fact index (fact_fts) is the only object a fresh v6 does not have.
+            assertEquals(
+                "v$from -> v7 equals a fresh v6 apart from fact_fts",
+                expected,
+                shape(migrated).filterKeys { !it.startsWith("fact_fts") },
+            )
             assertEquals(1L, migrated.long("SELECT COUNT(*) FROM sources WHERE id = 'a'"))
             assertEquals(0L, migrated.long("SELECT factInputEpoch FROM sources WHERE id = 'a'"))
             if (from >= 2) {
@@ -64,7 +69,7 @@ class FactDatabaseTest {
             C2_TABLES.forEach { assertEquals(0L, migrated.long("SELECT COUNT(*) FROM $it")) }
         }
         assertEquals(
-            listOf(1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6),
+            listOf(1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6, 6 to 7),
             OpenLifeDatabase.MIGRATIONS.map { it.startVersion to it.endVersion },
         )
     }

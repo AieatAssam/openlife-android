@@ -11,8 +11,10 @@ import org.openlife.vault.ocr.OcrScriptStatus
 object OcrPointerSql {
     /**
      * Run in the transaction that commits a reading READY: moves the pointer
-     * only when there is no current reading or this one started later, by
-     * `(startedAt, rowid)`. A late finisher that started earlier changes 0 rows.
+     * only when there is no current reading or this one has a greater rowid
+     * (C2-R14, amendment 2026-11-28, S-01). startedAt is display data only, so
+     * a clock set back cannot strand a new reading (F-71). A late finisher with
+     * a smaller rowid changes 0 rows.
      */
     const val MOVE_CURRENT_READING = """
         UPDATE sources SET currentOcrRevisionId = :revisionId
@@ -20,8 +22,7 @@ object OcrPointerSql {
           AND EXISTS (SELECT 1 FROM ocr_revisions WHERE id = :revisionId AND sourceId = :sourceId AND state = 'READY')
           AND (currentOcrRevisionId IS NULL OR EXISTS (
             SELECT 1 FROM ocr_revisions n JOIN ocr_revisions c ON c.id = sources.currentOcrRevisionId
-            WHERE n.id = :revisionId
-              AND (n.startedAt > c.startedAt OR (n.startedAt = c.startedAt AND n.rowid > c.rowid))))
+            WHERE n.id = :revisionId AND n.rowid > c.rowid))
         """
 
     /** The head of a span's (or, with a null span, a reading's) correction chain; none if uncorrected. */

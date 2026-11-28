@@ -29,8 +29,12 @@ object NonEntityTables {
         }
         assertEquals(
             "non-entity tables after migrating to v$version",
-            (SearchIndex.tables + SearchIndex.shadowTables).toSet(),
+            (SearchIndex.tables + SearchIndex.shadowTables + factIndex(version)).toSet(),
             tables - entityTables - BOOKKEEPING,
         )
     }
+
+    /** From v7 the fact index (P3-07) is the third non-entity table pair; v6 has none. */
+    private fun factIndex(version: Int): List<String> =
+        if (version >= 7) FactSearchIndex.tables + FactSearchIndex.shadowTables else emptyList()
 }

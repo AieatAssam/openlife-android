@@ -155,12 +155,16 @@ private fun ResultRow(hit: SearchHit, itemLabel: String?, onOpen: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("search_result"),
     ) {
-        val kind = if (hit.isCorrection) R.string.search_result_corrected else R.string.search_result_extracted
-        Text(
-            stringResource(kind),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val fact = hit.fact
+        if (fact == null) {
+            val kind = if (hit.isCorrection) R.string.search_result_corrected else R.string.search_result_extracted
+            ResultLabel(stringResource(kind))
+        } else {
+            // P3-07-R2: kind, status and origin are words, never colour alone.
+            ResultLabel(stringResource(factKindName(fact.kind)))
+            ResultLabel(stringResource(factStatusName(fact.status)))
+            ResultLabel(stringResource(factOriginName(fact.origin)))
+        }
         Text(
             highlighted(hit),
             modifier = Modifier.padding(top = 4.dp),
@@ -185,6 +189,37 @@ private fun ResultRow(hit: SearchHit, itemLabel: String?, onOpen: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun ResultLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** The stored fact kind as its label; an unknown value from another build reads as a plain fact. */
+private fun factKindName(kind: String): Int = when (kind) {
+    "DATE" -> R.string.search_fact_kind_date
+    "TIME" -> R.string.search_fact_kind_time
+    "DATETIME" -> R.string.search_fact_kind_datetime
+    "MONEY" -> R.string.search_fact_kind_money
+    "URL" -> R.string.search_fact_kind_url
+    "EMAIL" -> R.string.search_fact_kind_email
+    "PHONE" -> R.string.search_fact_kind_phone
+    else -> R.string.search_fact_unknown
+}
+
+private fun factStatusName(status: String): Int = when (status) {
+    "UNREVIEWED" -> R.string.search_fact_status_unreviewed
+    "CONFIRMED" -> R.string.search_fact_status_confirmed
+    "CLARIFICATION_NEEDED" -> R.string.search_fact_status_clarification
+    else -> R.string.search_fact_unknown
+}
+
+private fun factOriginName(origin: String): Int =
+    if (origin == "USER") R.string.search_fact_origin_user else R.string.search_fact_origin_extracted
 
 /** The snippet with each matched range on the evidence highlighter, underlined so it is not colour alone. */
 @Composable

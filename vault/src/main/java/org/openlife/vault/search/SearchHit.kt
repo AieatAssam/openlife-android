@@ -15,4 +15,13 @@ data class SearchHit(
     val snippet: String,
     val isCorrection: Boolean,
     val highlights: List<IntRange> = emptyList(),
+    /** P3-07-R1: set on a fact hit (its revision and labels); null for OCR text. */
+    val fact: SearchFact? = null,
 )
+
+/**
+ * P3-07-R1/R2: a fact hit. [revisionId] is the matched fact revision (the
+ * hit carries it so the UI can open that fact); [kind] and [status] are the
+ * stored enum names, [origin] is EXTRACTED or USER.
+ */
+data class SearchFact(val revisionId: UUID, val kind: String, val status: String, val origin: String)
