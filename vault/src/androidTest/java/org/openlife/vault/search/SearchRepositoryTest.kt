@@ -74,7 +74,7 @@ class SearchRepositoryTest {
     }
 
     @Test
-    fun excludesRejectedStaleAndNonReadySources() = runBlocking {
+    fun excludesRejectedAndNonReadySourcesAndShowsOnlyTheCurrentReading() = runBlocking {
         source(A)
         revision(RA, A, reviewState = "REJECTED")
         span(S1, RA, 0, "walrus rejected")
@@ -86,7 +86,10 @@ class SearchRepositoryTest {
         span(S3, RC, 0, "walrus older")
         revision(RC2, C, state = "STALE")
 
-        assertEquals(emptyList<SearchHit>(), repository.search("walrus").first())
+        // C2-R14: a STALE reading written after the current one does not move the pointer, so the
+        // READY current reading (span S3) is the only hit. The rejected and non-READY Sources have none.
+        val hits = repository.search("walrus").first()
+        assertEquals(listOf(UUID.fromString(S3)), hits.map { it.spanId })
     }
 
     @Test
@@ -315,6 +318,13 @@ class SearchRepositoryTest {
                 "VALUES (?, ?, ?, 'test', '1', 'NORMAL', X'01', ?, ?, ?, NULL, 0, 0)",
             arrayOf<Any?>(id, sourceId, state, clock, clock++, reviewState),
         )
+        // C2-R14: the first READY reading of a Source is its current reading; a later test moves it.
+        if (state == "READY") {
+            sql.execSQL(
+                "UPDATE sources SET currentOcrRevisionId = ? WHERE id = ? AND currentOcrRevisionId IS NULL",
+                arrayOf<Any?>(id, sourceId),
+            )
+        }
     }
 
     private fun span(id: String, revisionId: String, ordinal: Int, text: String) {
