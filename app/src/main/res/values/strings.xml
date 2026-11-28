@@ -337,4 +337,13 @@
     <string name="viewer_zoom_out">Zoom out</string>
     <string name="viewer_zoom_reset">Fit to screen</string>
     <string name="viewer_zoom_state">Zoom: %1$d%%</string>
+    <string name="facts_title">Facts</string>
+    <string name="facts_origin_extracted">Found in the text</string>
+    <string name="facts_origin_user">You added this</string>
+    <string name="facts_status_confirmed">Confirmed</string>
+    <string name="facts_status_unreviewed">Not reviewed</string>
+    <string name="facts_status_clarification">Needs clarification</string>
+    <string name="facts_status_stale">Out of date</string>
+    <string name="facts_status_rejected">Rejected</string>
+    <string name="facts_show_evidence">Show in the text</string>
 </resources>

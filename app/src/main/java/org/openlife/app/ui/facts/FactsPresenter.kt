@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.vault.facts.ExtractionCheck
+import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactOrigin
 import org.openlife.vault.facts.FactStatus
@@ -33,6 +34,7 @@ class FactItem(
     val staleReason: StaleReason?,
     val value: FactValue,
     val candidateTexts: List<String>,
+    val evidence: List<FactEvidence> = emptyList(),
 ) {
     val needsClarification: Boolean get() = status == FactStatus.CLARIFICATION_NEEDED
     val isStale: Boolean get() = status == FactStatus.STALE
