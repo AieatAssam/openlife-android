@@ -3,11 +3,14 @@ package org.openlife.app.ui.facts
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -19,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.UUID
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +41,7 @@ import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactOrigin
 import org.openlife.vault.facts.FactStatus
 import org.openlife.vault.facts.FactValue
+import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -127,6 +132,89 @@ class FactsFlowTest {
         assertEquals("the facts route must name the viewer's source", source.id.toString(), facts?.sourceId)
     }
 
+    @Test
+    fun clarifyChoosingACandidateSendsThatCandidateOnly() {
+        val source = source(UUID(0L, 41L))
+        val row = FakeFactsGateway.row(
+            source.id,
+            FactKind.DATE,
+            FactOrigin.EXTRACTED,
+            FactStatus.CLARIFICATION_NEEDED,
+            FactValue(CANDIDATES_JSON, "2026-04-03 | 2026-03-04"),
+        )
+        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING)
+        openFacts(source, facts)
+
+        awaitText("2026-03-04")
+        composeRule.onNodeWithText("2026-03-04").performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.clarifications.isNotEmpty() }
+        val (revisionId, chosen) = facts.clarifications.single()
+        assertEquals("the choice must name the revision shown", row.revision.id, revisionId)
+        assertEquals("the chosen candidate keeps its stored entry", "{\"date\":\"2026-03-04\"}", chosen.valueJson)
+        assertEquals("2026-03-04", chosen.canonicalText)
+    }
+
+    @Test
+    fun rejectSendsTheRejectDecisionForThatRevision() {
+        val source = source(UUID(0L, 42L))
+        val row = FakeFactsGateway.row(
+            source.id,
+            FactKind.URL,
+            FactOrigin.EXTRACTED,
+            FactStatus.UNREVIEWED,
+            FactValue("{\"url\":\"https://example.org\"}", "https://example.org"),
+        )
+        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING)
+        openFacts(source, facts)
+
+        val reject = context.getString(R.string.facts_reject)
+        awaitText(reject)
+        composeRule.onNodeWithText(reject).performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.reviews.isNotEmpty() }
+        assertEquals(listOf(row.revision.id to ReviewDecision.REJECT), facts.reviews)
+    }
+
+    @Test
+    fun addingAUserUrlSendsTheNormalisedValueToTheGateway() {
+        val source = source(UUID(0L, 43L))
+        val facts = FakeFactsGateway(readingId = READING)
+        openFacts(source, facts)
+
+        composeRule.onNodeWithText(context.getString(R.string.facts_add)).performClick()
+        composeRule.onNode(hasSetTextAction()).performTextInput("https://example.org/notice")
+        composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.additions.isNotEmpty() }
+        val (sourceId, kind, value) = facts.additions.single()
+        assertEquals(source.id, sourceId)
+        assertEquals(FactKind.URL, kind)
+        assertTrue("the accepted value keeps its address", value.canonicalText.contains("example.org"))
+    }
+
+    @Test
+    fun addingABlankUserValueIsRefusedAndNeverReachesTheGateway() {
+        val source = source(UUID(0L, 44L))
+        val facts = FakeFactsGateway(readingId = READING)
+        openFacts(source, facts)
+
+        composeRule.onNodeWithText(context.getString(R.string.facts_add)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
+
+        awaitText(context.getString(R.string.facts_refused_blank))
+        assertTrue("a refused value must not reach the repository", facts.additions.isEmpty())
+    }
+
+    private fun openFacts(source: Source, facts: FakeFactsGateway) {
+        setHost(FakeAppContainer(listOf(source), factsGateway = facts))
+        composeRule.runOnIdle { navController.navigate(Routes.Facts(source.id.toString())) }
+    }
+
+    private fun awaitText(text: String) {
+        composeRule.waitUntil(WAIT_MS) { composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    }
+
     private fun revision(id: UUID, sourceId: UUID) = OcrRevision(
         id = id,
         sourceId = sourceId,
@@ -176,6 +264,7 @@ class FactsFlowTest {
 
     private companion object {
         const val WAIT_MS = 10_000L
+        const val CANDIDATES_JSON = "{\"candidates\":[{\"date\":\"2026-04-03\"},{\"date\":\"2026-03-04\"}]}"
         val READING: UUID = UUID.fromString("11111111-1111-4111-8111-111111111111")
         val SPAN: UUID = UUID.fromString("22222222-2222-4222-8222-222222222222")
     }
