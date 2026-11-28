@@ -19,6 +19,9 @@ Gradle runs were foreground, one at a time, after checking that no other
 | `./gradlew :app:test` | `BUILD SUCCESSFUL in 5s` | `p306-app-test-full.log` |
 | `scripts/plan-check.sh` | `steps=83 errors=0`, `runnable now: []` | `p306-plan-check.log` |
 | `bash scripts/tests/run.sh` | `51 passed, 0 failed` | `p306-scripts-tests.log` |
+| Gate, one foreground run: `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test` | First run `BUILD FAILED` at `:eval:detekt` (style in `FactsImageGenerator.kt` and `EvalBoundaryTest.kt`); fixed in `0d42ac1` with no behaviour change. Rerun `BUILD SUCCESSFUL in 2m 23s`. | `p306-gate-final2.log` |
+| `scripts/plan-check.sh` (after the gate) | `steps=83 errors=0` | `p306-plan-check-final.log` |
+| `bash scripts/tests/run.sh` (rerun after the gate) | `51 passed, 0 failed` | `p306-scripts-tests-final.log` |
 | `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.facts.eval.FactsImageEval -Pandroid.testInstrumentationRunnerArguments.p306FactsImage=true` on the tablet (adb serial `U8BBB20806201256`; `pgrep -f connectedDebugAndroidTest` and `pgrep -f '[G]radleWrapperMain'` empty first; stay-on set, then restored to 0) | Test passed: 1 test, 0 failures, 0 errors, 0 skipped, about 26.5 s, both engines. The measured R2 image gate is FAIL on both engines. Recorded, not tuned. | `docs/verification/facts-image-results/facts-image-tesseract-eng-fast-2026-11-28.txt`, `docs/verification/facts-image-results/facts-image-mlkit-latin-2026-11-28.txt` |
 
 The background run `./gradlew detekt lint :vault:test :eval:test :app:testDebugUnitTest`

@@ -1,7 +1,7 @@
 id: P3-06
 title: Facts evaluation set and metrics
 phase: P3
-status: in_progress
+status: review
 started: 2026-11-28
 depends_on: [P3-04]
 estimate: M
@@ -49,7 +49,12 @@ evidence: >
   4/5 = 0.8000 (min 0.95); ML Kit latin DATE precision 26/27 = 0.9630, MONEY
   12/13 = 0.9231, URL 3/4 = 0.7500. Full table in docs/verification/facts-eval.md;
   reports in docs/verification/facts-image-results/. Verification commands and
-  output: docs/verification/P3-06-facts-eval.md.
+  output: docs/verification/P3-06-facts-eval.md. Gate command (one foreground
+  run, after the detekt style fix 0d42ac1): ./gradlew detekt lint :app:test
+  :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
+  :app:compileDebugAndroidTestKotlin :eval:test -> BUILD SUCCESSFUL in 2m 23s.
+  scripts/plan-check.sh -> steps=83 errors=0; bash scripts/tests/run.sh -> 51
+  passed, 0 failed.
 notes: >
   Synthetic only. Text part: eval/facts/v1/text.tsv (200 rows, expectations
   written from ADR-0008 and amendments, never from extractor output). Image
