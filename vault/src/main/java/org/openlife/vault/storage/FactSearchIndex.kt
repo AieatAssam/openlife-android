@@ -63,6 +63,7 @@ object FactSearchIndex {
     }
 
     private fun isComplete(db: SupportSQLiteDatabase): Boolean {
+        if (!SearchIndex.isSupportedEngine(db)) return false
         val tableAndTriggers = count(
             db,
             "(type = 'table' AND name = '$TABLE') OR " +
