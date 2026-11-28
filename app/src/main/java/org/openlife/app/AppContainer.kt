@@ -245,6 +245,14 @@ internal class AppOcrBackend(private val app: OpenLifeApp) : OcrBackend {
         }
     }
 
+    override fun observeReading(revisionId: UUID): Flow<OcrView?> = flow {
+        app.appLock.awaitContentAccess()
+        when (val access = app.vault()) {
+            is VaultAccess.Ready -> emitAll(access.ocrRepository.observeOcrViewOfRevision(revisionId))
+            is VaultAccess.Unavailable -> emit(null)
+        }
+    }
+
     override suspend fun run(sourceId: UUID): OcrRunResult {
         app.appLock.awaitContentAccess()
         val access = app.vault() as? VaultAccess.Ready

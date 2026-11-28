@@ -58,6 +58,9 @@ interface ViewerPorts<T : Any> {
 
     fun ocrState(sourceId: UUID): StateFlow<OcrUiState>
 
+    /** P3-05-R3 (C2-R39): the state of the reading [revisionId], never the source's latest. */
+    fun readingState(revisionId: UUID): StateFlow<OcrUiState>
+
     /** Runs beyond the screen (application scope); [onDeleted] reports whether the source is gone. */
     fun delete(sourceId: UUID, onDeleted: (Boolean) -> Unit)
 }
@@ -86,6 +89,8 @@ class ViewerSession<T : Any>(
     private val ports: ViewerPorts<T>,
     private val saved: SavedValues,
     private val scope: CoroutineScope,
+    /** Set when the viewer shows an earlier reading (C2-R39): read-only, named by id only. */
+    private val readingId: UUID? = null,
 ) {
     private val mutableSource = MutableStateFlow<SourceLookup>(SourceLookup.Loading)
     private val slot = ContentSlot<T>(ports::release)
@@ -102,6 +107,9 @@ class ViewerSession<T : Any>(
     val content: StateFlow<DecodedContent<T>> = slot.state
     val ocr: StateFlow<OcrUiState> = mutableOcr.asStateFlow()
     val selectedSpanId: StateFlow<UUID?> = mutableSelected.asStateFlow()
+
+    /** P3-05-R3: an earlier reading is read-only; the current reading is not. */
+    val readOnly: Boolean get() = readingId != null
 
     /** The source is gone (deleted here or elsewhere): the destination returns to the list once. */
     val exitRequested: StateFlow<Boolean> = mutableExit.asStateFlow()
@@ -183,9 +191,12 @@ class ViewerSession<T : Any>(
             }
         }
         ocrJob = scope.launch {
-            ports.ocrGeneration.flatMapLatest { ports.ocrState(sourceId) }.collect { mutableOcr.value = it }
+            ports.ocrGeneration.flatMapLatest { currentOcr() }.collect { mutableOcr.value = it }
         }
     }
+
+    private fun currentOcr(): StateFlow<OcrUiState> =
+        readingId?.let { ports.readingState(it) } ?: ports.ocrState(sourceId)
 
     private fun drop(release: Boolean) {
         contentJob?.cancel()

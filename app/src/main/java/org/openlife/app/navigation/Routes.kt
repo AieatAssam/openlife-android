@@ -12,7 +12,7 @@ sealed interface Routes {
      * route. [spanId] (P2-08): the span to select on opening, from a search result.
      */
     @Serializable
-    data class ListDetail(val sourceId: String, val spanId: String? = null) : Routes
+    data class ListDetail(val sourceId: String, val spanId: String? = null, val readingId: String? = null) : Routes
 
     /** P2-08: local search. The query is never a route argument. */
     @Serializable

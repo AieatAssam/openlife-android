@@ -91,7 +91,7 @@ fun OpenLifeNavHost(container: AppContainer, navController: NavHostController = 
 }
 
 /** Opens [sourceId] by the rules in [ListDetailNavigation.select]; ids only. */
-fun NavHostController.openSource(sourceId: UUID, spanId: UUID?, expanded: Boolean) {
+fun NavHostController.openSource(sourceId: UUID, spanId: UUID?, expanded: Boolean, readingId: UUID? = null) {
     val destination = currentBackStackEntry?.destination
     val top = when {
         destination == null -> TopDestination.OTHER
@@ -100,7 +100,7 @@ fun NavHostController.openSource(sourceId: UUID, spanId: UUID?, expanded: Boolea
         destination.hasRoute<Routes.Search>() -> TopDestination.SEARCH
         else -> TopDestination.OTHER
     }
-    val route = Routes.ListDetail(sourceId.toString(), spanId?.toString())
+    val route = Routes.ListDetail(sourceId.toString(), spanId?.toString(), readingId?.toString())
     when (ListDetailNavigation.select(top, expanded)) {
         SelectAction.PUSH -> navigate(route)
         SelectAction.REPLACE_TOP -> navigate(route) { popUpTo<Routes.ListDetail> { inclusive = true } }

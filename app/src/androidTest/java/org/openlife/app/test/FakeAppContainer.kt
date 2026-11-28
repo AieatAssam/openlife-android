@@ -55,6 +55,7 @@ class FakeAppContainer(
     private val readContent: suspend (UUID) -> ReadyReadResult = { awaitCancellation() },
     private val searchHits: List<SearchHit> = emptyList(),
     private val ocrView: (UUID) -> OcrView? = { null },
+    private val readingView: (UUID) -> OcrView? = { null },
     private val listed: (List<Source>) -> SourceListUiState? = { SourceListUiState.Loaded(it) },
     override val about: AboutPort = FakeAboutPort(),
     factsGateway: FactsGateway = FakeFactsGateway(),
@@ -71,6 +72,8 @@ class FakeAppContainer(
     override val ocr = OcrPresenter(
         object : OcrBackend {
             override fun observe(sourceId: UUID): Flow<OcrView?> = flowOf(ocrView(sourceId))
+
+            override fun observeReading(revisionId: UUID): Flow<OcrView?> = flowOf(readingView(revisionId))
 
             override suspend fun run(sourceId: UUID): OcrRunResult =
                 OcrRunResult.Failed(null, OcrFailureReason.SOURCE_NOT_READY)

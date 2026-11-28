@@ -38,6 +38,7 @@ class ViewerViewModel(private val container: AppContainer, handle: SavedStateHan
         ports = BitmapViewerPorts(container),
         saved = HandleSavedValues(handle),
         scope = viewModelScope,
+        readingId = route.readingId?.toUuidOrNull(),
     )
 
     // Hidden: drop now and stay dropped until visible again; trim: drop and reload if visible.
@@ -98,6 +99,8 @@ private class BitmapViewerPorts(private val container: AppContainer) : ViewerPor
     }
 
     override fun ocrState(sourceId: UUID): StateFlow<OcrUiState> = container.ocr.state(sourceId)
+
+    override fun readingState(revisionId: UUID): StateFlow<OcrUiState> = container.ocr.readingState(revisionId)
 
     override fun delete(sourceId: UUID, onDeleted: (Boolean) -> Unit) {
         container.sources.delete(sourceId) { result -> onDeleted(result is DeleteResult.Deleted) }

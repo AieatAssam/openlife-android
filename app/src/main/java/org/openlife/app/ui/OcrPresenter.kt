@@ -27,6 +27,9 @@ interface OcrBackend {
 
     suspend fun run(sourceId: UUID): OcrRunResult
 
+    /** P3-05-R3 (C2-R39): the reading [revisionId] names, whether or not it is the source's latest. */
+    fun observeReading(revisionId: UUID): Flow<OcrView?>
+
     suspend fun correct(revisionId: UUID, spanId: UUID?, correctedText: String)
 
     suspend fun review(revisionId: UUID, reviewState: OcrReviewState)
@@ -46,6 +49,7 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     private class Entry(val state: MutableStateFlow<OcrUiState>, val job: Job)
 
     private val entries = mutableMapOf<UUID, Entry>()
+    private val readings = mutableMapOf<UUID, Entry>()
     private val running = MutableStateFlow<Set<UUID>>(emptySet())
     private val runs = mutableMapOf<UUID, Job>()
 
@@ -60,7 +64,6 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     fun state(sourceId: UUID): StateFlow<OcrUiState> = entries.getOrPut(sourceId) { start(sourceId) }.state
 
     private fun start(sourceId: UUID): Entry {
-        val state = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
         val upstream = combine(
             backend.observe(sourceId)
                 .map<OcrView?, Persisted> { Persisted.Loaded(it) }
@@ -70,6 +73,30 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
         ) { persisted, runningIds, failures ->
             OcrStateMapper.map(sourceId, persisted, sourceId in runningIds, failures[sourceId])
         }
+        return watched(upstream)
+    }
+
+    /**
+     * P3-05-R3 (C2-R39): the state of one named reading. A reading has no run of its own, so it is never
+     * "running"; its source id comes from the reading itself.
+     */
+    @Synchronized
+    fun readingState(revisionId: UUID): StateFlow<OcrUiState> =
+        readings.getOrPut(revisionId) { startReading(revisionId) }.state
+
+    private fun startReading(revisionId: UUID): Entry {
+        val upstream = backend.observeReading(revisionId)
+            .map<OcrView?, Persisted> { Persisted.Loaded(it) }
+            .onStart { emit(Persisted.Pending) }
+            .map { persisted ->
+                val sourceId = (persisted as? Persisted.Loaded)?.view?.revision?.sourceId ?: NO_SOURCE
+                OcrStateMapper.map(sourceId, persisted, false, null)
+            }
+        return watched(upstream)
+    }
+
+    private fun watched(upstream: Flow<OcrUiState>): Entry {
+        val state = MutableStateFlow<OcrUiState>(OcrUiState.Loading)
         val job = scope.launch {
             // Read only while observed; drop the text as soon as nobody is looking.
             state.subscriptionCount.map { it > 0 }.distinctUntilChanged().collectLatest { observed ->
@@ -107,11 +134,12 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
     /** P2-01-R4: drop every held OCR text; running extractions continue and are recorded. */
     @Synchronized
     fun clearTransient() {
-        entries.values.forEach { entry ->
+        (entries.values + readings.values).forEach { entry ->
             entry.job.cancel()
             entry.state.value = OcrUiState.Loading
         }
         entries.clear()
+        readings.clear()
         mutableGeneration.update { it + 1 }
     }
 
@@ -152,6 +180,8 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
         scope.launch { backend.undoRejectSpan(spanId) }
     }
 }
+
+private val NO_SOURCE = UUID(0L, 0L)
 
 /** Whether the database has answered yet, and with what. */
 sealed interface Persisted {
