@@ -130,7 +130,10 @@ class FactExtractionCoreTest {
             2L,
             count("SELECT COUNT(DISTINCT ocrSpanId) FROM fact_evidence WHERE ocrSpanId IN ('a-s1', 'a-s2')"),
         )
-        assertEquals(listOf(listOf<Any?>("a-r", "USER")), host.query("SELECT ocrRevisionId, `trigger` FROM fact_extraction_runs"))
+        assertEquals(
+            listOf(listOf<Any?>("a-r", "USER")),
+            host.query("SELECT ocrRevisionId, `trigger` FROM fact_extraction_runs"),
+        )
     }
 
     @Test

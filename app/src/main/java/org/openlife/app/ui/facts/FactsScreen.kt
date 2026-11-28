@@ -20,9 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.paneTitle
@@ -56,7 +56,19 @@ fun FactsScreen(
             contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
             topBar = {
                 TopAppBar(
-                    title = { FactsTitle() },
+                    title = {
+                        BasicText(
+                            stringResource(R.string.facts_title),
+                            modifier = Modifier.asHeading(),
+                            style = MaterialTheme.typography.titleLarge.copy(color = LocalContentColor.current),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            autoSize = TextAutoSize.StepBased(
+                                minFontSize = TITLE_MIN_FONT_SIZE,
+                                maxFontSize = MaterialTheme.typography.titleLarge.fontSize,
+                            ),
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
@@ -91,20 +103,6 @@ fun FactsScreen(
 }
 
 private val TITLE_MIN_FONT_SIZE = 16.sp
-
-/** One line that scales down to the width the navigation icon leaves at 200 % font (same rule as the list title). */
-@Composable
-private fun FactsTitle() {
-    val style = MaterialTheme.typography.titleLarge
-    BasicText(
-        stringResource(R.string.facts_title),
-        modifier = Modifier.asHeading(),
-        style = style.copy(color = LocalContentColor.current),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        autoSize = TextAutoSize.StepBased(minFontSize = TITLE_MIN_FONT_SIZE, maxFontSize = style.fontSize),
-    )
-}
 
 private fun messageLabel(message: FactMessage): Int = when (message) {
     FactMessage.SAVED -> R.string.facts_message_saved

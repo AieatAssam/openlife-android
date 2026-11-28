@@ -48,13 +48,23 @@ object UserValueNormaliser {
     private const val DELETE = 0x7F
 
     /** A date from a date picker (C2-R38); a null day means the picker was closed without a choice. */
-    fun date(date: LocalDate?): UserValueResult =
-        if (date == null) UserValueResult.Refused(UserValueRefusal.NOT_CHOSEN) else typed { DateValue(date) }
+    fun date(date: LocalDate?): UserValueResult {
+        if (date == null) {
+            return UserValueResult.Refused(UserValueRefusal.NOT_CHOSEN)
+        }
+        return typed { DateValue(date) }
+    }
 
-    /** A time from a time picker (C2-R38); a null hour or minute means no time was chosen. [second] is null when none. */
-    fun time(hour: Int?, minute: Int?, second: Int?): UserValueResult =
-        if (hour == null || minute == null) UserValueResult.Refused(UserValueRefusal.NOT_CHOSEN)
-        else typed { TimeValue(hour, minute, second) }
+    /**
+     * A time from a time picker (C2-R38); a null hour or minute means no time was chosen.
+     * [second] is null when none.
+     */
+    fun time(hour: Int?, minute: Int?, second: Int?): UserValueResult {
+        if (hour == null || minute == null) {
+            return UserValueResult.Refused(UserValueRefusal.NOT_CHOSEN)
+        }
+        return typed { TimeValue(hour, minute, second) }
+    }
 
     /** An amount with an ISO 4217 code chosen from the list (C2-R38). */
     fun money(amount: String, currencyCode: String?): UserValueResult {

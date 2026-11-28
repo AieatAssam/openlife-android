@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.openlife.app.AppContainer
-import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactWriteResult
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.extract.UserValueRefusal

@@ -5,19 +5,19 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.FactRefusal
 import org.openlife.vault.facts.FactValue
-import org.openlife.vault.facts.extract.UserValueNormaliser
-import org.openlife.vault.facts.extract.UserValueResult
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.StaleReason
+import org.openlife.vault.facts.extract.UserValueNormaliser
+import org.openlife.vault.facts.extract.UserValueResult
 import org.openlife.vault.storage.FactHost
 import org.openlife.vault.storage.FactRows
 import org.openlife.vault.storage.HostFactDao
 import org.openlife.vault.storage.HostSqlite
+import java.time.LocalDate
 
 /**
  * P3-02-R5 on host SQLite: the transactional bodies of FactRepository's

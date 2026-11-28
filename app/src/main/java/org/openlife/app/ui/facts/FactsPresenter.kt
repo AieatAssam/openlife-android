@@ -139,7 +139,8 @@ class FactsPresenter(
     }
 
     /** P3-05-R2: a day from the date picker; no chosen day is refused and never reaches the repository. */
-    suspend fun addUserDate(date: LocalDate?): UserFactOutcome = saveResult(FactKind.DATE, UserValueNormaliser.date(date))
+    suspend fun addUserDate(date: LocalDate?): UserFactOutcome =
+        saveResult(FactKind.DATE, UserValueNormaliser.date(date))
 
     /** P3-05-R2: a time chosen in the time picker; a missing hour or minute is refused and never saved. */
     suspend fun addUserTime(hour: Int?, minute: Int?): UserFactOutcome =
@@ -156,16 +157,16 @@ class FactsPresenter(
         is UserFactInput.Time -> addUserTime(input.hour, input.minute)
         is UserFactInput.Money -> addUserMoney(input.amount, input.currency)
     }
-
-    private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): FactItem = FactItem(
-        factId = row.fact.id,
-        revisionId = row.revision.id,
-        kind = row.revision.kind,
-        origin = row.revision.origin,
-        status = row.revision.status,
-        staleReason = row.revision.staleReason,
-        value = row.revision.value,
-        candidateTexts = row.revision.value.candidateTexts(),
-        evidence = evidence,
-    )
 }
+
+private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): FactItem = FactItem(
+    factId = row.fact.id,
+    revisionId = row.revision.id,
+    kind = row.revision.kind,
+    origin = row.revision.origin,
+    status = row.revision.status,
+    staleReason = row.revision.staleReason,
+    value = row.revision.value,
+    candidateTexts = row.revision.value.candidateTexts(),
+    evidence = evidence,
+)

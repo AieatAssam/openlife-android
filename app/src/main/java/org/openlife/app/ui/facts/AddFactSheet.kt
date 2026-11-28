@@ -13,10 +13,10 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.TimePickerState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.ContentTextField
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.OpenLifeButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
 import org.openlife.vault.facts.FactKind
@@ -37,7 +38,14 @@ import org.openlife.vault.facts.extract.UserValueNormaliser
 import java.time.LocalDate
 
 /** The kinds the add-fact form offers (P3-05-R2). Money and time are added in their own steps of P3-05. */
-private val FORM_KINDS = listOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.DATE, FactKind.TIME, FactKind.MONEY)
+private val FORM_KINDS = listOf(
+    FactKind.URL,
+    FactKind.EMAIL,
+    FactKind.PHONE,
+    FactKind.DATE,
+    FactKind.TIME,
+    FactKind.MONEY,
+)
 
 /** P3-05-R2: a kind picker, then the input that kind takes. Nothing is saved until the user presses Save. */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -163,7 +171,7 @@ private fun TimeInput(onAdd: (UserFactInput) -> Unit) {
     if (open) {
         TimePickerDialog(
             onDismissRequest = { open = false },
-            title = { Text(stringResource(R.string.facts_pick_time)) },
+            title = { Text(stringResource(R.string.facts_pick_time), modifier = Modifier.asHeading()) },
             confirmButton = {
                 OpenLifeTextButton(onClick = {
                     chosen = pickerState.hour to pickerState.minute
