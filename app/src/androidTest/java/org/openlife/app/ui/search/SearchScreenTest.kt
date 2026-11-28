@@ -101,7 +101,7 @@ class SearchScreenTest {
      * fact's evidence span selected (the Facts panel is P3-05; see docs/verification/P3-07-facts-search.md).
      */
     @Test
-    fun factHitOpensFactsPanelHighlighted() {
+    fun factHitShowsKindAndStatusAndOpensTheViewerWithTheSpanSelected() {
         val fact = SearchFact(UUID.randomUUID(), "DATE", "UNREVIEWED", "EXTRACTED")
         setHost(
             DpSize(400.dp, 800.dp),
