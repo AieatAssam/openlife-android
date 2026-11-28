@@ -171,3 +171,24 @@ Decision for the coordinator: a cancelled run throws `CancellationException` and
 1. C2-R33 specifies a global greedy pairing: take the greatest overlap across all candidates and stale facts, remove the pair, repeat. The code pairs candidate by candidate. Not changed here; for the coordinator.
 2. P-07 has no dedicated failing test.
 3. The three opt-in measurement tests (`OcrEngineMeasurementTest`, `OcrEvaluationTest`, `RecoveryTimingTest`) fail without their argument, and Gradle still reports `BUILD SUCCESSFUL` for the full connected run. Not re-run in this pass; the XML is the authority.
+
+## Recorded deviations after the final review (2026-11-28)
+
+Accepted by the coordinating session after the reviewer's final read; nothing
+here was run on a device.
+
+- **C2-R33 pairing is greedy per candidate, not the global best overlap.**
+  Example: two stale facts with the same value, F1 at box A and F2 at box B.
+  Candidate c1 overlaps A by 0.3 and B by 0.9; candidate c2 overlaps B by 0.95
+  and A by 0.1. The code pairs c1 with F2 and c2 with F1; the global rule
+  pairs c2 with F2 and c1 with F1. The values are equal, so no value is wrong
+  or lost; only which fact keeps which location differs, which affects the
+  old and new context display (C2-R41). Follow-up for P3-05 or P3-07.
+- **Continuation needs an overlap above zero.** A candidate whose only
+  same-value stale match does not overlap it becomes a new fact, not a
+  continuation.
+- **A cancellation that arrives exactly as the commit finishes** can surface
+  as a `CancellationException` after the rows are committed. The commit is
+  whole in that case.
+- **The evidence-offset guard (P-07) has no dedicated test.** No extractor
+  input was found that produces out-of-range offsets.
