@@ -12,10 +12,10 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -33,8 +33,8 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.openlife.app.R
 import org.openlife.app.lock.AppLockOfferScreen
-import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.AppLockPolicy
+import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.LockScreen
 import org.openlife.app.settings.AboutScreen
 import org.openlife.app.settings.AboutState
@@ -52,9 +52,19 @@ import org.openlife.app.ui.SourceListScreen
 import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.VaultUnavailableScreen
 import org.openlife.app.ui.ViewerScreen
+import org.openlife.app.ui.facts.FactActions
+import org.openlife.app.ui.facts.FactItem
+import org.openlife.app.ui.facts.FactsScreen
+import org.openlife.app.ui.facts.FactsUiState
 import org.openlife.app.ui.search.SearchScreen
 import org.openlife.app.ui.search.SearchUiState
 import org.openlife.app.ui.theme.OpenLifeTheme
+import org.openlife.vault.facts.ExtractionCheck
+import org.openlife.vault.facts.FactKind
+import org.openlife.vault.facts.FactOrigin
+import org.openlife.vault.facts.FactStatus
+import org.openlife.vault.facts.FactValue
+import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.model.ImageFormat
 import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
@@ -327,8 +337,49 @@ class ScreenSemanticsTest {
             ScreenCase("delete-dialog", key = hasTestTag("delete_confirm"), paneTitle = false) {
                 DeleteConfirmationDialog(itemLabel = "Imported 1 Jan 1970", onConfirm = {}, onDismiss = {})
             },
+            ScreenCase("facts-ready") {
+                FactsScreen(state = syntheticFacts(), message = null, actions = factsActions(), onAddText = { _, _ -> }, onBack = {})
+            },
+            ScreenCase("facts-empty") {
+                FactsScreen(
+                    state = FactsUiState.Ready(emptyList(), ExtractionCheck.Completed, null),
+                    message = null,
+                    actions = factsActions(),
+                    onAddText = { _, _ -> },
+                    onBack = {},
+                )
+            },
         )
     }
+
+    private fun factsActions() = FactActions(
+        onOpenEvidence = {},
+        onReview = { _, _ -> },
+        onChoose = { _, _ -> },
+        onFindAgain = {},
+    )
+
+    /** One confirmed link, one stale date and one date that needs a choice; every value is synthetic. */
+    private fun syntheticFacts() = FactsUiState.Ready(
+        items = listOf(
+            FactItem(
+                UUID.randomUUID(), UUID.randomUUID(), FactKind.URL, FactOrigin.EXTRACTED, FactStatus.CONFIRMED, null,
+                FactValue("{\"url\":\"https://example.org\"}", "https://example.org"), emptyList(),
+            ),
+            FactItem(
+                UUID.randomUUID(), UUID.randomUUID(), FactKind.DATE, FactOrigin.EXTRACTED, FactStatus.STALE,
+                StaleReason.READING_REPLACED, FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03"), emptyList(),
+            ),
+            FactItem(
+                UUID.randomUUID(), UUID.randomUUID(), FactKind.DATE, FactOrigin.EXTRACTED,
+                FactStatus.CLARIFICATION_NEEDED, null,
+                FactValue("{\"candidates\":[{\"date\":\"2026-04-03\"},{\"date\":\"2026-03-04\"}]}", "2026-04-03 | 2026-03-04"),
+                listOf("2026-04-03", "2026-03-04"),
+            ),
+        ),
+        check = ExtractionCheck.Completed,
+        currentReadingId = UUID.randomUUID(),
+    )
 
     private fun span(source: Source, ordinal: Int, text: String, grounded: Boolean) = OcrSpan(
         id = UUID.randomUUID(),

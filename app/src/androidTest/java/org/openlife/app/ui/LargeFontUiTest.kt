@@ -57,12 +57,7 @@ class LargeFontUiTest {
 
     @Test
     fun noControlIsClippedAtFontScaleTwoOn320x640() {
-        composeRule.setContent {
-            navController = rememberNavController()
-            val config = DeviceConfigurationOverride.FontScale(2f) then
-                DeviceConfigurationOverride.ForcedSize(DpSize(320.dp, 640.dp))
-            DeviceConfigurationOverride(config) { OpenLifeTheme { OpenLifeNavHost(container, navController) } }
-        }
+        showAtLargeFont()
         val destinations = listOf<Any>(
             Routes.ListDetail(SOURCE_ID.toString()),
             Routes.Search,
@@ -74,6 +69,23 @@ class LargeFontUiTest {
             composeRule.runOnIdle { navController.navigate(route) }
             assertNothingClipped(route.toString())
             composeRule.runOnIdle { navController.popBackStack() }
+        }
+    }
+
+    /** P3-05-R6: the facts destination at 200% font on a 320x640dp window has no clipped control or text. */
+    @Test
+    fun factsAreNotClippedAtFontScaleTwoOn320x640() {
+        showAtLargeFont()
+        composeRule.runOnIdle { navController.navigate(Routes.Facts(SOURCE_ID.toString())) }
+        assertNothingClipped("facts")
+    }
+
+    private fun showAtLargeFont() {
+        composeRule.setContent {
+            navController = rememberNavController()
+            val config = DeviceConfigurationOverride.FontScale(2f) then
+                DeviceConfigurationOverride.ForcedSize(DpSize(320.dp, 640.dp))
+            DeviceConfigurationOverride(config) { OpenLifeTheme { OpenLifeNavHost(container, navController) } }
         }
     }
 

@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -48,6 +49,7 @@ fun FactsScreen(
     onAddText: (FactKind, String) -> Unit,
     onBack: () -> Unit,
 ) {
+    val pane = stringResource(R.string.facts_title)
     var adding by remember { mutableStateOf(false) }
     StatusHost(Modifier.fillMaxSize()) {
         Scaffold(
@@ -66,7 +68,7 @@ fun FactsScreen(
                 )
             },
         ) { padding ->
-            Column(modifier = Modifier.fillMaxWidth().padding(padding)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(padding).semantics { paneTitle = pane }) {
                 FactsPanel(state, actions, Modifier.weight(1f))
                 message?.let {
                     // Status only: the text names the outcome, never the value.
