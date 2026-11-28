@@ -106,7 +106,41 @@ Host (JVM):
 2. **Viewer versus search divergence (for P3-05).** The viewer shows the latest revision in any
    state (P2-01-R1). Search shows the READY pointer reading. For a STALE latest reading,
    search shows the older READY reading. Not changed in P3-07, per the coordinator.
-3. **F-71 and C2-R14 wording.** C2-R14 says the moving pointer uses `(startedAt, rowid)`.
-   The implementation uses `rowid` only, so the device clock cannot move the current reading
-   backwards. A dated C2-R14 amendment is needed from the owner. The shipped v6 backfill still uses `startedAt`.
+3. **F-71 and C2-R14 wording.** Amended 2026-11-28 (S-01, `docs/capabilities/C2.md`): the
+   current reading is the greatest `rowid`; `startedAt` is display data only. The shipped v6
+   backfill still orders by `startedAt` (known limit, S-02); the migration is not edited.
 4. **C2-13 wording.** C2-13 lists `UNRECOGNISED` as a state to test. The schema triggers make it unstorable, so the test proves the trigger rejects it. The owner may reword C2-13 to say so.
+
+## Schema review S-01..S-06 (2026-11-28)
+
+Branch `plan/P3-07-facts-search`. Each item has its own commit (prefix `P3-07:`).
+
+| Item | Change | Test or check |
+|---|---|---|
+| S-01 | C2-R14 dated amendment: current reading is the greatest `rowid`; F-71 row resolved; plan.yaml F-71 text appended | Commit `a4ad4b7`; doc only |
+| S-02 | Known limit recorded: v6 backfill (`FactMigration.BACKFILL_CURRENT_READING`) still orders by `startedAt`; not edited | Recorded in the S-01 amendment |
+| S-03 | `OcrDao.findRevisionsForSource` orders by `rowid ASC`; unused `observeRevisionsForSource` removed; KDocs in `OcrPointerSql` and `OcrViewDao` say rowid | Compiles in the gate (`:vault:compileDebugAndroidTestKotlin`); existing OCR tests run in the gate |
+| S-04 | `SearchIndex` KDoc: no VACUUM for the FTS rowid mapping and the reading order; new `NoVacuumTest.noProductionSourceRunsVacuum` | Mutation (recorded): a temporary `VACUUM` string in a vault main source fails `NoVacuumTest` and the existing `SearchIndexBoundaryTest.nothingRunsVacuum`; reverted |
+| S-04 host test (4) | `OcrRevisionPointerTest.aReadingWithAnEarlierStartedAtStillBecomesCurrentAndIsListedFirst`: clock set back (`startedAt` = 1), the later reading becomes current and `ORDER BY rowid DESC` lists it first | Passes. Mutation (recorded): ordering the pointer by `startedAt` fails this test; reverted |
+| S-05 | LIKE fallback matches each term in the canonical or the raw text, as the FTS index does | `FactSearchHostTest.likeFallbackFindsARawTextOnlyMatch`. RED before the fix (recorded), GREEN after |
+| S-05 note | An FTS hit that matches only `rawText` shows the canonical snippet, so the match is not highlighted in the snippet. Recorded as a known display limit, not changed in P3-07 | Doc note |
+| S-06 | `FactSearchIndex.isComplete` returns false on an engine below the SQLite floor, as `SearchIndex` does | `FactSearchHostTest.ensureOnAnEngineBelowTheFloorDoesNotKeepAnIntactIndex`. RED before the fix (recorded), GREEN after |
+
+Host tests (1) to (4), all in the JVM suite:
+
+1. `FactSearchHostTest.updatingRawTextIsRefusedByTheImmutabilityTrigger`
+2. `FactSearchHostTest.factIndexPassesIntegrityCheckWithRankOneAfterSourceRowRemoval`
+3. `FactSearchHostTest.createOnAnEngineBelowTheFloorReturnsFalseAndLeavesNoFactIndex`
+4. `OcrRevisionPointerTest.aReadingWithAnEarlierStartedAtStillBecomesCurrentAndIsListedFirst`
+
+Gate (one foreground command):
+`./gradlew --offline detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`
+Result: `BUILD SUCCESSFUL in 2m 39s` (exit 0). JVM tests: vault 312, app 241, eval 26, 0 failed.
+An earlier attempt failed when the Gradle daemon disappeared during the run (not a test failure); the rerun passed.
+
+Other checks: `bash scripts/plan-check.sh` gives `steps=83 errors=0`. `bash scripts/tests/run.sh` gives `51 passed, 0 failed`.
+
+Tablet (serial `U8BBB20806201256`, single class per run, `stay_on_while_plugged_in` set to 3 and restored to 0, verified):
+
+- `org.openlife.vault.search.SearchRepositoryTest`: 9 tests, 0 failures, 0 errors.
+- `org.openlife.vault.storage.FactSearchMigrationSqlCipherTest`: 2 tests, 0 failures, 0 errors.
