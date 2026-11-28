@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-03","image":"img-03.png","width":1080,"height":265,"rows":["D-03","E-01"],"lines":["2026.09.16","ann@example.org"],"items":[{"row":"D-03","kind":"DATE","raw":"2026.09.16","canonical":"2026-09-16"},{"row":"E-01","kind":"EMAIL","raw":"ann@example.org","canonical":"ann@example.org"}],"abstain":[],"truth":[]}

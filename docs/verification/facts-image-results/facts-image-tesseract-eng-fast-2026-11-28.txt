@@ -1,0 +1,118 @@
+schema	openlife-facts-image-report/1
+engine	tesseract-eng-fast	t4a-4.9.0+tessdata_fast-4.1.0-7d4322bd
+date	2026-11-28
+device	HUAWEI	AGS2-W09	sdk=26	abi=arm64-v8a
+gate	FAIL
+check	date_precision FAIL observed=28/29 min=0.97
+check	date_recall PASS observed=28/29 min=0.85
+check	money_precision PASS observed=13/13 min=0.95
+check	url_precision PASS observed=4/4 min=0.95
+check	email_precision PASS observed=5/5 min=0.95
+check	phone_precision FAIL observed=4/5 min=0.95
+check	ambiguous_dm_flagged PASS observed=6/6 min=1.0
+check	bare_currency_inferred PASS observed=0 max=0
+precision	DATE	28/29
+recall	DATE	28/29
+precision	MONEY	13/13
+recall	MONEY	13/13
+precision	URL	4/4
+recall	URL	4/4
+precision	EMAIL	5/5
+recall	EMAIL	5/5
+precision	PHONE	4/5
+recall	PHONE	4/5
+dm_flagged	6/6
+bare_currency	0
+wrong_definite	2	{DATE=1, PHONE=1}
+unexpected_emitted	{DATE=1, PHONE=1}
+misses_exact	{OCR_MISREAD=2}
+misses_ws_insensitive	{EXTRACTOR_MISS=2}
+unexpected_abstentions	2
+image	img-01	PERSISTED	ocr=2026-09-16|€7.80
+emit	img-01	EXACT	DATE	DATE	rules-date-v1	2026-09-16	2026-09-16
+emit	img-01	EXACT	MONEY	MONEY	rules-money-v1	€7.80	7.80 EUR
+image	img-02	PERSISTED	ocr=2026/9/6|https://example.org
+emit	img-02	EXACT	DATE	DATE	rules-date-v1	2026/9/6	2026-09-06
+emit	img-02	EXACT	URL	URL	rules-url-v1	https://example.org	https://example.org
+image	img-03	PERSISTED	ocr=2026.09.16|ann@example.org
+emit	img-03	EXACT	DATE	DATE	rules-date-v1	2026.09.16	2026-09-16
+emit	img-03	EXACT	EMAIL	EMAIL	rules-email-v1	ann@example.org	ann@example.org
+image	img-04	PERSISTED	ocr=16 September 2026|Tel: 01632 960123
+emit	img-04	EXACT	DATE	DATE	rules-date-v1	16 September 2026	2026-09-16
+emit	img-04	EXACT	PHONE	PHONE	rules-phone-v1	01632 960123	01632960123
+image	img-05	PERSISTED	ocr=13/04/2026|8,40 €
+emit	img-05	EXACT	DATE	DATE	rules-date-v1	13/04/2026	2026-04-13
+emit	img-05	EXACT	MONEY	MONEY	rules-money-v1	8,40 €	8.40 EUR
+image	img-06	PERSISTED	ocr=04/13/2026|14:30
+emit	img-06	EXACT	DATE	DATE	rules-date-v1	04/13/2026	2026-04-13
+emit	img-06	EXACT	DATE	TIME	rules-time-v1	14:30	14:30
+image	img-07	PERSISTED	ocr=03/04/2026|EUR 19.99
+emit	img-07	EXACT	DATE	DATE	rules-date-v1	03/04/2026	2026-03-04 | 2026-04-03
+emit	img-07	EXACT	MONEY	MONEY	rules-money-v1	EUR 19.99	19.99 EUR
+image	img-08	PERSISTED	ocr=05/06/2026|Ann@Example.ORG
+emit	img-08	EXACT	DATE	DATE	rules-date-v1	05/06/2026	2026-05-06 | 2026-06-05
+emit	img-08	EXACT	EMAIL	EMAIL	rules-email-v1	Ann@Example.ORG	Ann@example.org
+image	img-09	PERSISTED	ocr=10-11-2026|www.example.org/news
+emit	img-09	EXACT	DATE	DATE	rules-date-v1	10-11-2026	2026-10-11 | 2026-11-10
+emit	img-09	EXACT	URL	URL	rules-url-v1	www.example.org/news	www.example.org/news
+image	img-10	PERSISTED	ocr=1.2.2026|+44 (0)20 7946 0018
+emit	img-10	EXACT	DATE	DATE	rules-date-v1	1.2.2026	2026-01-02 | 2026-02-01
+emit	img-10	EXACT	PHONE	PHONE	rules-phone-v1	+44 (0)20 7946 0018	+442079460018
+image	img-11	PERSISTED	ocr=7/8/2026|£45.00
+emit	img-11	EXACT	DATE	DATE	rules-date-v1	7/8/2026	2026-07-08 | 2026-08-07
+emit	img-11	EXACT	MONEY	MONEY	rules-money-v1	£45.00	45.00 £
+image	img-12	PERSISTED	ocr=Wed 01/07/2026|2:45 pm
+emit	img-12	EXACT	DATE	DATE	rules-date-v1	Wed 01/07/2026	2026-01-07 | 2026-07-01
+emit	img-12	EXACT	DATE	TIME	rules-time-v1	2:45 pm	14:45
+image	img-13	PERSISTED	ocr=Wed 16 Sep 2026|2026-09-16 14:30
+emit	img-13	EXACT	DATE	DATE	rules-date-v1	Wed 16 Sep 2026	2026-09-16
+emit	img-13	EXACT	DATE	DATETIME	rules-datetime-v1	2026-09-16 14:30	2026-09-16 14:30
+image	img-14	PERSISTED	ocr=Sunday, 12 July 2026|https://example.org/a?b=1&c=2#top
+emit	img-14	EXACT	DATE	DATE	rules-date-v1	Sunday, 12 July 2026	2026-07-12
+emit	img-14	EXACT	URL	URL	rules-url-v1	https://example.org/a?b=1&c=2#top	https://example.org/a?b=1&c=2#top
+image	img-15	PERSISTED	ocr=2028-02-29|$12.50
+emit	img-15	EXACT	DATE	DATE	rules-date-v1	2028-02-29	2028-02-29
+emit	img-15	EXACT	MONEY	MONEY	rules-money-v1	$12.50	12.50 $
+image	img-16	PERSISTED	ocr=7&9 June 2026|9:15am
+emit	img-16	UNEXPECTED	DATE	TIME	rules-time-v1	9:15am	09:15
+miss	img-16	SILENT	OCR_MISREAD	EXTRACTOR_MISS	TIME	9:15 am
+image	img-17	PERSISTED	ocr=2026-03-04 to 2026-03-09|¥500
+emit	img-17	EXACT	MONEY	MONEY	rules-money-v1	¥500	500 ¥
+image	img-18	PERSISTED	ocr=2:30|first.last+tag@sub.example.co.uk
+emit	img-18	EXACT	DATE	TIME	rules-time-v1	2:30	02:30 | 14:30
+emit	img-18	EXACT	EMAIL	EMAIL	rules-email-v1	first.last+tag@sub.example.co.uk	first.last+tag@sub.example.co.uk
+image	img-19	PERSISTED	ocr=11:30 - 1:30 pm|2.500,75 €
+emit	img-19	EXACT	DATE	TIME	rules-time-v1	11:30	11:30 | 23:30
+emit	img-19	EXACT	DATE	TIME	rules-time-v1	1:30 pm	13:30
+emit	img-19	EXACT	MONEY	MONEY	rules-money-v1	2.500,75 €	2500.75 EUR
+image	img-20	PERSISTED	ocr=9am-5pm|+1555 123 4567
+emit	img-20	EXACT	DATE	TIME	rules-time-v1	9am	09:00
+emit	img-20	EXACT	DATE	TIME	rules-time-v1	5pm	17:00
+emit	img-20	UNEXPECTED	PHONE	PHONE	rules-phone-v1	+1555 123 4567	+15551234567
+miss	img-20	SILENT	OCR_MISREAD	EXTRACTOR_MISS	PHONE	+1 555 123 4567
+image	img-21	PERSISTED	ocr=Doors 6:00 pm - 11:00 pm|$15 USD
+emit	img-21	EXACT	DATE	TIME	rules-time-v1	6:00 pm	18:00
+emit	img-21	EXACT	DATE	TIME	rules-time-v1	11:00 pm	23:00
+emit	img-21	EXACT	MONEY	MONEY	rules-money-v1	$15 USD	15 USD
+image	img-22	PERSISTED	ocr=16 September 2026 at 14:30|1,234.56 $
+emit	img-22	EXACT	DATE	DATETIME	rules-datetime-v1	16 September 2026 at 14:30	2026-09-16 14:30
+emit	img-22	EXACT	MONEY	MONEY	rules-money-v1	1,234.56 $	1234.56 $
+image	img-23	PERSISTED	ocr=2026-09-16T14:30|Call 0800 123 456
+emit	img-23	EXACT	DATE	DATETIME	rules-datetime-v1	2026-09-16T14:30	2026-09-16 14:30
+emit	img-23	EXACT	PHONE	PHONE	rules-phone-v1	0800 123 456	0800123456
+image	img-24	PERSISTED	ocr=Fri 3 Apr 2026 09:30|Contact: ann@example.org, bob@example.net
+emit	img-24	EXACT	DATE	DATETIME	rules-datetime-v1	Fri 3 Apr 2026 09:30	2026-04-03 09:30
+emit	img-24	EXACT	EMAIL	EMAIL	rules-email-v1	ann@example.org	ann@example.org
+emit	img-24	EXACT	EMAIL	EMAIL	rules-email-v1	bob@example.net	bob@example.net
+image	img-25	PERSISTED	ocr=€40,-|Order 123456
+image	img-26	PERSISTED	ocr=$5 and £10|HTTPS://Example.ORG/Path
+emit	img-26	EXACT	MONEY	MONEY	rules-money-v1	$5	5 $
+emit	img-26	EXACT	MONEY	MONEY	rules-money-v1	£10	10 £
+emit	img-26	EXACT	URL	URL	rules-url-v1	HTTPS://Example.ORG/Path	https://example.org/Path
+image	img-27	PERSISTED	ocr=2'050.00 CHF|12.00 € +1 555 123 4567
+emit	img-27	EXACT	MONEY	MONEY	rules-money-v1	2'050.00 CHF	2050.00 CHF
+emit	img-27	EXACT	MONEY	MONEY	rules-money-v1	12.00 €	12.00 EUR
+emit	img-27	EXACT	PHONE	PHONE	rules-phone-v1	+1 555 123 4567	+15551234567
+image	img-28	PERSISTED	ocr=Invoice INV-2026-0047|Ref 123-2026-09-16
+image	img-29	PERSISTED	ocr=Room 101|12.50
+image	img-30	PERSISTED	ocr=Coffee - €3.50|v2.10.3

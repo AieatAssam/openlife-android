@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-13","image":"img-13.png","width":1080,"height":265,"rows":["D-22","DT-01"],"lines":["Wed 16 Sep 2026","2026-09-16 14:30"],"items":[{"row":"D-22","kind":"DATE","raw":"Wed 16 Sep 2026","canonical":"2026-09-16"},{"row":"DT-01","kind":"DATETIME","raw":"2026-09-16 14:30","canonical":"2026-09-16 14:30"}],"abstain":[],"truth":[]}

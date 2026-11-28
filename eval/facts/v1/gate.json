@@ -1,0 +1,22 @@
+{
+  "schema": "openlife-facts-gate/1",
+  "set": "facts/v1",
+  "requirement": "P3-06-R2 (amended 2026-11-26, C2.md governs). Pinned by FactsGatePinTest; changing a number is a reviewed diff here and in that test, with an ADR reference.",
+  "gated_families": {
+    "DATE": ["DATE", "TIME", "DATETIME"],
+    "MONEY": ["MONEY"],
+    "URL": ["URL"],
+    "EMAIL": ["EMAIL"],
+    "PHONE": ["PHONE"]
+  },
+  "thresholds": {
+    "date_precision_min": 0.97,
+    "date_recall_min": 0.85,
+    "money_precision_min": 0.95,
+    "url_precision_min": 0.95,
+    "email_precision_min": 0.95,
+    "phone_precision_min": 0.95,
+    "ambiguous_dm_flagged_min": 1.0,
+    "bare_currency_inferred_max": 0
+  }
+}

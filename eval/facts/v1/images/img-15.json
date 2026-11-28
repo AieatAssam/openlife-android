@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-15","image":"img-15.png","width":1080,"height":265,"rows":["D-31","M-10"],"lines":["2028-02-29","$12.50"],"items":[{"row":"D-31","kind":"DATE","raw":"2028-02-29","canonical":"2028-02-29"},{"row":"M-10","kind":"MONEY","raw":"$12.50","canonical":"12.50 $"}],"abstain":[],"truth":[]}
