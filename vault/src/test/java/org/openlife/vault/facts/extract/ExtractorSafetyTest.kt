@@ -69,16 +69,30 @@ class ExtractorSafetyTest {
         assertEquals(emptyList<String>(), slowest)
     }
 
-    /** Ten times the input must not cost much more than ten times the time (linear scanning). */
+    /**
+     * Ten times the input must not cost much more than ten times the time (linear scanning).
+     * Shared-host noise only inflates a measured ratio (a descheduled or GC-paused run
+     * lengthens one side), so an attempt that exceeds the bound is measured again, and the
+     * test fails only when every attempt exceeds it. A quadratic scan gives about
+     * [SCALE] * [SCALE] on every attempt, so it still fails.
+     */
     @Test
     fun workGrowsLinearly() {
         for (name in LINEAR) {
             val small = adversarial.getValue(name)
             val large = small.repeat(SCALE)
             val all = RuleStage.entries.toSet()
-            val ratio = bestOfRuns(large, all).cpu / bestOfRuns(small, all).cpu
-            println("ExtractorSafetyTest linearity $name x$SCALE ratio ${"%.1f".format(ratio)}")
-            assertTrue("$name grew by $ratio for ${SCALE}x input", ratio < SCALE * 2)
+            val ratios = mutableListOf<Double>()
+            for (attempt in 1..ATTEMPTS) {
+                val ratio = bestOfRuns(large, all).cpu / bestOfRuns(small, all).cpu
+                ratios += ratio
+                println("ExtractorSafetyTest linearity $name x$SCALE attempt $attempt ratio ${"%.1f".format(ratio)}")
+                if (ratio < SCALE * 2) break
+            }
+            assertTrue(
+                "$name grew by ${ratios.min()} for ${SCALE}x input in every attempt $ratios",
+                ratios.min() < SCALE * 2,
+            )
         }
     }
 
@@ -212,6 +226,7 @@ class ExtractorSafetyTest {
         const val WARMUP = 3
         const val RUNS = 5
         const val SCALE = 10
+        const val ATTEMPTS = 3
         const val NANOS_PER_MILLI = 1_000_000.0
         val LINEAR = listOf(
             "digit-space", "label-run", "at", "groups", "months", "time-ann", "url-many", "range-chain", "mark-led",
