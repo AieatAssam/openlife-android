@@ -140,15 +140,20 @@ internal class FactWriter(
         isNormalisedText(kind, value)
 
     /**
-     * P3-05 review U-06: a text kind's stored text must be a fixed point of the single-value normaliser. A value
-     * whose text the normaliser would change (or that it would refuse, or read as another kind) is not written.
+     * P3-05 review U-06: a URL, email, phone or money value is kept only when the single-value normaliser gives back
+     * its canonical text and its stored form from that text. A money value must match exactly. A text value's
+     * `normalized` part must match, and its `raw` part (the printed input, which the canonical text cannot restore)
+     * may be any JSON string. A value that disagrees with its text, or that the normaliser would change, refuse or
+     * read as another kind, is not written.
      */
-    private fun isNormalisedText(kind: FactKind, value: FactValue): Boolean = when (kind) {
-        FactKind.URL, FactKind.EMAIL, FactKind.PHONE ->
-            (UserValueNormaliser.text(kind, value.canonicalText) as? UserValueResult.Accepted)
-                ?.value?.canonicalText == value.canonicalText
-
-        else -> true
+    private fun isNormalisedText(kind: FactKind, value: FactValue): Boolean {
+        if (kind !in NORMALISED_KINDS) return true
+        val restored = (UserValueNormaliser.restore(kind, value.canonicalText) as? UserValueResult.Accepted)?.value
+            ?: return false
+        if (restored.canonicalText != value.canonicalText) return false
+        if (kind == FactKind.MONEY) return restored.valueJson == value.valueJson
+        val head = restored.valueJson.substringBefore(RAW_KEY) + RAW_KEY
+        return value.valueJson.startsWith(head) && RAW_TAIL.matches(value.valueJson.removePrefix(head))
     }
 
     private suspend fun hasValueEvidence(revision: Revision): Boolean =
@@ -190,5 +195,12 @@ internal class FactWriter(
 
     private companion object {
         const val READY = "READY"
+
+        /** P3-05 review U-06: the kinds whose stored form the normaliser restores (see isNormalisedText). */
+        val NORMALISED_KINDS = setOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.MONEY)
+        const val RAW_KEY = ",\"raw\":\""
+
+        /** The printed `raw` JSON string and the object's closing brace. */
+        val RAW_TAIL = Regex("""(?:[^"\\]|\\.)*"\}""")
     }
 }

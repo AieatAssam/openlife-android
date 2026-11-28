@@ -297,6 +297,66 @@ class FactWriterTest {
         assertEquals(1L, host.long("SELECT COUNT(*) FROM fact_revisions WHERE factId = 'f3'"))
     }
 
+    /** P3-05 review U-06 (follow-up 1): the whole stored value must be the normaliser's, not only its canonical text. */
+    @Test
+    fun userTextValueMustBeTheNormalisersWholeValue() = runBlocking {
+        rows.readySourceWithReading(FactHost.fresh(host), "a")
+        val mismatched = FactValue(
+            "{\"normalized\":\"https://other.example/\",\"raw\":\"https://example.org/\"}",
+            "https://example.org/",
+        )
+        assertEquals(FactWrite.Refused(FactRefusal.INVALID_VALUE), writer.addUserFact("a", FactKind.URL, mismatched))
+        assertEquals(0L, host.long("SELECT COUNT(*) FROM fact_revisions WHERE origin = 'USER'"))
+    }
+
+    /** P3-05 review U-06 (follow-up 1): a money value needs its amount and the currency code the normaliser writes. */
+    @Test
+    fun malformedMoneyIsRefused() = runBlocking {
+        rows.readySourceWithReading(FactHost.fresh(host), "a")
+        val invalid = FactWrite.Refused(FactRefusal.INVALID_VALUE)
+        listOf(
+            FactValue("{\"amount\":\"12.50\",\"currency\":null,\"rawSymbol\":null}", "12.50"),
+            FactValue("{\"amount\":\"12.50\",\"currency\":\"EUR\",\"rawSymbol\":null}", "12.50"),
+            FactValue("{\"amount\":\"12.50\",\"currency\":\"EUR\",\"rawSymbol\":null}", "12.50 GBP"),
+        ).forEach { value -> assertEquals(value.canonicalText, invalid, writer.addUserFact("a", FactKind.MONEY, value)) }
+    }
+
+    /** P3-05 review U-06 (follow-up 1): every value the normaliser accepts for these kinds is accepted by the writer. */
+    @Test
+    fun everyNormaliserOutputIsAcceptedByTheWriter() = runBlocking {
+        rows.readySourceWithReading(FactHost.fresh(host), "a")
+        val results = buildList {
+            listOf("https://example.org/a", "HTTP://EXAMPLE.org", "example.org/x?y=1#z").forEach {
+                add(FactKind.URL to UserValueNormaliser.text(FactKind.URL, it))
+            }
+            listOf("name@example.org", "First.Last+tag@Sub.Example.co.uk").forEach {
+                add(FactKind.EMAIL to UserValueNormaliser.text(FactKind.EMAIL, it))
+            }
+            listOf("+44 20 7946 0958", "+1 (415) 555-0100").forEach {
+                add(FactKind.PHONE to UserValueNormaliser.text(FactKind.PHONE, it))
+            }
+            listOf(LocalDate.of(2026, 4, 3), LocalDate.of(2024, 2, 29)).forEach {
+                add(FactKind.DATE to UserValueNormaliser.date(it))
+            }
+            listOf(Triple(0, 0, null), Triple(23, 59, 59), Triple(9, 5, null)).forEach { (h, m, s) ->
+                add(FactKind.TIME to UserValueNormaliser.time(h, m, s))
+            }
+            listOf("12.50" to "GBP", "1000" to "JPY", "0.99" to "USD").forEach { (amount, code) ->
+                add(FactKind.MONEY to UserValueNormaliser.money(amount, code))
+            }
+        }
+        val accepted = results.mapNotNull { (kind, result) -> (result as? UserValueResult.Accepted)?.let { kind to it.value } }
+        assertEquals(
+            "each kind has an accepted sample, so the loop is not empty",
+            setOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE, FactKind.DATE, FactKind.TIME, FactKind.MONEY),
+            accepted.map { it.first }.toSet(),
+        )
+        accepted.forEach { (kind, value) ->
+            val result = writer.addUserFact("a", kind, value)
+            assertTrue("$kind ${value.canonicalText}: $result", result is FactWrite.Written)
+        }
+    }
+
     private fun extractedOn(factId: String) {
         rows.fact(factId, "a")
         rows.revision("x2", factId)

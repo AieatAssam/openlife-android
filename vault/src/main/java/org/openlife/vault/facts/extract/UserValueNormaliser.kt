@@ -87,6 +87,21 @@ object UserValueNormaliser {
         return extracted(extractedKind, input.trim())
     }
 
+    /**
+     * The value the normaliser gives for a stored [canonicalText] of [kind] (P3-05 review U-06). The writer keeps a
+     * user text or money value only when this is the stored value itself. Dates and times are checked by
+     * UserValueShape, not here.
+     */
+    fun restore(kind: FactKind, canonicalText: String): UserValueResult = when (kind) {
+        FactKind.URL, FactKind.EMAIL, FactKind.PHONE -> text(kind, canonicalText)
+        FactKind.MONEY -> {
+            val code = canonicalText.substringAfterLast(' ', "").ifEmpty { null }
+            money(canonicalText.substringBeforeLast(' ', ""), code)
+        }
+
+        else -> UserValueResult.Refused(UserValueRefusal.NOT_ONE_VALUE)
+    }
+
     private fun extracted(kind: ExtractedKind, text: String): UserValueResult {
         inputRefusal(text)?.let { return UserValueResult.Refused(it) }
         val candidates = FactExtractor.extract(listOf(ExtractionSpan(USER_SPAN_ID, null, 0, text))).candidates
