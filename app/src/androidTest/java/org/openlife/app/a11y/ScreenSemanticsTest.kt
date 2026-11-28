@@ -375,6 +375,10 @@ class ScreenSemanticsTest {
                 FactStatus.CLARIFICATION_NEEDED, null,
                 FactValue("{\"candidates\":[{\"date\":\"2026-04-03\"},{\"date\":\"2026-03-04\"}]}", "2026-04-03 | 2026-03-04"),
                 listOf("2026-04-03", "2026-03-04"),
+                candidates = FactValue(
+                    "{\"candidates\":[{\"date\":\"2026-04-03\"},{\"date\":\"2026-03-04\"}]}",
+                    "2026-04-03 | 2026-03-04",
+                ),
             ),
         ),
         check = ExtractionCheck.Completed,

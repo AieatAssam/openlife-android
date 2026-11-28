@@ -118,7 +118,9 @@ class FactsPresenter(
             gateway.facts(sourceId).collect { rows ->
                 val check = gateway.extractionCheck(sourceId)
                 val current = gateway.currentReadingId(sourceId)
-                val items = rows.map { row -> toItem(row, gateway.evidenceOf(row.revision.id)) }
+                val items = rows.map { row ->
+                    toItem(row, gateway.evidenceOf(row.revision.id), gateway.candidatesOf(row.revision.id))
+                }
                 mutableState.value = FactsUiState.Ready(items, check, current)
             }
         }
@@ -136,8 +138,9 @@ class FactsPresenter(
 
     /** Chooses one candidate of a CLARIFICATION_NEEDED fact; the entry and its text stay exactly as stored (C2-R36). */
     suspend fun chooseCandidate(item: FactItem, index: Int): FactWriteResult {
-        val entries = item.value.candidateEntries()
-        val texts = item.value.candidateTexts()
+        val candidates = item.candidates ?: return FactWriteResult.Refused(FactRefusal.INVALID_VALUE)
+        val entries = candidates.candidateEntries()
+        val texts = candidates.candidateTexts()
         if (index !in entries.indices || index !in texts.indices) {
             return FactWriteResult.Refused(FactRefusal.INVALID_VALUE)
         }
@@ -197,7 +200,11 @@ class FactsPresenter(
     }
 }
 
-private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): FactItem = FactItem(
+private fun toItem(
+    row: FactWithLatestRevision,
+    evidence: List<FactEvidence>,
+    candidates: FactValue?,
+): FactItem = FactItem(
     factId = row.fact.id,
     revisionId = row.revision.id,
     kind = row.revision.kind,
@@ -205,6 +212,7 @@ private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): F
     status = row.revision.status,
     staleReason = row.revision.staleReason,
     value = row.revision.value,
-    candidateTexts = row.revision.value.candidateTexts(),
+    candidateTexts = candidates?.candidateTexts().orEmpty(),
     evidence = evidence,
+    candidates = candidates,
 )

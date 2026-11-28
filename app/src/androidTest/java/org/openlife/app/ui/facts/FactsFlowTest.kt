@@ -180,7 +180,8 @@ class FactsFlowTest {
             FactStatus.CLARIFICATION_NEEDED,
             FactValue(CANDIDATES_JSON, "2026-04-03 | 2026-03-04"),
         )
-        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING)
+        val candidates = mapOf(row.revision.id to row.revision.value)
+        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING, candidates = candidates)
         openFacts(source, facts)
 
         // P3-05-R6: the candidate button shows the locale's date; the chosen entry stays canonical.

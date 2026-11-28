@@ -140,20 +140,33 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
                 Text(text = stringResource(R.string.facts_show_evidence), modifier = Modifier.fillMaxWidth())
             }
         }
-        if (item.needsClarification) {
-            Text(text = stringResource(R.string.facts_choose_heading), style = MaterialTheme.typography.bodyMedium)
-            // Each candidate is its own button with its own stored text; none is shown as the definite value (C2-R36).
-            item.candidateTexts.forEachIndexed { index, text ->
-                OpenLifeTextButton(
-                    onClick = { actions.onChoose(item, index) },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) {
-                    Text(text = FactDisplay.value(item.kind, text, locale), modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
+        if (item.candidates != null) CandidateChoices(item, actions)
         if (item.isCorrectable) CorrectSection(item, actions)
         FactReviewActions(item, actions)
+    }
+}
+
+/**
+ * C2-R36: each candidate is its own button with its own stored text; none is shown as the definite value.
+ * The value in use is labelled as the current choice and is not offered again.
+ */
+@Composable
+private fun CandidateChoices(item: FactItem, actions: FactActions) {
+    val locale = LocalConfiguration.current.locales[0]
+    val entries = item.candidates?.candidateEntries().orEmpty()
+    Text(text = stringResource(R.string.facts_choose_heading), style = MaterialTheme.typography.bodyMedium)
+    item.candidateTexts.forEachIndexed { index, text ->
+        val inUse = entries.getOrNull(index) == item.value.valueJson
+        OpenLifeTextButton(
+            onClick = { actions.onChoose(item, index) },
+            enabled = !inUse,
+            modifier = Modifier.heightIn(min = 48.dp),
+        ) {
+            Text(text = FactDisplay.value(item.kind, text, locale), modifier = Modifier.fillMaxWidth())
+        }
+        if (inUse) {
+            Text(text = stringResource(R.string.facts_choice_current), style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 

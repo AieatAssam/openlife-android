@@ -195,19 +195,12 @@ class FactWriterTest {
         )
         rows.current("f", "x")
         rows.evidence("e1", "x", "a", "a-s1")
-        val chosen = written(writer.clarify("x", FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03")))
         assertEquals(candidates, writer.candidatesOf("x")?.valueJson)
+        val chosen = written(writer.clarify("x", FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03")))
+        assertNull("a superseded revision offers no candidates", writer.candidatesOf("x"))
         assertEquals(candidates, writer.candidatesOf(chosen.revisionId)?.valueJson)
-        rows.fact("g", "a")
-        rows.revision(
-            "y",
-            "g",
-            status = "STALE",
-            valueJson = candidates,
-            canonicalText = "2026-03-04 | 2026-04-03",
-        )
-        rows.current("g", "y")
-        assertNull("a stale revision offers no candidates", writer.candidatesOf("y"))
+        marker.markForSpan("a-s1", StaleReason.SPAN_CORRECTED)
+        assertNull("a stale clarification offers no candidates", writer.candidatesOf(chosen.revisionId))
     }
 
     @Test

@@ -85,6 +85,11 @@ class FactRepository(
     suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult =
         write { it.clarify(revisionId.toString(), chosen) }
 
+    /** C2-R36: the candidates a clarification of [revisionId] may choose from; null when it offers none. */
+    suspend fun candidatesOf(revisionId: UUID): FactValue? = withContext(ioDispatcher) {
+        FactWriter(database.factDao(), clock).candidatesOf(revisionId.toString())
+    }
+
     /** C2-R37. */
     suspend fun correct(revisionId: UUID, value: FactValue): FactWriteResult =
         write { it.correct(revisionId.toString(), value) }
