@@ -151,10 +151,12 @@ object FactsImageGenerator {
         append('"')
     }
 
-    fun write(renders: List<Rendered>, fonts: FixtureFonts, outDir: File) {
+    fun write(renders: List<Rendered>, fonts: FixtureFonts, gateText: String, outDir: File) {
         outDir.mkdirs()
         val manifest = StringBuilder("# P3-06 image set manifest: id, PNG SHA-256, truth SHA-256, seed ${SEED}, width, height\n")
         manifest.append("#fonts\t").append(fonts.entries.joinToString(" ") { "${it.file}=${it.sha256}" }).append('\n')
+        File(outDir, "gate.json").writeText(gateText)
+        manifest.append("gate.json\t").append(Digests.sha256(gateText)).append("\t-\t0\t0\n")
         renders.forEach { r ->
             val id = r.case.id
             File(outDir, "$id.png").writeBytes(r.png)
@@ -182,6 +184,7 @@ fun main(args: Array<String>) {
     val rowsById = FactsImageGenerator.parseRows(File(root, "eval/facts/v1/text.tsv").readText(Charsets.UTF_8))
     val cases = FactsImageGenerator.parseCases(File(root, "eval/facts/v1/image-cases.tsv").readText(Charsets.UTF_8))
     val renders = cases.mapIndexed { i, case -> FactsImageGenerator.render(case, rowsById, fonts, i) }
-    FactsImageGenerator.write(renders, fonts, File(args[1]))
+    val gateText = File(root, "eval/facts/v1/gate.json").readText(Charsets.UTF_8)
+    FactsImageGenerator.write(renders, fonts, gateText, File(args[1]))
     println("wrote ${renders.size} images to ${args[1]}")
 }

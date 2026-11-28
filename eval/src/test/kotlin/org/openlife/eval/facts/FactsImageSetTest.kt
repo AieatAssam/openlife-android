@@ -18,13 +18,21 @@ class FactsImageSetTest {
     fun committedImagesMatchTheirManifest() {
         val rows = File(dir, "manifest.tsv").readLines(Charsets.UTF_8)
             .filter { it.isNotBlank() && !it.startsWith("#") }
-        assertEquals("30 image cases", 30, rows.size)
-        rows.forEach { line ->
+        val cases = rows.filter { it.startsWith("img-") }
+        assertEquals("30 image cases", 30, cases.size)
+        cases.forEach { line ->
             val cells = line.split('\t')
             val id = cells[0]
             assertEquals("$id PNG", cells[1], Digests.sha256(File(dir, "$id.png").readBytes()))
             assertEquals("$id truth", cells[2], Digests.sha256(File(dir, "$id.json").readText(Charsets.UTF_8)))
         }
+        val gate = rows.single { it.startsWith("gate.json\t") }.split('\t')
+        assertEquals("gate.json", gate[1], Digests.sha256(File(dir, "gate.json").readText(Charsets.UTF_8)))
+        assertEquals(
+            "the image set ships the pinned gate",
+            File(root, "eval/facts/v1/gate.json").readText(Charsets.UTF_8),
+            File(dir, "gate.json").readText(Charsets.UTF_8),
+        )
     }
 
     @Test
