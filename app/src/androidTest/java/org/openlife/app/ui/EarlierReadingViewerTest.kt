@@ -55,7 +55,7 @@ class EarlierReadingViewerTest {
                     loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
                     onBack = {},
                     onDeleteRequested = {},
-                    ocrState = OcrUiState.Ready(source.id, span.revisionId, listOf(span), reviewState = OcrReviewState.UNREVIEWED),
+                    ocrState = readyState(source, span),
                     initialSelectedSpanId = span.id,
                     readOnly = true,
                 )
@@ -64,9 +64,11 @@ class EarlierReadingViewerTest {
 
         composeRule.onNodeWithText(context.getString(R.string.viewer_earlier_reading)).assertIsDisplayed()
         MUTATING_TEXTS.forEach { text ->
-            assertEquals("read-only must not offer: $text", 0, composeRule.onAllNodesWithText(text).fetchSemanticsNodes().size)
+            val found = composeRule.onAllNodesWithText(text).fetchSemanticsNodes().size
+            assertEquals("read-only must not offer: $text", 0, found)
         }
-        assertEquals("read-only must not offer facts", 0, composeRule.onAllNodesWithTag("viewer_open_facts").fetchSemanticsNodes().size)
+        val facts = composeRule.onAllNodesWithTag("viewer_open_facts").fetchSemanticsNodes().size
+        assertEquals("read-only must not offer facts", 0, facts)
         assertEquals(
             "read-only must not offer delete",
             0,
@@ -85,7 +87,7 @@ class EarlierReadingViewerTest {
                     loadContent = { ReadyReadResult.Loaded(tinyJpeg()) },
                     onBack = {},
                     onDeleteRequested = {},
-                    ocrState = OcrUiState.Ready(source.id, span.revisionId, listOf(span), reviewState = OcrReviewState.UNREVIEWED),
+                    ocrState = readyState(source, span),
                     initialSelectedSpanId = span.id,
                 )
             }
@@ -93,7 +95,8 @@ class EarlierReadingViewerTest {
 
         composeRule.onNodeWithText(context.getString(R.string.viewer_correct)).assertIsDisplayed()
         assertTrue(composeRule.onAllNodesWithTag("viewer_open_facts").fetchSemanticsNodes().isNotEmpty())
-        assertEquals(0, composeRule.onAllNodesWithText(context.getString(R.string.viewer_earlier_reading)).fetchSemanticsNodes().size)
+        val label = context.getString(R.string.viewer_earlier_reading)
+        assertEquals(0, composeRule.onAllNodesWithText(label).fetchSemanticsNodes().size)
     }
 
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
@@ -112,6 +115,9 @@ class EarlierReadingViewerTest {
         wrappedDek = ByteArray(16),
         artefactVersion = 1,
     )
+
+    private fun readyState(source: Source, span: OcrSpan) =
+        OcrUiState.Ready(source.id, span.revisionId, listOf(span), reviewState = OcrReviewState.UNREVIEWED)
 
     private fun span(sourceId: UUID) = OcrSpan(
         UUID(0L, 62L),

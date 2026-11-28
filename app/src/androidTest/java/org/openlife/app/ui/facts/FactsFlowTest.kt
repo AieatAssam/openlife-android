@@ -157,7 +157,9 @@ class FactsFlowTest {
         )
         composeRule.runOnIdle { navController.navigate(Routes.ListDetail(source.id.toString())) }
 
-        composeRule.waitUntil(WAIT_MS) { composeRule.onAllNodesWithTag("viewer_open_facts").fetchSemanticsNodes().isNotEmpty() }
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.onAllNodesWithTag("viewer_open_facts").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("viewer_open_facts").performClick()
 
         composeRule.waitUntil(WAIT_MS) {

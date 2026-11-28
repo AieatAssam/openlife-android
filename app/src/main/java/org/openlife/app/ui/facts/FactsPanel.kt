@@ -129,16 +129,15 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
             Text(text = stringResource(statusLabel(item.status)), style = MaterialTheme.typography.bodyMedium)
         }
         item.evidence.firstOrNull()?.let { evidence ->
-            // P3-05-R1: only evidence on the reading the source shows can be opened; an earlier reading says so.
-            if (evidence.ocrRevisionId == currentReadingId?.toString()) {
-                OpenLifeTextButton(
-                    onClick = { actions.onOpenEvidence(evidence) },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) {
-                    Text(text = stringResource(R.string.facts_show_evidence), modifier = Modifier.fillMaxWidth())
-                }
-            } else {
-                Text(text = stringResource(R.string.facts_earlier_reading), style = MaterialTheme.typography.bodySmall)
+            // P3-05-R1/R3: evidence on the shown reading opens the viewer; an earlier reading opens read-only.
+            val onCurrentReading = evidence.ocrRevisionId == currentReadingId?.toString()
+            OpenLifeTextButton(
+                onClick = {
+                    if (onCurrentReading) actions.onOpenEvidence(evidence) else actions.onOpenEarlierEvidence(evidence)
+                },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(text = stringResource(R.string.facts_show_evidence), modifier = Modifier.fillMaxWidth())
             }
         }
         if (item.needsClarification) {

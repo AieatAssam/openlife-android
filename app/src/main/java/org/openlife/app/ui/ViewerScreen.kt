@@ -73,7 +73,7 @@ fun ViewerScreen(
     // P2-08-R4: a search result opens the viewer with its span selected. Selection
     // rules still apply: a span that is ungrounded or rejected is not selected.
     initialSelectedSpanId: java.util.UUID? = null,
-    // P3-05-R3 (C2-R39): stub for RED; the earlier-reading viewer is not implemented yet.
+    // P3-05-R3 (C2-R39): an earlier reading is read-only; no mutating action is offered.
     readOnly: Boolean = false,
 ) {
     var loadAttempt by remember(source.id) { mutableIntStateOf(0) }
@@ -86,6 +86,7 @@ fun ViewerScreen(
         selectedSpanId = selectedSpanId,
         onSelectSpan = { selectedSpanId = it },
         onRetryLoad = { loadAttempt++ },
+        readOnly = readOnly,
         actions = ViewerActions(
             onBack = onBack,
             onDeleteRequested = onDeleteRequested,
@@ -131,6 +132,7 @@ internal fun ViewerBody(
     onRetryLoad: () -> Unit,
     actions: ViewerActions,
     viewport: EvidenceViewport? = null,
+    readOnly: Boolean = false,
 ) {
     var correctingSpan by remember(source.id) { mutableStateOf<OcrSpan?>(null) }
     var correctionText by remember(source.id) { mutableStateOf("") }
@@ -140,7 +142,7 @@ internal fun ViewerBody(
     Scaffold(
         modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { ViewerTopBar(source, actions.onBack, onDelete = { confirmingDelete = true }) },
+        topBar = { ViewerTopBar(source, actions.onBack, onDelete = { confirmingDelete = true }, readOnly = readOnly) },
     ) { padding ->
         ViewerContent(
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -168,6 +170,7 @@ internal fun ViewerBody(
             onSetUserContentKind = actions.onSetUserContentKind,
             onOpenFacts = actions.onOpenFacts,
             viewport = viewport,
+            readOnly = readOnly,
         )
     }
 
@@ -195,7 +198,7 @@ internal fun ViewerBody(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Unit) {
+private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Unit, readOnly: Boolean) {
     TopAppBar(
         title = { Text(sourceLabel(source), modifier = Modifier.asHeading()) },
         navigationIcon = {
@@ -207,7 +210,7 @@ private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Uni
             }
         },
         actions = {
-            IconButton(onClick = onDelete) {
+            if (!readOnly) IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
                     contentDescription = stringResource(
@@ -241,6 +244,7 @@ private fun ViewerContent(
     onSetUserContentKind: (UserContentKind?) -> Unit,
     onOpenFacts: () -> Unit,
     viewport: EvidenceViewport?,
+    readOnly: Boolean,
 ) {
     val ready = ocrState as? OcrUiState.Ready
     val spans = ready?.spans.orEmpty()
@@ -250,6 +254,13 @@ private fun ViewerContent(
     StatusHost {
         Surface(modifier = modifier) {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                if (readOnly) {
+                    Text(
+                        stringResource(R.string.viewer_earlier_reading),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
                 ViewerImage(
                     source,
                     content,
@@ -259,6 +270,7 @@ private fun ViewerContent(
                     onSelectSpan = onSelectSpan,
                     onRetry = onRetryLoad,
                     onDelete = onDeleteRequested,
+                    deletable = !readOnly,
                     viewport = viewport,
                 )
                 // Visible text only: status announcements never carry document content (span text).
@@ -271,7 +283,7 @@ private fun ViewerContent(
                 }
                 // What the user came for (the text and its evidence) comes before
                 // the bookkeeping about the saved copy. Facts are offered once the text is read (P3-05-R1).
-                if (ocrState is OcrUiState.Ready) {
+                if (ocrState is OcrUiState.Ready && !readOnly) {
                     OpenLifeTextButton(
                         onClick = onOpenFacts,
                         modifier = Modifier.padding(horizontal = 16.dp).testTag("viewer_open_facts"),
@@ -289,12 +301,14 @@ private fun ViewerContent(
                     onReview = onReview,
                     onRejectSpan = onRejectSpan,
                     onUndoRejectSpan = onUndoRejectSpan,
+                    readOnly = readOnly,
                 )
                 PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 DetailsSection(
                     source = source,
                     verified = content is ViewerContentState.Shown,
                     onSetUserContentKind = onSetUserContentKind,
+                    readOnly = readOnly,
                 )
             }
         }
@@ -346,7 +360,12 @@ private fun ViewerCorrectionDialog(
 }
 
 @Composable
-private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKind: (UserContentKind?) -> Unit) {
+private fun DetailsSection(
+    source: Source,
+    verified: Boolean,
+    onSetUserContentKind: (UserContentKind?) -> Unit,
+    readOnly: Boolean,
+) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -383,7 +402,7 @@ private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKi
             // P2-07: communication safety context; no assessment runs in this version.
             PerforationDivider(modifier = Modifier.padding(top = 12.dp))
             AssessmentNotice(source)
-            if (ContentKindLabel.showQuestion(source)) ContentKindQuestion(source, onSetUserContentKind)
+            if (!readOnly && ContentKindLabel.showQuestion(source)) ContentKindQuestion(source, onSetUserContentKind)
         }
     }
 }

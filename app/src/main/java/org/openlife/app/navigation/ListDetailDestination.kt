@@ -173,6 +173,7 @@ private fun ViewerFor(
         selectedSpanId = selectedSpanId,
         onSelectSpan = session::selectSpan,
         onRetryLoad = session::retry,
+        readOnly = session.readOnly,
         actions = ViewerActions(
             onBack = onBack,
             onDeleteRequested = session::delete,

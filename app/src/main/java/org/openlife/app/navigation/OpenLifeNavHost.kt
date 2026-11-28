@@ -173,6 +173,12 @@ private fun FactsDestination(
                 runCatching { UUID.fromString(evidence.ocrSpanId) }.getOrNull()
                     ?.let { navController.openSource(sourceId, it, expanded) }
             },
+            // P3-05-R3: an earlier reading is named by id and opens read-only; both ids must parse.
+            onOpenEarlierEvidence = { evidence ->
+                runCatching { UUID.fromString(evidence.ocrSpanId) to UUID.fromString(evidence.ocrRevisionId) }
+                    .getOrNull()
+                    ?.let { (spanId, reading) -> navController.openSource(sourceId, spanId, expanded, reading) }
+            },
             onReview = facts::review,
             onChoose = facts::choose,
             onCorrect = facts::correct,
