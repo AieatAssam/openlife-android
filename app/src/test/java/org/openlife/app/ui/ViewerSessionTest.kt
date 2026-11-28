@@ -243,7 +243,32 @@ class ViewerSessionTest {
         assertSame(DecodedContent.Loading, session.content.value)
     }
 
-    private fun newSession(initialSpanId: UUID? = null) = ViewerSession(sourceId, initialSpanId, ports, saved, scope)
+    private fun newSession(initialSpanId: UUID? = null, readingId: UUID? = null) =
+        ViewerSession(sourceId, initialSpanId, ports, saved, scope, readingId)
+
+    /** P3-05-R3 (C2-R39): an earlier reading opens read-only, with its own OCR and the evidence span selected. */
+    @Test
+    fun anEarlierReadingOpensReadOnlyWithItsOwnTextAndSpanSelected() {
+        val earlier = UUID(0L, 55L)
+        val spanId = UUID(0L, 9L)
+        ports.ocr.value = OcrUiState.Idle
+        ports.reading.value = readyOcr()
+        ports.sources.value = SourceLookup.Found(source())
+        val session = newSession(initialSpanId = spanId, readingId = earlier)
+        session.onVisible()
+
+        assertTrue(session.readOnly)
+        assertEquals(earlier, ports.readingRequested)
+        assertEquals(spanId, session.selectedSpanId.value)
+        assertEquals(readyOcr(), session.ocr.value)
+    }
+
+    @Test
+    fun aCurrentReadingSessionIsNotReadOnly() {
+        val session = newSession()
+        assertFalse(session.readOnly)
+        assertEquals(null, ports.readingRequested)
+    }
 
     private fun source(state: SourceState = SourceState.READY) = Source(
         id = sourceId,
@@ -304,6 +329,14 @@ class ViewerSessionTest {
         }
 
         override fun ocrState(sourceId: UUID): StateFlow<OcrUiState> = ocr
+
+        val reading = MutableStateFlow<OcrUiState>(OcrUiState.Idle)
+        var readingRequested: UUID? = null
+
+        override fun readingState(revisionId: UUID): StateFlow<OcrUiState> {
+            readingRequested = revisionId
+            return reading
+        }
 
         override fun delete(sourceId: UUID, onDeleted: (Boolean) -> Unit) {
             deleteCallback = onDeleted
