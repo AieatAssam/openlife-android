@@ -215,6 +215,8 @@ internal class FactExtractionCore(
                 stale.filter { it.kind == kind && it.canonicalText == canonicalTextOf(candidate) }
                     .map { it to overlapRatio(box, it.evidenceBox()) }
                     .filter { it.second > 0.0 }
+                    // C2-R33: an equal overlap goes to the lower fact ordinal, whatever order the rows came in.
+                    .sortedBy { it.first.factOrdinal }
                     .maxByOrNull { it.second }
                     ?.first
             }
