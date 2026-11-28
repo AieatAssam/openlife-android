@@ -1,7 +1,8 @@
 id: P3-07
 title: Facts in local search
 phase: P3
-status: todo
+status: in_progress
+started: 2026-11-28
 depends_on: [P3-04, P2-08]
 estimate: S
 owner: agent
