@@ -236,6 +236,38 @@ class OcrFactHooksTest {
         )
     }
 
+    /**
+     * T1 (C2-R40, C2 §7.4): the reading replacement is one transaction: the pointer move, the span inserts and the
+     * STALE marking. A real failure inside the marking, arranged through the schema (a test-installed trigger that
+     * aborts the STALE write), must roll all three back. No production code is changed to reach this path.
+     */
+    @Test
+    fun staleMarkFailureRollsBackPointerMoveSpansAndEpoch(): Unit = runBlocking {
+        val sourceId = prepareAndSave()
+        val first = ocr(FixedEngine { spans("Due 26.11.2026") }).runOcr(sourceId) as OcrRunResult.Completed
+        extraction().extract(sourceId, ExtractionTrigger.AUTO)
+        val epochBefore = epoch(sourceId)
+        exec(
+            "CREATE TRIGGER test_fail_stale BEFORE UPDATE OF status ON fact_revisions " +
+                "WHEN NEW.status = 'STALE' BEGIN SELECT RAISE(ABORT, 'induced stale failure'); END",
+        )
+
+        val second = try {
+            ocr(FixedEngine { spans("Due 03.03.2025") }).runOcr(sourceId)
+        } finally {
+            exec("DROP TRIGGER test_fail_stale")
+        }
+
+        assertTrue("$second", second is OcrRunResult.Failed)
+        val failedRevision = (second as OcrRunResult.Failed).revisionId.toString()
+        assertEquals("the pointer stays on the first reading", first.revisionId.toString(), currentReading(sourceId))
+        assertEquals(0L, scalar("SELECT COUNT(*) FROM ocr_spans WHERE revisionId = '$failedRevision'"))
+        assertEquals(0L, scalar("SELECT COUNT(*) FROM fact_revisions WHERE status = 'STALE'"))
+        assertEquals("no epoch bump survives the rollback", epochBefore, epoch(sourceId))
+    }
+
+    private fun exec(sql: String) = db.openHelper.writableDatabase.execSQL(sql)
+
     private suspend fun assertStale(reason: StaleReason, expected: Long) {
         assertEquals(
             "rows staled by ${reason.name}",
