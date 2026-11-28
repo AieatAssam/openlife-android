@@ -201,7 +201,7 @@ class FactsFlowTest {
         val source = source(UUID(0L, 43L))
         val chosen = FactValue("{\"date\":\"2026-03-04\"}", "2026-03-04")
         val row = FakeFactsGateway.row(source.id, FactKind.DATE, FactOrigin.USER, FactStatus.CONFIRMED, chosen)
-        val candidates = mapOf(row.revision.id to FactValue(CANDIDATES_JSON, "2026-03-04 | 2026-04-03"))
+        val candidates = mapOf(row.revision.id to FactValue(CANDIDATES_JSON, "2026-04-03 | 2026-03-04"))
         val facts = FakeFactsGateway(rows = listOf(row), readingId = READING, candidates = candidates)
         openFacts(source, facts)
 
