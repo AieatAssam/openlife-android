@@ -226,6 +226,32 @@ class FactExtractionGuardTest {
         assertSuperseded(HookedGate(host) { rows.setState("a", "DELETING") })
     }
 
+    /**
+     * C2-R31 fingerprint, the per-fact pointers: a clarification moves one fact's current revision while the Source
+     * reading does not change. The reading-level fingerprint cannot see this, so only the pointer set can.
+     */
+    @Test
+    fun factPointerChangeBetweenReadAndCommitWritesNothing() {
+        groundedReading()
+        finished(extract(trigger = ExtractionTrigger.AUTO))
+        val runsBefore = runRowCount()
+        val date = host.query("SELECT id, currentRevisionId FROM facts WHERE sourceId = 'a' AND kind = 'DATE'").single()
+        val factId = date[0] as String
+        val currentRevision = date[1] as String
+
+        val result = runBlocking {
+            core(
+                HookedGate(host) {
+                    rows.revision("u-hook", factId, origin = "USER", status = "CONFIRMED", supersedes = currentRevision)
+                    rows.current(factId, "u-hook", expected = currentRevision)
+                },
+            ).extract("a", ExtractionTrigger.USER)
+        }
+
+        assertEquals("$result", FactExtractionResult.Superseded, result)
+        assertEquals("no run row is added", runsBefore, runRowCount())
+    }
+
     private fun assertSuperseded(gate: ExtractionGate) {
         val result = runBlocking { core(gate).extract("a", ExtractionTrigger.AUTO) }
         assertEquals("$result", FactExtractionResult.Superseded, result)
