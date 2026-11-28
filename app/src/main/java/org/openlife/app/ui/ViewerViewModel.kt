@@ -84,8 +84,8 @@ class ViewerViewModel(private val container: AppContainer, handle: SavedStateHan
 }
 
 /**
- * P3-05 review U-03: the writes a viewer asks for. RED stub: the read-only flag is not yet applied, so every
- * write reaches the store even when the viewer shows an earlier reading.
+ * P3-05 review U-03: the writes a viewer asks for. When [readOnly] (an earlier reading is shown), every write is a
+ * no-op and never reaches the store.
  */
 internal class ViewerWrites(
     private val sourceId: UUID,
