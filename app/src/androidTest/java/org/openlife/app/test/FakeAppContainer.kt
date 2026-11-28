@@ -26,13 +26,6 @@ import org.openlife.app.ui.SourceListUiState
 import org.openlife.app.ui.SourceLookup
 import org.openlife.app.ui.search.SearchBackend
 import org.openlife.app.ui.facts.FactsGateway
-import org.openlife.vault.facts.ExtractionCheck
-import org.openlife.vault.facts.FactEvidence
-import org.openlife.vault.facts.FactKind
-import org.openlife.vault.facts.FactValue
-import org.openlife.vault.facts.FactWithLatestRevision
-import org.openlife.vault.facts.FactWriteResult
-import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.UserContentKind
 import org.openlife.vault.ocr.OcrFailureReason
@@ -64,6 +57,7 @@ class FakeAppContainer(
     private val ocrView: (UUID) -> OcrView? = { null },
     private val listed: (List<Source>) -> SourceListUiState? = { SourceListUiState.Loaded(it) },
     override val about: AboutPort = FakeAboutPort(),
+    factsGateway: FactsGateway = FakeFactsGateway(),
 ) : AppContainer {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val sourceList = MutableStateFlow(initialSources)
@@ -72,16 +66,7 @@ class FakeAppContainer(
     override val internalLinks = InternalLinks()
     override val searchBackend = SearchBackend { flowOf(searchHits) }
 
-    /** P3-05: no facts unless a test supplies them; writes report a failure. */
-    override val facts: FactsGateway = object : FactsGateway {
-        override fun facts(sourceId: UUID) = flowOf(emptyList<FactWithLatestRevision>())
-        override suspend fun extractionCheck(sourceId: UUID) = ExtractionCheck.NotChecked
-        override suspend fun currentReadingId(sourceId: UUID): UUID? = null
-        override suspend fun evidenceOf(revisionId: UUID): List<FactEvidence> = emptyList()
-        override suspend fun review(revisionId: UUID, decision: ReviewDecision) = FactWriteResult.Failed
-        override suspend fun clarify(revisionId: UUID, chosen: FactValue) = FactWriteResult.Failed
-        override suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue) = FactWriteResult.Failed
-    }
+    override val facts: FactsGateway = factsGateway
 
     override val ocr = OcrPresenter(
         object : OcrBackend {
