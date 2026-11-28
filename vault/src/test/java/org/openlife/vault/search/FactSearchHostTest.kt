@@ -1,5 +1,8 @@
 package org.openlife.vault.search
 
+import androidx.sqlite.db.SupportSQLiteDatabase
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Proxy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -131,5 +134,82 @@ class FactSearchHostTest {
         }
         assertEquals(1, factHits("2026-11-26").size)
         fixture.integrityCheck(FactSearchIndex.TABLE)
+    }
+
+    /** [host] as a SupportSQLiteDatabase whose `SELECT sqlite_version()` reports [version] (as SearchIndexEngineGateTest). */
+    private fun reporting(version: String): SupportSQLiteDatabase {
+        val real = host.asSupportDatabase()
+        val literal = "SELECT '$version'"
+        return Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            val sql = args?.singleOrNull() as? String
+            val asksVersion = method.name == "query" && sql?.contains("sqlite_version()", ignoreCase = true) == true
+            try {
+                if (asksVersion) real.query(literal) else method.invoke(real, *(args ?: emptyArray()))
+            } catch (e: InvocationTargetException) {
+                throw e.targetException
+            }
+        } as SupportSQLiteDatabase
+    }
+
+    private fun factIndexCount(): Long = host.long("SELECT COUNT(*) FROM sqlite_master WHERE name = 'fact_fts'")
+
+    @Test
+    fun updatingRawTextIsRefusedByTheImmutabilityTrigger() {
+        val fixture = FactHost.fresh(host)
+        seedFact(fixture)
+        assertThrows(Failure::class.java) {
+            host.exec("UPDATE fact_revisions SET rawText = 'changed' WHERE id = '$FACT_REVISION'")
+        }
+        assertTrue(fixture.dataContains(FactSearchIndex.TABLE, "2026"))
+    }
+
+    @Test
+    fun factIndexPassesIntegrityCheckWithRankOneAfterSourceRowRemoval() {
+        val fixture = FactHost.fresh(host)
+        seedFact(fixture)
+        rows.setState(SOURCE, "DELETING")
+        val dao = HostSourceRowRemovalDao(host)
+        runBlocking { SourceRowRemoval.remove(dao, SOURCE, dao::deleteSource) }
+        fixture.integrityCheck(FactSearchIndex.TABLE)
+        host.exec("INSERT INTO ${FactSearchIndex.TABLE}(${FactSearchIndex.TABLE}, rank) VALUES('integrity-check', 1)")
+    }
+
+    @Test
+    fun createOnAnEngineBelowTheFloorReturnsFalseAndLeavesNoFactIndex() {
+        val fixture = FactHost.fresh(host)
+        seedFact(fixture)
+        assertEquals(1L, factIndexCount())
+        assertFalse(FactSearchIndex.create(reporting("3.46.0")))
+        assertEquals(0L, factIndexCount())
+    }
+
+    @Test
+    fun ensureOnAnEngineBelowTheFloorDoesNotKeepAnIntactIndex() {
+        val fixture = FactHost.fresh(host)
+        seedFact(fixture)
+        assertFalse(FactSearchIndex.ensure(reporting("3.46.0")))
+        assertEquals(0L, factIndexCount())
+    }
+
+    @Test
+    fun likeFallbackFindsARawTextOnlyMatch() {
+        val fixture = FactHost.fresh(host)
+        fixture.source(SOURCE)
+        fixture.revision(REVISION, SOURCE)
+        fixture.span(SPAN, REVISION, 0, "Due 14 March 2026")
+        rows.fact(FACT, SOURCE)
+        rows.revision(FACT_REVISION, FACT, canonicalText = "2026-03-14", rawText = "14 March 2026")
+        rows.evidence(EVIDENCE, FACT_REVISION, SOURCE, SPAN)
+        rows.current(FACT, FACT_REVISION)
+        assertEquals(1, rows.moveCurrentReading(SOURCE, REVISION))
+        // Force the LIKE path: without fact_fts the repository does not use FTS for facts.
+        host.exec("DROP TRIGGER fact_fts_ai")
+        host.exec("DROP TRIGGER fact_fts_ad")
+        host.exec("DROP TABLE fact_fts")
+        assertEquals(listOf(FACT_REVISION), factHits("March").map { it.fact?.revisionId.toString() })
+        assertEquals(emptyList<SearchHit>(), factHits("2027"))
     }
 }
