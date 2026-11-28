@@ -94,6 +94,7 @@ object UserValueNormaliser {
      */
     fun restore(kind: FactKind, canonicalText: String): UserValueResult = when (kind) {
         FactKind.URL, FactKind.EMAIL, FactKind.PHONE -> text(kind, canonicalText)
+
         FactKind.MONEY -> {
             val code = canonicalText.substringAfterLast(' ', "").ifEmpty { null }
             money(canonicalText.substringBeforeLast(' ', ""), code)

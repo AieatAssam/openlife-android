@@ -70,7 +70,7 @@ class FactsViewModelTest {
         commands.review(item, ReviewDecision.CONFIRM)
         commands.clear()
         gate.complete(Unit)
-        assertEquals("the screen cleared the message, and the late result does not set it", null, commands.message.value)
+        assertEquals("a late result does not set the cleared message", null, commands.message.value)
     }
 
     private class RecordingGateway : FactsGateway {
