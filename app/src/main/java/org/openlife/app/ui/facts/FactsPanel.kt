@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -174,8 +175,9 @@ private fun FactReviewActions(item: FactItem, actions: FactActions) {
 }
 
 @Composable
-private fun FactActionButton(label: Int, onClick: () -> Unit) {
-    OpenLifeTextButton(onClick = onClick, modifier = Modifier.heightIn(min = 48.dp)) {
+private fun RowScope.FactActionButton(label: Int, onClick: () -> Unit) {
+    // Two buttons share the row by weight; a fillMaxWidth label here would leave the second button with no bounds.
+    OpenLifeTextButton(onClick = onClick, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
         Text(text = stringResource(label), modifier = Modifier.fillMaxWidth())
     }
 }
