@@ -111,3 +111,131 @@ The harness writes `results-<engine>-<date>.json` to the
   `docs/verification/P2-04-ocr-evaluation.md`.
 - The review suspects that the English-only models cannot emit Cyrillic or
   Greek. If so, the abstention check would read 0/5 by construction.
+
+## Tablet run 2026-11-28 (Huawei AGS2-W09, Android 8.0, API 26)
+
+Supersedes the 2026-11-25 status above for the gate: both engines now have
+measured results on a physical device. The 2026-11-25 tables are kept
+unchanged; their "gap" entries describe that date only.
+
+- Device: Huawei AGS2-W09 (`ro.build.version.sdk=26`, arm64-v8a), adb serial
+  `U8BBB20806201256`. No emulator was used.
+- Code: commit `df98bb3bd334a614f0a80f9af7b7b2f82b446455` (branch
+  `verify/ocr-eval-tablet` from `main`). No production code changed.
+- Set and gate: `manifest_sha256`
+  `73a4dc901e5c2fc874560d2a7f86d98867290ee5adeebea2cdbd60c1696e9e41`,
+  `gate_sha256` `a1fe9421c5422a949575b883673bae9a44938183f8181c6bf318bf0e3536692d`.
+  Both are the values recorded in the 2026-11-27 run.
+- Model pins (checked by the gate): `tesseract-eng-fast`
+  `t4a-4.9.0+tessdata_fast-4.1.0-7d4322bd`; `mlkit-latin` `16.0.1`.
+
+### Commands
+
+```bash
+export ANDROID_SERIAL=U8BBB20806201256
+./gradlew :vault:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.ocr.eval.OcrEvaluationTest \
+  -Pandroid.testInstrumentationRunnerArguments.p204Eval=true \
+  -Pandroid.testInstrumentationRunnerArguments.p204Commit=df98bb3bd334a614f0a80f9af7b7b2f82b446455
+./gradlew :vault:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.ocr.OcrEngineMeasurementTest \
+  -Pandroid.testInstrumentationRunnerArguments.p203Measure=true
+./gradlew :eval:checkOcrGate \
+  -PocrResults=<dir>/results-tesseract-eng-fast-2026-11-28.json,<dir>/results-mlkit-latin-2026-11-28.json
+```
+
+Both `connectedDebugAndroidTest` runs: `BUILD SUCCESSFUL`, JUnit
+`tests=1 failures=0 errors=0 skipped=0`. Each run wrote its results to
+`vault/build/outputs/connected_android_test_additional_output/`, and both JSON
+files were copied from there. Raw reports are in the scratchpad at
+`device-logs/2026-11-28-ocr-eval/` (results JSON, gate output, JUnit XML,
+Gradle logs).
+
+### Gate results (`:eval:checkOcrGate`, exit 1)
+
+Category CER means use the Latin fixtures only (`OcrGate.kt`, the
+`expectedAbstain` filter), so the five non-Latin or mixed fixtures count
+only through the abstention check.
+
+| Check | Limit | tesseract-eng-fast | mlkit-latin |
+| --- | --- | --- | --- |
+| Mean CER, screenshots | <= 0.08 | 0.0 PASS | 0.00018670649738610902 PASS |
+| Mean CER, receipts | <= 0.15 | 0.1947820478529403 **FAIL** | 0.02328556294786782 PASS |
+| Mean CER, letters | <= 0.10 | 0.001246465999739051 PASS | 0.001747922254587778 PASS |
+| Lines matched at IoU >= 0.5 | >= 0.90 | 0.9021113243761996 PASS | 0.9980806142034548 PASS |
+| Correct abstention, non-Latin fixtures | 1.0 | 0.0 **FAIL** | 0.0 **FAIL** |
+| Abstentions on Latin fixtures | 0 | 0 PASS | 0 PASS |
+| Timed-out images | 0 | 0 PASS | 0 PASS |
+| p95 duration (ms) | <= 6000 | 1734 PASS | 675 PASS |
+| Peak PSS delta (KiB) | <= 122880 | 50398 PASS | 53900 PASS |
+
+Gate verdict: **tesseract-eng-fast FAIL** (2 checks failed);
+**mlkit-latin FAIL** (1 check failed). Neither engine permits default.
+
+The Tesseract line match rate passes by 0.0021 (0.9021 against 0.90).
+
+### Non-Latin and mixed fixtures (the five `expected_abstain` samples)
+
+For both engines, production returned OUTPUT on all five. None abstained.
+The gate's abstention check therefore reads 0.0 for both.
+
+| Fixture | Class | tesseract outcome | mlkit outcome | Non-Latin lines accepted (both policies, tesseract / mlkit) |
+| --- | --- | --- | --- | --- |
+| screenshot-07 | non_latin | OUTPUT | OUTPUT | 10 / 10 |
+| screenshot-14 | mixed | OUTPUT | OUTPUT | 1 / 1 |
+| receipt-07 | mixed | OUTPUT | OUTPUT | 1 / 1 |
+| receipt-12 | mixed | OUTPUT | OUTPUT | 1 / 1 |
+| letter-08 | non_latin | OUTPUT | OUTPUT | 9 / 9 |
+
+Whole-revision and per-span policy gave identical counts on these five
+fixtures, with 0 Latin lines lost. The V-15 difference therefore did not
+show up on this device run. The R5 decision is still deferred (see the
+2026-11-25 section above). Nothing here changes it. The `non_latin_accepted`
+counts are the policy fields in the results JSON, computed by
+`ScriptPolicyCost` from each engine's raw spans. They are not a per-line
+transcription. No engine output text is recorded here.
+
+### Timings and memory
+
+Gate per-image numbers, 40 fixtures per engine. Duration is the production
+`extract` call.
+
+| Engine | Min ms | Median ms | p95 ms (gate) | Max ms | Timeouts |
+| --- | --- | --- | --- | --- | --- |
+| tesseract-eng-fast | 993 | 1343 | 1734 | 1774 | 0 |
+| mlkit-latin | 376 | 526 | 675 | 789 | 0 |
+
+R3 names the p95 limit "on the CI emulator". These numbers come from the
+tablet and do not test that wording.
+
+`OcrEngineMeasurementTest` (3 runs per fixture, after a warm-up; times in ms):
+
+| Engine | Fixture | Runs (ms) | Peak PSS (KiB) |
+| --- | --- | --- | --- |
+| tesseract-eng-fast | receipt-900x360 (2 spans) | 677, 695, 711 | 64263 |
+| tesseract-eng-fast | screenshot-1080x2400 (20 spans) | 2113, 2135, 2083 | 76512 |
+| tesseract-eng-fast | dense-1200x1600 (40 spans) | 3101, 3061, 2967 | 68323 |
+| mlkit-latin | receipt-900x360 (2 spans) | 304, 290, 298 | 62950 |
+| mlkit-latin | screenshot-1080x2400 (20 spans) | 885, 755, 702 | 91953 |
+| mlkit-latin | dense-1200x1600 (40 spans) | 982, 961, 966 | 98889 |
+
+### Tesseract result: the 2026-11-25 reading was incomplete
+
+The P1-21 device note (`docs/verification/P1-21-min-sdk-26.md`, run C5)
+said that no Tesseract result appeared in its run. The stored logcat of that
+same run contains the Tesseract results (scratchpad
+`device-logs/vault-results-optin-eval2/.../logcat-org.openlife.vault.ocr.eval.OcrEvaluationTest-evaluateRegisteredEnginesOverTheFixtureSet.txt`,
+lines 2953 to 2962). Those lines carry the same figures as this run:
+`cer_mean_receipt` 0.1947820478529403 and `abstention_correct_rate_non_latin`
+0.0. The earlier reading was therefore a partial capture, not an engine that
+produced no result. Engine output was never missing in this run, so there is
+no cause to report for an absent Tesseract result.
+
+### Known gaps
+
+- The `P204Eval` logcat copy did not appear in this run's logcat capture
+  (the `-s P204Eval:I` dump was empty). The results JSON files are the
+  complete record. The `P203Measure` tag captured fully.
+- The gate's `timeouts` check (limit 0) is not yet owner-reviewed, as the
+  ADR-0003 notes say.
+- No ADR-0003 addendum and no P2-05 change were made in this run.
