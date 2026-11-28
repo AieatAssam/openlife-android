@@ -1,0 +1,1 @@
+{"schema":"openlife-facts-image-truth/1","id":"img-17","image":"img-17.png","width":1080,"height":265,"rows":["D-35","M-11"],"lines":["2026-03-04 to 2026-03-09","¥500"],"items":[{"row":"M-11","kind":"MONEY","raw":"¥500","canonical":"500 ¥"}],"abstain":[{"row":"D-35","kind":"DATE","raw":"2026-03-04 to 2026-03-09"}],"truth":[]}

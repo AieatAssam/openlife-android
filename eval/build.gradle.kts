@@ -68,6 +68,15 @@ tasks.register<JavaExec>("generateOcrFixtures") {
     args(rootProject.projectDir.absolutePath, ocrSetDir.asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("generateFactsImages") {
+    group = "evaluation"
+    description = "Regenerate eval/facts/v1/images (P3-06 image cases, truth, manifest) from the committed generator."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("org.openlife.eval.facts.fixtures.FactsImageGeneratorKt")
+    systemProperty("java.awt.headless", "true")
+    args(rootProject.projectDir.absolutePath, rootProject.file("eval/facts/v1/images").absolutePath)
+}
+
 // Fails unless every required engine has a results file that passes the
 // gate. With no results file the verdict is NO_MEASUREMENT and the task
 // fails: the gate never passes on absent data. P2-05 runs this before the
