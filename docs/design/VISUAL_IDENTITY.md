@@ -58,7 +58,8 @@ are WCAG AA at minimum; text on paper is AAA.
 | Vermilion container | `#F9DDD6` | `#4A1F17` | primary container, selected chips |
 | Stamp green (confirmed) | `#2F6B4F` | `#7FC39B` | Confirmed / Verified badges only |
 | Highlighter (evidence) | `#FFE45C` | `#D9B93A` | evidence region outline and span highlight |
-| Amber (attention) | `#B7791F` | `#E3B04B` | stale, needs clarification, not assessed |
+| Amber (attention) | `#B7791F` | `#E3B04B` | stale, needs clarification, not assessed: borders and marks |
+| Amber ink (attention text) | `#8A5A10` | `#E3B04B` | amber words, e.g. the Stale stamp label (P1-10) |
 | Error | `#8F1D1D` | `#F2B8B5` | destructive confirmations, unreadable content |
 | Outline | `#7D776B` | `#857F75` | meaningful boundaries: text-field and outlined-button borders (≥ 3:1 on every paper/carbon surface) |
 
@@ -102,6 +103,15 @@ P1-19 amendments (audit A-04, A-08):
   `#C8412B` is unchanged as the mark colour: the launcher icon background and
   the surface tint. `PaletteContrastTest` enforces ≥ 4.5:1 for primary on
   every surface role and primaryContainer, light and dark.
+
+P1-10 amendment (accessibility):
+- **Amber ink.** Amber `#B7791F` is 3.23:1 on Surface and 3.55:1 on Surface
+  raised: enough for a border or mark (3:1), not for words (4.5:1). The Stale
+  stamp drew its label in it. Amber words now use **Amber ink** `#8A5A10`
+  (5.25:1 on Surface, 5.77:1 on Surface raised); the stamp outline stays
+  amber. In carbon, amber `#E3B04B` already reaches ≥ 8.58:1 and serves both.
+  `ThemeContrastTest` (JVM) checks every stamp's label (4.5:1) and outline
+  (3:1) on every page surface, light and dark.
 
 ## 5. Typography (all OFL, bundled, licences in About)
 

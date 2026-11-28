@@ -28,9 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -134,7 +133,9 @@ internal fun ViewerBody(
     var correctionText by remember(source.id) { mutableStateOf("") }
     var confirmingDelete by remember(source.id) { mutableStateOf(false) }
 
+    val pane = stringResource(R.string.viewer_pane_title)
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = pane },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = { ViewerTopBar(source, actions.onBack, onDelete = { confirmingDelete = true }) },
     ) { padding ->
@@ -192,7 +193,7 @@ internal fun ViewerBody(
 @Composable
 private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Unit) {
     TopAppBar(
-        title = { Text(sourceLabel(source)) },
+        title = { Text(sourceLabel(source), modifier = Modifier.asHeading()) },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
@@ -205,7 +206,10 @@ private fun ViewerTopBar(source: Source, onBack: () -> Unit, onDelete: () -> Uni
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.viewer_delete_content_description),
+                    contentDescription = stringResource(
+                        R.string.viewer_delete_content_description,
+                        sourceLabel(source),
+                    ),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -238,51 +242,48 @@ private fun ViewerContent(
     val spanReviews = ready?.spanReviews.orEmpty()
     // P2-06-R13: a span rejected after it was selected stops being the selection.
     val selectedSpan = EvidenceSelection.selectableSpans(spans, spanReviews).find { it.id == selectedSpanId }
-    Surface(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            ViewerImage(
-                source,
-                content,
-                spans,
-                spanReviews,
-                selectedSpan?.id,
-                onSelectSpan = onSelectSpan,
-                onRetry = onRetryLoad,
-                onDelete = onDeleteRequested,
-                viewport = viewport,
-            )
-            if (selectedSpan != null) {
-                // TalkBack does not receive visual Canvas changes by itself.
-                // Announce the selected span as a polite live region. The text
-                // stays inert: it is not a link and it is not executed.
-                Text(
-                    stringResource(R.string.viewer_span_selected, evidenceSpanPreview(selectedSpan.text)),
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .testTag("viewer_span_announcement")
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                    style = MaterialTheme.typography.bodySmall,
+    StatusHost {
+        Surface(modifier = modifier) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                ViewerImage(
+                    source,
+                    content,
+                    spans,
+                    spanReviews,
+                    selectedSpan?.id,
+                    onSelectSpan = onSelectSpan,
+                    onRetry = onRetryLoad,
+                    onDelete = onDeleteRequested,
+                    viewport = viewport,
+                )
+                // Visible text only: status announcements never carry document content (span text).
+                selectedSpan?.let {
+                    Text(
+                        stringResource(R.string.viewer_span_selected, evidenceSpanPreview(it.text)),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                // What the user came for (the text and its evidence) comes before
+                // the bookkeeping about the saved copy.
+                OcrSection(
+                    source = source,
+                    state = ocrState,
+                    onExtractText = onExtractText,
+                    onCancel = onCancelOcr,
+                    onSelectSpan = onSelectSpan,
+                    onCorrect = onCorrect,
+                    onReview = onReview,
+                    onRejectSpan = onRejectSpan,
+                    onUndoRejectSpan = onUndoRejectSpan,
+                )
+                PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                DetailsSection(
+                    source = source,
+                    verified = content is ViewerContentState.Shown,
+                    onSetUserContentKind = onSetUserContentKind,
                 )
             }
-            // What the user came for (the text and its evidence) comes before
-            // the bookkeeping about the saved copy.
-            OcrSection(
-                source = source,
-                state = ocrState,
-                onExtractText = onExtractText,
-                onCancel = onCancelOcr,
-                onSelectSpan = onSelectSpan,
-                onCorrect = onCorrect,
-                onReview = onReview,
-                onRejectSpan = onRejectSpan,
-                onUndoRejectSpan = onUndoRejectSpan,
-            )
-            PerforationDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            DetailsSection(
-                source = source,
-                verified = content is ViewerContentState.Shown,
-                onSetUserContentKind = onSetUserContentKind,
-            )
         }
     }
 }
@@ -299,7 +300,7 @@ private fun ViewerCorrectionDialog(
     span?.let { currentSpan ->
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.viewer_correct_title)) },
+            title = { Text(stringResource(R.string.viewer_correct_title), modifier = Modifier.asHeading()) },
             text = {
                 val correctionLabel = stringResource(R.string.viewer_correction_label)
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -335,7 +336,11 @@ private fun ViewerCorrectionDialog(
 private fun DetailsSection(source: Source, verified: Boolean, onSetUserContentKind: (UserContentKind?) -> Unit) {
     FoldedCornerCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.viewer_details_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.viewer_details_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.asHeading(),
+            )
             DetailRow(stringResource(R.string.viewer_imported_label), importedTime(source), valueIsData = true)
             DetailRow(
                 stringResource(R.string.viewer_route_label),

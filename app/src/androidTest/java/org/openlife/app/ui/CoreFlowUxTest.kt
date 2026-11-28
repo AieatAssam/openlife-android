@@ -57,12 +57,12 @@ class CoreFlowUxTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Delete").performClick()
+        composeRule.onNodeWithContentDescription("Delete ", substring = true).performClick()
         assertEquals("delete must wait for confirmation", 0, deleteRequests)
         composeRule.onNodeWithText("Cancel").performClick()
         assertEquals("cancel must leave the item untouched", 0, deleteRequests)
 
-        composeRule.onNodeWithContentDescription("Delete").performClick()
+        composeRule.onNodeWithContentDescription("Delete ", substring = true).performClick()
         composeRule.onNode(hasText("Delete") and hasClickAction()).performClick()
         assertEquals(1, deleteRequests)
     }

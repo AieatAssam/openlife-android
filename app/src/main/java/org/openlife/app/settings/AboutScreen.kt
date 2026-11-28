@@ -21,11 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
 import org.openlife.app.ui.BackTopAppBar
+import org.openlife.app.ui.StatusHost
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.PerforationDivider
 import org.openlife.app.ui.theme.OpenLifeMono
 
@@ -42,27 +45,31 @@ fun AboutScreen(
     onBack: () -> Unit = {},
     lowRamDevice: Boolean = false,
 ) {
-    Scaffold(
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
-        topBar = { BackTopAppBar(title = stringResource(R.string.about_title), onBack = onBack) },
-    ) { padding ->
-        Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item { AboutHeader(lowRamDevice) }
-                section(R.string.about_section_build) {
-                    BuildSection(state.identity, AboutFact.BUILD_IDENTITY in state.unavailable)
+    StatusHost {
+        val pane = stringResource(R.string.about_title)
+        Scaffold(
+            modifier = Modifier.semantics { paneTitle = pane },
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+            topBar = { BackTopAppBar(title = pane, onBack = onBack) },
+        ) { padding ->
+            Surface(modifier = Modifier.fillMaxSize().padding(padding)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item { AboutHeader(lowRamDevice) }
+                    section(R.string.about_section_build) {
+                        BuildSection(state.identity, AboutFact.BUILD_IDENTITY in state.unavailable)
+                    }
+                    section(R.string.about_section_security) { SecuritySection(state.keyLevel) }
+                    section(R.string.about_section_will_not_do) { WillNotDoSection() }
+                    section(R.string.about_section_diagnostics) {
+                        DiagnosticsSection(state.diagnostics, AboutFact.DIAGNOSTICS in state.unavailable)
+                    }
+                    documentSection(BundledDocument.PRIVACY_POLICY, state.documents, onToggleDocument)
+                    documentSection(BundledDocument.THIRD_PARTY_LICENCES, state.documents, onToggleDocument)
                 }
-                section(R.string.about_section_security) { SecuritySection(state.keyLevel) }
-                section(R.string.about_section_will_not_do) { WillNotDoSection() }
-                section(R.string.about_section_diagnostics) {
-                    DiagnosticsSection(state.diagnostics, AboutFact.DIAGNOSTICS in state.unavailable)
-                }
-                documentSection(BundledDocument.PRIVACY_POLICY, state.documents, onToggleDocument)
-                documentSection(BundledDocument.THIRD_PARTY_LICENCES, state.documents, onToggleDocument)
             }
         }
     }
@@ -72,7 +79,11 @@ fun AboutScreen(
 private fun AboutHeader(lowRamDevice: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // The wordmark: Fraunces through the display role (VISUAL_IDENTITY §2 allows it on About).
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
+        Text(
+            stringResource(R.string.app_name),
+            style = MaterialTheme.typography.displaySmall,
+            modifier = Modifier.asHeading(),
+        )
         Text(stringResource(R.string.about_subtitle), style = MaterialTheme.typography.bodyLarge)
         if (lowRamDevice) {
             // P1-16-R4: the supported RAM floor is 2 GB; say so where it applies.

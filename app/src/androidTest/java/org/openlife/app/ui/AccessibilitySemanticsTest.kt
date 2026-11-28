@@ -205,7 +205,7 @@ class AccessibilitySemanticsTest {
         }
 
         composeRule.onNodeWithContentDescription("Back").assertIsDisplayed().assertHasClickAction()
-        composeRule.onNodeWithContentDescription("Delete").assertIsDisplayed().assertHasClickAction()
+        composeRule.onNodeWithContentDescription("Delete ", substring = true).assertIsDisplayed().assertHasClickAction()
     }
 
     @Test
@@ -278,7 +278,7 @@ class AccessibilitySemanticsTest {
         // Clickable rows merge label text into the row node, so measure the
         // unmerged Text and Delete icon. "Before" is visual left in RTL.
         val deleteBounds = composeRule
-            .onNodeWithContentDescription("Delete", useUnmergedTree = true)
+            .onNodeWithContentDescription("Delete ", substring = true, useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         val labelBounds = composeRule
             .onNodeWithTag("source_row_label", useUnmergedTree = true)

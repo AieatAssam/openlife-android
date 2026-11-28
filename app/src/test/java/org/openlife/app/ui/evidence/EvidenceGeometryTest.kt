@@ -260,6 +260,23 @@ class EvidenceGeometryTest {
     }
 
     /**
+     * P1-10: pinch and double-tap zoom have accessibility equivalents (Zoom in,
+     * Zoom out, Fit). Each step doubles or halves, within [MIN_ZOOM, MAX_ZOOM],
+     * so every zoom a pinch can reach is a few actions away.
+     */
+    @Test
+    fun accessibilityZoomStepsDoubleAndHalveWithinTheLimits() {
+        assertEquals(2f, EvidenceGeometry.zoomInStep(1f), 0f)
+        assertEquals(6f, EvidenceGeometry.zoomInStep(3f), 0f)
+        assertEquals(EvidenceGeometry.MAX_ZOOM, EvidenceGeometry.zoomInStep(6f), 0f)
+        assertEquals(EvidenceGeometry.MAX_ZOOM, EvidenceGeometry.zoomInStep(EvidenceGeometry.MAX_ZOOM), 0f)
+        assertEquals(4f, EvidenceGeometry.zoomOutStep(EvidenceGeometry.MAX_ZOOM), 0f)
+        assertEquals(1.5f, EvidenceGeometry.zoomOutStep(3f), 0f)
+        assertEquals(EvidenceGeometry.MIN_ZOOM, EvidenceGeometry.zoomOutStep(1.5f), 0f)
+        assertEquals(EvidenceGeometry.MIN_ZOOM, EvidenceGeometry.zoomOutStep(EvidenceGeometry.MIN_ZOOM), 0f)
+    }
+
+    /**
      * P2-06-R8 (E-01): at 3x the image and its regions are measured at their
      * zoomed size from the same transform, not limited to the canvas.
      */

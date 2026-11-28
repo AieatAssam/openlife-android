@@ -198,7 +198,8 @@ android {
         warningsAsErrors = true
         checkReleaseBuilds = true
         lintConfig = file("lint.xml")
-        warning.add("Accessibility")
+        // P1-10-R3: accessibility findings fail the build outright.
+        error.add("Accessibility")
     }
 
     packaging {

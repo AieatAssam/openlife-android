@@ -1,5 +1,6 @@
 package org.openlife.app.lock
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -25,6 +28,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.first
 import org.openlife.app.R
+import org.openlife.app.ui.Announce
+import org.openlife.app.ui.Announcement
+import org.openlife.app.ui.StatusHost
+import org.openlife.app.ui.asHeading
 import org.openlife.app.ui.brand.OpenLifeButton
 import org.openlife.app.ui.brand.OpenLifeOutlinedButton
 
@@ -95,7 +102,7 @@ private fun LockedHost(lockState: AppLockState, authenticator: BiometricAuthenti
         LockScreen(
             title = stringResource(R.string.lock_title),
             body = stringResource(R.string.lock_body),
-            note = if (notVerified) stringResource(R.string.lock_not_verified) else null,
+            note = if (notVerified) R.string.lock_not_verified else null,
             action = stringResource(R.string.lock_unlock),
             onAction = prompt,
         )
@@ -113,20 +120,33 @@ private fun LockedHost(lockState: AppLockState, authenticator: BiometricAuthenti
 
 /** Shows only fixed copy: no item count, label or other content-derived text (R7). */
 @Composable
-private fun LockScreen(title: String, body: String, note: String?, action: String, onAction: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.headlineSmall)
-            Text(body, style = MaterialTheme.typography.bodyLarge)
-            note?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            OpenLifeButton(onClick = onAction) { Text(action) }
+internal fun LockScreen(
+    title: String,
+    body: String,
+    @StringRes note: Int?,
+    action: String,
+    onAction: () -> Unit,
+) {
+    StatusHost {
+        // Both lock variants are the locked app; the pane title is fixed copy (R7).
+        val pane = stringResource(R.string.lock_title)
+        Surface(modifier = Modifier.fillMaxSize().semantics { paneTitle = pane }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
+                Text(body, style = MaterialTheme.typography.bodyLarge)
+                note?.let {
+                    Announce(Announcement.statusOf(it))
+                    Text(stringResource(it), color = MaterialTheme.colorScheme.error)
+                }
+                OpenLifeButton(onClick = onAction) { Text(action) }
+            }
         }
     }
 }
@@ -138,26 +158,35 @@ private fun LockScreen(title: String, body: String, note: String?, action: Strin
  */
 @Composable
 fun AppLockOfferScreen(onEnable: () -> LockAvailability, onSkip: () -> Unit) {
-    var refusal by remember { mutableStateOf<LockAvailability?>(null) }
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.app_lock_offer_title), style = MaterialTheme.typography.headlineSmall)
-            Text(stringResource(R.string.app_lock_offer_body), style = MaterialTheme.typography.bodyLarge)
-            refusal?.let { Text(stringResource(refusalText(it)), color = MaterialTheme.colorScheme.error) }
-            OpenLifeButton(
-                onClick = {
-                    val availability = onEnable()
-                    refusal = availability.takeIf { it != LockAvailability.AVAILABLE }
-                },
-            ) { Text(stringResource(R.string.app_lock_offer_enable)) }
-            OpenLifeOutlinedButton(onClick = onSkip) { Text(stringResource(R.string.app_lock_offer_skip)) }
+    StatusHost {
+        var refusal by remember { mutableStateOf<LockAvailability?>(null) }
+        val pane = stringResource(R.string.app_lock_offer_title)
+        Surface(modifier = Modifier.fillMaxSize().semantics { paneTitle = pane }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(pane, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
+                Text(stringResource(R.string.app_lock_offer_body), style = MaterialTheme.typography.bodyLarge)
+                refusal?.let {
+                    Announce(Announcement.statusOf(refusalText(it)))
+                    Text(
+                        stringResource(refusalText(it)),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                OpenLifeButton(
+                    onClick = {
+                        val availability = onEnable()
+                        refusal = availability.takeIf { it != LockAvailability.AVAILABLE }
+                    },
+                ) { Text(stringResource(R.string.app_lock_offer_enable)) }
+                OpenLifeOutlinedButton(onClick = onSkip) { Text(stringResource(R.string.app_lock_offer_skip)) }
+            }
         }
     }
 }

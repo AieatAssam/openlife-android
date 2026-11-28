@@ -1,7 +1,8 @@
 id: P1-10
 title: Accessibility automation and TalkBack runbook
 phase: P1
-status: todo
+status: review
+started: 2026-11-26
 depends_on: [P0-07, P1-08, P1-20]
 estimate: M
 owner: agent
@@ -70,3 +71,115 @@ notes: >
   docs/reviews/2026-11-24-app-audit.md (decorative divider, span-named
   actions, outline contrast, StampBadge double announcement); this step's
   automated checks must keep them fixed rather than re-fixing them.
+
+  2026-11-26 (agent): started on acting-owner authorisation while the
+  dependencies P0-07, P1-08 and P1-20 were at `review`, not `done`.
+
+  R1 deviation: `enableAccessibilityChecks()` lives in
+  androidx.compose.ui:ui-test-accessibility (1.12.1 matches the BOM's
+  ui-test; checked on Google Maven 2026-11-26), which brings
+  com.google.android.apps.common.testing.accessibility.framework:accessibility-test-framework
+  (latest 4.1.1). Neither is in the Gradle cache or
+  verification-metadata.xml, and a new dependency needs an owner decision
+  record. Proposed (owner decision, not taken): add
+  `androidTestImplementation("androidx.compose.ui:ui-test-accessibility")`
+  via the BOM with verification metadata, and replace
+  AccessibilityRule.findIssues() with enableAccessibilityChecks(), keeping
+  the suppression list. Meanwhile AccessibilityRule is an in-house
+  semantics-tree rule (label, 48 dp, image description, field label, role,
+  duplicate bounds, clipped text). It has 2 documented suppressions:
+  evidence regions, whose equivalent is the "Show region" buttons, and the
+  capped search snippets. libs.versions.toml was not touched.
+  Robolectric was not added, so Compose UI tests remain instrumented only.
+
+  R2 deviation: focus order is not asserted. Compose orders TalkBack by
+  geometry and the app sets no traversalIndex, so a tree-order check would
+  not show what TalkBack does. It is covered by runbook rows A2, A13 and B3.
+
+  Device gaps (implemented; unverified (gap — pending physical-device run)):
+  ./gradlew :app:connectedDebugAndroidTest
+  -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.app.a11y.ScreenSemanticsTest
+  (both tests), then the existing classes listed in
+  docs/verification/P1-10-accessibility.md, which has the prioritised
+  checklist. The acceptance criterion "checks pass on both CI legs" is
+  therefore not met yet. The TalkBack runbook (OA-3) is written and not yet
+  executed.
+
+  Found and not fixed (ideas, not done here):
+  - The list's Delete buttons say "Delete"/"Retry deletion" without the
+    item label. That is acceptable in context (WCAG 2.4.4), but naming the
+    item is better. Changing it rewrites descriptions that 5 instrumented
+    tests and SecureWindowUiTest (uiautomator By.desc("Delete")) look up,
+    which cannot be re-run here.
+  - The OCR history toggle has no expanded/collapsed state.
+  - The correction, search and reset-word fields set both a label and a
+    contentDescription, so they may be announced twice (runbook A22, A30).
+  - A zoomed image cannot be panned by accessibility action, only revealed
+    via "Show region" or reset via "Fit to screen". Idea: visible zoom
+    buttons and scroll actions.
+  - AOSP lint's Accessibility checks see little of Compose; the source
+    rules carry most of the static weight.
+  2026-11-27/28 (agent, review fixes and device run): origin/main was already
+  merged (no-op). Review fixes are listed in docs/verification/P1-10-accessibility.md
+  ("Review fixes (2026-11-27)"). Full app suite run on the attached tablet
+  (Huawei AGS2-W09, Android 8.0, API 26): 148 tests, 8 assertion failures,
+  4 assumption skips, 0 errors. Failures and the ScreenSemanticsTest findings
+  (236: 233 clipped-text, 3 touch-target) are recorded in the verification
+  record, not fixed here. The TalkBack runbook was corrected against
+  strings.xml (26 replacements), gained a precondition (no real data on the
+  device) and section D (two-pane layout and share success path); it is still
+  not executed. Open: R1 deviation (ATF not adopted, decision record pending);
+  acceptance line "checks pass on both CI legs" not met (CI emulator legs are
+  manual-dispatch only); default focus indicator about 1.2:1 on paper; no
+  accessible pan for zoomed images (WCAG 2.5.7); possible double announcement
+  of labelled text fields (device check pending). Status stays review.
+evidence: >
+  RED 00d0dad: 12 of 29 targeted JVM tests failed for their intended reasons
+  (Stale stamp label 3.23:1; source rules for gestures, pane titles,
+  clickables, status announcements, icons, headings, fixed height, colour
+  alone; lint Accessibility severity; zoom step NotImplementedError);
+  ScreenSemanticsTest compiled. GREEN f201f6c, REFACTOR 6c926eb (gesture
+  rule tightened after the mutation run found an import satisfied it) and
+  2dfc505. Recorded mutations (8 real violations in shipped code, run
+  together, reverted with git checkout): AccessibilitySourceRulesTest 10/10
+  failed, each naming its mutation (icons: SourceListScreen decorative
+  comment; clickables: search onClickLabel; headings: VaultUnavailable
+  asHeading; font scale + status: OCR Extracting text given 14.dp.toSp() in
+  place of announceStatus; fixed height: intake height(320.dp); gestures:
+  customActions renamed; colour alone: this.selected dropped; pane title +
+  hard-coded text: About paneTitle = "About"). VERIFY 2dfc505: ./gradlew
+  detekt lint :app:test :vault:test assembleDebug
+  :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+  :eval:test => BUILD SUCCESSFUL; app JVM 231/231 (baseline 211), vault JVM
+  197/197, eval 26/26, 0 failures; scripts/plan-check.sh steps=82 errors=0;
+  scripts/tests/run.sh 51 passed, 0 failed. Connected: none run (owner
+  instruction: no emulator, no device). ScreenSemanticsTest: implemented;
+  unverified (gap - pending physical-device run). See
+  docs/verification/P1-10-accessibility.md.
+  2026-11-28 (agent). Merge: origin/main already an ancestor (no-op).
+  plan-check: steps=83 errors=0. Gate (./gradlew detekt lint :app:test :vault:test
+  assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin
+  :eval:test) exit 0, last lines: "BUILD SUCCESSFUL in 9s", "138 actionable
+  tasks: 7 executed, 131 up-to-date". Test tasks were UP-TO-DATE in that run
+  (inputs unchanged), so no new JVM counts were observed in this run; the
+  counts in the step's earlier evidence (app 231/231, vault 197/197, eval 26/26)
+  are not re-observed here. Device: Huawei AGS2-W09 Android 8.0.0 (API 26),
+  serial U8BBB20806201256, ./gradlew :app:connectedDebugAndroidTest --continue
+  -> BUILD FAILED in 7m 8s. Totals: 148 tests, 8 assertion failures, 4 assumption
+  skips reported as failures, 0 errors. Failures: ScreenSemanticsTest
+  .everyScreenPassesAccessibilityChecks (236 findings), EdgeToEdgeUiTest
+  .contentClearsSystemBarsWithLargeInsets, EvidenceNavigationTest x3
+  (performScrollTo failed), LargeFontUiTest.noControlIsClippedAtFontScaleTwoOn320x640,
+  SearchScreenTest x2 (Pick up by Friday not found). Skips: AppLockFlowTest
+  deviceCredentialUnlockBelowApi30KeepsThePendingShare (emulator-only opt-in),
+  BrandScreenshotInstrumentedTest x3 (no goldens for api26-AGS2-W09EEA-320dpi).
+  Gap: the TalkBack runbook (docs/runbooks/talkback.md) is not executed.
+  Regression fixes 2026-11-28 (branch plan/P1-10-accessibility): selected-span
+  line restored as visible text; span text removed from announcements (fixes 1-2);
+  host message held 4 s, StatusChannelTest 3/3 (fix 3); title min 16 sp (fix 4);
+  VaultUnavailable StatusHost removed (fix 5); rule announcementArgumentsAreNeverDocumentContent (fix 6).
+  Gate: detekt lint :app:test :vault:test assembleDebug androidTest compiles :eval:test BUILD SUCCESSFUL;
+  plan-check steps=83 errors=0. Device (AGS2-W09, Android 8.0): full app run 148 tests, 140 passed,
+  8 failed; failures vs main in docs/verification/P1-10-accessibility.md "Regression fixes (2026-11-28)".
+  SearchScreenTest re-run on device: 2 tests, 0 failures. Open: 48 dp OCR buttons still fail
+  ScreenSemanticsTest.everyScreenPassesAccessibilityChecks (80 px = 40 dp height).

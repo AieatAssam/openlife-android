@@ -5,6 +5,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -24,7 +25,7 @@ import org.openlife.app.ui.brand.PerforationDivider
 fun DeleteConfirmationDialog(itemLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.delete_title, itemLabel)) },
+        title = { Text(stringResource(R.string.delete_title, itemLabel), modifier = Modifier.asHeading()) },
         text = {
             FoldedCornerCard {
                 Text(

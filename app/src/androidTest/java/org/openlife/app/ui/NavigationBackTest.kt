@@ -81,7 +81,7 @@ class NavigationBackTest {
         sourceId = application.createReadySource().also(application::requestOpenSource)
         ActivityScenario.launch<MainActivity>(Intent(application, MainActivity::class.java)).use { scenario ->
             assertTrue("viewer not shown", device.wait(Until.hasObject(By.desc(SAVED_IMAGE)), WAIT_MS))
-            device.findObject(By.desc("Delete")).click()
+            device.findObject(By.descStartsWith("Delete ")).click()
             device.wait(Until.findObject(By.res("delete_confirm")), WAIT_MS)?.click()
                 ?: device.wait(Until.findObject(By.text("Delete")), WAIT_MS)!!.click()
 

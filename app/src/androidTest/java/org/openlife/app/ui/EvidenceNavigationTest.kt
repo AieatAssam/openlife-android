@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import androidx.compose.ui.test.assert
 import android.graphics.Bitmap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsNode
@@ -159,7 +160,7 @@ class EvidenceNavigationTest {
         val canvas = composeRule.onNodeWithTag("viewer_evidence_canvas")
         canvas.performTouchInput { doubleClick(percentOffset(0.05f, 0.05f)) } // no region at 1x
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithTag("viewer_span_announcement").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Selected:", substring = true).assertCountEquals(0)
         composeRule.mainClock.advanceTimeBy(DOUBLE_TAP_GAP_MS)
 
         canvas.performTouchInput { click(percentOffset(0.25f, 0.25f)) }
@@ -182,7 +183,7 @@ class EvidenceNavigationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onAllNodesWithTag("viewer_span_announcement").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Selected:", substring = true).assertCountEquals(0)
         val after = imageNode().positionInRoot.y
         assertTrue("the column scrolled ($before -> $after) and stayed scrolled", after < before - 10f)
     }
@@ -210,7 +211,7 @@ class EvidenceNavigationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onAllNodesWithTag("viewer_span_announcement").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Selected:", substring = true).assertCountEquals(0)
     }
 
     /** E-02 / P2-06-R9: a pan caused by the first tap does not restart the detector. */
@@ -263,14 +264,14 @@ class EvidenceNavigationTest {
 
         composeRule.onNodeWithTag("viewer_evidence_canvas").performTouchInput { click(center) }
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithTag("viewer_span_announcement").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Selected:", substring = true).assertCountEquals(0)
         // Exact label: the per-span Correct and Undo buttons name the span too, and are not evidence.
         composeRule.onAllNodes(hasClickAction() and hasContentDescription("rejected token"))
             .assertCountEquals(0)
         composeRule.onAllNodesWithText("Show region").assertCountEquals(0)
         composeRule.onNodeWithText("rejected token").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithTag("viewer_span_announcement").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Selected:", substring = true).assertCountEquals(0)
     }
 
     private fun showSquareSource(spans: List<OcrSpan>) {

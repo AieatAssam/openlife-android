@@ -1,5 +1,6 @@
 package org.openlife.app.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -44,53 +48,53 @@ fun IntakeScreen(
     onDone: () -> Unit,
     onOpenExisting: (UUID) -> Unit = {},
 ) {
-    Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-        when (state) {
-            IntakeUiState.Preparing -> PreparingContent(onCancel)
+    StatusHost {
+        val pane = stringResource(R.string.intake_pane_title)
+        Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding().semantics { paneTitle = pane }) {
+            when (state) {
+                IntakeUiState.Preparing -> PreparingContent(onCancel)
 
-            is IntakeUiState.Preview -> PreviewContent(state, onSave, onCancel)
+                is IntakeUiState.Preview -> PreviewContent(state, onSave, onCancel)
 
-            is IntakeUiState.Saving -> CenteredMessage(stringResource(R.string.intake_saving))
+                is IntakeUiState.Saving -> CenteredMessage(R.string.intake_saving)
 
-            is IntakeUiState.Saved -> {
-                CenteredMessage(
-                    stringResource(R.string.intake_saved),
-                    stampState = StampState.Saved,
-                    onDone = onDone,
-                )
-                DoneAfterAcknowledging(onDone)
+                is IntakeUiState.Saved -> {
+                    CenteredMessage(
+                        R.string.intake_saved,
+                        stampState = StampState.Saved,
+                        onDone = onDone,
+                    )
+                    DoneAfterAcknowledging(onDone)
+                }
+
+                is IntakeUiState.Duplicate -> {
+                    DuplicateContent(state.existingSourceId, onOpenExisting, onDone)
+                }
+
+                is IntakeUiState.Rejected -> {
+                    TerminalMessage(R.string.intake_not_imported, onDone, state.message.stringRes)
+                }
+
+                IntakeUiState.Busy -> {
+                    TerminalMessage(R.string.intake_busy, onDone)
+                }
+
+                IntakeUiState.Failed -> {
+                    TerminalMessage(R.string.intake_failed, onDone)
+                }
+
+                IntakeUiState.StorageUnavailable -> {
+                    TerminalMessage(R.string.intake_storage_unavailable, onDone)
+                }
+
+                is IntakeUiState.VaultUnavailable -> {
+                    TerminalMessage(R.string.intake_vault_unavailable, onDone)
+                }
+
+                // Leaving is a side effect; run it once per Cancelled state rather
+                // than on every recomposition (F-43).
+                IntakeUiState.Cancelled -> LaunchedEffect(state) { onDone() }
             }
-
-            is IntakeUiState.Duplicate -> {
-                DuplicateContent(state.existingSourceId, onOpenExisting, onDone)
-            }
-
-            is IntakeUiState.Rejected -> {
-                TerminalMessage(
-                    stringResource(R.string.intake_not_imported, stringResource(state.message.stringRes)),
-                    onDone,
-                )
-            }
-
-            IntakeUiState.Busy -> {
-                TerminalMessage(stringResource(R.string.intake_busy), onDone)
-            }
-
-            IntakeUiState.Failed -> {
-                TerminalMessage(stringResource(R.string.intake_failed), onDone)
-            }
-
-            IntakeUiState.StorageUnavailable -> {
-                TerminalMessage(stringResource(R.string.intake_storage_unavailable), onDone)
-            }
-
-            is IntakeUiState.VaultUnavailable -> {
-                TerminalMessage(stringResource(R.string.intake_vault_unavailable), onDone)
-            }
-
-            // Leaving is a side effect; run it once per Cancelled state rather
-            // than on every recomposition (F-43).
-            IntakeUiState.Cancelled -> LaunchedEffect(state) { onDone() }
         }
     }
 }
@@ -103,6 +107,7 @@ private fun PreparingContent(onCancel: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Announce(Announcement.statusOf(R.string.intake_preparing))
             Text(stringResource(R.string.intake_preparing))
             OpenLifeOutlinedButton(onClick = onCancel, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(R.string.cancel_action))
@@ -118,6 +123,7 @@ private fun DuplicateContent(existingSourceId: UUID, onOpenExisting: (UUID) -> U
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Announce(Announcement.statusOf(R.string.intake_duplicate))
             Text(stringResource(R.string.intake_duplicate))
             Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
                 OpenLifeButton(onClick = { onOpenExisting(existingSourceId) }) {
@@ -163,14 +169,19 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
                 .padding(start = 24.dp, top = 24.dp, end = 24.dp),
         ) {
             FoldedCornerCard {
-                Box(modifier = Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
+                // The image keeps its fixed frame; the text states may grow with the font (P1-10).
+                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp), contentAlignment = Alignment.Center) {
                     when {
                         bitmap != null -> Image(
                             bitmap = bitmap.asImageBitmap(),
                             contentDescription = stringResource(R.string.intake_selected_image_content_description),
+                            modifier = Modifier.fillMaxWidth().height(320.dp).testTag("intake_preview_image"),
                         )
 
-                        current == PreviewImage.Loading -> Text(stringResource(R.string.intake_preparing))
+                        current == PreviewImage.Loading -> {
+                            Announce(Announcement.statusOf(R.string.intake_preparing))
+                            Text(stringResource(R.string.intake_preparing))
+                        }
 
                         else -> Text(stringResource(R.string.intake_preview_unavailable))
                     }
@@ -214,14 +225,19 @@ private fun PreviewContent(state: IntakeUiState.Preview, onSave: () -> Unit, onC
 }
 
 @Composable
-private fun CenteredMessage(text: String, stampState: StampState? = null, onDone: (() -> Unit)? = null) {
+private fun CenteredMessage(
+    @StringRes textRes: Int,
+    stampState: StampState? = null,
+    onDone: (() -> Unit)? = null,
+) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             stampState?.let { StampBadge(it, modifier = Modifier.padding(bottom = 16.dp)) }
-            Text(text)
+            Announce(Announcement.statusOf(textRes))
+            Text(stringResource(textRes))
             onDone?.let {
                 OpenLifeButton(onClick = it, modifier = Modifier.padding(top = 16.dp)) {
                     Text(stringResource(R.string.intake_done))
@@ -232,13 +248,18 @@ private fun CenteredMessage(text: String, stampState: StampState? = null, onDone
 }
 
 @Composable
-private fun TerminalMessage(text: String, onDone: () -> Unit) {
+private fun TerminalMessage(
+    @StringRes textRes: Int,
+    onDone: () -> Unit,
+    @StringRes vararg argRes: Int,
+) {
     Box(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text)
+            Announce(Announcement.statusOf(textRes, *argRes))
+            Text(stringResource(textRes, *argRes.map { stringResource(it) }.toTypedArray()))
             OpenLifeButton(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(R.string.intake_done))
             }

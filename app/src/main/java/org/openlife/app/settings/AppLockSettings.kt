@@ -28,6 +28,9 @@ import org.openlife.app.R
 import org.openlife.app.lock.AppLockPolicy
 import org.openlife.app.lock.LockAvailability
 import org.openlife.app.lock.refusalText
+import org.openlife.app.ui.Announce
+import org.openlife.app.ui.Announcement
+import org.openlife.app.ui.asHeading
 
 /** What Settings needs to show and change the app lock (P1-07-R1/R4). */
 class AppLockSettings(
@@ -67,14 +70,24 @@ fun AppLockSettingsSection(settings: AppLockSettings) {
             Switch(checked = policy.enabled, onCheckedChange = null)
         }
         Text(stringResource(R.string.app_lock_explanation), style = MaterialTheme.typography.bodyMedium)
-        refusal?.let { Text(stringResource(refusalText(it)), color = MaterialTheme.colorScheme.error) }
+        refusal?.let {
+            Announce(Announcement.statusOf(refusalText(it)))
+            Text(
+                stringResource(refusalText(it)),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         if (policy.enabled) TimeoutChoices(policy, settings.onChange)
     }
 }
 
 @Composable
 private fun TimeoutChoices(policy: AppLockPolicy, onChange: (AppLockPolicy) -> Unit) {
-    Text(stringResource(R.string.app_lock_timeout_title), style = MaterialTheme.typography.titleSmall)
+    Text(
+        stringResource(R.string.app_lock_timeout_title),
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.asHeading(),
+    )
     Column(modifier = Modifier.selectableGroup()) {
         AppLockPolicy.TIMEOUT_OPTIONS_SECONDS.forEach { seconds ->
             Row(

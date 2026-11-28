@@ -148,9 +148,20 @@ no recents-thumbnail bitmap for the task. Every icon-only control carries a
 checked for clipping across every screen (`docs/verification/C0.md` C0-16).
 P0-07 adds deterministic Compose contracts for 1.3x/2x font scale, forced RTL,
 and inset bounds, while its final-tree connected run remains a documented
-device gap (`docs/verification/P0-07-ui-foundation.md`). An actual TalkBack accessibility-service
-run has not been performed in this environment and remains an open item
-(`docs/reviews/C0-security-self-review.md`), not a passed check.
+device gap (`docs/verification/P0-07-ui-foundation.md`). P1-10 adds JVM source rules and a
+WCAG contrast check over every theme colour pair (pass), and per-screen
+semantics tests at 1x, 2x font and the largest display size (compiled, not
+yet run on a device). Accessibility text is fixed copy from resources for pane titles, action
+labels and status announcements, and no status announcement carries document
+content. Two accessibility labels do carry document content: each evidence
+region's label is the OCR text of its span (a rejected span's label is that
+text marked as rejected), and the viewer's selected-span announcement (P2-06)
+speaks the selected span's text. Both reach only accessibility services the
+user has enabled, as on-screen text does, and are not in notifications or the
+window title. Delete labels carry only the import timestamp. An actual TalkBack
+accessibility-service run has not been performed and remains an open item
+(owner action OA-3, `docs/runbooks/talkback.md`, not yet executed;
+`docs/reviews/C0-security-self-review.md`), not a passed check.
 
 ## Explicit vault reset
 

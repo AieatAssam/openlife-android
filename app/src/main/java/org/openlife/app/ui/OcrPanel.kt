@@ -1,7 +1,9 @@
 package org.openlife.app.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -9,10 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
@@ -57,9 +62,17 @@ internal fun OcrSection(
 ) {
     val spanActions = SpanActions(onSelectSpan, onCorrect, onRejectSpan, onUndoRejectSpan)
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.viewer_extracted_text_title), style = MaterialTheme.typography.titleMedium)
+        Text(
+            stringResource(R.string.viewer_extracted_text_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.asHeading(),
+        )
         val runAgain = @Composable {
-            OpenLifeTextButton(onClick = onExtractText, enabled = source.state == SourceState.READY) {
+            OpenLifeTextButton(
+                onClick = onExtractText,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+                enabled = source.state == SourceState.READY,
+            ) {
                 Text(stringResource(R.string.viewer_run_again))
             }
         }
@@ -73,6 +86,7 @@ internal fun OcrSection(
 
             is OcrUiState.Running -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Announce(Announcement.statusOf(R.string.viewer_extracting))
                     Text(stringResource(R.string.viewer_extracting))
                     Spacer(Modifier.width(8.dp))
                     OpenLifeTextButton(onClick = onCancel) { Text(stringResource(R.string.cancel_action)) }
@@ -87,13 +101,19 @@ internal fun OcrSection(
             }
 
             is OcrUiState.Failed -> OcrOutcome(
-                stringResource(R.string.viewer_extraction_failed, ocrFailureMessage(state.reason)),
+                Announcement.statusOf(R.string.viewer_extraction_failed, ocrFailureRes(state.reason)),
+                stringResource(R.string.viewer_extraction_failed, stringResource(ocrFailureRes(state.reason))),
                 state.history,
                 runAgain,
             )
 
             is OcrUiState.Cancelled ->
-                OcrOutcome(stringResource(R.string.viewer_extraction_cancelled), state.history, runAgain)
+                OcrOutcome(
+                    Announcement.statusOf(R.string.viewer_extraction_cancelled),
+                    stringResource(R.string.viewer_extraction_cancelled),
+                    state.history,
+                    runAgain,
+                )
 
             is OcrUiState.Stale -> StaleOutcome(state.history, runAgain)
         }
@@ -154,7 +174,7 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
         Text(
             stringResource(R.string.viewer_text_without_location),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 8.dp).asHeading(),
         )
         Text(
             stringResource(R.string.viewer_text_without_location_explanation),
@@ -164,10 +184,16 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
     }
     state.revisionCorrection?.let { CorrectionLine(it) }
     Row {
-        OpenLifeTextButton(onClick = { onReview(OcrReviewState.ACCEPTED) }) {
+        OpenLifeTextButton(
+            onClick = { onReview(OcrReviewState.ACCEPTED) },
+            modifier = Modifier.minimumInteractiveComponentSize(),
+        ) {
             Text(stringResource(R.string.viewer_accept_text))
         }
-        OpenLifeTextButton(onClick = { onReview(OcrReviewState.REJECTED) }) {
+        OpenLifeTextButton(
+            onClick = { onReview(OcrReviewState.REJECTED) },
+            modifier = Modifier.minimumInteractiveComponentSize(),
+        ) {
             Text(stringResource(R.string.viewer_reject_text))
         }
     }
@@ -185,10 +211,21 @@ private fun SpanRow(span: OcrSpan, state: OcrUiState.Ready, actions: SpanActions
     val rejected = EvidenceSelection.isRejected(span, state.spanReviews)
     val selectable = span.evidenceRegion != null && !rejected
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        val selectLabel = stringResource(R.string.viewer_select_text_action)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (selectable) Modifier.clickable { actions.onSelect(span) } else Modifier),
+                .then(
+                    if (selectable) {
+                        // Only a row that can be selected is a target, so only it needs the 48 dp minimum.
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .clickable(onClickLabel = selectLabel, role = Role.Button) { actions.onSelect(span) }
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalArrangement = Arrangement.Center,
         ) {
             val value = if (rejected) {
                 buildAnnotatedString {
@@ -250,6 +287,7 @@ private fun CorrectionLine(correctedText: String) {
 private fun StaleOutcome(history: List<OcrHistoryItem>, runAgain: @Composable () -> Unit) {
     val muted = LocalOpenLifeBrandColors.current.mutedInk
     StampBadge(StampState.Stale)
+    Announce(Announcement.statusOf(R.string.viewer_extraction_stale))
     Text(
         stringResource(R.string.viewer_extraction_stale),
         color = muted,
@@ -260,7 +298,13 @@ private fun StaleOutcome(history: List<OcrHistoryItem>, runAgain: @Composable ()
 }
 
 @Composable
-private fun OcrOutcome(explanation: String, history: List<OcrHistoryItem>, runAgain: @Composable () -> Unit) {
+private fun OcrOutcome(
+    status: Announcement,
+    explanation: String,
+    history: List<OcrHistoryItem>,
+    runAgain: @Composable () -> Unit,
+) {
+    Announce(status)
     Text(explanation)
     runAgain()
     OcrHistory(history)
@@ -271,8 +315,14 @@ private fun OcrOutcome(explanation: String, history: List<OcrHistoryItem>, runAg
 private fun OcrHistory(history: List<OcrHistoryItem>) {
     if (history.isEmpty()) return
     var expanded by rememberSaveable { mutableStateOf(false) }
+    // The label names the action, as the About screen's Show/Hide toggles do, so the state reaches TalkBack.
+    val label = if (expanded) {
+        stringResource(R.string.viewer_ocr_history_hide, history.size)
+    } else {
+        stringResource(R.string.viewer_ocr_history_show, history.size)
+    }
     OpenLifeTextButton(onClick = { expanded = !expanded }) {
-        Text(stringResource(R.string.viewer_ocr_history, history.size))
+        Text(label)
     }
     if (expanded) {
         history.forEach { item ->
@@ -314,17 +364,18 @@ private fun revisionStateLabel(state: org.openlife.vault.ocr.OcrRevisionState): 
 }
 
 @Composable
-private fun ocrFailureMessage(reason: OcrFailureReason): String = when (reason) {
-    OcrFailureReason.SOURCE_NOT_READY -> stringResource(R.string.ocr_failure_source_not_ready)
-    OcrFailureReason.SOURCE_CORRUPT -> stringResource(R.string.ocr_failure_source_corrupt)
-    OcrFailureReason.SOURCE_DELETED -> stringResource(R.string.ocr_failure_source_deleted)
-    OcrFailureReason.LIMIT_EXCEEDED -> stringResource(R.string.ocr_failure_limit_exceeded)
-    OcrFailureReason.UNSUPPORTED_SCRIPT -> stringResource(R.string.ocr_failure_unsupported_script)
-    OcrFailureReason.ENGINE_FAILURE -> stringResource(R.string.ocr_failure_engine)
-    OcrFailureReason.CANCELLED -> stringResource(R.string.ocr_failure_cancelled)
-    OcrFailureReason.PROCESS_RESTART -> stringResource(R.string.ocr_failure_process_restart)
-    OcrFailureReason.TIMEOUT -> stringResource(R.string.ocr_failure_timeout)
-    OcrFailureReason.STORAGE_FAILURE -> stringResource(R.string.ocr_failure_storage)
-    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> stringResource(R.string.ocr_failure_source_unavailable)
-    OcrFailureReason.UNRECOGNISED -> stringResource(R.string.ocr_failure_unrecognised)
+@StringRes
+private fun ocrFailureRes(reason: OcrFailureReason): Int = when (reason) {
+    OcrFailureReason.SOURCE_NOT_READY -> R.string.ocr_failure_source_not_ready
+    OcrFailureReason.SOURCE_CORRUPT -> R.string.ocr_failure_source_corrupt
+    OcrFailureReason.SOURCE_DELETED -> R.string.ocr_failure_source_deleted
+    OcrFailureReason.LIMIT_EXCEEDED -> R.string.ocr_failure_limit_exceeded
+    OcrFailureReason.UNSUPPORTED_SCRIPT -> R.string.ocr_failure_unsupported_script
+    OcrFailureReason.ENGINE_FAILURE -> R.string.ocr_failure_engine
+    OcrFailureReason.CANCELLED -> R.string.ocr_failure_cancelled
+    OcrFailureReason.PROCESS_RESTART -> R.string.ocr_failure_process_restart
+    OcrFailureReason.TIMEOUT -> R.string.ocr_failure_timeout
+    OcrFailureReason.STORAGE_FAILURE -> R.string.ocr_failure_storage
+    OcrFailureReason.SOURCE_TEMPORARILY_UNAVAILABLE -> R.string.ocr_failure_source_unavailable
+    OcrFailureReason.UNRECOGNISED -> R.string.ocr_failure_unrecognised
 }
