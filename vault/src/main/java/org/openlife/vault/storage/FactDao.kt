@@ -62,6 +62,28 @@ object FactSql {
         FROM fact_revisions WHERE id = :id
         """
 
+    /** P3-05-R1: the evidence rows of one revision, in their stored order (C2-R34). */
+    const val EVIDENCE_OF_REVISION = """
+        SELECT id, revisionId, ordinal, role, sourceId, ocrRevisionId, ocrSpanId, ocrUserRevisionId, textStart, textEnd,
+            regionLeft, regionTop, regionRight, regionBottom, regionCoordinateSystem
+        FROM fact_evidence WHERE revisionId = :revisionId ORDER BY ordinal
+        """
+
+    /** P3-05-R1: the decision of the highest-sequence review event, or none if the revision was never reviewed. */
+    const val LATEST_DECISION = """
+        SELECT decision FROM review_events WHERE revisionId = :revisionId ORDER BY sequence DESC LIMIT 1
+        """
+
+    /**
+     * P3-05-R1: the outcome of the newest extraction run against the source's current reading (C2-R39). Runs against
+     * an older reading do not count, so a stale reading never reports a checked state.
+     */
+    const val EXTRACTION_OUTCOME_OF_CURRENT_READING = """
+        SELECT r.outcome FROM fact_extraction_runs AS r
+        JOIN sources AS s ON s.id = r.sourceId AND s.currentOcrRevisionId = r.ocrRevisionId
+        WHERE r.sourceId = :sourceId ORDER BY r.finishedAt DESC LIMIT 1
+        """
+
     const val SOURCE_STATE = "SELECT state FROM sources WHERE id = :sourceId"
 
     const val COUNT_CURRENT_REVISIONS =
@@ -290,6 +312,15 @@ interface FactDao {
 
     @Query(FactSql.FIND_REVISION)
     suspend fun findRevision(id: String): FactRevisionEntity?
+
+    @Query(FactSql.EVIDENCE_OF_REVISION)
+    suspend fun evidenceOfRevision(revisionId: String): List<FactEvidenceEntity>
+
+    @Query(FactSql.LATEST_DECISION)
+    suspend fun latestDecision(revisionId: String): String?
+
+    @Query(FactSql.EXTRACTION_OUTCOME_OF_CURRENT_READING)
+    suspend fun extractionOutcomeOfCurrentReading(sourceId: String): String?
 
     @Query(FactSql.SOURCE_STATE)
     suspend fun sourceState(sourceId: String): String?
