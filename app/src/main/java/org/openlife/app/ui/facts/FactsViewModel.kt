@@ -15,6 +15,7 @@ import org.openlife.vault.facts.FactWriteResult
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.extract.UserValueRefusal
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /** What the add-fact form says after a save attempt. Never carries the value (no fact text in a message). */
 enum class FactMessage {
@@ -88,17 +89,32 @@ internal class FactsCommands(private val presenter: FactsPresenter, private val 
     private val mutableMessage = MutableStateFlow<FactMessage?>(null)
     val message: StateFlow<FactMessage?> = mutableMessage.asStateFlow()
 
+    /**
+     * P3-05 review U-05 (follow-up): the newest request that may set the message. Clearing the screen or starting
+     * another message-setting request supersedes the older ones, so a late result never sets a stale message.
+     */
+    private val latestRequest = AtomicLong(0)
+
     fun clear() {
         presenter.clear()
+        latestRequest.incrementAndGet()
         mutableMessage.value = null
     }
 
     fun review(item: FactItem, decision: ReviewDecision) {
-        writeScope.launch { reportWrite(presenter.review(item, decision)) }
+        val request = latestRequest.incrementAndGet()
+        writeScope.launch {
+            val result = presenter.review(item, decision)
+            if (latestRequest.get() == request) reportWrite(result)
+        }
     }
 
     fun choose(item: FactItem, index: Int) {
-        writeScope.launch { reportWrite(presenter.chooseCandidate(item, index)) }
+        val request = latestRequest.incrementAndGet()
+        writeScope.launch {
+            val result = presenter.chooseCandidate(item, index)
+            if (latestRequest.get() == request) reportWrite(result)
+        }
     }
 
     fun findAgain() {
@@ -111,8 +127,9 @@ internal class FactsCommands(private val presenter: FactsPresenter, private val 
     fun correct(item: FactItem, input: UserFactInput) = report { presenter.correct(item, input) }
 
     private fun report(outcome: suspend () -> UserFactOutcome) {
+        val request = latestRequest.incrementAndGet()
         writeScope.launch {
-            mutableMessage.value = when (val result = outcome()) {
+            val message = when (val result = outcome()) {
                 is UserFactOutcome.Saved -> when (result.result) {
                     is FactWriteResult.Written -> FactMessage.SAVED
                     else -> FactMessage.NOT_SAVED
@@ -120,6 +137,7 @@ internal class FactsCommands(private val presenter: FactsPresenter, private val 
 
                 is UserFactOutcome.Refused -> result.reason.toMessage()
             }
+            if (latestRequest.get() == request) mutableMessage.value = message
         }
     }
 

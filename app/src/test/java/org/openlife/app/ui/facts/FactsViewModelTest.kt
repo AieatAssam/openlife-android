@@ -60,6 +60,19 @@ class FactsViewModelTest {
         assertEquals(null, commands.message.value)
     }
 
+    /** P3-05 review U-05 (follow-up): a write that finishes after the screen cleared must not set a message. */
+    @Test
+    fun aLateRefusalAfterClearSetsNoMessage() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        gateway.gate = gate
+        gateway.reviewResult = FactWriteResult.Refused(FactRefusal.NOT_ALLOWED)
+        val commands = FactsCommands(presenter, CoroutineScope(Dispatchers.Unconfined))
+        commands.review(item, ReviewDecision.CONFIRM)
+        commands.clear()
+        gate.complete(Unit)
+        assertEquals("the screen cleared the message, and the late result does not set it", null, commands.message.value)
+    }
+
     private class RecordingGateway : FactsGateway {
         val reviews = mutableListOf<Pair<UUID, ReviewDecision>>()
         var reviewResult: FactWriteResult = FactWriteResult.Failed
