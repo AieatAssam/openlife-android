@@ -85,6 +85,8 @@ class OcrViewModelTest {
         val state = presenter.readingState(UUID.randomUUID(), backend.revisionId)
         val collector = scope.launch { state.collect {} }
         assertEquals(OcrUiState.Unavailable, state.value)
+        backend.readingView.value = null
+        assertEquals("the store's null for another source is not an empty panel", OcrUiState.Unavailable, state.value)
         collector.cancel()
     }
 

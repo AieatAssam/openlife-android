@@ -95,6 +95,8 @@ class OcrPresenter(private val backend: OcrBackend, private val scope: Coroutine
 
     /** P3-05 review U-01: a reading that does not belong to [sourceId] is never shown, even if the store returns it. */
     private fun readingUiState(sourceId: UUID, persisted: Persisted): OcrUiState {
+        // P3-05 review U-01: the store answers null for a reading of another source, and that is not an empty panel.
+        if (persisted is Persisted.Loaded && persisted.view == null) return OcrUiState.Unavailable
         val owner = (persisted as? Persisted.Loaded)?.view?.revision?.sourceId
         if (owner != null && owner != sourceId) return OcrUiState.Unavailable
         return OcrStateMapper.map(sourceId, persisted, false, null)
