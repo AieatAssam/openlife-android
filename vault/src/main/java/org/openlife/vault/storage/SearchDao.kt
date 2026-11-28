@@ -15,6 +15,11 @@ data class SearchRow(
     val isCorrection: Int,
     val score: Double,
     val ordinal: Int,
+    /** P3-07: set on a fact row only (the revision and its stored kind, status and origin). */
+    val factRevisionId: String? = null,
+    val factKind: String? = null,
+    val factStatus: String? = null,
+    val factOrigin: String? = null,
 )
 
 /**
@@ -31,10 +36,16 @@ interface SearchDao {
             OcrSpanEntity::class,
             OcrUserRevisionEntity::class,
             OcrSpanReviewEntity::class,
+            FactEntity::class,
+            FactRevisionEntity::class,
+            FactEvidenceEntity::class,
         ],
     )
     fun observe(query: SupportSQLiteQuery): Flow<List<SearchRow>>
 
-    @Query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('ocr_text_fts', 'ocr_correction_fts')")
+    @Query(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' " +
+            "AND name IN ('ocr_text_fts', 'ocr_correction_fts', 'fact_fts')",
+    )
     suspend fun countIndexTables(): Int
 }

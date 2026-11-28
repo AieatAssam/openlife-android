@@ -67,4 +67,30 @@ class OcrRevisionPointerTest {
         assertEquals(listOf<Any?>("w1"), head("r2", null))
         refused("C2-R15") { host.exec("UPDATE ocr_user_revisions SET supersedesId = NULL WHERE id = 'c2'") }
     }
+
+    /**
+     * S-04 / F-71 (C2-R14 amendment 2026-11-28, S-01): the device clock is set back, so a later
+     * reading carries an earlier startedAt. It must still become current and be listed first.
+     */
+    @Test
+    fun aReadingWithAnEarlierStartedAtStillBecomesCurrentAndIsListedFirst() {
+        val fixture = FactHost.fresh(host)
+        fixture.source("c")
+        fixture.revision("before-clock-change", "c")
+        assertEquals(1, rows.moveCurrentReading("c", "before-clock-change"))
+        fixture.revision("after-clock-change", "c")
+        host.exec("UPDATE ocr_revisions SET startedAt = 1 WHERE id = 'after-clock-change'")
+        assertEquals(
+            "a reading with a greater rowid moves the pointer even when its startedAt is earlier (F-71)",
+            1,
+            rows.moveCurrentReading("c", "after-clock-change"),
+        )
+        assertEquals("after-clock-change", current("c"))
+        val newestFirst = host.query("SELECT id FROM ocr_revisions WHERE sourceId = ? ORDER BY rowid DESC", "c")
+        assertEquals(
+            "the viewer order (rowid DESC) lists the new reading first",
+            "after-clock-change",
+            newestFirst.first().single(),
+        )
+    }
 }

@@ -3,7 +3,6 @@ package org.openlife.vault.storage
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import kotlinx.coroutines.flow.Flow
 
 /**
  * OCR rows. Revision state changes are compare-and-set statements that
@@ -44,11 +43,9 @@ interface OcrDao {
     @Query("SELECT * FROM ocr_revisions WHERE id = :id")
     suspend fun findRevision(id: String): OcrRevisionEntity?
 
-    @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY startedAt ASC")
+    /** Oldest first by rowid (insertion order); startedAt is display data only (C2-R14, S-01). */
+    @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY rowid ASC")
     suspend fun findRevisionsForSource(sourceId: String): List<OcrRevisionEntity>
-
-    @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY startedAt ASC")
-    fun observeRevisionsForSource(sourceId: String): Flow<List<OcrRevisionEntity>>
 
     @Query("SELECT * FROM ocr_spans WHERE revisionId = :revisionId ORDER BY ordinal ASC")
     suspend fun findSpans(revisionId: String): List<OcrSpanEntity>
