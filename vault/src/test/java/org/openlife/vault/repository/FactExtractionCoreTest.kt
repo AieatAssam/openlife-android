@@ -199,20 +199,3 @@ class FactExtractionCoreTest {
         )
     }
 }
-
-/** The host stand-in for MutationQueue and the database transaction: BEGIN, COMMIT or ROLLBACK around [commit]. */
-private class TransactionalHostGate(private val host: HostSqlite) : ExtractionGate {
-    override suspend fun <T> read(block: suspend () -> T): T = block()
-
-    override suspend fun <T> commit(block: suspend () -> T): T {
-        host.exec("BEGIN")
-        try {
-            val result = block()
-            host.exec("COMMIT")
-            return result
-        } catch (failure: Throwable) {
-            host.exec("ROLLBACK")
-            throw failure
-        }
-    }
-}

@@ -212,10 +212,15 @@ class FactRows(val host: HostSqlite) {
 class HostFactDao(private val host: HostSqlite) : FactDao {
     private fun q(sql: String, vararg params: Pair<String, Any?>) = with(FactHost) { host.named(sql, *params) }
 
+    /** A write: the number of rows it changed. */
     private fun count(sql: String, vararg params: Pair<String, Any?>): Int = with(FactHost) {
         q(sql, *params)
         host.changes()
     }
+
+    /** A SELECT COUNT(*): its result, not the changes() of the last write on the connection. */
+    private fun selectCount(sql: String, vararg params: Pair<String, Any?>): Int =
+        (q(sql, *params).single().single() as Long).toInt()
 
     override suspend fun insertFact(id: String, sourceId: String, kind: String, createdAt: Long) {
         q(FactSql.INSERT_FACT, "id" to id, "sourceId" to sourceId, "kind" to kind, "createdAt" to createdAt)
@@ -428,10 +433,10 @@ class HostFactDao(private val host: HostSqlite) : FactDao {
         q(FactSql.FACT_POINTERS, "sourceId" to sourceId).map { FactPointer(it[0] as String, it[1] as String?) }
 
     override suspend fun runCountForReading(ocrRevisionId: String): Int =
-        count(FactSql.RUN_COUNT_FOR_READING, "ocrRevisionId" to ocrRevisionId)
+        selectCount(FactSql.RUN_COUNT_FOR_READING, "ocrRevisionId" to ocrRevisionId)
 
     override suspend fun extractedCountOfSource(sourceId: String): Int =
-        count(FactSql.EXTRACTED_COUNT_OF_SOURCE, "sourceId" to sourceId)
+        selectCount(FactSql.EXTRACTED_COUNT_OF_SOURCE, "sourceId" to sourceId)
 
     private fun nodeOf(row: List<Any?>) = DependencyNode(row[0] as String, row[1] as String)
 
