@@ -26,7 +26,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *
  * The index is keyed on the content tables' implicit rowid. VACUUM may
  * renumber implicit rowids, so OpenLife never runs VACUUM; any future VACUUM
- * must be followed by the 'rebuild' commands in [statements].
+ * must be followed by the 'rebuild' commands in [statements]. No VACUUM is a
+ * correctness rule for two things: the FTS rowid mapping above, and the
+ * current-reading order (C2-R14, amendment 2026-11-28, S-01), which also
+ * orders by rowid. `NoVacuumTest` fails if a production source runs VACUUM.
  *
  * Rule: one definition, used by [OpenLifeDatabase.MIGRATION_4_5], by
  * [OpenLifeDatabase.readyInvariantCallback] for a fresh database and by
