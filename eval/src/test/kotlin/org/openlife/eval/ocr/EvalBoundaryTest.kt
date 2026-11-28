@@ -36,7 +36,10 @@ class EvalBoundaryTest {
         val androidTestBlock = buildFile.substringAfter("getByName(\"androidTest\") {").substringBefore("}")
         assertTrue("the source and asset directories belong to androidTest", androidTestBlock.contains("eval/ocr"))
         assertTrue(androidTestBlock.contains("eval/src/core/kotlin"))
-        assertTrue("the facts image set is an androidTest asset only (P3-06-R1)", androidTestBlock.contains("eval/facts/v1/images"))
+        assertTrue(
+            "the facts image set is an androidTest asset only (P3-06-R1)",
+            androidTestBlock.contains("eval/facts/v1/images"),
+        )
         val testInputs = buildFile.substringAfter("tasks.withType<Test>().configureEach {").substringBefore("}")
         assertTrue("the set is an input of vault's unit tests only", testInputs.contains("eval/ocr/v1"))
         assertTrue("the facts set is an input of vault's unit tests only", testInputs.contains("eval/facts/v1"))

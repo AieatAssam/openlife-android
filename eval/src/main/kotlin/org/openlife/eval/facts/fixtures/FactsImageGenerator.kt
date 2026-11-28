@@ -9,8 +9,8 @@ import java.awt.Color
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
-import javax.imageio.ImageIO
 import java.util.Random
+import javax.imageio.ImageIO
 
 /**
  * P3-06-R1 image part: renders eval/facts/v1/image-cases.tsv into eval/facts/v1/images.
@@ -35,12 +35,24 @@ object FactsImageGenerator {
     private const val ITEM_SEP = " ‖ "
     private const val PART_SEP = "¦"
     private const val COLUMNS = 8
+    private const val IDX_TEXT = 2
+    private const val IDX_ITEMS = 3
+    private const val IDX_ABSTAIN = 4
+    private const val IDX_TRUTH = 5
+    private const val ITEM_FIELDS = 3
+    private const val ABSTAIN_FIELDS = 2
 
     data class Item(val kind: String, val raw: String, val canonical: String)
 
     data class Abstain(val kind: String?, val raw: String)
 
-    data class Row(val id: String, val text: String, val items: List<Item>, val abstain: List<Abstain>, val truth: String?)
+    data class Row(
+        val id: String,
+        val text: String,
+        val items: List<Item>,
+        val abstain: List<Abstain>,
+        val truth: String?,
+    )
 
     data class Case(val id: String, val rows: List<String>)
 
@@ -49,13 +61,13 @@ object FactsImageGenerator {
         .map { line ->
             val cells = line.split('\t')
             require(cells.size == COLUMNS) { "row has ${cells.size} columns: ${cells[0]}" }
-            require(!cells[2].contains("\\u")) { "${cells[0]}: escaped characters are not drawable" }
+            require(!cells[IDX_TEXT].contains("\\u")) { "${cells[0]}: escaped characters are not drawable" }
             Row(
                 id = cells[0],
-                text = cells[2],
-                items = parseItems(cells[3]),
-                abstain = parseAbstain(cells[4]),
-                truth = cells[5].ifEmpty { null },
+                text = cells[IDX_TEXT],
+                items = parseItems(cells[IDX_ITEMS]),
+                abstain = parseAbstain(cells[IDX_ABSTAIN]),
+                truth = cells[IDX_TRUTH].ifEmpty { null },
             )
         }
         .associateBy { it.id }
@@ -74,7 +86,7 @@ object FactsImageGenerator {
         }
         return cell.split(ITEM_SEP).map { item ->
             val parts = item.split(PART_SEP)
-            require(parts.size == 3) { "item needs KIND, raw and canonical: $item" }
+            require(parts.size == ITEM_FIELDS) { "item needs KIND, raw and canonical: $item" }
             Item(parts[0], parts[1], parts[2])
         }
     }
@@ -85,13 +97,20 @@ object FactsImageGenerator {
         }
         return cell.split(ITEM_SEP).map { item ->
             val parts = item.split(PART_SEP)
-            require(parts.size == 2) { "abstention needs KIND and raw: $item" }
+            require(parts.size == ABSTAIN_FIELDS) { "abstention needs KIND and raw: $item" }
             Abstain(if (parts[0] == "*") null else parts[0], parts[1])
         }
     }
 
     /** One image: its page, its truth JSON and its PNG. */
-    class Rendered(val case: Case, val rows: List<Row>, val png: ByteArray, val truthJson: String, val width: Int, val height: Int)
+    class Rendered(
+        val case: Case,
+        val rows: List<Row>,
+        val png: ByteArray,
+        val truthJson: String,
+        val width: Int,
+        val height: Int,
+    )
 
     fun render(case: Case, rowsById: Map<String, Row>, fonts: FixtureFonts, index: Int): Rendered {
         val rows = case.rows.map { id -> rowsById[id] ?: error("${case.id}: no row $id") }
@@ -122,7 +141,11 @@ object FactsImageGenerator {
     private const val SEED_STRIDE = 1_000L
 
     fun truthJson(case: Case, rows: List<Row>, width: Int, height: Int): String {
-        val items = rows.flatMap { row -> row.items.map { "{\"row\":${q(row.id)},\"kind\":${q(it.kind)},\"raw\":${q(it.raw)},\"canonical\":${q(it.canonical)}}" } }
+        val items = rows.flatMap { row ->
+            row.items.map {
+                "{\"row\":${q(row.id)},\"kind\":${q(it.kind)},\"raw\":${q(it.raw)},\"canonical\":${q(it.canonical)}}"
+            }
+        }
         val abstain = rows.flatMap { row ->
             row.abstain.map { "{\"row\":${q(row.id)},\"kind\":${it.kind?.let(::q) ?: "null"},\"raw\":${q(it.raw)}}" }
         }
@@ -153,7 +176,9 @@ object FactsImageGenerator {
 
     fun write(renders: List<Rendered>, fonts: FixtureFonts, gateText: String, outDir: File) {
         outDir.mkdirs()
-        val manifest = StringBuilder("# P3-06 image set manifest: id, PNG SHA-256, truth SHA-256, seed ${SEED}, width, height\n")
+        val header = "# P3-06 image set manifest: id, PNG SHA-256, truth SHA-256, " +
+            "seed $SEED, width, height\n"
+        val manifest = StringBuilder(header)
         manifest.append("#fonts\t").append(fonts.entries.joinToString(" ") { "${it.file}=${it.sha256}" }).append('\n')
         File(outDir, "gate.json").writeText(gateText)
         manifest.append("gate.json\t").append(Digests.sha256(gateText)).append("\t-\t0\t0\n")
