@@ -3,6 +3,7 @@ package org.openlife.vault.repository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.vault.facts.FactKind
@@ -177,6 +178,36 @@ class FactWriterTest {
         val again = written(writer.clarify(chosen.revisionId, FactValue("{\"date\":\"2026-03-04\"}", "2026-03-04")))
         assertEquals("x", dao.basisOf(again.revisionId))
         assertEquals("user:clarify", dao.findRevision(again.revisionId)!!.methodId)
+    }
+
+    @Test
+    fun candidatesAreReadForTheExtractedRevisionAndEveryClarificationOfIt() = runBlocking {
+        val fixture = FactHost.fresh(host)
+        rows.readySourceWithReading(fixture, "a")
+        rows.fact("f", "a")
+        val candidates = "{\"candidates\":[{\"date\":\"2026-03-04\"},{\"date\":\"2026-04-03\"}]}"
+        rows.revision(
+            "x",
+            "f",
+            status = "CLARIFICATION_NEEDED",
+            valueJson = candidates,
+            canonicalText = "2026-03-04 | 2026-04-03",
+        )
+        rows.current("f", "x")
+        rows.evidence("e1", "x", "a", "a-s1")
+        val chosen = written(writer.clarify("x", FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03")))
+        assertEquals(candidates, writer.candidatesOf("x")?.valueJson)
+        assertEquals(candidates, writer.candidatesOf(chosen.revisionId)?.valueJson)
+        rows.fact("g", "a")
+        rows.revision(
+            "y",
+            "g",
+            status = "STALE",
+            valueJson = candidates,
+            canonicalText = "2026-03-04 | 2026-04-03",
+        )
+        rows.current("g", "y")
+        assertNull("a stale revision offers no candidates", writer.candidatesOf("y"))
     }
 
     @Test

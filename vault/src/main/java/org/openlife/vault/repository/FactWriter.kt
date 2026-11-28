@@ -60,6 +60,9 @@ internal class FactWriter(
         return FactWrite.Written(target.factId, revisionId)
     }
 
+    /** C2-R36 (RED stub): the candidate set a clarification may choose from, for a current revision; null otherwise. */
+    fun candidatesOf(revisionId: String): FactValue? = TODO("P3-05 C2-R36 RED stub")
+
     /** C2-R36: choose (or re-choose) one candidate of the extracted revision, byte for byte. */
     suspend fun clarify(revisionId: String, chosen: FactValue): FactWrite {
         val target = currentTarget(revisionId) ?: return refused(FactRefusal.NOT_ALLOWED)
