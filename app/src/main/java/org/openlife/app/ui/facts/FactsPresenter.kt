@@ -21,7 +21,6 @@ import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.facts.extract.UserValueNormaliser
 import org.openlife.vault.facts.extract.UserValueRefusal
 import org.openlife.vault.facts.extract.UserValueResult
-import java.time.LocalDate
 import java.util.UUID
 
 /** The app-side port the facts presenter reads through; the app container implements it over FactRepository. */
@@ -103,7 +102,6 @@ sealed interface FactsUiState {
  * P3-05-R1: the facts of one source as UI state. Values live here, in memory, only: [clear] drops them
  * (on hide, on a content scrub and before a vault reset). Nothing is written to saved state.
  */
-@Suppress("TooManyFunctions") // the facts list state and each user action (P3-05, C2-R36..R37)
 class FactsPresenter(
     private val gateway: FactsGateway,
     private val sourceId: UUID,
@@ -151,29 +149,10 @@ class FactsPresenter(
     /** P3-05-R4: asks the extraction port to run again for this source; the list updates from its own flow. */
     suspend fun findAgain(): Boolean = gateway.findAgain(sourceId)
 
-    /**
-     * Adds a user-typed URL, email or phone through the vault's single-value normaliser. A refused input is
-     * returned with its reason and never reaches the repository.
-     */
-    suspend fun addUserText(kind: FactKind, input: String): UserFactOutcome =
-        saveResult(kind, UserValueNormaliser.text(kind, input))
-
     private suspend fun saveResult(kind: FactKind, result: UserValueResult): UserFactOutcome = when (result) {
         is UserValueResult.Accepted -> UserFactOutcome.Saved(gateway.addUserFact(sourceId, kind, result.value))
         is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
     }
-
-    /** P3-05-R2: a day from the date picker; no chosen day is refused and never reaches the repository. */
-    suspend fun addUserDate(date: LocalDate?): UserFactOutcome =
-        saveResult(FactKind.DATE, UserValueNormaliser.date(date))
-
-    /** P3-05-R2: a time chosen in the time picker; a missing hour or minute is refused and never saved. */
-    suspend fun addUserTime(hour: Int?, minute: Int?): UserFactOutcome =
-        saveResult(FactKind.TIME, UserValueNormaliser.time(hour, minute, null))
-
-    /** P3-05-R2: an amount with a currency chosen from the list; a missing currency is refused and never saved. */
-    suspend fun addUserMoney(amount: String, currencyCode: String?): UserFactOutcome =
-        saveResult(FactKind.MONEY, UserValueNormaliser.money(amount, currencyCode))
 
     /** Routes one form submission to the normaliser for its kind; nothing else reaches the repository. */
     suspend fun addUserInput(input: UserFactInput): UserFactOutcome {

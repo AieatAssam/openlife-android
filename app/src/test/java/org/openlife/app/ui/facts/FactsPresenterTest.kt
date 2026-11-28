@@ -180,7 +180,7 @@ class FactsPresenterTest {
     fun aBlankUserValueIsRefusedAndNeverSaved() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        val outcome = presenter.addUserText(FactKind.EMAIL, "   ")
+        val outcome = presenter.addUserInput(UserFactInput.Typed(FactKind.EMAIL, "   "))
         assertEquals(UserFactOutcome.Refused(UserValueRefusal.BLANK), outcome)
         assertTrue(gateway.additions.isEmpty())
     }
@@ -189,7 +189,7 @@ class FactsPresenterTest {
     fun anAcceptedUserEmailIsSavedWithTheUserKind() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        val outcome = presenter.addUserText(FactKind.EMAIL, "name@example.com")
+        val outcome = presenter.addUserInput(UserFactInput.Typed(FactKind.EMAIL, "name@example.com"))
         assertTrue(outcome is UserFactOutcome.Saved)
         assertEquals(1, gateway.additions.size)
         assertEquals(FactKind.EMAIL, gateway.additions.single().second)
@@ -199,7 +199,7 @@ class FactsPresenterTest {
     fun aPickedDateIsSavedAsADateValueWithItsDay() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        val outcome = presenter.addUserDate(LocalDate.of(2026, 4, 3))
+        val outcome = presenter.addUserInput(UserFactInput.Date(LocalDate.of(2026, 4, 3)))
         assertTrue(outcome is UserFactOutcome.Saved)
         val (_, kind, value) = gateway.additions.single()
         assertEquals(FactKind.DATE, kind)
@@ -210,7 +210,10 @@ class FactsPresenterTest {
     fun noDateChosenIsRefusedAndNeverSaved() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        assertEquals(UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN), presenter.addUserDate(null))
+        assertEquals(
+            UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN),
+            presenter.addUserInput(UserFactInput.Date(null)),
+        )
         assertTrue(gateway.additions.isEmpty())
     }
 
@@ -218,7 +221,7 @@ class FactsPresenterTest {
     fun aPickedTimeIsSavedAsATimeValueWithItsHourAndMinute() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        val outcome = presenter.addUserTime(9, 30)
+        val outcome = presenter.addUserInput(UserFactInput.Time(9, 30))
         assertTrue(outcome is UserFactOutcome.Saved)
         val (_, kind, value) = gateway.additions.single()
         assertEquals(FactKind.TIME, kind)
@@ -229,7 +232,10 @@ class FactsPresenterTest {
     fun noTimeChosenIsRefusedAndNeverSaved() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        assertEquals(UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN), presenter.addUserTime(null, null))
+        assertEquals(
+            UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN),
+            presenter.addUserInput(UserFactInput.Time(null, null)),
+        )
         assertTrue(gateway.additions.isEmpty())
     }
 
@@ -237,7 +243,7 @@ class FactsPresenterTest {
     fun anAmountWithAChosenCurrencyIsSavedAsAMoneyValue() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        val outcome = presenter.addUserMoney("12.50", "EUR")
+        val outcome = presenter.addUserInput(UserFactInput.Money("12.50", "EUR"))
         assertTrue(outcome is UserFactOutcome.Saved)
         val (_, kind, value) = gateway.additions.single()
         assertEquals(FactKind.MONEY, kind)
@@ -248,7 +254,10 @@ class FactsPresenterTest {
     fun anAmountWithNoCurrencyIsRefusedAndNeverSaved() = runBlocking {
         val gateway = FakeGateway(MutableStateFlow(emptyList()))
         val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
-        assertEquals(UserFactOutcome.Refused(UserValueRefusal.MONEY_NEEDS_CODE), presenter.addUserMoney("12.50", null))
+        assertEquals(
+            UserFactOutcome.Refused(UserValueRefusal.MONEY_NEEDS_CODE),
+            presenter.addUserInput(UserFactInput.Money("12.50", null)),
+        )
         assertTrue(gateway.additions.isEmpty())
     }
 
