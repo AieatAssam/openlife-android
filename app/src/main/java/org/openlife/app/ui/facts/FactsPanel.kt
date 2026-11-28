@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.openlife.app.R
@@ -54,24 +53,17 @@ private fun FactsList(state: FactsUiState.Ready, actions: FactActions, modifier:
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Text(
-                text = stringResource(R.string.facts_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
         if (state.items.any { it.isStale }) {
             item {
                 OpenLifeTextButton(onClick = actions.onFindAgain, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text(text = stringResource(R.string.facts_find_again))
+                    Text(text = stringResource(R.string.facts_find_again), modifier = Modifier.fillMaxWidth())
                 }
             }
         }
         val note = checkNote(state.check)
         if (note != null) item { Text(text = stringResource(note)) }
         if (state.items.isEmpty() && state.check == ExtractionCheck.Completed) {
-            item { Text(text = stringResource(R.string.facts_none)) }
+            item { Text(text = stringResource(R.string.facts_none), modifier = Modifier.fillMaxWidth()) }
         }
         items(state.items, key = { it.revisionId.toString() }) { item ->
             FactCard(item, state.currentReadingId, actions)
@@ -139,7 +131,7 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
                     onClick = { actions.onOpenEvidence(evidence) },
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
-                    Text(text = stringResource(R.string.facts_show_evidence))
+                    Text(text = stringResource(R.string.facts_show_evidence), modifier = Modifier.fillMaxWidth())
                 }
             } else {
                 Text(text = stringResource(R.string.facts_earlier_reading), style = MaterialTheme.typography.bodySmall)
@@ -153,7 +145,7 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
                     onClick = { actions.onChoose(item, index) },
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
-                    Text(text = FactDisplay.value(item.kind, text, locale))
+                    Text(text = FactDisplay.value(item.kind, text, locale), modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -185,7 +177,7 @@ private fun FactReviewActions(item: FactItem, actions: FactActions) {
 @Composable
 private fun FactActionButton(label: Int, onClick: () -> Unit) {
     OpenLifeTextButton(onClick = onClick, modifier = Modifier.heightIn(min = 48.dp)) {
-        Text(text = stringResource(label))
+        Text(text = stringResource(label), modifier = Modifier.fillMaxWidth())
     }
 }
 
