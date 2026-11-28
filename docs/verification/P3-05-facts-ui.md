@@ -107,7 +107,31 @@ Device (tablet `U8BBB20806201256`, AGS2-W09, Android 8.0.0), one class per run, 
 
 Totals this review: 27 device tests, 27 passed, 0 failed (plus 3 earlier for EarlierReadingViewerTest).
 
-Gaps:
-1. Not run on the tablet in this review: `OcrRepositoryTest` (vault androidTest, compiled only). `ViewerScreenC1Test` was not run in this review (10/0 on 5488566 per the earlier evidence).
+Gaps (as of the coordinator follow-ups below):
+1. The earlier device results above stand: FactsScreenTest, FactsInertValuesTest, ViewerScreenTest and EvidenceNavigationTest were run before the follow-ups, not again after them.
 2. RED was observed for U-05 and U-06 (JVM). For U-01 to U-04 the RED run is not recorded, so their fixes are not shown to fail first. The instrumented RED for U-01 (`EarlierReadingViewerTest`) and U-04 (`FactsScreenTest`) was not observed on the device.
 3. The U-03 guard is covered on the JVM only, not in `ViewerScreenTest` for the read-only UI.
+4. The late-result guard (follow-up 4) covers the messages only. `findAgain` sets no message and takes no request number.
+
+### Coordinator follow-ups (review of U-01..U-05 with four follow-ups)
+
+Commits: `4410bb2` (follow-up 1), `dc571d6` (follow-up 2), `d8fec41` (follow-up 3), `511593b` (follow-up 4), `7cc6b8d` (detekt formatting).
+
+1. U-06 remainder: `4410bb2`. A URL, email, phone or money value is kept only when `UserValueNormaliser.restore` gives back its canonical text and stored form. MONEY must match exactly. For URL, EMAIL and PHONE the `normalized` part must match, and the printed `raw` part may be any JSON string, because the canonical text cannot restore the typed input. Tests (`FactWriterTest`, host SQLite): `userTextValueMustBeTheNormalisersWholeValue` (RED: written instead of refused, then GREEN), `malformedMoneyIsRefused` (RED: written instead of refused, then GREEN), `everyNormaliserOutputIsAcceptedByTheWriter` (a guard: it passed on the pre-fix code, so it is not a RED; it asserts that each kind has an accepted sample and that the writer accepts every one). `FactWriterTest` 14/14, `UserValueNormaliserTest` 12/12.
+2. U-01 nit: `dc571d6`. A null view from the store maps to `OcrUiState.Unavailable`. `OcrViewModelTest.aReadingOfAnotherSourceIsUnavailableNotShown` now also sets the store's view to null and asserts `Unavailable` (RED: `Idle`, then GREEN). `OcrViewModelTest` 7/7.
+3. KDoc: `d8fec41`. The `ViewerWrites` comment no longer says "RED stub". No test (comment only).
+4. U-05 minor: `511593b`. Each message-setting request (review, choose, add, correct) takes a number. `clear()` and a newer request supersede the older ones, and a late result sets a message only when its number is still the latest. `FactsViewModelTest.aLateRefusalAfterClearSetsNoMessage` (RED: `NOT_SAVED` after the clear, then GREEN). `FactsViewModelTest` 3/3, `FactsPresenterTest` 19/19.
+5. Detekt formatting: `7cc6b8d` (line lengths in the new tests, blank line between `when` branches in `restore`).
+
+Gate (one foreground command: `gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`, then `scripts/plan-check.sh`, then `scripts/tests/run.sh`): `gradle exit=0`, last line `BUILD SUCCESSFUL in 4m 11s`; `plan-check exit=0`, `steps=83 errors=0`, `runnable now: []`; `tests-run exit=0`, `51 passed, 0 failed`. The earlier gate attempts failed on detekt line length and when-branch spacing, both fixed in `7cc6b8d`.
+
+Device (tablet `U8BBB20806201256`, one Gradle invocation per class, `svc power stayon true`, wakeup and dismiss-keyguard before each, XML read after each, `svc power stayon false` after the last run, `settings get global stay_on_while_plugged_in` reads 0):
+
+| Class | Module | Result |
+| --- | --- | --- |
+| EarlierReadingViewerTest | app | 3 pass, 0 fail |
+| FactsFlowTest | app | 13 pass, 0 fail |
+| ViewerScreenC1Test | app | 10 pass, 0 fail |
+| OcrRepositoryTest | vault | 19 pass, 0 fail (suite name confirmed in the XML) |
+
+Totals for these four classes: 45 pass, 0 fail. The first `svc power stayon 0` attempt was not a valid argument (the usage line says `true|false`), so it changed nothing; the reset that worked is `false`.
