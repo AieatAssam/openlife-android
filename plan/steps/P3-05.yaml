@@ -1,7 +1,7 @@
 id: P3-05
 title: Facts UI with origin badges, review, user-provided facts, inert values
 phase: P3
-status: in_progress
+status: review
 started: 2026-11-28
 depends_on: [P3-04, P1-20]
 estimate: L
@@ -73,3 +73,25 @@ notes: >
   - Handed-over finding (a), viewer shows the latest reading while search and facts use the READY pointer: NOT changed in P3-05. C2 decision Q-6 assigns moving the viewer and search onto the pointer to P3-07.
   - Handed-over finding (b), fact hit in search opens the viewer without a facts panel: NOT routed in P3-05. P3-07-R2 owns "tapping opens the Facts panel with the fact highlighted"; P3-05's requirements do not mention search.
   - Earlier-reading viewer mode (Q-15, C2-R39): NOT implemented in P3-05. The viewer loads only the current reading (OcrRepository.observeOcrView, ViewerSession); a reading-by-id mode needs new viewer state across ViewerSession, ViewerPorts and OcrPresenter. Recorded as a stated R1 gap.
+
+  P3-05 close-out (2026-11-28):
+  Item 1 (200 % title) fixed by an autosizing title (16 sp floor); item 2 kinds DATE, TIME, MONEY each red then green with
+  JVM presenter tests and one FactsFlowTest case; item 3 host tests added in 66946ce. The review action row
+  (Confirm/Reject) was broken by item 1's fillMaxWidth labels (a zero-bounds second button, caught on the tablet);
+  fixed in 01180c1 by weighting the buttons. Open: FactsScreenTest final-code run (device locked; the lock was not
+  touched). Not built: earlier-reading viewer mode (Q-15), "Correct this value" (C2-R37), CAD in the currency chooser.
+  Owner decisions still needed: money with no currency code (ADR-0008 vs C2-R38), and the dependency order (P3-04
+  and P1-20 are review, not done). Device gaps recorded in docs/verification/P3-05-facts-ui.md.
+
+evidence: >
+  docs/verification/P3-05-facts-ui.md (requirement to test, device totals, gaps). Final code 01180c1; gate
+  `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
+  :app:compileDebugAndroidTestKotlin :eval:test` BUILD SUCCESSFUL in 3m 2s (log scratchpad/gate6.log);
+  `scripts/plan-check.sh` steps=83 errors=0; `bash scripts/tests/run.sh` 51 passed, 0 failed. Tablet
+  U8BBB20806201256 (AGS2-W09, Android 8.0.0), one class per run, XML read each time: FactsFlowTest 10/0
+  (on 01180c1 after the review-row fix); FactsInertValuesTest 1/0; LargeFontUiTest 2 tests, 1 known failure
+  (noControlIsClippedAtFontScaleTwoOn320x640, list route); ScreenSemanticsTest 2 tests, 1 known failure
+  (everyScreenPassesAccessibilityChecks; 24 facts-route clipped-text findings). FactsScreenTest passed 1/0
+  on a38f7ff at 05:57; its final-code runs failed with "No compose hierarchies found" because the tablet was
+  locked, so the final-code result is not obtained. Host: FactWriterTest 8/0 (per-kind USER revision with
+  createdAt and no evidence), FactExtractionCoreTest 9/0 (findAgain on the current reading only).
