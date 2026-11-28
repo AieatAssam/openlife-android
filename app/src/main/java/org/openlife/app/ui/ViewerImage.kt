@@ -118,11 +118,13 @@ internal fun ViewerImage(
         ViewerContentState.Unreadable -> ViewerLoadProblem(
             message = stringResource(R.string.viewer_saved_content_unreadable_explained),
         ) {
-            if (deletable) OpenLifeOutlinedButton(
-                onClick = onDelete,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.testTag("viewer_unreadable_delete"),
-            ) { Text(stringResource(R.string.delete_action)) }
+            if (deletable) {
+                OpenLifeOutlinedButton(
+                    onClick = onDelete,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.testTag("viewer_unreadable_delete"),
+                ) { Text(stringResource(R.string.delete_action)) }
+            }
         }
 
         ViewerContentState.Transient -> ViewerLoadProblem(

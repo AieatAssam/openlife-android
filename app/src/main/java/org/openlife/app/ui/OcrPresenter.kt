@@ -45,6 +45,7 @@ interface OcrBackend {
  * the last observer leaves, or [clearTransient] runs, the state returns to
  * [OcrUiState.Loading] and the next observer re-reads the database.
  */
+@Suppress("TooManyFunctions") // the OCR reading state per source and per earlier reading (P3-05-R3, C2-R39)
 class OcrPresenter(private val backend: OcrBackend, private val scope: CoroutineScope) {
     private class Entry(val state: MutableStateFlow<OcrUiState>, val job: Job)
 

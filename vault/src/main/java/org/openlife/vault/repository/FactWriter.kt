@@ -29,6 +29,7 @@ internal sealed interface FactWrite {
  * compare-and-set after a write throws, so the transaction rolls back
  * (C2-R23). The C2 triggers check the same rules a second time.
  */
+@Suppress("TooManyFunctions") // one method per write and read rule (C2-R23..R37); a split would scatter the gate
 internal class FactWriter(
     private val dao: FactDao,
     private val clock: () -> Long,

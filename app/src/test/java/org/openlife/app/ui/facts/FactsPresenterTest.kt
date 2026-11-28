@@ -129,7 +129,10 @@ class FactsPresenterTest {
         )
     }
 
-    /** P3-05-R1 (C2-R37): a correction goes through the same input as Add a fact; a refusal never reaches the gateway. */
+    /**
+     * P3-05-R1 (C2-R37): a correction goes through the same input as Add a fact;
+     * a refusal never reaches the gateway.
+     */
     @Test
     fun aClarifiedValueOffersItsCandidatesAndRechoosingSendsOneOfThem() = runBlocking {
         val candidates = "{\"candidates\":[{\"date\":\"2026-03-04\"},{\"date\":\"2026-04-03\"}]}"

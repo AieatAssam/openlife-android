@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // one composable per fact section (P3-05); a split would scatter the panel
+
 package org.openlife.app.ui.facts
 
 import androidx.compose.foundation.layout.Arrangement

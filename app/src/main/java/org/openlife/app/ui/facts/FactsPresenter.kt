@@ -103,6 +103,7 @@ sealed interface FactsUiState {
  * P3-05-R1: the facts of one source as UI state. Values live here, in memory, only: [clear] drops them
  * (on hide, on a content scrub and before a vault reset). Nothing is written to saved state.
  */
+@Suppress("TooManyFunctions") // the facts list state and each user action (P3-05, C2-R36..R37)
 class FactsPresenter(
     private val gateway: FactsGateway,
     private val sourceId: UUID,
@@ -200,11 +201,7 @@ class FactsPresenter(
     }
 }
 
-private fun toItem(
-    row: FactWithLatestRevision,
-    evidence: List<FactEvidence>,
-    candidates: FactValue?,
-): FactItem = FactItem(
+private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>, choices: FactValue?): FactItem = FactItem(
     factId = row.fact.id,
     revisionId = row.revision.id,
     kind = row.revision.kind,
@@ -212,7 +209,7 @@ private fun toItem(
     status = row.revision.status,
     staleReason = row.revision.staleReason,
     value = row.revision.value,
-    candidateTexts = candidates?.candidateTexts().orEmpty(),
+    candidateTexts = choices?.candidateTexts().orEmpty(),
     evidence = evidence,
-    candidates = candidates,
+    candidates = choices,
 )

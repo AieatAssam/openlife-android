@@ -83,6 +83,7 @@ interface SavedValues {
  * pan are saved as a UUID string and floats; nothing else is saved.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("TooManyFunctions") // one viewer session: OCR, earlier reading, facts and delete (P3-05-R3)
 class ViewerSession<T : Any>(
     val sourceId: UUID,
     initialSpanId: UUID?,

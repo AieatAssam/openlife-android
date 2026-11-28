@@ -69,12 +69,14 @@ internal fun OcrSection(
             modifier = Modifier.asHeading(),
         )
         val runAgain = @Composable {
-            if (!readOnly) OpenLifeTextButton(
-                onClick = onExtractText,
-                modifier = Modifier.minimumInteractiveComponentSize(),
-                enabled = source.state == SourceState.READY,
-            ) {
-                Text(stringResource(R.string.viewer_run_again))
+            if (!readOnly) {
+                OpenLifeTextButton(
+                    onClick = onExtractText,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                    enabled = source.state == SourceState.READY,
+                ) {
+                    Text(stringResource(R.string.viewer_run_again))
+                }
             }
         }
         when (state) {
@@ -189,18 +191,20 @@ private fun OcrReadyContent(state: OcrUiState.Ready, actions: SpanActions, onRev
         ungrounded.forEach { span -> SpanRow(span, state, actions) }
     }
     state.revisionCorrection?.let { CorrectionLine(it) }
-    if (!actions.readOnly) Row {
-        OpenLifeTextButton(
-            onClick = { onReview(OcrReviewState.ACCEPTED) },
-            modifier = Modifier.minimumInteractiveComponentSize(),
-        ) {
-            Text(stringResource(R.string.viewer_accept_text))
-        }
-        OpenLifeTextButton(
-            onClick = { onReview(OcrReviewState.REJECTED) },
-            modifier = Modifier.minimumInteractiveComponentSize(),
-        ) {
-            Text(stringResource(R.string.viewer_reject_text))
+    if (!actions.readOnly) {
+        Row {
+            OpenLifeTextButton(
+                onClick = { onReview(OcrReviewState.ACCEPTED) },
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(stringResource(R.string.viewer_accept_text))
+            }
+            OpenLifeTextButton(
+                onClick = { onReview(OcrReviewState.REJECTED) },
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(stringResource(R.string.viewer_reject_text))
+            }
         }
     }
 }
