@@ -112,6 +112,21 @@ class FactWriterTest {
         assertEquals(listOf<Any?>("STALE", "READING_REPLACED"), status("y"))
     }
 
+    /** C2-R37: a correction adds a CONFIRMED user:correct revision; the extracted one is never mutated. */
+    @Test
+    fun aCorrectionLeavesTheExtractedRevisionUnchanged() = runBlocking {
+        extracted()
+        val columns = "SELECT origin, valueJson, canonicalText, status, staleReason FROM fact_revisions WHERE id = ?"
+        val before = host.query(columns, "x").single()
+        val corrected = written(writer.correct("x", date))
+        val current = dao.findFact("f")!!.currentRevisionId
+        assertEquals("the correction is the fact's current revision", corrected.revisionId, current)
+        assertEquals("user:correct", dao.findRevision(corrected.revisionId)!!.methodId)
+        assertEquals(listOf<Any?>("CONFIRMED", null), status(corrected.revisionId))
+        assertEquals("the extracted revision is never mutated", before, host.query(columns, "x").single())
+        assertEquals(1L, host.long("SELECT COUNT(*) FROM fact_evidence WHERE revisionId = ?", "x"))
+    }
+
     @Test
     fun reviewFollowsTheStatusTable() = runBlocking {
         extracted()

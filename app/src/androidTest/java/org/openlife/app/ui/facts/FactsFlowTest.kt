@@ -222,6 +222,31 @@ class FactsFlowTest {
     }
 
     @Test
+    fun correctingAUserUrlSendsTheRevisionAndTheNormalisedValue() {
+        val source = source(UUID(0L, 47L))
+        val row = FakeFactsGateway.row(
+            source.id,
+            FactKind.URL,
+            FactOrigin.EXTRACTED,
+            FactStatus.UNREVIEWED,
+            FactValue("{\"url\":\"https://example.org\"}", "https://example.org"),
+        )
+        val facts = FakeFactsGateway(rows = listOf(row), readingId = READING)
+        openFacts(source, facts)
+
+        val correct = context.getString(R.string.facts_correct)
+        awaitText(correct)
+        composeRule.onNodeWithText(correct).performClick()
+        composeRule.onNode(hasSetTextAction()).performTextInput("https://example.org/notice")
+        composeRule.onNodeWithText(context.getString(R.string.facts_correct_save)).performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.corrections.isNotEmpty() }
+        val (revisionId, value) = facts.corrections.single()
+        assertEquals("the correction supersedes the revision shown", row.revision.id, revisionId)
+        assertTrue("the accepted value keeps its address", value.canonicalText.contains("example.org/notice"))
+    }
+
+    @Test
     fun addingABlankUserValueIsRefusedAndNeverReachesTheGateway() {
         val source = source(UUID(0L, 44L))
         val facts = FakeFactsGateway(readingId = READING)

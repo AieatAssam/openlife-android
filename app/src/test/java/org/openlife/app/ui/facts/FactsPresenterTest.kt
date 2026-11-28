@@ -59,6 +59,7 @@ class FactsPresenterTest {
         val reviews = mutableListOf<Pair<UUID, ReviewDecision>>()
         val clarifications = mutableListOf<Pair<UUID, FactValue>>()
         val additions = mutableListOf<Triple<UUID, FactKind, FactValue>>()
+        val corrections = mutableListOf<Pair<UUID, FactValue>>()
         val findAgainSources = mutableListOf<UUID>()
 
         override fun facts(sourceId: UUID) = rows
@@ -83,6 +84,11 @@ class FactsPresenterTest {
 
         override suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult {
             additions += Triple(sourceId, kind, value)
+            return FactWriteResult.Failed
+        }
+
+        override suspend fun correct(revisionId: UUID, value: FactValue): FactWriteResult {
+            corrections += revisionId to value
             return FactWriteResult.Failed
         }
     }
@@ -115,6 +121,22 @@ class FactsPresenterTest {
             listOf(item.revisionId to FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03")),
             gateway.clarifications,
         )
+    }
+
+    /** P3-05-R1 (C2-R37): a correction goes through the same input as Add a fact; a refusal never reaches the gateway. */
+    @Test
+    fun correctSendsTheNormalisedValueForThatRevisionAndNeverARefusedOne() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val item = toItemFor(row(FactOrigin.EXTRACTED, FactStatus.UNREVIEWED, "2026-04-03"))
+        val saved = presenter.correct(item, UserFactInput.Date(LocalDate.of(2026, 11, 27)))
+        assertTrue(saved is UserFactOutcome.Saved)
+        val (revisionId, value) = gateway.corrections.single()
+        assertEquals(item.revisionId, revisionId)
+        assertEquals("2026-11-27", value.canonicalText)
+        val refused = presenter.correct(item, UserFactInput.Date(null))
+        assertEquals(UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN), refused)
+        assertEquals(1, gateway.corrections.size)
     }
 
     @Test

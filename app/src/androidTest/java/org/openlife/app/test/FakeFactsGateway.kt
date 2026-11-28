@@ -28,6 +28,7 @@ class FakeFactsGateway(
     val reviews = mutableListOf<Pair<UUID, ReviewDecision>>()
     val clarifications = mutableListOf<Pair<UUID, FactValue>>()
     val additions = mutableListOf<Triple<UUID, FactKind, FactValue>>()
+    val corrections = mutableListOf<Pair<UUID, FactValue>>()
     val findAgainSources = mutableListOf<UUID>()
 
     override fun facts(sourceId: UUID): Flow<List<FactWithLatestRevision>> = flowOf(rows)
@@ -50,6 +51,11 @@ class FakeFactsGateway(
 
     override suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult {
         additions += Triple(sourceId, kind, value)
+        return FactWriteResult.Failed
+    }
+
+    override suspend fun correct(revisionId: UUID, value: FactValue): FactWriteResult {
+        corrections += revisionId to value
         return FactWriteResult.Failed
     }
 
