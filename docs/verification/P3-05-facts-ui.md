@@ -76,3 +76,38 @@ Device RED: the instrumented RED for items B and C was written, and the androidT
 8. **Dependency order.** `depends_on` P3-04 and P1-20 are both `review`, not `done`. The coordinating session directed this step to proceed. The owner should confirm before review.
 9. **Locale (R6)** is covered by JVM tests only. No device test switches locale.
 10. **Viewer and search** (handed-over findings a and b in the step notes) are not changed here; they belong to P3-07.
+
+## Review fixes U-01..U-06 and cleanup
+
+Commits on `plan/P3-05-facts-ui` (not pushed): `b2e8441` U-01, `eb9757d` U-02 and U-03, `39e1251` U-06,
+`a9dd719` U-05, `6fedd04` cleanup, `872c558` U-04, `edddeae` detekt formatting.
+
+| Finding | Fix | Tests | Result |
+| --- | --- | --- | --- |
+| U-01 a reading of another source is shown | `findRevisionOfSource` in the DAO; `Unavailable` state | `OcrViewModelTest.aReadingOfAnotherSourceIsUnavailableNotShown` (JVM); `EarlierReadingViewerTest.readingOfAnotherSourceIsRejected` (device); `OcrRepositoryTest.observeOcrViewOfRevisionRefusesAReadingOfAnotherSource` (vault androidTest, compiled, not run on device) | JVM and device pass; repository test not run |
+| U-02 a malformed reading id must stay read-only | `earlierReading` flag set from the route | `ViewerSessionTest.malformedReadingIdStaysReadOnly` (JVM) | pass |
+| U-03 writes and delete reach the stores from an earlier reading | `ViewerWrites` guard; `delete()` no-op when read-only | `ViewerSessionTest.deleteIsANoOpWhenReadOnly`; `ViewerViewModelTest.mutationsAreNoOpsWhenReadOnly` and `mutationsReachTheStoresWhenWritable` (JVM) | pass; the guard is tested on the JVM because `ViewerViewModel` needs `viewModelScope` |
+| U-04 correction-derived origin and unknown origin or status not named | `ocrUserRevisionId` carried through `FactEvidence`; labels and icons for "from your correction", "Unknown origin", "Unknown status" | `FactReadMappingTest.evidenceKeepsTheCorrectionItWasReadFrom`; `FactDisplayTest.aValueReadThroughACorrectionIsExtractedFromIt` (JVM); `FactsScreenTest.originFromCorrectionAndUnrecognisedLabels` (device) | pass. The device test was not observed failing first |
+| U-05 facts writes cancelled on leaving the screen; refusal not reported | writes run in `AppContainer.writeScope` through `FactsCommands`; refused or failed write reports `NOT_SAVED` | `FactsViewModelTest.refusedReviewReportsMessage`, `writeCompletesAfterClear` (JVM, RED then GREEN) | pass. The brief named `FactsViewModelTest`; the seam is `FactsCommands` because `FactsViewModel` needs a ViewModelStore |
+| U-06 a correction of another kind, or an unnormalised URL, email or phone, was stored | presenter refuses `KIND_MISMATCH`; `FactWriter` requires a normaliser fixed point for URL, EMAIL and PHONE | `FactsPresenterTest.correctRefusesInputOfAnotherKind`; `FactWriterTest.correctRefusesUnnormalisedUrlForEmailKind` (host SQLite; the brief named `FactWriterHostTest`, the class is `FactWriterTest`) | JVM RED then GREEN |
+| Cleanup | `addUserText`, `addUserDate`, `addUserTime`, `addUserMoney` removed (their only callers were tests, now on `addUserInput`); `TooManyFunctions` suppression removed from `FactsPresenter` | existing `FactsPresenterTest` (19 tests) | pass |
+
+Gate: `./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test` ended `BUILD SUCCESSFUL in 4m 31s` after one detekt failure was fixed (`edddeae`). `scripts/plan-check.sh`: `steps=83 errors=0`, `runnable now: []`. `bash scripts/tests/run.sh`: `51 passed, 0 failed`.
+
+Device (tablet `U8BBB20806201256`, AGS2-W09, Android 8.0.0), one class per run, `stay_on`, wakeup and dismiss-keyguard before each, XML read after each:
+
+| Class | Result |
+| --- | --- |
+| FactsFlowTest | 13 pass, 0 fail |
+| FactsScreenTest | 2 pass, 0 fail |
+| FactsInertValuesTest | 1 pass, 0 fail |
+| ViewerScreenTest | 3 pass, 0 fail |
+| EvidenceNavigationTest | 8 pass, 0 fail |
+| EarlierReadingViewerTest (U-01 run, earlier) | 3 pass, 0 fail |
+
+Totals this review: 27 device tests, 27 passed, 0 failed (plus 3 earlier for EarlierReadingViewerTest).
+
+Gaps:
+1. Not run on the tablet in this review: `OcrRepositoryTest` (vault androidTest, compiled only). `ViewerScreenC1Test` was not run in this review (10/0 on 5488566 per the earlier evidence).
+2. RED was observed for U-05 and U-06 (JVM). For U-01 to U-04 the RED run is not recorded, so their fixes are not shown to fail first. The instrumented RED for U-01 (`EarlierReadingViewerTest`) and U-04 (`FactsScreenTest`) was not observed on the device.
+3. The U-03 guard is covered on the JVM only, not in `ViewerScreenTest` for the read-only UI.
