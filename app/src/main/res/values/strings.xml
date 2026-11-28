@@ -346,4 +346,15 @@
     <string name="facts_status_stale">Out of date</string>
     <string name="facts_status_rejected">Rejected</string>
     <string name="facts_show_evidence">Show in the text</string>
+    <string name="facts_none">No facts found</string>
+    <string name="facts_not_checked">Not checked for facts yet</string>
+    <string name="facts_check_failed">The last check did not finish</string>
+    <string name="facts_kind_date">Date</string>
+    <string name="facts_kind_time">Time</string>
+    <string name="facts_kind_datetime">Date and time</string>
+    <string name="facts_kind_money">Amount</string>
+    <string name="facts_kind_url">Web address</string>
+    <string name="facts_kind_email">Email address</string>
+    <string name="facts_kind_phone">Phone number</string>
+    <string name="facts_kind_unrecognised">Other</string>
 </resources>
