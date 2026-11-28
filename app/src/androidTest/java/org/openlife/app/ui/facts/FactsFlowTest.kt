@@ -103,6 +103,37 @@ class FactsFlowTest {
         assertEquals("the viewer must open on the fact's source", source.id.toString(), top?.sourceId)
     }
 
+    /**
+     * P3-05-R3 (C2-R39): evidence on an earlier reading is offered, and opens that reading read-only, with the
+     * span selected. The route names the reading by id only.
+     */
+    @Test
+    fun anEarlierReadingEvidenceOpensThatReadingAndNoOther() {
+        val source = source(UUID(0L, 34L))
+        val evidence = FactEvidence(EvidenceRole.VALUE, EARLIER.toString(), SPAN.toString(), 4, 14)
+        val row = FakeFactsGateway.row(
+            source.id,
+            FactKind.DATE,
+            FactOrigin.EXTRACTED,
+            FactStatus.UNREVIEWED,
+            FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03"),
+        )
+        val facts = FakeFactsGateway(rows = listOf(row), evidence = listOf(evidence), readingId = READING)
+        setHost(FakeAppContainer(listOf(source), factsGateway = facts))
+        composeRule.runOnIdle { navController.navigate(Routes.Facts(source.id.toString())) }
+
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.onAllNodesWithText(context.getString(R.string.facts_show_evidence))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onAllNodesWithText(context.getString(R.string.facts_show_evidence)).onFirst().performClick()
+
+        composeRule.waitUntil(WAIT_MS) { topRouteIsViewer() }
+        val top = composeRule.runOnIdle { navController.currentBackStackEntry?.toRoute<Routes.ListDetail>() }
+        assertEquals("the route must name the earlier reading", EARLIER.toString(), top?.readingId)
+        assertEquals("the viewer must open on the evidence span", SPAN.toString(), top?.spanId)
+    }
+
     @Test
     fun viewerFactsEntryOpensTheFactsOfThatSource() {
         val source = source(UUID(0L, 32L))
@@ -342,6 +373,7 @@ class FactsFlowTest {
         const val CANDIDATES_JSON = "{\"candidates\":[{\"date\":\"2026-04-03\"},{\"date\":\"2026-03-04\"}]}"
         val READING: UUID = UUID.fromString("11111111-1111-4111-8111-111111111111")
         val SPAN: UUID = UUID.fromString("22222222-2222-4222-8222-222222222222")
+        val EARLIER: UUID = UUID.fromString("55555555-5555-4555-8555-555555555555")
     }
 
     @Test
