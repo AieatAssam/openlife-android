@@ -1,8 +1,8 @@
 package org.openlife.vault.storage
 
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.File
 
 /**
  * S-04: VACUUM may renumber implicit rowids. The FTS rowid mapping (SearchIndex) and the

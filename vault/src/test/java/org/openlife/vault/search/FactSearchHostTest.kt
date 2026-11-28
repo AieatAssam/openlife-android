@@ -1,8 +1,6 @@
 package org.openlife.vault.search
 
 import androidx.sqlite.db.SupportSQLiteDatabase
-import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Proxy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -20,6 +18,8 @@ import org.openlife.vault.storage.HostSourceRowRemovalDao
 import org.openlife.vault.storage.HostSqlite
 import org.openlife.vault.storage.HostSqlite.Failure
 import org.openlife.vault.storage.SourceRowRemoval
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Proxy
 
 /**
  * P3-07-R1 on host SQLite: fact_fts is intact on a fresh database and after a v6
@@ -136,7 +136,10 @@ class FactSearchHostTest {
         fixture.integrityCheck(FactSearchIndex.TABLE)
     }
 
-    /** [host] as a SupportSQLiteDatabase whose `SELECT sqlite_version()` reports [version] (as SearchIndexEngineGateTest). */
+    /**
+     * [host] as a SupportSQLiteDatabase whose `SELECT sqlite_version()` reports [version]
+     * (as SearchIndexEngineGateTest).
+     */
     private fun reporting(version: String): SupportSQLiteDatabase {
         val real = host.asSupportDatabase()
         val literal = "SELECT '$version'"

@@ -86,6 +86,7 @@ object SearchSql {
         fun matches(column: String) = patterns.indices.joinToString(" AND ") { index ->
             "lower($column) LIKE ?${index + 1} ESCAPE '\\'"
         }
+
         // A fact matches when each term is in its canonical or its raw text, as the FTS index does (S-05).
         fun matchesCanonicalOrRaw() = patterns.indices.joinToString(" AND ") { index ->
             "(lower(r.canonicalText) LIKE ?${index + 1} ESCAPE '\\' OR lower(r.rawText) LIKE ?${index + 1} ESCAPE '\\')"

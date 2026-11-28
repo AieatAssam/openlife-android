@@ -87,6 +87,10 @@ class OcrRevisionPointerTest {
         )
         assertEquals("after-clock-change", current("c"))
         val newestFirst = host.query("SELECT id FROM ocr_revisions WHERE sourceId = ? ORDER BY rowid DESC", "c")
-        assertEquals("the viewer order (rowid DESC) lists the new reading first", "after-clock-change", newestFirst.first().single())
+        assertEquals(
+            "the viewer order (rowid DESC) lists the new reading first",
+            "after-clock-change",
+            newestFirst.first().single(),
+        )
     }
 }
