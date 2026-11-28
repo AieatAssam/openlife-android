@@ -81,7 +81,7 @@ object FactSql {
     const val EXTRACTION_OUTCOME_OF_CURRENT_READING = """
         SELECT r.outcome FROM fact_extraction_runs AS r
         JOIN sources AS s ON s.id = r.sourceId AND s.currentOcrRevisionId = r.ocrRevisionId
-        WHERE r.sourceId = :sourceId ORDER BY r.finishedAt DESC LIMIT 1
+        WHERE r.sourceId = :sourceId ORDER BY r.finishedAt DESC, r.startedAt DESC, r.id DESC LIMIT 1
         """
 
     const val SOURCE_STATE = "SELECT state FROM sources WHERE id = :sourceId"

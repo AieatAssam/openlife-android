@@ -23,7 +23,7 @@ class FactReadHostTest {
     @After
     fun close() = host.close()
 
-    /** Source `a` with its READY current reading `a-r`, and fact `f` whose EXTRACTED `x` has VALUE evidence on `a-s1`. */
+    /** Source `a` with READY current reading `a-r`; fact `f` whose EXTRACTED `x` has VALUE evidence on `a-s1`. */
     private fun extracted(): SearchFixture {
         val fixture = FactHost.fresh(host)
         rows.readySourceWithReading(fixture, "a")

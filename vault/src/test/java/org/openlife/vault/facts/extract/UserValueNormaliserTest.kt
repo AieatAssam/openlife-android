@@ -53,7 +53,6 @@ class UserValueNormaliserTest {
         assertEquals(UserValueRefusal.MONEY_NEEDS_CODE, refused(UserValueNormaliser.money("12.50", null)))
     }
 
-
     @Test
     fun everyChooserCodeAcceptsPlainIntegerAndFractionAmounts() {
         val failing = UserValueNormaliser.CURRENCY_CHOICES.filter { code ->
