@@ -7,6 +7,7 @@ import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -158,6 +159,52 @@ class FactExtractionGuardTest {
             currentDateRevisions(),
         )
     }
+
+    // P-02 (C2-R32 step 1): a clarified fact whose current revision has gone STALE no longer hides its value.
+    @Test
+    fun rerunAfterStaleClarificationExtractsTheValueAgain() {
+        groundedReading()
+        finished(extract(trigger = ExtractionTrigger.AUTO))
+        val date = host.query("SELECT id, currentRevisionId FROM facts WHERE sourceId = 'a' AND kind = 'DATE'").single()
+        val factId = date[0] as String
+        // The user clarifies the value. The trigger adds a BASIS edge from the clarification to the extracted revision.
+        rows.revision("u1", factId, origin = "USER", status = "CONFIRMED", supersedes = date[1] as String)
+        rows.current(factId, "u1", expected = date[1] as String)
+        // Replacing the reading stales the extracted revision, and BASIS reaches the clarification (C2-R40).
+        staleOldReading()
+        assertEquals("the clarification is stale", "STALE", host.query("SELECT status FROM fact_revisions WHERE id = 'u1'").single().single())
+
+        val rerun = finished(extract())
+
+        // The DATE fact takes a new extracted revision: its current revision is EXTRACTED and not STALE.
+        val current = host.query(
+            "SELECT r.origin, r.status FROM facts f JOIN fact_revisions r ON r.id = f.currentRevisionId " +
+                "WHERE f.id = '$factId'",
+        ).single()
+        assertEquals("the DATE value is extracted again: $rerun", "EXTRACTED", current[0])
+        assertNotEquals("the new revision is not stale", "STALE", current[1])
+    }
+
+    // P-02 (C2-R32 step 1): the key includes textStart, so a second occurrence of an already extracted value is written.
+    @Test
+    fun sameValueAtAnotherOffsetIsWrittenAgain() {
+        groundedReading()
+        finished(extract(trigger = ExtractionTrigger.AUTO))
+        assertEquals(listOf(listOf<Any?>(4L)), offsets())
+        // The span's read text gains a second occurrence of the same value, after the first run.
+        host.exec("UPDATE ocr_spans SET text = 'Due 26.11.2026 and 26.11.2026' WHERE id = 'a-s1'")
+
+        val rerun = finished(extract())
+
+        assertEquals("only the second occurrence is new: $rerun", 1, rerun.createdRevisionCount)
+        assertEquals(listOf(listOf<Any?>(4L), listOf<Any?>(19L)), offsets())
+    }
+
+    private fun offsets(): List<List<Any?>> = host.query(
+        "SELECT e.textStart FROM facts f JOIN fact_revisions r ON r.id = f.currentRevisionId " +
+            "JOIN fact_evidence e ON e.revisionId = r.id AND e.role = 'VALUE' " +
+            "WHERE f.sourceId = 'a' AND f.kind = 'DATE' ORDER BY e.textStart",
+    )
 
     // P-06 (C2-R30): a rejected current reading is never due for the automatic run.
     @Test
