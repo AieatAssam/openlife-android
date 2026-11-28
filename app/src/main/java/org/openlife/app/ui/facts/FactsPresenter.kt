@@ -131,15 +131,21 @@ class FactsPresenter(
      * returned with its reason and never reaches the repository.
      */
     suspend fun addUserText(kind: FactKind, input: String): UserFactOutcome =
-        when (val result = UserValueNormaliser.text(kind, input)) {
-            is UserValueResult.Accepted ->
-                UserFactOutcome.Saved(gateway.addUserFact(sourceId, kind, result.value))
+        saveResult(kind, UserValueNormaliser.text(kind, input))
 
-            is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
-        }
+    private suspend fun saveResult(kind: FactKind, result: UserValueResult): UserFactOutcome = when (result) {
+        is UserValueResult.Accepted -> UserFactOutcome.Saved(gateway.addUserFact(sourceId, kind, result.value))
+        is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
+    }
 
     /** P3-05-R2: a day from the date picker; no chosen day is refused and never reaches the repository. */
-    suspend fun addUserDate(date: LocalDate?): UserFactOutcome = TODO("P3-05-R2 RED stub")
+    suspend fun addUserDate(date: LocalDate?): UserFactOutcome = saveResult(FactKind.DATE, UserValueNormaliser.date(date))
+
+    /** Routes one form submission to the normaliser for its kind; nothing else reaches the repository. */
+    suspend fun addUserInput(input: UserFactInput): UserFactOutcome = when (input) {
+        is UserFactInput.Typed -> addUserText(input.kind, input.text)
+        is UserFactInput.Date -> addUserDate(input.date)
+    }
 
     private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): FactItem = FactItem(
         factId = row.fact.id,

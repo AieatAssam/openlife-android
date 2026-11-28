@@ -1,7 +1,6 @@
 package org.openlife.app.ui.facts
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -11,7 +10,6 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -22,9 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.paneTitle
@@ -35,16 +33,12 @@ import androidx.compose.ui.unit.sp
 import org.openlife.app.R
 import org.openlife.app.ui.Announce
 import org.openlife.app.ui.Announcement
-import org.openlife.app.ui.ContentTextField
 import org.openlife.app.ui.StatusHost
 import org.openlife.app.ui.asHeading
-import org.openlife.app.ui.brand.OpenLifeButton
 import org.openlife.app.ui.brand.OpenLifeTextButton
-import org.openlife.vault.facts.FactKind
 
 /**
- * P3-05-R1..R2: the facts of one source with its review actions and the add-fact form. The form takes the three
- * text kinds for now; dates, times and money are not offered here yet (recorded as a gap in the step notes).
+ * P3-05-R1..R2: the facts of one source with its review actions and the add-fact form (see [AddFactForm]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +46,7 @@ fun FactsScreen(
     state: FactsUiState,
     message: FactMessage?,
     actions: FactActions,
-    onAddText: (FactKind, String) -> Unit,
+    onAdd: (UserFactInput) -> Unit,
     onBack: () -> Unit,
 ) {
     val pane = stringResource(R.string.facts_title)
@@ -82,7 +76,7 @@ fun FactsScreen(
                     Text(text = stringResource(messageLabel(it)), modifier = Modifier.padding(horizontal = 16.dp))
                 }
                 if (adding) {
-                    AddTextFact(onAddText)
+                    AddFactForm(onAdd)
                 } else {
                     OpenLifeTextButton(
                         onClick = { adding = true },
@@ -92,35 +86,6 @@ fun FactsScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddTextFact(onAddText: (FactKind, String) -> Unit) {
-    var kind by remember { mutableStateOf(FactKind.URL) }
-    var input by remember { mutableStateOf("") }
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Row {
-            listOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE).forEach { option ->
-                FilterChip(
-                    selected = kind == option,
-                    onClick = { kind = option },
-                    label = { Text(stringResource(kindLabel(option))) },
-                    modifier = Modifier.heightIn(min = 48.dp).padding(end = 8.dp),
-                )
-            }
-        }
-        ContentTextField(
-            value = input,
-            onValueChange = { input = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.facts_add_input_label)) },
-            singleLine = true,
-        )
-        OpenLifeButton(onClick = { onAddText(kind, input) }) {
-            Text(stringResource(R.string.facts_add_save), modifier = Modifier.fillMaxWidth())
         }
     }
 }

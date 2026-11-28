@@ -5,6 +5,7 @@ import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -12,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -205,7 +208,9 @@ class FactsFlowTest {
         composeRule.onNodeWithText(context.getString(R.string.facts_add)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.facts_kind_date)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.facts_pick_date)).performClick()
-        composeRule.onAllNodesWithText("15").onFirst().performClick()
+        awaitText(context.getString(R.string.facts_picker_confirm))
+        // Day cells carry their date as text ("Sunday, 15 November 2026").
+        composeRule.onAllNodes(dayCell(15)).onFirst().performClick()
         composeRule.onNodeWithText(context.getString(R.string.facts_picker_confirm)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
 
@@ -312,5 +317,10 @@ class FactsFlowTest {
         const val CANDIDATES_JSON = "{\"candidates\":[{\"date\":\"2026-04-03\"},{\"date\":\"2026-03-04\"}]}"
         val READING: UUID = UUID.fromString("11111111-1111-4111-8111-111111111111")
         val SPAN: UUID = UUID.fromString("22222222-2222-4222-8222-222222222222")
+    }
+
+    /** Matches the picker's grid cell for one day of the shown month, by its spoken date text. */
+    private fun dayCell(day: Int): SemanticsMatcher = SemanticsMatcher("day cell $day") { node ->
+        node.config.getOrNull(SemanticsProperties.Text)?.any { " $day " in it.text } == true
     }
 }

@@ -338,14 +338,14 @@ class ScreenSemanticsTest {
                 DeleteConfirmationDialog(itemLabel = "Imported 1 Jan 1970", onConfirm = {}, onDismiss = {})
             },
             ScreenCase("facts-ready") {
-                FactsScreen(state = syntheticFacts(), message = null, actions = factsActions(), onAddText = { _, _ -> }, onBack = {})
+                FactsScreen(state = syntheticFacts(), message = null, actions = factsActions(), onAdd = {}, onBack = {})
             },
             ScreenCase("facts-empty") {
                 FactsScreen(
                     state = FactsUiState.Ready(emptyList(), ExtractionCheck.Completed, null),
                     message = null,
                     actions = factsActions(),
-                    onAddText = { _, _ -> },
+                    onAdd = {},
                     onBack = {},
                 )
             },

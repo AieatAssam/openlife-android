@@ -177,7 +177,7 @@ private fun FactsDestination(
             onChoose = facts::choose,
             onFindAgain = facts::findAgain,
         ),
-        onAddText = facts::addText,
+        onAdd = facts::add,
         onBack = { navController.popBackStack() },
     )
 }

@@ -47,8 +47,9 @@ object UserValueNormaliser {
     private const val CONTROL_LIMIT = 0x20
     private const val DELETE = 0x7F
 
-    /** A date from a date picker (C2-R38). */
-    fun date(date: LocalDate): UserValueResult = typed { DateValue(date) }
+    /** A date from a date picker (C2-R38); a null day means the picker was closed without a choice. */
+    fun date(date: LocalDate?): UserValueResult =
+        if (date == null) UserValueResult.Refused(UserValueRefusal.NOT_CHOSEN) else typed { DateValue(date) }
 
     /** A time from a time picker (C2-R38); [second] is null when the picker has none. */
     fun time(hour: Int, minute: Int, second: Int?): UserValueResult = typed { TimeValue(hour, minute, second) }

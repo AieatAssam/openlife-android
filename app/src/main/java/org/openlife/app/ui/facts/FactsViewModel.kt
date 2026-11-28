@@ -59,9 +59,9 @@ class FactsViewModel(container: AppContainer, sourceId: UUID) : ViewModel() {
         viewModelScope.launch { presenter.chooseCandidate(item, index) }
     }
 
-    fun addText(kind: FactKind, input: String) {
+    fun add(input: UserFactInput) {
         viewModelScope.launch {
-            mutableMessage.value = when (val outcome = presenter.addUserText(kind, input)) {
+            mutableMessage.value = when (val outcome = presenter.addUserInput(input)) {
                 is UserFactOutcome.Saved -> when (outcome.result) {
                     is FactWriteResult.Written -> FactMessage.SAVED
                     else -> FactMessage.NOT_SAVED

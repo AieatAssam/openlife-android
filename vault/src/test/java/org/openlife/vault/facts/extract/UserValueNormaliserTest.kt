@@ -105,4 +105,9 @@ class UserValueNormaliserTest {
         val reason = refused(UserValueNormaliser.text(org.openlife.vault.facts.FactKind.URL, "secret-text-here"))
         assertTrue(!reason.name.contains("secret"))
     }
+
+    @Test
+    fun noDateChosenIsRefusedWithNoValue() {
+        assertEquals(UserValueResult.Refused(UserValueRefusal.NOT_CHOSEN), UserValueNormaliser.date(null))
+    }
 }
