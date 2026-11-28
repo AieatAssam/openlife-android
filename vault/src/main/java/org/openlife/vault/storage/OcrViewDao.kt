@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface OcrViewDao {
     /**
-     * P2-01-R1: newest first. startedAt can tie when two runs start in the same
-     * millisecond, so the insertion order (rowid) breaks the tie.
+     * P2-01-R1: newest first by rowid, the same order that moves the current
+     * reading (C2-R14, amendment 2026-11-28, S-01). startedAt is not used.
      */
     @Query("SELECT * FROM ocr_revisions WHERE sourceId = :sourceId ORDER BY rowid DESC")
     fun observeRevisionsNewestFirst(sourceId: String): Flow<List<OcrRevisionEntity>>
