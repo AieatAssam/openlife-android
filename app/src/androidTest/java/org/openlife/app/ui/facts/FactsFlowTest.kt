@@ -4,13 +4,16 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.toRoute
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -25,6 +28,8 @@ import org.openlife.app.navigation.Routes
 import org.openlife.app.test.FakeAppContainer
 import org.openlife.app.test.FakeFactsGateway
 import org.openlife.app.test.StrictModeRule
+import org.openlife.app.test.syntheticJpeg
+import org.openlife.vault.repository.ReadyReadResult
 import org.openlife.app.ui.theme.OpenLifeTheme
 import org.openlife.vault.facts.EvidenceRole
 import org.openlife.vault.facts.FactEvidence
@@ -37,6 +42,14 @@ import org.openlife.vault.model.IntakeKind
 import org.openlife.vault.model.Orientation
 import org.openlife.vault.model.Source
 import org.openlife.vault.model.SourceState
+import org.openlife.vault.ocr.OcrCoordinateSystem
+import org.openlife.vault.ocr.OcrEvidenceRegion
+import org.openlife.vault.ocr.OcrReviewState
+import org.openlife.vault.ocr.OcrRevision
+import org.openlife.vault.ocr.OcrRevisionState
+import org.openlife.vault.ocr.OcrSpan
+import org.openlife.vault.ocr.OcrSpanView
+import org.openlife.vault.ocr.OcrView
 
 /**
  * P3-05-R1 through the real navigation graph: the facts route, the evidence action and the viewer entry. The facts
@@ -80,6 +93,55 @@ class FactsFlowTest {
         assertEquals("the viewer must open on the evidence span", SPAN.toString(), top?.spanId)
         assertEquals("the viewer must open on the fact's source", source.id.toString(), top?.sourceId)
     }
+
+    @Test
+    fun viewerFactsEntryOpensTheFactsOfThatSource() {
+        val source = source(UUID(0L, 32L))
+        val revisionId = UUID.fromString("33333333-3333-4333-8333-333333333333")
+        val span = OcrSpan(
+            UUID.fromString("44444444-4444-4444-8444-444444444444"),
+            revisionId,
+            0,
+            "2026-04-03",
+            null,
+            OcrCoordinateSystem.SOURCE_PIXELS,
+            OcrEvidenceRegion(0, 0, 50, 20),
+        )
+        val view = OcrView(revision(revisionId, source.id), listOf(OcrSpanView(span, null)), null, emptyList())
+        setHost(
+            FakeAppContainer(
+                listOf(source),
+                readContent = { ReadyReadResult.Loaded(syntheticJpeg()) },
+                ocrView = { view },
+            ),
+        )
+        composeRule.runOnIdle { navController.navigate(Routes.ListDetail(source.id.toString())) }
+
+        composeRule.waitUntil(WAIT_MS) { composeRule.onAllNodesWithTag("viewer_open_facts").fetchSemanticsNodes().isNotEmpty() }
+        composeRule.onNodeWithTag("viewer_open_facts").performClick()
+
+        composeRule.waitUntil(WAIT_MS) {
+            navController.currentBackStackEntry?.destination?.hasRoute<Routes.Facts>() == true
+        }
+        val facts = composeRule.runOnIdle { navController.currentBackStackEntry?.toRoute<Routes.Facts>() }
+        assertEquals("the facts route must name the viewer's source", source.id.toString(), facts?.sourceId)
+    }
+
+    private fun revision(id: UUID, sourceId: UUID) = OcrRevision(
+        id = id,
+        sourceId = sourceId,
+        state = OcrRevisionState.READY,
+        engineId = "test-engine",
+        modelVersion = "1",
+        orientation = Orientation.NORMAL,
+        sourceDigest = ByteArray(32) { 1 },
+        startedAt = 1L,
+        extractedAt = 2L,
+        reviewState = OcrReviewState.UNREVIEWED,
+        failureReason = null,
+        charCount = 10,
+        spanCount = 1,
+    )
 
     private fun topRouteIsViewer(): Boolean {
         val entry = navController.currentBackStackEntry ?: return false
