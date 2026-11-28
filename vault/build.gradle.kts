@@ -113,6 +113,7 @@ dependencies {
 tasks.withType<Test>().configureEach {
     systemProperty("openlife.rootDir", rootProject.projectDir.absolutePath)
     inputs.files(rootProject.fileTree("eval/ocr/v1")).withPropertyName("ocrSet")
+    inputs.files(rootProject.fileTree("eval/facts/v1")).withPropertyName("factsSet")
     // A failed test prints its exception message and causes, so a CI log
     // explains a host-SQLite failure (HostSqlite.Failure carries the SQLite
     // error, the statement kind and the engine version); skips print their

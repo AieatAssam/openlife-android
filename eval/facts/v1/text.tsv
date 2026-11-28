@@ -1,0 +1,211 @@
+# Facts evaluation set v1 (P3-06, C2-R26 text cases). 200 synthetic text cases; no real data.
+# One case per line. Eight columns, each separated by one TAB (empty cells allowed):
+#   1 id   2 kind (the family the case stresses)   3 text (one span; raw slices are exact)
+#   4 items: expected candidates, separated by " ‖ ", each KIND¦raw¦canonical
+#   5 abstain: expected abstentions, separated by " ‖ ", each KIND¦raw (* = no kind)
+#   6 truth: the reading the synthetic text means, for a d/m ambiguous case only
+#   7 tags   8 ref: the ADR-0008 section or amendment the expectation comes from
+# Expectations are written from ADR-0008 and the amendments in it, not from the extractor.
+# Two or more items with the same raw are one clarification (CLARIFICATION_NEEDED).
+# Empty items and empty abstain: the case expects nothing to be emitted.
+# Escapes: \uXXXX (four hex digits) only, BMP only. Raw slices are checked by exact match.
+D-01	DATE	2026-09-16	DATE¦2026-09-16¦2026-09-16			positive,iso	§4.1 ISO
+D-02	DATE	2026/9/6	DATE¦2026/9/6¦2026-09-06			positive,iso	§4.1 ISO, one-digit month and day
+D-03	DATE	2026.09.16	DATE¦2026.09.16¦2026-09-16			positive,iso	§4.1 ISO with dots
+D-04	DATE	16 September 2026	DATE¦16 September 2026¦2026-09-16			positive,english	§4.1 D Month YYYY
+D-05	DATE	3rd Sep 2026	DATE¦3rd Sep 2026¦2026-09-03			positive,english	§4.1 ordinal and abbreviation
+D-06	DATE	3-Sep-2026	DATE¦3-Sep-2026¦2026-09-03			positive,english	§4.1 D-Mon-YYYY
+D-07	DATE	Dec 25, 2026	DATE¦Dec 25, 2026¦2026-12-25			positive,english	§4.1 Month D, YYYY
+D-08	DATE	Sept. 3, 2026	DATE¦Sept. 3, 2026¦2026-09-03			positive,english	§4.1 Sept with a dot
+D-09	DATE	13/04/2026	DATE¦13/04/2026¦2026-04-13			positive,numeric	§4.1 exactly one valid reading
+D-10	DATE	04/13/2026	DATE¦04/13/2026¦2026-04-13			positive,numeric	§4.1 only the month-first reading is valid
+D-11	DATE	04/04/2026	DATE¦04/04/2026¦2026-04-04			positive,numeric	§4.1 both readings give the same date
+D-12	DATE	31/04/2026		DATE¦31/04/2026		negative,invalid	§4.1 neither reading valid
+D-13	DATE	03/04/2026	DATE¦03/04/2026¦2026-03-04 ‖ DATE¦03/04/2026¦2026-04-03		2026-03-04	dm,hostile	§4.1 two valid readings
+D-14	DATE	05/06/2026	DATE¦05/06/2026¦2026-05-06 ‖ DATE¦05/06/2026¦2026-06-05		2026-06-05	dm	§4.1 two valid readings
+D-15	DATE	10-11-2026	DATE¦10-11-2026¦2026-10-11 ‖ DATE¦10-11-2026¦2026-11-10		2026-11-10	dm	§4.1 hyphen separator
+D-16	DATE	1.2.2026	DATE¦1.2.2026¦2026-01-02 ‖ DATE¦1.2.2026¦2026-02-01		2026-02-01	dm	§4.1 dot separator, one-digit parts
+D-17	DATE	7/8/2026	DATE¦7/8/2026¦2026-07-08 ‖ DATE¦7/8/2026¦2026-08-07		2026-08-07	dm	§4.1 one-digit parts
+D-18	DATE	Wed 01/07/2026	DATE¦Wed 01/07/2026¦2026-01-07 ‖ DATE¦Wed 01/07/2026¦2026-07-01		2026-07-01	dm,weekday	§4.1 weekday keeps both readings
+D-19	DATE	Fri 03/04/2026	DATE¦Fri 03/04/2026¦2026-04-03			positive,weekday	§4.1 weekday leaves one reading
+D-20	DATE	Tue 13/04/2026		DATE¦Tue 13/04/2026		negative,weekday	§4.1 single value that does not match
+D-21	DATE	Sat 03/04/2026		DATE¦Sat 03/04/2026		negative,weekday	§4.1 weekday leaves no reading
+D-22	DATE	Wed 16 Sep 2026	DATE¦Wed 16 Sep 2026¦2026-09-16			positive,weekday	§4.1 weekday matches
+D-23	DATE	Mon 16 Sep 2026		DATE¦Mon 16 Sep 2026		negative,weekday	§4.1 weekday does not match
+D-24	DATE	Sunday, 12 July 2026	DATE¦Sunday, 12 July 2026¦2026-07-12			positive,weekday	§4.1 full weekday name with comma
+D-25	DATE	07/08/26	DATE¦07/08/26¦1907-08-26 ‖ DATE¦07/08/26¦1926-07-08 ‖ DATE¦07/08/26¦1926-08-07 ‖ DATE¦07/08/26¦2007-08-26 ‖ DATE¦07/08/26¦2026-07-08 ‖ DATE¦07/08/26¦2026-08-07		2026-07-08	dm,twodigit	§4.1 two-digit year gives six readings (Q-4)
+D-26	DATE	11/12/31	DATE¦11/12/31¦1911-12-31 ‖ DATE¦11/12/31¦1931-11-12 ‖ DATE¦11/12/31¦1931-12-11 ‖ DATE¦11/12/31¦2011-12-31 ‖ DATE¦11/12/31¦2031-11-12 ‖ DATE¦11/12/31¦2031-12-11		2031-12-11	dm,twodigit	§4.1 two-digit year gives six readings (Q-4)
+D-27	DATE	04/09/23	DATE¦04/09/23¦1904-09-23 ‖ DATE¦04/09/23¦1923-04-09 ‖ DATE¦04/09/23¦1923-09-04 ‖ DATE¦04/09/23¦2004-09-23 ‖ DATE¦04/09/23¦2023-04-09 ‖ DATE¦04/09/23¦2023-09-04		2023-09-04	dm,twodigit	§4.1 two-digit year gives six readings (Q-4)
+D-28	DATE	Mon 04/09/23	DATE¦Mon 04/09/23¦1923-04-09 ‖ DATE¦Mon 04/09/23¦2023-09-04		2023-09-04	dm,twodigit,weekday	A-3: weekday leaves two readings
+D-29	DATE	Sun 07/08/26		DATE¦Sun 07/08/26		negative,twodigit,weekday	A-3: weekday leaves one two-digit reading, so it abstains
+D-30	DATE	Thu 07/08/26		DATE¦Thu 07/08/26		negative,twodigit,weekday	A-3: weekday leaves one two-digit reading, so it abstains
+D-31	DATE	2028-02-29	DATE¦2028-02-29¦2028-02-29			positive,iso,leap	§4.1 leap day
+D-32	DATE	12–14 June 2026		DATE¦12–14 June 2026		negative,range,lookalike	§4.1 D–D Month YYYY with an en dash
+D-33	DATE	10-11 May 2026		DATE¦10-11 May 2026		negative,range	§4.1 D-D Month YYYY
+D-34	DATE	1 March – 3 April 2026		DATE¦1 March – 3 April 2026		negative,range,lookalike	§4.1 D Month – D Month YYYY
+D-35	DATE	2026-03-04 to 2026-03-09		DATE¦2026-03-04 to 2026-03-09		negative,range	§4.1 two dates joined by to
+D-36	DATE	2026-03-04 till 2026-03-09		DATE¦2026-03-04 till 2026-03-09		negative,range	§4.1 two dates joined by till
+D-37	DATE	7 & 9 June 2026		DATE¦7 & 9 June 2026		negative,range	§4.1 ZZ-06: digits, &, D Month YYYY
+D-38	DATE	June 2026		DATE¦June 2026		negative	§4.1 year and month only
+D-39	DATE	12 June		DATE¦12 June		negative	Q-10 no year
+D-40	DATE	12/06		DATE¦12/06		negative	Q-10 no year
+D-41	DATE	2 Mar		DATE¦2 Mar		negative	Q-10 no year
+D-42	DATE	Room 12/3		DATE¦12/3		negative,hostile	Q-10 no year, in a room label
+D-43	DATE	2026-09-16-17		DATE¦2026-09-16-17		negative,hostile	A-5: a dash continues a numeric date run
+D-44	DATE	Version 1.2.33	DATE¦1.2.33¦1933-01-02 ‖ DATE¦1.2.33¦1933-02-01 ‖ DATE¦1.2.33¦2033-01-02 ‖ DATE¦1.2.33¦2033-02-01			residual,twodigit	A-9(c) stated residual: dotted groups are date candidates
+D-45	DATE	‎2026-09-16		*¦‎2026-09-16		negative,invisible	A-6: a format mark attached to a token abstains, covering the mark
+T-01	TIME	14:30	TIME¦14:30¦14:30			positive,24h	§4.2 24-hour form
+T-04	TIME	2:45 pm	TIME¦2:45 pm¦14:45			positive,ampm	§4.2 12-hour form
+T-05	TIME	9:15 am	TIME¦9:15 am¦09:15			positive,ampm	§4.2 12-hour form
+T-06	TIME	12:15 am	TIME¦12:15 am¦00:15 ‖ TIME¦12:15 am¦12:15			clarify,hour12	§4.2 hour 12 gives 00:mm | 12:mm
+T-07	TIME	12:00 PM	TIME¦12:00 PM¦00:00 ‖ TIME¦12:00 PM¦12:00			clarify,hour12	§4.2 hour 12 gives 00:mm | 12:mm
+T-08	TIME	2:30	TIME¦2:30¦02:30 ‖ TIME¦2:30¦14:30			clarify,nomarker	§4.2 no marker gives h:mm | h+12:mm (Q-5)
+T-09	TIME	10:30	TIME¦10:30¦10:30 ‖ TIME¦10:30¦22:30			clarify,nomarker	§4.2 no marker gives h:mm | h+12:mm (Q-5)
+T-10	TIME	12:15	TIME¦12:15¦00:15 ‖ TIME¦12:15¦12:15			clarify,hour12,nomarker	§4.2 hour 12 with no marker gives 00:mm | 12:mm (Q-5)
+T-11	TIME	4.45 pm		TIME¦4.45 pm		negative	§4.2 a dot before am/pm is abstained (A-11)
+T-12	TIME	09h15		TIME¦09h15		negative	§4.2 HhMM is abstained (A-11)
+T-13	TIME	14.30				negative	§4.2 a bare 14.30 is not a time
+T-14	TIME	1430		TIME¦1430		negative	§4.2 a bare 1430 is abstained
+T-15	TIME	24:30		TIME¦24:30		negative	§4.2 hour 24 is abstained
+T-16	TIME	12:75		TIME¦12:75		negative	§4.2 minute over 59
+T-17	TIME	08:15:99		TIME¦08:15:99		negative	§4.2 second over 59
+T-18	TIME	08:15:30,5		TIME¦08:15:30,5		negative	§4.2 fractional seconds abstain the token (A-2)
+T-19	TIME	11:30 - 1:30 pm	TIME¦11:30¦11:30 ‖ TIME¦11:30¦23:30 ‖ TIME¦1:30 pm¦13:30			range,clarify	§4.2 each time is read from its own text (Z-05)
+T-20	TIME	09:30 TO 11:30	TIME¦09:30¦09:30 ‖ TIME¦09:30¦21:30 ‖ TIME¦11:30¦11:30 ‖ TIME¦11:30¦23:30			range,allowlist,clarify	§4.2 and §4.3: TO is allowlisted, both times are read
+T-21	TIME	9am-5pm	TIME¦9am¦09:00 ‖ TIME¦5pm¦17:00			range,positive	§4.2 a dash joins two markers
+T-22	TIME	Doors 6:00 pm - 11:00 pm	TIME¦6:00 pm¦18:00 ‖ TIME¦11:00 pm¦23:00			range,positive	§4.2 each time from its own text
+T-23	TIME	14:45 - 16:45 CET		TIME¦14:45 - 16:45 CET		range,zone,negative	§4.2 ZZ-03: a zone after T2 abstains the whole range
+T-24	TIME	10:15 - 25:15		TIME¦10:15 - 25:15		range,negative	§4.2 A-11: any abstention of T1 or T2 abstains the range
+T-25	TIME	08:45 CEST		TIME¦08:45 CEST		zone,negative	§4.3 2 to 5 uppercase letters are a zone
+T-26	TIME	09:00 Uhr	TIME¦09:00¦09:00			positive,mixedcase	§4.3 a mixed-case word is not a zone
+T-27	TIME	10:00 and 11:00 UTC	TIME¦10:00¦10:00 ‖ TIME¦10:00¦22:00		TIME¦11:00 UTC	residual,zone	§4.2 and §4.3: only the second time abstains (zone after 11:00)
+T-31	TIME	09:20 (local)		TIME¦09:20 (local)		zone,negative	§4.3 a parenthesised group starting with a letter
+T-32	TIME	10:30 −05:00		TIME¦10:30 −05:00		zone,lookalike,negative	§4.3 an offset with U+2212 abstains
+DT-01	DATETIME	2026-09-16 14:30	DATETIME¦2026-09-16 14:30¦2026-09-16 14:30			positive,iso	§4.3 both parts unambiguous
+DT-02	DATETIME	16 September 2026 at 14:30	DATETIME¦16 September 2026 at 14:30¦2026-09-16 14:30			positive,english	§4.3 joined by at
+DT-03	DATETIME	2026-09-16T14:30	DATETIME¦2026-09-16T14:30¦2026-09-16 14:30			positive,iso	§4.3 joined by T
+DT-04	DATETIME	14:30, 16 Sept 2026	DATETIME¦14:30, 16 Sept 2026¦2026-09-16 14:30			positive,english	§4.3 time first, in either order
+DT-05	DATETIME	05/06/2026 14:15	DATE¦05/06/2026¦2026-05-06 ‖ DATE¦05/06/2026¦2026-06-05 ‖ TIME¦14:15¦14:15		2026-06-05	dm,split	§4.3 ambiguous part emitted separately, no cross-product
+DT-06	DATETIME	2026-09-16 2:30 PM	DATETIME¦2026-09-16 2:30 PM¦2026-09-16 14:30			positive,iso,ampm	§4.3 12-hour time
+DT-07	DATETIME	2026-09-17 08:45 UTC	DATE¦2026-09-17¦2026-09-17	TIME¦08:45 UTC		zone,negative	§4.3 the time abstains, the separate date is still emitted
+DT-08	DATETIME	2026-11-02 at 09:00 (local)	DATE¦2026-11-02¦2026-11-02	TIME¦09:00 (local)		zone,negative	§4.3 the time abstains, the separate date is still emitted
+DT-09	DATETIME	Fri 3 Apr 2026 09:30	DATETIME¦Fri 3 Apr 2026 09:30¦2026-04-03 09:30			positive,weekday	§4.3 weekday matches, both parts unambiguous
+M-01	MONEY	€7.80	MONEY¦€7.80¦7.80 EUR			positive,single_symbol	§5.3 single-code symbol
+M-02	MONEY	8,40 €	MONEY¦8,40 €¦8.40 EUR			positive,single_symbol	§5.2 comma decimal
+M-03	MONEY	€ 42	MONEY¦€ 42¦42 EUR			positive,single_symbol	§5.1 one space allowed
+M-04	MONEY	EUR 19.99	MONEY¦EUR 19.99¦19.99 EUR			positive,code	§5.1 ISO code before digits
+M-05	MONEY	19.99EUR	MONEY¦19.99EUR¦19.99 EUR			positive,code	§5.1 code without space
+M-06	MONEY	USD250	MONEY¦USD250¦250 USD			positive,code	§5.1 code without space
+M-07	MONEY	₪90	MONEY¦₪90¦90 ILS			positive,single_symbol	§5.3 single-code symbol
+M-08	MONEY	R$25	MONEY¦R$25¦25 BRL			positive,single_symbol	§5.3 single-code symbol with two characters
+M-09	MONEY	£45.00	MONEY¦£45.00¦45.00 £			bare,positive	§5.1 bare multi-code symbol: currency null
+M-10	MONEY	$12.50	MONEY¦$12.50¦12.50 $			bare,positive	§5.1 bare multi-code symbol: currency null
+M-11	MONEY	¥500	MONEY¦¥500¦500 ¥			bare,positive	§5.1 bare multi-code symbol: currency null
+M-12	MONEY	₩15000	MONEY¦₩15000¦15000 ₩			bare,positive	§5.1 bare multi-code symbol: currency null
+M-13	MONEY	kr250	MONEY¦kr250¦250 kr			bare,positive	§5.3 kr is a multi-code symbol: currency null
+M-14	MONEY	$15 USD	MONEY¦$15 USD¦15 USD			positive,code	§5.1 the code takes the symbol's digits
+M-15	MONEY	£ 20 EUR		MONEY¦£ 20 EUR		negative,hostile	§5.1 EUR is not among the symbol's codes: abstained
+M-16	MONEY	SSP £84.10	MONEY¦£84.10¦84.10 £ ‖ MONEY¦£84.10¦84.10 SSP			context,clarify	§5.4 SSP is a context code (§5.5 deliberately not listed)
+M-17	MONEY	Prices in AUD $9.50	MONEY¦$9.50¦9.50 $ ‖ MONEY¦$9.50¦9.50 AUD		9.50 AUD	context,clarify	§5.4 a context code beside the symbol
+M-18	MONEY	Prices in CAD $9.50	MONEY¦$9.50¦9.50 $			context,englishword	§5.5 CAD is never context
+M-19	MONEY	TEA CUP $4.20	MONEY¦$4.20¦4.20 $			context,englishword	§5.5 CUP is never context
+M-20	MONEY	Total $45.00 USD 33.10	MONEY¦$45.00¦45.00 $ ‖ MONEY¦USD 33.10¦33.10 USD			context,hostile	§5.4 Z-10: another amount's marker is not context
+M-21	MONEY	TRY 12.90	MONEY¦TRY 12.90¦12.90 TRY			positive,englishword	§5.1 an English-word code with fraction digits is money
+M-22	MONEY	MAD 4				negative,englishword	§5.1 an English-word code alone needs fraction digits (Q-13)
+M-23	MONEY	€9876543210987654		MONEY¦€9876543210987654		negative,limit	§5.2 limit: more than 15 integer digits
+M-24	MONEY	€100000000000000	MONEY¦€100000000000000¦100000000000000 EUR			positive,limit	§5.2 15 integer digits are within the limit
+M-25	MONEY	1,234 €	MONEY¦1,234 €¦1.234 EUR ‖ MONEY¦1,234 €¦1234 EUR		1234 EUR	grouping,clarify	§5.2 one separator before exactly 3 digits
+M-26	MONEY	2.500,75 €	MONEY¦2.500,75 €¦2500.75 EUR			grouping,positive	§5.2 both separators present
+M-27	MONEY	1,234.56 $	MONEY¦1,234.56 $¦1234.56 $			grouping,bare	§5.2 both separators present, currency null
+M-28	MONEY	2'050.00 CHF	MONEY¦2'050.00 CHF¦2050.00 CHF			grouping,positive	§5.2 apostrophe is grouping only
+M-29	MONEY	2 500 €	MONEY¦2 500 €¦500 EUR ‖ MONEY¦2 500 €¦2500 EUR		2500 EUR	grouping,clarify	§5.2 space grouping: the adjacent group and the grouped reading
+M-30	MONEY	€8 000	MONEY¦€8 000¦8 EUR ‖ MONEY¦€8 000¦8000 EUR		8000 EUR	grouping,clarify	§5.2 space grouping with the marker before
+M-31	MONEY	3 000 000 €	MONEY¦3 000 000 €¦3 EUR ‖ MONEY¦3 000 000 €¦3000000 EUR			grouping,clarify	§5.2 EE-06: a zero-led adjacent group takes the first group's reading
+M-32	MONEY	0 500 €		MONEY¦0 500 €		negative,grouping	§5.2 a zero-led first group is abstained
+M-33	MONEY	12 345.67 €		MONEY¦12 345.67 €		negative,grouping	§5.2 a fraction after space groups is abstained (EE-02)
+M-34	MONEY	€9 876,54		MONEY¦€9 876,54		negative,grouping	§5.2 a fraction after space groups is abstained (EE-02)
+M-35	MONEY	1234,567 €		MONEY¦1234,567 €		negative,grouping	§5.2 A-10: the grouping reading cannot exist
+M-36	MONEY	0.750 €		MONEY¦0.750 €		negative,grouping	§5.2 A-10: a zero-led first group
+M-37	MONEY	-€5	MONEY¦-€5¦-5 EUR			sign,positive	§5.1 a lone minus touching the marker
+M-38	MONEY	€-12	MONEY¦€-12¦-12 EUR			sign,positive	§5.1 a lone minus after the marker
+M-39	MONEY	-7,50 €	MONEY¦-7,50 €¦-7.50 EUR			sign,positive	§5.1 a lone minus with comma decimal
+M-40	MONEY	€40,-		MONEY¦€40,-		negative,credit	§5.1 25,- form is abstained
+M-41	MONEY	€6.00 Cr		MONEY¦€6.00 Cr		negative,credit	§5.1 CR directly after the amount is abstained
+M-42	MONEY	–€9.50		MONEY¦–€9.50		negative,lookalike	§5.1 a dash look-alike in a sign position is abstained
+M-43	MONEY	€31.00 −		MONEY¦€31.00 −		negative,lookalike	§5.1 a trailing dash-like character is abstained
+M-44	MONEY	10–20 €		MONEY¦10–20 €		negative,range,lookalike	§5.1 an amount range is abstained
+M-45	MONEY	10 to 20 EUR		MONEY¦10 to 20 EUR		negative,range	§5.1 an amount range is abstained
+M-46	MONEY	€10 and €20		MONEY¦€10 and €20		negative,range	§5.1 and joins amounts with the same marker: a range
+M-47	MONEY	$5 and £10	MONEY¦$5¦5 $ ‖ MONEY¦£10¦10 £			hostile,positive	§5.1 and is not a range across different markers
+M-48	MONEY	€10 and 20	MONEY¦€10¦10 EUR			hostile,positive	§5.1 a bare number is not an amount
+M-49	MONEY	USD/EUR 0.92		MONEY¦USD/EUR 0.92		negative,pair	§5.1 a currency pair beside an amount is abstained
+M-50	MONEY	0.93 EUR/CHF		MONEY¦0.93 EUR/CHF		negative,pair	§5.1 a currency pair beside an amount is abstained
+U-01	URL	https://example.org	URL¦https://example.org¦https://example.org			positive	§6.1 start, host and end
+U-02	URL	HTTPS://Example.ORG/Path	URL¦HTTPS://Example.ORG/Path¦https://example.org/Path			positive,normalise	§6.1 scheme and host lowercased only
+U-03	URL	www.example.org/news	URL¦www.example.org/news¦www.example.org/news			positive	§6.1 www. start, nothing added
+U-04	URL	https://example.org/a?b=1&c=2#top	URL¦https://example.org/a?b=1&c=2#top¦https://example.org/a?b=1&c=2#top			positive	§6.1 reserved characters kept
+U-05	URL	(see https://example.org/x).	URL¦https://example.org/x¦https://example.org/x			positive,punctuation	§6.1 unmatched ) and trailing . are trimmed
+U-06	URL	https://example.org/end.	URL¦https://example.org/end¦https://example.org/end			positive,punctuation	§6.1 trailing . trimmed
+U-07	URL	https://example.org:8080/x	URL¦https://example.org:8080/x¦https://example.org:8080/x			positive,port	§6.1 optional port
+U-08	URL	http://EXAMPLE.org:80	URL¦http://EXAMPLE.org:80¦http://example.org:80			positive,normalise	§6.1 host lowercased, port kept
+U-09	URL	https://example.org/%7Euser	URL¦https://example.org/%7Euser¦https://example.org/%7Euser			positive	§6.1 percent sign allowed
+U-10	URL	https://bank.example@evil.example				negative,hostile	§6.1 userinfo: no URL and no EMAIL (Z-17)
+U-11	URL	javascript:alert(1)				negative	§6.1 other scheme is abstained
+U-12	URL	ftp://example.org/file				negative	§6.1 other scheme is abstained
+U-13	URL	https://bücher.example				negative,hostile	§6.1 non-ASCII host is abstained
+U-14	URL	https://xn--bcher-kva.example				negative,hostile	§6.1 xn-- host is abstained
+U-15	URL	https://example.org/2026-09-16	URL¦https://example.org/2026-09-16¦https://example.org/2026-09-16			positive,precedence	§1 URL outranks DATE
+E-01	EMAIL	ann@example.org	EMAIL¦ann@example.org¦ann@example.org			positive	§6.2 dot-atom local part
+E-02	EMAIL	Ann@Example.ORG	EMAIL¦Ann@Example.ORG¦Ann@example.org			positive,normalise	§6.2 domain lowercased, local part unchanged
+E-03	EMAIL	mailto:bob@example.net	EMAIL¦mailto:bob@example.net¦bob@example.net			positive,mailto	§6.2 mailto: consumed
+E-04	EMAIL	first.last+tag@sub.example.co.uk	EMAIL¦first.last+tag@sub.example.co.uk¦first.last+tag@sub.example.co.uk			positive	§6.2 plus and subdomains
+E-05	EMAIL	ann..bee@example.org				negative,hostile	§6.2 doubled dot in the local part
+E-06	EMAIL	"ann bee"@example.org				negative,hostile	§6.2 quoted local part is abstained
+E-07	EMAIL	ann@example				negative	§6.2 at least two labels
+E-08	EMAIL	ann@example.c				negative	§6.2 final label of 2 or more letters
+E-09	EMAIL	ann@-example.org				negative,hostile	§6.2 a label never starts with -
+E-10	EMAIL	ann@xn--bcher-kva.example				negative,hostile	§6.2 an xn-- label is never allowed
+E-11	EMAIL	user@example.com_evil				negative,hostile	A-10: a domain followed by _ is attached
+E-12	EMAIL	ann@example.org.	EMAIL¦ann@example.org¦ann@example.org			positive,punctuation	§6.2 sentence dot is not part of the domain
+E-13	EMAIL	Contact: ann@example.org, bob@example.net	EMAIL¦ann@example.org¦ann@example.org ‖ EMAIL¦bob@example.net¦bob@example.net			positive	§6.2 two addresses
+E-14	EMAIL	a%b@example.org	EMAIL¦a%b@example.org¦a%b@example.org			positive	§6.2 percent sign in the local part
+E-15	EMAIL	https://ann@example.org				negative,hostile	§6.1 userinfo: no EMAIL either (Z-17)
+P-01	PHONE	Tel: 01632 960123	PHONE¦01632 960123¦01632960123			positive,label	§7 Tel label; raw excludes the label
+P-02	PHONE	+44 (0)20 7946 0018	PHONE¦+44 (0)20 7946 0018¦+442079460018			positive,plus	§7 (0) dropped after +
+P-03	PHONE	+1 555 123 4567	PHONE¦+1 555 123 4567¦+15551234567			positive,plus	§7 plus prefix, spaces dropped
+P-04	PHONE	tel:+49-30-1234567	PHONE¦+49-30-1234567¦+49301234567			positive,tel	§7 tel: prefix; the run starts at +
+P-05	PHONE	Phone 020 7946 0018	PHONE¦020 7946 0018¦02079460018			positive,label	§7 Phone label
+P-06	PHONE	Mobile: 07700 900123	PHONE¦07700 900123¦07700900123			positive,label	§7 Mobile label
+P-07	PHONE	Call 0800 123 456	PHONE¦0800 123 456¦0800123456			positive,label	§7 Call label
+P-08	PHONE	Fax: +49 30 123456	PHONE¦+49 30 123456¦+4930123456			positive,label,plus	§7 Fax label with plus
+P-09	PHONE	Cell 07123-456789	PHONE¦07123-456789¦07123456789			positive,label	§7 Cell label, hyphen separator
+P-10	PHONE	12.00 € +1 555 123 4567	MONEY¦12.00 €¦12.00 EUR ‖ PHONE¦+1 555 123 4567¦+15551234567			positive,phone_vs_money	§7 A-9 example: the marker has a digit on its far side, the phone is kept
+P-11	PHONE	192.168.1.10				negative	§7 dotted quad is abstained
+P-12	PHONE	4111 1111 1111 1111				negative	§7 card-like grouping is abstained
+P-13	PHONE	01632 960123				negative	§7 pure digit run with no prefix
+P-14	PHONE	+12.345.678				negative,hostile	§7 A-9: a +-led run containing . is abstained
+P-15	PHONE	+1 555 123 4567 USD				negative,phone_vs_money	§7 A-9: a phone beside a currency marker gives nothing
+N-01	NONE	Invoice INV-2026-0047				negative	no date, money or phone shape
+N-02	NONE	Order 123456				negative	bare digits, no marker or prefix
+N-03	NONE	Score 3-1				negative	a score, no year and no date shape
+N-04	NONE	ISBN 978-3-16-148410-0				negative	identifier, no marker or prefix
+N-05	NONE	Room 101				negative	bare digits
+N-06	NONE	Depth 1200-1500				negative,label	§7 a label is not a whole token
+N-07	NONE	Halifax 1234-5678				negative,label	§7 Fax inside a word
+N-08	NONE	Hotel 0221 123456				negative,label	§7 Tel inside a word
+N-09	NONE	+1234567 EUR				negative,phone_vs_money	§7 A-9: seven digits beside a currency marker
+N-10	NONE	€ +1234567				negative,phone_vs_money	§7 A-9: seven digits beside a currency marker
+N-11	NONE	Tel: +44 20 7946 0018 USD				negative,residual	§7 stated residual: a +-led phone beside a currency marker gives nothing
+N-12	NONE	Ref 123-2026-09-16				negative,hostile	A-5: nothing is emitted
+N-13	NONE	v2.10.3				negative,hostile	§1 a letter before the token blocks a date
+N-14	NONE	Rs 500				negative	§5.3 Rs is not a marker
+N-15	NONE	Fr 25				negative	§5.3 Fr is not a marker
+N-16	NONE	C$5				negative	§5.3 C$ is excluded
+N-17	NONE	¢25				negative	§5.3 the cent sign is not a marker
+N-18	NONE	12.50				negative	§5.1 a bare number is never money
+N-19	NONE	£				negative	a symbol with no amount
+N-20	NONE	L 25				negative	§5.3 L is not a marker
+N-21	NONE	(€5.00)				negative	§5.1 parentheses are abstained
+N-22	NONE	EUR -33.10				negative	§5.1 a spaced sign is abstained
+N-23	NONE	Coffee – €3.50				negative,residual	§5.1 stated residual: a dash within 4 spaces abstains the amount
+N-24	NONE	٠٣/٠٤/٢٠٢٦				negative,hostile	§1 digits must be ASCII
