@@ -340,6 +340,9 @@
     <string name="facts_title">Facts</string>
     <string name="facts_origin_extracted">Found in the text</string>
     <string name="facts_origin_user">You added this</string>
+    <string name="facts_origin_from_correction">Extracted, from your correction</string>
+    <string name="facts_origin_unknown">Unknown origin</string>
+    <string name="facts_status_unknown">Unknown status</string>
     <string name="facts_status_confirmed">Confirmed</string>
     <string name="facts_status_unreviewed">Not reviewed</string>
     <string name="facts_status_clarification">Needs clarification</string>

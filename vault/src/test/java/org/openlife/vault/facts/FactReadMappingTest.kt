@@ -7,7 +7,7 @@ import org.openlife.vault.storage.FactEvidenceEntity
 
 /** P3-05-R1: the domain types the facts UI reads, mapped from the DAO's raw columns. No SQL strings leave the vault. */
 class FactReadMappingTest {
-    private fun evidence(role: String, textStart: Int?) = FactEvidenceEntity(
+    private fun evidence(role: String, textStart: Int?, userRevision: String? = null) = FactEvidenceEntity(
         id = "e1",
         revisionId = "x",
         ordinal = 0,
@@ -15,7 +15,7 @@ class FactReadMappingTest {
         sourceId = "a",
         ocrRevisionId = "a-r",
         ocrSpanId = "a-s1",
-        ocrUserRevisionId = null,
+        ocrUserRevisionId = userRevision,
         textStart = textStart,
         textEnd = textStart?.plus(10),
         regionLeft = null,
@@ -32,6 +32,13 @@ class FactReadMappingTest {
         assertEquals("a-r", mapped.ocrRevisionId)
         assertEquals("a-s1", mapped.ocrSpanId)
         assertEquals(4 to 14, mapped.textStart to mapped.textEnd)
+    }
+
+    /** P3-05 review U-04: the correction a value was read through reaches the domain evidence. */
+    @Test
+    fun evidenceKeepsTheCorrectionItWasReadFrom() {
+        assertEquals("u1", evidence("VALUE", 4, userRevision = "u1").toFactEvidence().ocrUserRevisionId)
+        assertNull(evidence("VALUE", 4).toFactEvidence().ocrUserRevisionId)
     }
 
     @Test

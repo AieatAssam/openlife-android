@@ -5,10 +5,15 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openlife.app.R
+import org.openlife.vault.facts.EvidenceRole
+import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
+import org.openlife.vault.facts.FactOrigin
+import org.openlife.vault.facts.FactStatus
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.StaleReason
 import java.util.Locale
+import java.util.UUID
 
 /** P3-05-R6: dates, times and amounts read in the reader's locale; the stored canonical value is never changed. */
 class FactDisplayTest {
@@ -61,4 +66,25 @@ class FactDisplayTest {
         assertEquals(R.string.facts_stale_rejected_reading, FactDisplay.staleSentence(StaleReason.READING_REJECTED))
         assertEquals(R.string.facts_stale_rejected_line, FactDisplay.staleSentence(StaleReason.SPAN_REJECTED))
     }
+
+    /** P3-05 review U-04: a value read through a user's correction of the reading says so. */
+    @Test
+    fun aValueReadThroughACorrectionIsExtractedFromIt() {
+        val corrected = item(listOf(FactEvidence(EvidenceRole.VALUE, "r", "s", 0, 1, ocrUserRevisionId = "u")))
+        val plain = item(listOf(FactEvidence(EvidenceRole.VALUE, "r", "s", 0, 1)))
+        assertEquals(true, corrected.extractedFromCorrection)
+        assertEquals(false, plain.extractedFromCorrection)
+    }
+
+    private fun item(evidence: List<FactEvidence>) = FactItem(
+        factId = UUID.randomUUID(),
+        revisionId = UUID.randomUUID(),
+        kind = FactKind.DATE,
+        origin = FactOrigin.EXTRACTED,
+        status = FactStatus.UNREVIEWED,
+        staleReason = null,
+        value = FactValue("{}", "2026-04-03"),
+        candidateTexts = emptyList(),
+        evidence = evidence,
+    )
 }

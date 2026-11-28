@@ -9,6 +9,8 @@ data class FactEvidence(
     val ocrSpanId: String,
     val textStart: Int?,
     val textEnd: Int?,
+    /** P3-05 review U-04: the user's correction of the reading this value was read from; null when it was not corrected. */
+    val ocrUserRevisionId: String? = null,
 )
 
 /** What the facts panel can say about the current reading's extraction (C2-R39). */
@@ -30,6 +32,7 @@ fun FactEvidenceEntity.toFactEvidence(): FactEvidence = FactEvidence(
     ocrSpanId = ocrSpanId,
     textStart = textStart,
     textEnd = textEnd,
+    ocrUserRevisionId = ocrUserRevisionId,
 )
 
 /** Maps the stored outcome of the current reading's newest run; null means no run exists. */

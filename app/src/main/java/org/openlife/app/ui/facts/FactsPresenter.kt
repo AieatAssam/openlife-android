@@ -82,6 +82,9 @@ class FactItem(
     val candidates: FactValue? = null,
 ) {
     val needsClarification: Boolean get() = status == FactStatus.CLARIFICATION_NEEDED
+
+    /** P3-05 review U-04: the value was read from a reading the user corrected (its evidence names the correction). */
+    val extractedFromCorrection: Boolean get() = evidence.any { it.ocrUserRevisionId != null }
     val isStale: Boolean get() = status == FactStatus.STALE
 
     /** C2-R37: a non-stale fact of a kind the add-fact form takes can be corrected (DATETIME has no form yet). */

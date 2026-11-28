@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
@@ -115,11 +116,11 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Decorative: the origin label beside it names the origin.
             Icon(
-                imageVector = originIcon(item.origin),
+                imageVector = originIcon(item),
                 contentDescription = null,
                 modifier = Modifier.padding(end = 4.dp),
             )
-            Text(text = stringResource(originLabel(item.origin)), style = MaterialTheme.typography.bodyMedium)
+            Text(text = stringResource(originLabel(item)), style = MaterialTheme.typography.bodyMedium)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Decorative: the status label beside it names the status.
@@ -223,14 +224,22 @@ internal fun kindLabel(kind: FactKind): Int = when (kind) {
     FactKind.UNRECOGNISED -> R.string.facts_kind_unrecognised
 }
 
-private fun originLabel(origin: FactOrigin): Int = when (origin) {
+/** P3-05 review U-04: an extracted value read through the user's correction says so; an unrecognised origin is not guessed. */
+private fun originLabel(item: FactItem): Int = when (item.origin) {
     FactOrigin.USER -> R.string.facts_origin_user
-    else -> R.string.facts_origin_extracted
+    FactOrigin.EXTRACTED -> if (item.extractedFromCorrection) {
+        R.string.facts_origin_from_correction
+    } else {
+        R.string.facts_origin_extracted
+    }
+
+    FactOrigin.UNRECOGNISED -> R.string.facts_origin_unknown
 }
 
-private fun originIcon(origin: FactOrigin) = when (origin) {
+private fun originIcon(item: FactItem) = when (item.origin) {
     FactOrigin.USER -> Icons.Filled.Person
-    else -> Icons.Filled.Info
+    FactOrigin.EXTRACTED -> if (item.extractedFromCorrection) Icons.Filled.Edit else Icons.Filled.Info
+    FactOrigin.UNRECOGNISED -> Icons.Filled.Warning
 }
 
 private fun statusLabel(status: FactStatus): Int = when (status) {
@@ -238,12 +247,13 @@ private fun statusLabel(status: FactStatus): Int = when (status) {
     FactStatus.REJECTED -> R.string.facts_status_rejected
     FactStatus.CLARIFICATION_NEEDED -> R.string.facts_status_clarification
     FactStatus.STALE -> R.string.facts_status_stale
+    FactStatus.UNRECOGNISED -> R.string.facts_status_unknown
     else -> R.string.facts_status_unreviewed
 }
 
 private fun statusIcon(status: FactStatus) = when (status) {
     FactStatus.CONFIRMED -> Icons.Filled.Check
     FactStatus.REJECTED -> Icons.Filled.Close
-    FactStatus.CLARIFICATION_NEEDED, FactStatus.STALE -> Icons.Filled.Warning
+    FactStatus.CLARIFICATION_NEEDED, FactStatus.STALE, FactStatus.UNRECOGNISED -> Icons.Filled.Warning
     else -> Icons.Filled.Info
 }
