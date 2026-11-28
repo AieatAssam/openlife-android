@@ -335,6 +335,9 @@ open class HostFactDao(private val host: HostSqlite) : FactDao {
     override suspend fun extractionOutcomeOfCurrentReading(sourceId: String): String? =
         q(FactSql.EXTRACTION_OUTCOME_OF_CURRENT_READING, "sourceId" to sourceId).singleOrNull()?.single() as String?
 
+    override suspend fun currentReadingId(sourceId: String): String? =
+        q(FactSql.CURRENT_READING_OF_SOURCE, "sourceId" to sourceId).singleOrNull()?.single() as String?
+
     override suspend fun sourceState(sourceId: String): String? =
         q(FactSql.SOURCE_STATE, "sourceId" to sourceId).singleOrNull()?.single() as String?
 

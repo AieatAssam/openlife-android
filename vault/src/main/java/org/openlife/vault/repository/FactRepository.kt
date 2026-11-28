@@ -58,6 +58,11 @@ class FactRepository(
     }
 
     /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
+    /** P3-05-R1: the reading [sourceId] currently shows, or null when it has none. */
+    suspend fun currentReadingId(sourceId: UUID): UUID? = withContext(ioDispatcher) {
+        database.factDao().currentReadingId(sourceId.toString())?.let(UUID::fromString)
+    }
+
     suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = withContext(ioDispatcher) {
         database.factDao().extractionOutcomeOfCurrentReading(sourceId.toString()).toExtractionCheck()
     }

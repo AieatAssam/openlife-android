@@ -54,6 +54,12 @@ class FactReadHostTest {
     }
 
     @Test
+    fun currentReadingIsTheReadingTheSourcePoints() = runBlocking {
+        extracted()
+        assertEquals("a-r", dao.currentReadingId("a"))
+    }
+
+    @Test
     fun extractionOutcomeIsOnlyReportedForTheCurrentReading() = runBlocking {
         val fixture = extracted()
         assertNull(dao.extractionOutcomeOfCurrentReading("a"))

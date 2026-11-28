@@ -86,6 +86,9 @@ object FactSql {
 
     const val SOURCE_STATE = "SELECT state FROM sources WHERE id = :sourceId"
 
+    /** P3-05-R1: the reading the source currently shows; evidence on any other reading is not navigable. */
+    const val CURRENT_READING_OF_SOURCE = "SELECT currentOcrRevisionId FROM sources WHERE id = :sourceId"
+
     const val COUNT_CURRENT_REVISIONS =
         "SELECT COUNT(*) FROM facts WHERE sourceId = :sourceId AND currentRevisionId IS NOT NULL"
 
@@ -324,6 +327,9 @@ interface FactDao {
 
     @Query(FactSql.SOURCE_STATE)
     suspend fun sourceState(sourceId: String): String?
+
+    @Query(FactSql.CURRENT_READING_OF_SOURCE)
+    suspend fun currentReadingId(sourceId: String): String?
 
     @Query(FactSql.COUNT_CURRENT_REVISIONS)
     suspend fun countCurrentRevisions(sourceId: String): Int
