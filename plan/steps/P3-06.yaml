@@ -71,7 +71,8 @@ notes: >
   Known deviations and findings (follow-ups, not fixed here):
   D-1 (M-20): two silent MONEY misses in the text part (ADR-0008 5.4 lines 521
   and 549); also an extension in the single-line form. Kept, reported.
-  D-2 (T-14): bare 1430 abstention not recorded (ADR-0008 line 314). Kept, reported.
+  D-2 (T-14): bare 1430 abstention not recorded (ADR-0008 line 314). Resolved
+  in the follow-up (see below).
   F1 OCR space drops: Tesseract img-16 "9:15 am" read "9:15am" (TIME, canonical
   09:15 correct, scored UNEXPECTED); Tesseract img-20 "+1 555 123 4567" read
   "+1555 123 4567" (PHONE, canonical correct, scored UNEXPECTED); ML Kit img-14
@@ -109,3 +110,44 @@ notes: >
   Dependency P3-04 was at review when this step started. Adversarial review is
   not required by this step (not in the owner's list of specification steps)
   and was not run.
+
+  P3-06 follow-up (2026-11-28, branch ci/host-sqlite-fts; status stays review):
+  - F3 (img-30): a lone `-` after a letter is a separator, so `Coffee-€3.50`
+    abstains (SIGN_OR_CREDIT). Proposed ADR-0008 amendment A-14, not yet decided
+    (ADR section 5.1). Rows: vault money.tsv "P3-06 follow-up F3"; test
+    MoneyExtractorTest tableDriven.
+  - F1 (image scorer): FactValueScorer (eval/src/core, JVM test
+    FactValueScorerTest, 10 tests) pairs on kind and canonical value. Raw-text
+    differences are the informational count raw_text_differs. Text part
+    (FactsEval) is unchanged.
+  - D-2 (T-14): a standalone valid HHMM is abstained (TIME, AMBIGUOUS_FORM),
+    ADR-0008 4.2 "Abstained". RED: times.tsv row `1430 ‖ !TIME¦1430`, recorded
+    failure "missing abstentions [!TIME¦1430]". The one changed existing
+    expectation is the moved `1430 ‖ -` row. Scope is narrow on purpose: a
+    generic four-digit rule broke PHONE and MONEY rows (0221 123456,
+    ₩1000, €1234,567). The ADR does not settle precedence against PHONE or
+    MONEY, so the rule is limited to a standalone token. Unresolved: years
+    such as `2026` standing alone are not claimed (20:26 is not in the rule
+    list). Owner decision needed if ADR-level precedence is wanted.
+  - D-1 (M-20, `Total $45.00 USD 33.10`): documented only, no extraction change.
+    ADR-0008 5.4 gives the two-line form at line 549 and the single-line
+    example at line 521. The single-line form is an extension (see the text
+    eval). Recorded, not changed.
+  - F2 (img-21, `Doors 6:00 pm -11:00 pm`): documented only, no extraction
+    change. ADR-0008 4.2 range rules (lines 294-304, A-11) cover a range
+    joiner with spaces. The ADR does not say whether a zero-space joiner after
+    a marker (`pm -11:00`) is a range. Decision needed: a range value, an
+    abstention record, or nothing. Recorded, not changed.
+  - Image metrics after the fixes: docs/verification/facts-eval.md section
+    "Image part after the follow-up fixes (2026-11-28)". Tesseract gate PASS
+    (was FAIL); ML Kit gate still FAIL (DATE precision 26/27, URL 3/4).
+  - Gate (one foreground run, 2026-11-28): `./gradlew detekt lint :app:test
+    :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
+    :app:compileDebugAndroidTestKotlin :eval:test` BUILD SUCCESSFUL in 14m 50s.
+    A first attempt stopped with "Gradle build daemon disappeared unexpectedly"
+    (no code failure); the rerun passed. `scripts/plan-check.sh` steps=83 errors=0.
+    `bash scripts/tests/run.sh` 51 passed, 0 failed.
+  - Tablet (2026-11-28): FactsImageEval with p306FactsImage passed (1 test,
+    26.9 s). Reports saved as facts-image-*-after-followup-2026-11-28.txt.
+  - Device-verification gap: none new. The tablet run used the stay-on setting
+    only while it ran and restored it to 0.

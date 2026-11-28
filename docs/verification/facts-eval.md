@@ -196,3 +196,40 @@ Fixture corrections made during GREEN, each checked against ADR-0008 (commit
 
 `./gradlew :vault:test` (foreground). Then read `vault/build/facts-eval/summary.tsv`
 and `vault/build/facts-eval/rows.tsv`.
+
+## Image part after the follow-up fixes (2026-11-28)
+
+Run: `./gradlew :vault:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.openlife.vault.facts.eval.FactsImageEval -Pandroid.testInstrumentationRunnerArguments.p306FactsImage=true`
+on the tablet (adb serial `U8BBB20806201256`, HUAWEI AGS2-W09, Android 8.0.0, sdk 26). Test passed:
+1 test, 0 failures, 0 errors, 0 skipped, 26.9 s, both engines. The earlier section above is kept unchanged.
+
+Changes in this run (P3-06 follow-up commits on `ci/host-sqlite-fts`):
+- F1: the image scorer (`eval/src/core` FactValueScorer) pairs on kind and canonical value. Raw-text
+  differences are an informational count (`raw_text_differs`), not a wrong value.
+- F3 (proposed ADR-0008 A-14): a lone `-` after a letter (`Coffee-€3.50`) is a separator; the amount abstains.
+- D-2: a standalone valid HHMM (`1430`) is abstained with TIME, not dropped (ADR-0008 4.2). The narrow rule
+  is deliberate: a generic four-digit rule broke PHONE and MONEY rows.
+
+Reports: `docs/verification/facts-image-results/facts-image-tesseract-eng-fast-after-followup-2026-11-28.txt`,
+`docs/verification/facts-image-results/facts-image-mlkit-latin-after-followup-2026-11-28.txt`.
+
+| Kind (family) | Tesseract precision (before -> after) | Tesseract recall (after) | ML Kit precision (before -> after) | ML Kit recall (before -> after) | R2 threshold |
+| --- | --- | --- | --- | --- | --- |
+| DATE (DATE, TIME, DATETIME) | 28/29 -> 29/29 = 1.0000 | 29/29 | 26/27 -> 26/27 = 0.9630 | 26/29 -> 26/29 = 0.8966 | precision >= 0.97: Tesseract PASS, ML Kit FAIL; recall >= 0.85: PASS both |
+| MONEY | 13/13 -> 13/13 = 1.0000 | 13/13 | 12/13 -> 12/12 = 1.0000 | 12/13 -> 12/13 = 0.9231 | precision >= 0.95: PASS both |
+| URL | 4/4 -> 4/4 = 1.0000 | 4/4 | 3/4 -> 3/4 = 0.7500 | 3/4 -> 3/4 = 0.7500 | precision >= 0.95: Tesseract PASS, ML Kit FAIL |
+| EMAIL | 5/5 | 5/5 | 5/5 | 5/5 | PASS both |
+| PHONE | 4/5 -> 5/5 = 1.0000 | 5/5 | 5/5 | 5/5 | precision >= 0.95: PASS both |
+| Ambiguous d/m flagged | 6/6 | | 6/6 | | PASS both |
+| Currency inferred from a bare symbol | 0 | | 0 | | PASS both |
+| Wrong definite values | 0 (was 2) | | 1 URL (was 2: URL 1, MONEY 1) | | reported, not gated |
+| **Gate** | **PASS (was FAIL)** | | **FAIL** | | |
+
+Notes:
+- Tesseract img-16 and img-20 now score EXACT (`raw_text_differs` 2). Tesseract's gate fail is cleared.
+- ML Kit img-30 (`Coffee – €3.50`) now abstains instead of emitting `-€3.50`, so the wrong MONEY is gone and
+  MONEY recall drops from 13 to 12 of 13 expected units (the abstained row, not a wrong value).
+- ML Kit still fails: DATE precision 26/27 (the unexpected clarification for img-19, `1:30 pm` read `1:30 pmn`),
+  and URL precision 3/4 (img-14, the truncated URL, still a wrong value). These are not tuned; they are recorded.
+- Unlisted abstentions: Tesseract 2, ML Kit 3. `raw_text_differs`: Tesseract 2, ML Kit 0.
+- Not changed: F2 (img-21 `Doors 6:00 pm -11:00 pm`, ML Kit) and D-1 (text part) remain open, as recorded above.
