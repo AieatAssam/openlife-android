@@ -1,7 +1,7 @@
 id: P3-06
 title: Facts evaluation set and metrics
 phase: P3
-status: review
+status: in_progress
 started: 2026-11-28
 depends_on: [P3-04]
 estimate: M
