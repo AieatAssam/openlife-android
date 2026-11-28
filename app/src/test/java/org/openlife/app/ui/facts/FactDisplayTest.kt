@@ -1,6 +1,5 @@
 package org.openlife.app.ui.facts
 
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -9,6 +8,7 @@ import org.openlife.app.R
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.StaleReason
+import java.util.Locale
 
 /** P3-05-R6: dates, times and amounts read in the reader's locale; the stored canonical value is never changed. */
 class FactDisplayTest {

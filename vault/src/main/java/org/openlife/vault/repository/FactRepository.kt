@@ -65,10 +65,11 @@ class FactRepository(
         database.factDao().currentReadingId(sourceId.toString())?.let(UUID::fromString)
     }
 
-    /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
     /** P3-05-R4 "Find facts again": one USER-triggered extraction of the current reading, under the C2-R30 protocol. */
     suspend fun findAgain(sourceId: UUID): FactExtractionResult =
         FactExtractionRepository(database, mutationQueue).extract(sourceId, ExtractionTrigger.USER)
+
+    /** What the facts panel can say about the extraction of [sourceId]'s current reading (C2-R39). */
 
     suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = withContext(ioDispatcher) {
         database.factDao().extractionOutcomeOfCurrentReading(sourceId.toString()).toExtractionCheck()

@@ -1,5 +1,8 @@
 package org.openlife.app.ui.facts
 
+import org.openlife.app.R
+import org.openlife.vault.facts.FactKind
+import org.openlife.vault.facts.StaleReason
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -8,24 +11,25 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Currency
 import java.util.Locale
-import org.openlife.app.R
-import org.openlife.vault.facts.FactKind
-import org.openlife.vault.facts.StaleReason
 
 /**
- * P3-05-R6: the text a fact value is shown with, formatted for the reader's locale. The stored canonical text is only an
- * input here and is never changed. A value that cannot be parsed, or a money amount with a printed symbol instead of a
- * code, is shown as stored.
+ * P3-05-R6: the text a fact value is shown with, formatted for the reader's locale. The stored canonical text is
+ * only an input here and is never changed. A value that cannot be parsed, or a money amount with a printed symbol
+ * instead of a code, is shown as stored.
  */
 internal object FactDisplay {
     fun value(kind: FactKind, canonicalText: String, locale: Locale): String = runCatching {
         when (kind) {
             FactKind.DATE -> LocalDate.parse(canonicalText).format(dateFormat(locale))
+
             FactKind.TIME -> LocalTime.parse(canonicalText).format(timeFormat(locale))
+
             FactKind.DATETIME -> LocalDate.parse(canonicalText.substringBefore(' '))
                 .atTime(LocalTime.parse(canonicalText.substringAfter(' ')))
                 .format(dateTimeFormat(locale))
+
             FactKind.MONEY -> money(canonicalText, locale)
+
             else -> canonicalText
         }
     }.getOrElse { canonicalText }

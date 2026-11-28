@@ -96,7 +96,11 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
         Text(
             text = FactDisplay.value(item.kind, item.value.canonicalText, locale),
             style = MaterialTheme.typography.bodyLarge,
-            color = if (item.isStale) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            color = if (item.isStale) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
         )
         if (item.isStale) {
             // P3-05-R4: a stale fact is greyed and says why, in words as well as in colour.
