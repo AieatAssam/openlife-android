@@ -50,6 +50,7 @@ import java.util.UUID
  * mutation queue, OCR runs outside the queue so deletion can proceed, and the
  * final commit is serialized and guarded by a RUNNING/READY recheck.
  */
+@Suppress("TooManyFunctions") // the OCR lifecycle: run, completion, review and the fact hooks (C2-R40)
 class OcrRepository(
     private val paths: VaultPaths,
     private val database: OpenLifeDatabase,

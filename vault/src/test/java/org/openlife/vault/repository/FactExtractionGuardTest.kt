@@ -38,14 +38,16 @@ class FactExtractionGuardTest {
     @After
     fun close() = host.close()
 
-    private fun core(gate: ExtractionGate = TransactionalHostGate(host), deadlineMillis: Long = FactLimits.DEADLINE_MILLIS) =
-        FactExtractionCore(
-            dao = dao,
-            gate = gate,
-            clock = { now++ },
-            newId = { "id-${ids++}" },
-            deadlineMillis = deadlineMillis,
-        )
+    private fun core(
+        gate: ExtractionGate = TransactionalHostGate(host),
+        deadlineMillis: Long = FactLimits.DEADLINE_MILLIS,
+    ) = FactExtractionCore(
+        dao = dao,
+        gate = gate,
+        clock = { now++ },
+        newId = { "id-${ids++}" },
+        deadlineMillis = deadlineMillis,
+    )
 
     /** Source `a` with a READY current reading `a-r` (`a-s1` "Due 26.11.2026", `a-s2` "Total EUR 12.50"). */
     private fun groundedReading() {
@@ -140,7 +142,11 @@ class FactExtractionGuardTest {
         fixture.span("a-r-s3", "a-r", 2, "Paid 26.11.2026")
         grounded("a-r")
         finished(extract(trigger = ExtractionTrigger.AUTO))
-        assertEquals("two DATE facts, one per span", listOf(listOf<Any?>(1L, "UNREVIEWED"), listOf<Any?>(2L, "UNREVIEWED")), currentDateRevisions())
+        assertEquals(
+            "two DATE facts, one per span",
+            listOf(listOf<Any?>(1L, "UNREVIEWED"), listOf<Any?>(2L, "UNREVIEWED")),
+            currentDateRevisions(),
+        )
         staleOldReading()
         newReading("a-r2", listOf("Due 26.11.2026", "Total EUR 12.50"))
 
@@ -267,8 +273,10 @@ class FactExtractionGuardTest {
         val facts = count("SELECT COUNT(*) FROM facts WHERE sourceId = 'a'")
         val reading = runBlocking { dao.readingOfSource("a") }
         val dueParts = "reading=${reading?.id} runsRows=${host.query("SELECT * FROM fact_extraction_runs")} " +
-            "revs=${host.query("SELECT id, origin FROM fact_revisions")} extracted=${runBlocking { dao.extractedCountOfSource("a") }}"
-        assertNotNull("still due: state=$state runs=$runs facts=$facts $dueParts", runBlocking { core().extractIfDue("a") })
+            "revs=${host.query("SELECT id, origin FROM fact_revisions")} " +
+            "extracted=${runBlocking { dao.extractedCountOfSource("a") }}"
+        val due = runBlocking { core().extractIfDue("a") }
+        assertNotNull("still due: state=$state runs=$runs facts=$facts $dueParts", due)
     }
 
     // T3 (C2-R57): a kind over 64 candidates is skipped and reported; the other kinds commit.
@@ -281,7 +289,10 @@ class FactExtractionGuardTest {
         assertEquals(setOf(ExtractedKind.DATE), result.skippedKinds)
         assertEquals(66, result.candidateCount)
         assertEquals(1, result.createdRevisionCount)
-        assertEquals(listOf<Any?>("DATE", 66L), host.query("SELECT skippedKinds, candidateCount FROM fact_extraction_runs").single())
+        assertEquals(
+            listOf<Any?>("DATE", 66L),
+            host.query("SELECT skippedKinds, candidateCount FROM fact_extraction_runs").single(),
+        )
         assertEquals(0L, count("SELECT COUNT(*) FROM facts WHERE sourceId = 'a' AND kind = 'DATE'"))
         assertEquals(1L, count("SELECT COUNT(*) FROM facts WHERE sourceId = 'a' AND kind = 'EMAIL'"))
     }

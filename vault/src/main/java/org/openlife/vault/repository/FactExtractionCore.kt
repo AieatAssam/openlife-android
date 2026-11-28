@@ -3,12 +3,12 @@ package org.openlife.vault.repository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import org.openlife.vault.facts.EvidenceOffsets
 import org.openlife.vault.facts.ExtractionOutcome
 import org.openlife.vault.facts.ExtractionTrigger
 import org.openlife.vault.facts.FactExtractionResult
 import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.FactOrigin
-import org.openlife.vault.facts.EvidenceOffsets
 import org.openlife.vault.facts.FactStatusRules
 import org.openlife.vault.facts.SpanEligibility
 import org.openlife.vault.facts.SpanEligibilityInput
@@ -41,6 +41,7 @@ internal interface ExtractionGate {
  * fingerprint re-check. A fingerprint mismatch gives [FactExtractionResult.Superseded] and writes nothing. Terminal
  * outcomes other than SUPERSEDED write one run row and no facts (C2 §7.6).
  */
+@Suppress("TooManyFunctions") // one method per protocol step (C2-R29..R33); split would scatter the gate contract
 internal class FactExtractionCore(
     private val dao: FactDao,
     private val gate: ExtractionGate,
@@ -232,41 +233,43 @@ internal class FactExtractionCore(
         started: Long,
     ): FactExtractionResult {
         val now = clock()
-        return withContext(NonCancellable) { try {
-            gate.commit {
-                if (fingerprint(sourceId) != snapshot.fingerprint) {
-                    FactExtractionResult.Superseded
-                } else {
-                    val texts = snapshot.spans.associate { it.spanId to it.text }
-                    for (candidate in plan.creates) writeNew(sourceId, candidate, now, texts)
-                    for ((candidate, previous) in plan.continues) {
-                        writeContinuation(sourceId, candidate, previous, now, texts)
+        return withContext(NonCancellable) {
+            try {
+                gate.commit {
+                    if (fingerprint(sourceId) != snapshot.fingerprint) {
+                        FactExtractionResult.Superseded
+                    } else {
+                        val texts = snapshot.spans.associate { it.spanId to it.text }
+                        for (candidate in plan.creates) writeNew(sourceId, candidate, now, texts)
+                        for ((candidate, previous) in plan.continues) {
+                            writeContinuation(sourceId, candidate, previous, now, texts)
+                        }
+                        val created = plan.creates.size + plan.continues.size
+                        writeRun(
+                            sourceId,
+                            snapshot.reading.id,
+                            trigger,
+                            started,
+                            RunSummary(ExtractionOutcome.COMPLETED, plan.candidateCount, created, plan.skipped),
+                        )
+                        FactExtractionResult.Finished(
+                            ExtractionOutcome.COMPLETED,
+                            plan.candidateCount,
+                            created,
+                            plan.skipped,
+                        )
                     }
-                    val created = plan.creates.size + plan.continues.size
-                    writeRun(
-                        sourceId,
-                        snapshot.reading.id,
-                        trigger,
-                        started,
-                        RunSummary(ExtractionOutcome.COMPLETED, plan.candidateCount, created, plan.skipped),
-                    )
-                    FactExtractionResult.Finished(
-                        ExtractionOutcome.COMPLETED,
-                        plan.candidateCount,
-                        created,
-                        plan.skipped,
-                    )
                 }
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
+                // The transaction rolled back, so no fact row survives. Only the run row is recorded, and a failure
+                // to record it still returns the outcome (P-05).
+                val summary = RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet())
+                recordRunQuietly(sourceId, snapshot.reading.id, trigger, started, summary)
+                FactExtractionResult.Finished(ExtractionOutcome.STORAGE_FAILURE, 0, 0, emptySet())
             }
-        } catch (failure: CancellationException) {
-            throw failure
-        } catch (failure: Exception) {
-            // The transaction rolled back, so no fact row survives. Only the run row is recorded, and a failure
-            // to record it still returns the outcome (P-05).
-            val summary = RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet())
-            recordRunQuietly(sourceId, snapshot.reading.id, trigger, started, summary)
-            FactExtractionResult.Finished(ExtractionOutcome.STORAGE_FAILURE, 0, 0, emptySet())
-        } }
+        }
     }
 
     /** P-05: a run row that cannot be written does not replace the outcome already decided. */
@@ -302,7 +305,12 @@ internal class FactExtractionCore(
         return FactExtractionResult.Finished(outcome, 0, 0, emptySet())
     }
 
-    private suspend fun writeNew(sourceId: String, candidate: ExtractedCandidate, now: Long, texts: Map<String, String>) {
+    private suspend fun writeNew(
+        sourceId: String,
+        candidate: ExtractedCandidate,
+        now: Long,
+        texts: Map<String, String>,
+    ) {
         val factId = newId()
         dao.insertFact(factId, sourceId, mapKind(candidate.kind).name, now)
         val revisionId = writeRevision(sourceId, factId, candidate, now, supersedes = null, texts = texts)
