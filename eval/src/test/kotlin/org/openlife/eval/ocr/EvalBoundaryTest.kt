@@ -28,6 +28,7 @@ class EvalBoundaryTest {
             "java.srcDir(rootProject.file(\"eval/src/core/kotlin\"))",
             "assets.srcDir(rootProject.file(\"eval/ocr\"))",
             "inputs.files(rootProject.fileTree(\"eval/ocr/v1\")).withPropertyName(\"ocrSet\")",
+            "inputs.files(rootProject.fileTree(\"eval/facts/v1\")).withPropertyName(\"factsSet\")",
         )
         assertEquals(allowed.sorted(), vault.sorted())
         val buildFile = File(root, "vault/build.gradle.kts").readText()
@@ -36,6 +37,7 @@ class EvalBoundaryTest {
         assertTrue(androidTestBlock.contains("eval/src/core/kotlin"))
         val testInputs = buildFile.substringAfter("tasks.withType<Test>().configureEach {").substringBefore("}")
         assertTrue("the set is an input of vault's unit tests only", testInputs.contains("eval/ocr/v1"))
+        assertTrue("the facts set is an input of vault's unit tests only", testInputs.contains("eval/facts/v1"))
     }
 
     private fun String.mentionsEval(): Boolean = contains(":eval") || contains("eval/")

@@ -25,4 +25,4 @@ personal data and no copied documents are used.
 ## Families and gating
 
 DATE covers DATE, TIME and DATETIME (decision Q-3). MONEY, URL, EMAIL and PHONE are gated
-separately. Metric definitions are in `docs/verification/P3-06-facts-eval.md`.
+separately. Metric definitions and the measured results are in `docs/verification/facts-eval.md`.
