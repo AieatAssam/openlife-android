@@ -224,9 +224,13 @@ internal fun kindLabel(kind: FactKind): Int = when (kind) {
     FactKind.UNRECOGNISED -> R.string.facts_kind_unrecognised
 }
 
-/** P3-05 review U-04: an extracted value read through the user's correction says so; an unrecognised origin is not guessed. */
+/**
+ * P3-05 review U-04: an extracted value read through the user's correction says so; an unrecognised origin
+ * is not guessed.
+ */
 private fun originLabel(item: FactItem): Int = when (item.origin) {
     FactOrigin.USER -> R.string.facts_origin_user
+
     FactOrigin.EXTRACTED -> if (item.extractedFromCorrection) {
         R.string.facts_origin_from_correction
     } else {

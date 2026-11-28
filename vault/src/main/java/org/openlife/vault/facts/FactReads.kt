@@ -9,7 +9,7 @@ data class FactEvidence(
     val ocrSpanId: String,
     val textStart: Int?,
     val textEnd: Int?,
-    /** P3-05 review U-04: the user's correction of the reading this value was read from; null when it was not corrected. */
+    /** P3-05 review U-04: the user's correction of the reading this value was read from; null when uncorrected. */
     val ocrUserRevisionId: String? = null,
 )
 

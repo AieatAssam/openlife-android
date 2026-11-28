@@ -8,16 +8,16 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.openlife.vault.facts.ExtractionCheck
+import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactOrigin
 import org.openlife.vault.facts.FactRefusal
 import org.openlife.vault.facts.FactStatus
 import org.openlife.vault.facts.FactValue
+import org.openlife.vault.facts.FactWithLatestRevision
 import org.openlife.vault.facts.FactWriteResult
 import org.openlife.vault.facts.ReviewDecision
-import org.openlife.vault.facts.FactWithLatestRevision
-import org.openlife.vault.facts.ExtractionCheck
-import org.openlife.vault.facts.FactEvidence
 import java.util.UUID
 
 /** P3-05 review U-05: the facts writes run outside the screen's scope, and a refused write reports a message. */
