@@ -17,9 +17,9 @@ import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.facts.extract.ExtractedKind
 import org.openlife.vault.search.SearchFixture
+import org.openlife.vault.storage.FactDao
 import org.openlife.vault.storage.FactHost
 import org.openlife.vault.storage.FactRows
-import org.openlife.vault.storage.FactDao
 import org.openlife.vault.storage.HistoryRow
 import org.openlife.vault.storage.HostFactDao
 import org.openlife.vault.storage.HostSqlite
@@ -195,7 +195,11 @@ class FactExtractionGuardTest {
         rows.current(factId, "u1", expected = date[1] as String)
         // Replacing the reading stales the extracted revision, and BASIS reaches the clarification (C2-R40).
         staleOldReading()
-        assertEquals("the clarification is stale", "STALE", host.query("SELECT status FROM fact_revisions WHERE id = 'u1'").single().single())
+        assertEquals(
+            "the clarification is stale",
+            "STALE",
+            host.query("SELECT status FROM fact_revisions WHERE id = 'u1'").single().single(),
+        )
 
         val rerun = finished(extract())
 
@@ -211,7 +215,7 @@ class FactExtractionGuardTest {
         )
     }
 
-    // P-02 (C2-R32 step 1): the key includes textStart, so a second occurrence of an already extracted value is written.
+    // P-02 (C2-R32 step 1): the key includes textStart, so a second occurrence of an extracted value is written.
     @Test
     fun sameValueAtAnotherOffsetIsWrittenAgain() {
         groundedReading()
