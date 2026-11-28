@@ -13,7 +13,7 @@ enum class UserValueRefusal {
     TOO_LONG,
     CONTROL_CHARACTER,
 
-    /** A money amount needs an ISO 4217 code: a value without one cannot be stored (see the P3-05 notes). */
+    /** A money amount needs an ISO 4217 code: ADR-0008 stores "not stated" only with a printed symbol (P3-05 notes). */
     MONEY_NEEDS_CODE,
 
     /** The rules do not accept exactly one value of the kind covering the whole input. */
@@ -38,6 +38,9 @@ sealed interface UserValueResult {
  */
 object UserValueNormaliser {
     private const val USER_SPAN_ID = "user-input"
+
+    /** The ISO 4217 codes the money chooser offers (P3-05 R2). Each must accept a plain amount (see the host test). */
+    val CURRENCY_CHOICES: List<String> = listOf("CHF", "DKK", "EUR", "GBP", "INR", "JPY", "NOK", "PLN", "SEK", "USD")
     private const val CONTROL_LIMIT = 0x20
     private const val DELETE = 0x7F
 

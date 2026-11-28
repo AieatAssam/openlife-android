@@ -53,6 +53,16 @@ class UserValueNormaliserTest {
         assertEquals(UserValueRefusal.MONEY_NEEDS_CODE, refused(UserValueNormaliser.money("12.50", null)))
     }
 
+
+    @Test
+    fun everyChooserCodeAcceptsPlainIntegerAndFractionAmounts() {
+        val failing = UserValueNormaliser.CURRENCY_CHOICES.filter { code ->
+            UserValueNormaliser.money("10", code) !is UserValueResult.Accepted ||
+                UserValueNormaliser.money("10.50", code) !is UserValueResult.Accepted
+        }
+        assertEquals(emptyList<String>(), failing)
+    }
+
     @Test
     fun moneyAmountThatIsNotDecimalIsRefused() {
         assertEquals(UserValueRefusal.NOT_ONE_VALUE, refused(UserValueNormaliser.money("1e3", "GBP")))

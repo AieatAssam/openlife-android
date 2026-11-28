@@ -66,3 +66,10 @@ notes: >
   normalisers (C2-R38, C2-R5) belongs to this step's input screens, using
   P3-03's normalisers, and must refuse an input they reject before calling
   the repository.
+  P3-05 implementation notes (2026-11-28, Haiku agent under the coordinating session):
+  - Dependency deviation: depends_on P3-04 and P1-20 are both status review, not done (plan-status lists nothing runnable). The coordinating session directed this step; it proceeds on that instruction and the owner should confirm the order before review.
+  - Money "not stated" (C2-R38 vs ADR-0008 §3, §5): ADR-0008 stores a null currency only with a printed symbol (rawSymbol required), and MoneyValue requires a code or a symbol. A "Not stated" amount with no symbol therefore cannot be stored. The normaliser refuses it (MONEY_NEEDS_CODE) with a visible message. OPEN QUESTION for the owner: allow a user-typed symbol, or drop "Not stated" from C2-R38.
+  - Money chooser: CAD is not offered. The line scanner gives no single value for "10 CAD" (ADR-0008 §5.5 English-word code list); the other 10 codes accept whole and fraction amounts (UserValueNormaliserTest.everyChooserCodeAcceptsPlainIntegerAndFractionAmounts).
+  - Handed-over finding (a), viewer shows the latest reading while search and facts use the READY pointer: NOT changed in P3-05. C2 decision Q-6 assigns moving the viewer and search onto the pointer to P3-07.
+  - Handed-over finding (b), fact hit in search opens the viewer without a facts panel: NOT routed in P3-05. P3-07-R2 owns "tapping opens the Facts panel with the fact highlighted"; P3-05's requirements do not mention search.
+  - Earlier-reading viewer mode (Q-15, C2-R39): NOT implemented in P3-05. The viewer loads only the current reading (OcrRepository.observeOcrView, ViewerSession); a reading-by-id mode needs new viewer state across ViewerSession, ViewerPorts and OcrPresenter. Recorded as a stated R1 gap.
