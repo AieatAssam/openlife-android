@@ -242,21 +242,49 @@ class FactExtractionGuardTest {
         assertEquals(0L, runRowCount())
     }
 
-    // P-06 (C2-R29): the commit is NonCancellable, so a cancelled run still ends with its rows committed.
+    // C2 section 7.6: a run cancelled before its commit writes nothing, not even a run row.
     @Test
-    fun commitIsNotInterruptedByCancellation() {
+    fun cancelledBeforeCommitWritesNothing() {
+        groundedReading()
+        runBlocking {
+            lateinit var job: Job
+            val gate = object : TransactionalHostGate(host) {
+                override suspend fun <T> read(block: suspend () -> T): T = block().also { job.cancel() }
+            }
+            job = launch { core(gate).extract("a", ExtractionTrigger.AUTO) }
+            job.join()
+            assertTrue("the run was cancelled", job.isCancelled)
+        }
+        assertEquals(0L, factCount())
+        assertEquals(0L, runRowCount())
+    }
+
+    // P-06 (C2-R29): once the transaction has begun, cancellation does not tear it: the commit ends with its rows.
+    @Test
+    fun cancellationDuringTransactionDoesNotTearTheCommit() {
         groundedReading()
         var result: FactExtractionResult? = null
         runBlocking {
             lateinit var job: Job
-            job = launch {
-                result = core(CancellingGate(host) { job.cancel() }).extract("a", ExtractionTrigger.AUTO)
+            val cancelling = object : HostFactDao(host) {
+                private var cancelled = false
+
+                override suspend fun insertFact(id: String, sourceId: String, kind: String, createdAt: Long) {
+                    if (!cancelled) {
+                        cancelled = true
+                        job.cancel()
+                        yield()
+                    }
+                    super.insertFact(id, sourceId, kind, createdAt)
+                }
             }
+            job = launch { result = core(dao = cancelling).extract("a", ExtractionTrigger.AUTO) }
             job.join()
         }
         assertNotNull("the commit ran to its end", result)
         assertEquals(ExtractionOutcome.COMPLETED, finished(result!!).outcome)
         assertEquals(2L, factCount())
+        assertEquals(1L, runRowCount())
     }
 
     // P-05: a failed commit whose fallback run row also fails still returns STORAGE_FAILURE, not an exception.
@@ -398,14 +426,5 @@ class FactExtractionGuardTest {
     private class ReversedHistoryDao(host: HostSqlite) : HostFactDao(host) {
         override suspend fun revisionHistoryOfSource(sourceId: String): List<HistoryRow> =
             super.revisionHistoryOfSource(sourceId).reversed()
-    }
-}
-
-/** Cancels the running job inside the commit, then suspends: a cancellable commit would stop here. */
-private class CancellingGate(host: HostSqlite, private val cancel: () -> Unit) : TransactionalHostGate(host) {
-    override suspend fun <T> commit(block: suspend () -> T): T {
-        cancel()
-        yield()
-        return transaction(block)
     }
 }
