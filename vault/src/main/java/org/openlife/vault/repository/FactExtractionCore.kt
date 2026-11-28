@@ -2,6 +2,8 @@ package org.openlife.vault.repository
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.openlife.vault.facts.EvidenceOffsets
 import org.openlife.vault.facts.ExtractionOutcome
@@ -243,9 +245,12 @@ internal class FactExtractionCore(
         started: Long,
     ): FactExtractionResult {
         val now = clock()
-        return withContext(NonCancellable) {
-            try {
-                gate.commit {
+        // C2 section 7.6: a run cancelled before its commit writes nothing, not even a run row.
+        currentCoroutineContext().ensureActive()
+        return try {
+            gate.commit {
+                // Once the transaction has begun, its writes finish whole (C2-R29): cancellation does not tear it.
+                withContext(NonCancellable) {
                     if (fingerprint(sourceId) != snapshot.fingerprint) {
                         FactExtractionResult.Superseded
                     } else {
@@ -270,15 +275,15 @@ internal class FactExtractionCore(
                         )
                     }
                 }
-            } catch (failure: CancellationException) {
-                throw failure
-            } catch (failure: Exception) {
-                // The transaction rolled back, so no fact row survives. Only the run row is recorded, and a failure
-                // to record it still returns the outcome (P-05).
-                val summary = RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet())
-                recordRunQuietly(sourceId, snapshot.reading.id, trigger, started, summary)
-                FactExtractionResult.Finished(ExtractionOutcome.STORAGE_FAILURE, 0, 0, emptySet())
             }
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            // The transaction rolled back, so no fact row survives. Only the run row is recorded, and a failure
+            // to record it still returns the outcome (P-05).
+            val summary = RunSummary(ExtractionOutcome.STORAGE_FAILURE, null, null, emptySet())
+            withContext(NonCancellable) { recordRunQuietly(sourceId, snapshot.reading.id, trigger, started, summary) }
+            FactExtractionResult.Finished(ExtractionOutcome.STORAGE_FAILURE, 0, 0, emptySet())
         }
     }
 
@@ -309,6 +314,7 @@ internal class FactExtractionCore(
     ): FactExtractionResult.Finished {
         // With no reading there is no ocr_revision_id for a run row (C2 §7.6), so nothing is recorded.
         if (reading != null) {
+            currentCoroutineContext().ensureActive()
             val summary = RunSummary(outcome, null, null, emptySet())
             withContext(NonCancellable) { recordRunQuietly(sourceId, reading.id, trigger, started, summary) }
         }
