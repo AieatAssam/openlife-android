@@ -67,12 +67,22 @@ notes: >
   per-trigger C2-R40 rows are not individually tested; the auto-run (C2-R30) is wired through
   OpenLifeApp but not exercised on device. Device gap: only FactExtractionRepositoryTest was
   run on the tablet, not the full connectedDebugAndroidTest suite.
+  Review fixes P-01..P-07 (2026-11-28): the gaps above are closed by host and device tests named in
+  docs/verification/P3-04-extraction-pipeline.md. Findings recorded, not changed: (1) BASIS traversal depth is
+  at most 1 under the schema trigger (BASIS edges only from a USER revision to a non-USER one), so the
+  FactLimits.MAX_TRAVERSAL_DEPTH guard in FactStaleMarker is unreachable; kept. (2) P-07 (offsets outside the
+  span text) has no failing test: no extractor input was found that produces them, so the check is a defensive
+  guard. (3) The three opt-in measurement tests (OcrEngineMeasurementTest, OcrEvaluationTest,
+  RecoveryTimingTest) fail without their instrumentation argument; Gradle still printed BUILD SUCCESSFUL.
 
 evidence: >
   Claim 3319c6a; RED df14add (eight host and androidTest cases); GREEN ffc162e;
   REFACTOR 3300ede. Gate (foreground re-run, scratchpad p304-gate2.log):
   ./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin
   :app:compileDebugAndroidTestKotlin :eval:test -> BUILD SUCCESSFUL in 5m 2s.
+  Review fixes (tree at b75ede4): gate BUILD SUCCESSFUL in 4m 23s; plan-check steps=83 errors=0;
+  tests/run.sh 51 passed. Full tablet run :vault:connectedDebugAndroidTest --continue: 191 tests, 0 errors,
+  3 failures (the opt-in measurement tests, expected), see the doc. Mutations M1-M6 recorded in the doc.
   Host FactExtractionCoreTest 8/8. Tablet U8BBB20806201256 (AGS2-W09, Android 8.0.0):
   :vault:connectedDebugAndroidTest with class FactExtractionRepositoryTest -> 8 tests, 0 failures,
   BUILD SUCCESSFUL in 1m 9s; stay_on_while_plugged_in restored to 0. scripts/plan-check.sh

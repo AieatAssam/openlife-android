@@ -1,6 +1,8 @@
 # P3-04 verification: extraction pipeline, evidence links and staleness
 
 Branch `plan/P3-04-extraction-pipeline`. Commits: claim `3319c6a`, RED `df14add`, GREEN `ffc162e` (includes the test-shape fixes), REFACTOR `3300ede`.
+Review fixes P-01..P-07: host RED `ac5cfa7`, host GREEN `aaf72d1`, device RED `7d0aa1b`, device GREEN `365f452`,
+T1 rollback test `479e839`, pointer boundary test `9059789`, mapKind test `0b1b4a4`, style fixes `b75ede4`.
 Date of run: 2026-11-28 (step started 2026-11-27).
 
 ## Commands and real results
@@ -47,3 +49,62 @@ The same eight names, run on the tablet. All passed (`vault/build/outputs/androi
 3. Per-kind 64 skip (C2-R57) has no test.
 4. Auto-run from OCR READY (C2-R30) is not exercised end to end on device.
 5. Instrumented runs cover only FactExtractionRepositoryTest, not the full `:vault:connectedDebugAndroidTest` suite.
+
+## Review fixes P-01..P-07
+
+Gate after the fixes (foreground, `scratchpad/gate.log`, tree at `b75ede4`):
+`./gradlew detekt lint :app:test :vault:test assembleDebug :vault:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :eval:test`
+-> `BUILD SUCCESSFUL in 4m 23s`. `scripts/plan-check.sh` -> `steps=83 errors=0`, `runnable now: []`.
+`bash scripts/tests/run.sh` -> `51 passed, 0 failed`.
+
+| Finding | Change | Test (host unless marked device) | Result |
+| --- | --- | --- | --- |
+| P-01 late finisher | A replaced reading marks the previous reading's facts only when the pointer move succeeded (`moveCurrentReading == 1`) | `lateFinisherDoesNotStaleCurrentFacts` (device) | pass |
+| P-02 duplicate keys | Duplicate detection ignores STALE current rows; continuation matches stale rows by kind and canonical text | `rerunAfterClarifyCreatesNothing`, `continuationRequiresEqualCanonicalText` (host) | pass |
+| P-03 cancellation | `commit` and the run-row write run under `NonCancellable`; a non-cancellation storage error records a run row and returns STORAGE_FAILURE | `commitIsNotInterruptedByCancellation`, `failedFallbackRunRowStillReturnsStorageFailure`, `failedTerminalRunRowStillReturnsItsOutcome` (host) | pass |
+| P-04 rejected readings | Rejecting a reading marks its facts REJECTED; un-rejecting bumps the input epoch; `extractIfDue` refuses a rejected reading | `undoRejectBumpsEpoch` (device), `extractIfDueRefusesARejectedReading` (host) | pass |
+| P-05 onReady | `onReady` runs after a completed OCR; its failure is swallowed (cancellation rethrown) and does not change the OCR result | `onReadyFailureStillCompletesOcr` (device), `autoRunAfterReadyCreatesFactsOnce` (device) | pass |
+| P-06 per-kind cap | 64 candidates committed in full; 65 skips the kind and reports it; the other kinds commit | `kindAtExactly64IsCommittedInFull`, `kindOver64IsSkippedOthersCommit` (host) | pass |
+| P-07 offsets | Evidence offsets are checked against the span text (`EvidenceOffsets.fit`) before a fact write; out of range fails with `OFFSETS_OUT_OF_RANGE` | no dedicated test | defensive guard, see below |
+
+The six C2-R40 stale triggers are device tests named `staleTrigger_<reason>`. The six rows pass on the tablet with no production change, so each arrangement is real.
+
+### T1 rollback
+
+Covered on device by `OcrFactHooksTest.staleMarkFailureRollsBackPointerMoveSpansAndEpoch` (`479e839`). A test-installed trigger aborts the first `fact_revisions` write to STALE during a reading replacement. The test then asserts that the pointer stays on the first reading, that no span rows of the failed revision exist, that no STALE row exists, and that the epoch is unchanged. No production code was changed to reach the path. The test asserts `OcrRunResult.Failed`, so it fails if the induced abort does not happen.
+
+### Recorded mutations (boundary tests that already passed)
+
+Each mutation was applied to `FactExtractionCore.kt`, the test class was run with `:vault:testDebugUnitTest --tests '*FactExtractionGuardTest*'`, and the file was restored with `git checkout`.
+
+| Mutation (production line) | Failing test |
+| --- | --- |
+| M1 `MAX_CANDIDATES_PER_KIND = 64` changed to `65` | `kindOver64IsSkippedOthersCommit` |
+| M2 `MAX_CANDIDATES_PER_KIND = 64` changed to `63` | `kindAtExactly64IsCommittedInFull` |
+| M3 continuation candidates `stale.filter` replaced by `stale.asReversed().filter` (tie-break) | `continuationTieBreakIsOverlapThenFactOrdinal` |
+| M4 `epoch = dao.sourceEpoch(sourceId)` replaced by `epoch = null` (epoch supersession) | `epochBumpBetweenReadAndCommitWritesNothing` |
+| M5 `pointers = dao.factPointers(sourceId).toSet()` replaced by `pointers = emptySet()` (pointer supersession) | `factPointerChangeBetweenReadAndCommitWritesNothing` (added in `9059789`) |
+| M6 `sourceState = dao.sourceState(sourceId)` replaced by `sourceState = null` (DELETING supersession) | `deletingSourceBetweenReadAndCommitWritesNothing` |
+
+M5 was first run before its test existed and every guard test still passed, so the pointer comparison was untested. The pointer test closed that gap.
+
+### Findings recorded, not changed
+
+- BASIS traversal depth: a BASIS edge is created only from a USER revision to a non-USER one, so `FactStaleMarker` never reaches depth 2 through the schema. The `FactLimits.MAX_TRAVERSAL_DEPTH` guard is unreachable in practice. It is kept, not removed.
+- P-07 has no failing test: no extractor input was found that yields out-of-range offsets, so the check is a defensive guard.
+
+### Device run (full `:vault:connectedDebugAndroidTest --continue`)
+
+Tablet `U8BBB20806201256`, log `scratchpad/device-full.log`. Result from the XML reports (`vault/build/outputs/androidTest-results/connected/debug`): 191 tests, 0 errors, 0 skipped, 3 failures. The three failures are the opt-in measurement tests, which the coordinator expected to fail:
+`OcrEngineMeasurementTest.measureEnginesOnSyntheticFixtures`, `OcrEvaluationTest.evaluateRegisteredEnginesOverTheFixtureSet`, `RecoveryTimingTest.recoveryTimeWithFiftySources`.
+Their failure elements carry no message, and each takes under 10 ms, so they fail without their opt-in argument rather than measuring anything. Gradle printed `BUILD SUCCESSFUL in 5m 15s` despite these three failures; the XML reports are the authority here.
+
+`stay_on_while_plugged_in` was set to 3 for the run and read back as `0` after the restore.
+
+### Status of the gaps above
+
+1. SUPERSEDED path (C2-R31): tested by `epochBumpBetweenReadAndCommitWritesNothing`, `factPointerChangeBetweenReadAndCommitWritesNothing`, `deletingSourceBetweenReadAndCommitWritesNothing`.
+2. markStale throw rollback: tested on device by `staleMarkFailureRollsBackPointerMoveSpansAndEpoch`.
+3. Per-kind 64 skip (C2-R57): tested by `kindOver64IsSkippedOthersCommit` and `kindAtExactly64IsCommittedInFull`.
+4. Auto-run from OCR READY (C2-R30): tested on device by `autoRunAfterReadyCreatesFactsOnce`.
+5. Full suite: run on the tablet as above (191 tests, the three opt-in failures expected).
