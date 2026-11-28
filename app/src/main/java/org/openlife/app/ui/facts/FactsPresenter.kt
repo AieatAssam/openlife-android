@@ -12,7 +12,13 @@ import org.openlife.vault.facts.FactEvidence
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactOrigin
 import org.openlife.vault.facts.FactStatus
+import org.openlife.vault.facts.FactRefusal
 import org.openlife.vault.facts.FactValue
+import org.openlife.vault.facts.FactWriteResult
+import org.openlife.vault.facts.ReviewDecision
+import org.openlife.vault.facts.extract.UserValueNormaliser
+import org.openlife.vault.facts.extract.UserValueRefusal
+import org.openlife.vault.facts.extract.UserValueResult
 import org.openlife.vault.facts.FactWithLatestRevision
 import org.openlife.vault.facts.StaleReason
 import java.util.UUID
@@ -22,6 +28,19 @@ interface FactsGateway {
     fun facts(sourceId: UUID): Flow<List<FactWithLatestRevision>>
 
     suspend fun extractionCheck(sourceId: UUID): ExtractionCheck
+
+    suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult
+
+    suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult
+
+    suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult
+}
+
+/** What a typed user value did: saved through the repository, or refused with the reason shown to the user (R2). */
+sealed interface UserFactOutcome {
+    data class Saved(val result: FactWriteResult) : UserFactOutcome
+
+    data class Refused(val reason: UserValueRefusal) : UserFactOutcome
 }
 
 /** One fact as the panel shows it. The value is held in memory only and never printed (see [toString]). */
@@ -78,6 +97,31 @@ class FactsPresenter(
         job = null
         mutableState.value = FactsUiState.Loading
     }
+
+    /** Confirms, rejects or reopens one revision; the repository decides whether the status table allows it. */
+    suspend fun review(item: FactItem, decision: ReviewDecision): FactWriteResult =
+        gateway.review(item.revisionId, decision)
+
+    /** Chooses one candidate of a CLARIFICATION_NEEDED fact; the entry and its text stay exactly as stored (C2-R36). */
+    suspend fun chooseCandidate(item: FactItem, index: Int): FactWriteResult {
+        val entries = item.value.candidateEntries()
+        val texts = item.value.candidateTexts()
+        if (index !in entries.indices || index !in texts.indices) {
+            return FactWriteResult.Refused(FactRefusal.INVALID_VALUE)
+        }
+        return gateway.clarify(item.revisionId, FactValue(entries[index], texts[index]))
+    }
+
+    /**
+     * Adds a user-typed URL, email or phone through the vault's single-value normaliser. A refused input is
+     * returned with its reason and never reaches the repository.
+     */
+    suspend fun addUserText(kind: FactKind, input: String): UserFactOutcome =
+        when (val result = UserValueNormaliser.text(kind, input)) {
+            is UserValueResult.Accepted ->
+                UserFactOutcome.Saved(gateway.addUserFact(sourceId, kind, result.value))
+            is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
+        }
 
     private fun toItem(row: FactWithLatestRevision): FactItem = FactItem(
         factId = row.fact.id,

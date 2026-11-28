@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 import org.openlife.vault.facts.ExtractionCheck
 import org.openlife.vault.facts.Fact
 import org.openlife.vault.facts.FactKind
@@ -16,6 +17,9 @@ import org.openlife.vault.facts.FactRevision
 import org.openlife.vault.facts.FactStatus
 import org.openlife.vault.facts.FactValue
 import org.openlife.vault.facts.FactWithLatestRevision
+import org.openlife.vault.facts.FactWriteResult
+import org.openlife.vault.facts.ReviewDecision
+import org.openlife.vault.facts.extract.UserValueRefusal
 import java.util.UUID
 
 /** P3-05-R1, R2: the facts presenter shows origin and status per fact and holds nothing once cleared. */
@@ -48,8 +52,82 @@ class FactsPresenterTest {
     }
 
     private class FakeGateway(val rows: MutableStateFlow<List<FactWithLatestRevision>>) : FactsGateway {
+        val reviews = mutableListOf<Pair<UUID, ReviewDecision>>()
+        val clarifications = mutableListOf<Pair<UUID, FactValue>>()
+        val additions = mutableListOf<Triple<UUID, FactKind, FactValue>>()
+
         override fun facts(sourceId: UUID) = rows
         override suspend fun extractionCheck(sourceId: UUID): ExtractionCheck = ExtractionCheck.Completed
+
+        override suspend fun review(revisionId: UUID, decision: ReviewDecision): FactWriteResult {
+            reviews += revisionId to decision
+            return FactWriteResult.Failed
+        }
+
+        override suspend fun clarify(revisionId: UUID, chosen: FactValue): FactWriteResult {
+            clarifications += revisionId to chosen
+            return FactWriteResult.Failed
+        }
+
+        override suspend fun addUserFact(sourceId: UUID, kind: FactKind, value: FactValue): FactWriteResult {
+            additions += Triple(sourceId, kind, value)
+            return FactWriteResult.Failed
+        }
+    }
+
+    private fun candidateRow(): FactWithLatestRevision {
+        val base = row(FactOrigin.EXTRACTED, FactStatus.CLARIFICATION_NEEDED, "2026-03-04 | 2026-04-03")
+        val value = FactValue(
+            "{\"candidates\":[{\"date\":\"2026-03-04\"},{\"date\":\"2026-04-03\"}]}",
+            "2026-03-04 | 2026-04-03",
+        )
+        return base.copy(revision = base.revision.copy(value = value))
+    }
+
+    @Test
+    fun reviewPassesTheRevisionAndDecisionToTheGateway() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val item = toItemFor(row(FactOrigin.EXTRACTED, FactStatus.UNREVIEWED, "2026-04-03"))
+        presenter.review(item, ReviewDecision.CONFIRM)
+        assertEquals(listOf(item.revisionId to ReviewDecision.CONFIRM), gateway.reviews)
+    }
+
+    @Test
+    fun chooseCandidateSendsTheChosenEntryAndItsText() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val item = toItemFor(candidateRow())
+        presenter.chooseCandidate(item, 1)
+        assertEquals(
+            listOf(item.revisionId to FactValue("{\"date\":\"2026-04-03\"}", "2026-04-03")),
+            gateway.clarifications,
+        )
+    }
+
+    @Test
+    fun aBlankUserValueIsRefusedAndNeverSaved() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val outcome = presenter.addUserText(FactKind.EMAIL, "   ")
+        assertEquals(UserFactOutcome.Refused(UserValueRefusal.BLANK), outcome)
+        assertTrue(gateway.additions.isEmpty())
+    }
+
+    @Test
+    fun anAcceptedUserEmailIsSavedWithTheUserKind() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val outcome = presenter.addUserText(FactKind.EMAIL, "name@example.com")
+        assertTrue(outcome is UserFactOutcome.Saved)
+        assertEquals(1, gateway.additions.size)
+        assertEquals(FactKind.EMAIL, gateway.additions.single().second)
+    }
+
+    private fun toItemFor(row: FactWithLatestRevision): FactItem {
+        val presenter = FactsPresenter(FakeGateway(MutableStateFlow(listOf(row))), sourceId, CoroutineScope(Dispatchers.Unconfined))
+        presenter.start()
+        return (presenter.state.value as FactsUiState.Ready).items.single()
     }
 
     @Test
