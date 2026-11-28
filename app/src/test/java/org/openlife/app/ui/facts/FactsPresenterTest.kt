@@ -175,6 +175,25 @@ class FactsPresenterTest {
     }
 
     @Test
+    fun anAmountWithAChosenCurrencyIsSavedAsAMoneyValue() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val outcome = presenter.addUserMoney("12.50", "EUR")
+        assertTrue(outcome is UserFactOutcome.Saved)
+        val (_, kind, value) = gateway.additions.single()
+        assertEquals(FactKind.MONEY, kind)
+        assertTrue(value.canonicalText, value.canonicalText.contains("12.50") && value.canonicalText.contains("EUR"))
+    }
+
+    @Test
+    fun anAmountWithNoCurrencyIsRefusedAndNeverSaved() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        assertEquals(UserFactOutcome.Refused(UserValueRefusal.MONEY_NEEDS_CODE), presenter.addUserMoney("12.50", null))
+        assertTrue(gateway.additions.isEmpty())
+    }
+
+    @Test
     fun aPickedDayStaysTheSameDayInEveryTimeZone() {
         val before = TimeZone.getDefault()
         try {

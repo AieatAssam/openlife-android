@@ -338,6 +338,23 @@ class FactsFlowTest {
         assertTrue(Regex("""\d{2}:\d{2}""").matches(value.canonicalText))
     }
 
+    @Test
+    fun addingAUserAmountSavesTheAmountAndCurrencyWithNoEvidence() {
+        val source = source(UUID(0L, 46L))
+        val facts = FakeFactsGateway(readingId = READING)
+        openFacts(source, facts)
+
+        composeRule.onNodeWithText(context.getString(R.string.facts_add)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_kind_money)).performClick()
+        composeRule.onNode(hasSetTextAction()).performTextInput("12.50")
+        composeRule.onNodeWithText("EUR").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
+        composeRule.waitUntil(WAIT_MS) { facts.additions.isNotEmpty() }
+        val (_, kind, value) = facts.additions.single()
+        assertEquals(FactKind.MONEY, kind)
+        assertTrue(value.canonicalText, value.canonicalText.contains("12.50") && value.canonicalText.contains("EUR"))
+    }
+
     /** Matches the picker's grid cell for one day of the shown month, by its spoken date text. */
     private fun dayCell(day: Int): SemanticsMatcher = SemanticsMatcher("day cell $day") { node ->
         node.config.getOrNull(SemanticsProperties.Text)?.any { " $day " in it.text } == true

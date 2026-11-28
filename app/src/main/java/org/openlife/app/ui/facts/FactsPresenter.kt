@@ -145,6 +145,9 @@ class FactsPresenter(
     suspend fun addUserTime(hour: Int?, minute: Int?): UserFactOutcome =
         saveResult(FactKind.TIME, UserValueNormaliser.time(hour, minute, null))
 
+    /** P3-05-R2 RED stub: the amount entry is not implemented yet. */
+    suspend fun addUserMoney(amount: String, currencyCode: String?): UserFactOutcome = TODO("P3-05-R2 MONEY")
+
     /** Routes one form submission to the normaliser for its kind; nothing else reaches the repository. */
     suspend fun addUserInput(input: UserFactInput): UserFactOutcome = when (input) {
         is UserFactInput.Typed -> addUserText(input.kind, input.text)
