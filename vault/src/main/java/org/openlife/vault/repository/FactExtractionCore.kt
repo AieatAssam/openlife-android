@@ -8,6 +8,7 @@ import org.openlife.vault.facts.ExtractionTrigger
 import org.openlife.vault.facts.FactExtractionResult
 import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.FactOrigin
+import org.openlife.vault.facts.EvidenceOffsets
 import org.openlife.vault.facts.FactStatusRules
 import org.openlife.vault.facts.SpanEligibility
 import org.openlife.vault.facts.SpanEligibilityInput
@@ -236,8 +237,11 @@ internal class FactExtractionCore(
                 if (fingerprint(sourceId) != snapshot.fingerprint) {
                     FactExtractionResult.Superseded
                 } else {
-                    for (candidate in plan.creates) writeNew(sourceId, candidate, now)
-                    for ((candidate, previous) in plan.continues) writeContinuation(sourceId, candidate, previous, now)
+                    val texts = snapshot.spans.associate { it.spanId to it.text }
+                    for (candidate in plan.creates) writeNew(sourceId, candidate, now, texts)
+                    for ((candidate, previous) in plan.continues) {
+                        writeContinuation(sourceId, candidate, previous, now, texts)
+                    }
                     val created = plan.creates.size + plan.continues.size
                     writeRun(
                         sourceId,
@@ -298,10 +302,10 @@ internal class FactExtractionCore(
         return FactExtractionResult.Finished(outcome, 0, 0, emptySet())
     }
 
-    private suspend fun writeNew(sourceId: String, candidate: ExtractedCandidate, now: Long) {
+    private suspend fun writeNew(sourceId: String, candidate: ExtractedCandidate, now: Long, texts: Map<String, String>) {
         val factId = newId()
         dao.insertFact(factId, sourceId, mapKind(candidate.kind).name, now)
-        val revisionId = writeRevision(sourceId, factId, candidate, now, supersedes = null)
+        val revisionId = writeRevision(sourceId, factId, candidate, now, supersedes = null, texts = texts)
         dao.moveCurrentRevision(factId, null, revisionId)
     }
 
@@ -310,8 +314,16 @@ internal class FactExtractionCore(
         candidate: ExtractedCandidate,
         previous: HistoryRow,
         now: Long,
+        texts: Map<String, String>,
     ) {
-        val revisionId = writeRevision(sourceId, previous.factId, candidate, now, supersedes = previous.revisionId)
+        val revisionId = writeRevision(
+            sourceId,
+            previous.factId,
+            candidate,
+            now,
+            supersedes = previous.revisionId,
+            texts = texts,
+        )
         check(dao.moveCurrentRevision(previous.factId, previous.revisionId, revisionId) == 1) { POINTER_MOVED }
     }
 
@@ -321,6 +333,7 @@ internal class FactExtractionCore(
         candidate: ExtractedCandidate,
         now: Long,
         supersedes: String?,
+        texts: Map<String, String>,
     ): String {
         val revisionId = newId()
         val fromCorrection = candidate.correctionId != null ||
@@ -341,6 +354,9 @@ internal class FactExtractionCore(
             createdAt = now,
             supersedesRevisionId = supersedes,
         )
+        // P-07: the offsets are checked against the text they index before any evidence row is written.
+        val valueText = checkNotNull(texts[candidate.spanId])
+        check(EvidenceOffsets.fit(valueText, candidate.startOffset, candidate.endOffset)) { OFFSETS_OUT_OF_RANGE }
         dao.insertEvidence(
             id = newId(),
             revisionId = revisionId,
@@ -353,6 +369,9 @@ internal class FactExtractionCore(
         )
         // Only context codes with stored offsets become evidence (C2 §4.7).
         for (context in candidate.currencyContext.filter { it.codeStart != null && it.codeEnd != null }) {
+            val start = checkNotNull(context.codeStart)
+            val end = checkNotNull(context.codeEnd)
+            check(EvidenceOffsets.fit(checkNotNull(texts[context.spanId]), start, end)) { OFFSETS_OUT_OF_RANGE }
             dao.insertEvidence(
                 id = newId(),
                 revisionId = revisionId,
@@ -399,5 +418,6 @@ internal class FactExtractionCore(
         const val CORRECTION_SUFFIX = "+correction"
         const val MAX_CANDIDATES_PER_KIND = 64
         const val POINTER_MOVED = "current revision moved during the commit"
+        const val OFFSETS_OUT_OF_RANGE = "evidence offsets do not fit the text they index"
     }
 }
