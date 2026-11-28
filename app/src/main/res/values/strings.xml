@@ -379,6 +379,7 @@
     <string name="facts_picker_confirm">OK</string>
     <string name="facts_picker_dismiss">Cancel</string>
     <string name="facts_refused_not_chosen">Choose a date or time first.</string>
+    <string name="facts_pick_time">Choose a time</string>
     <string name="facts_not_saved">The fact could not be saved.</string>
     <string name="viewer_open_facts">Facts</string>
 </resources>

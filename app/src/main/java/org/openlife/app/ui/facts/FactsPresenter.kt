@@ -141,6 +141,9 @@ class FactsPresenter(
     /** P3-05-R2: a day from the date picker; no chosen day is refused and never reaches the repository. */
     suspend fun addUserDate(date: LocalDate?): UserFactOutcome = saveResult(FactKind.DATE, UserValueNormaliser.date(date))
 
+    /** P3-05-R2 RED stub: the time entry is not implemented yet. */
+    suspend fun addUserTime(hour: Int?, minute: Int?): UserFactOutcome = TODO("P3-05-R2 TIME")
+
     /** Routes one form submission to the normaliser for its kind; nothing else reaches the repository. */
     suspend fun addUserInput(input: UserFactInput): UserFactOutcome = when (input) {
         is UserFactInput.Typed -> addUserText(input.kind, input.text)

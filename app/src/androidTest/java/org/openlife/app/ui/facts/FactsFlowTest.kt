@@ -319,6 +319,24 @@ class FactsFlowTest {
         val SPAN: UUID = UUID.fromString("22222222-2222-4222-8222-222222222222")
     }
 
+    @Test
+    fun addingAUserTimeSavesTheChosenTimeWithNoEvidence() {
+        val source = source(UUID(0L, 46L))
+        val facts = FakeFactsGateway(readingId = READING)
+        openFacts(source, facts)
+
+        composeRule.onNodeWithText(context.getString(R.string.facts_add)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_kind_time)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_pick_time)).performClick()
+        awaitText(context.getString(R.string.facts_picker_confirm))
+        composeRule.onNodeWithText(context.getString(R.string.facts_picker_confirm)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
+        composeRule.waitUntil(WAIT_MS) { facts.additions.isNotEmpty() }
+        val (_, kind, value) = facts.additions.single()
+        assertEquals(FactKind.TIME, kind)
+        assertTrue(Regex("""\d{2}:\d{2}""").matches(value.canonicalText))
+    }
+
     /** Matches the picker's grid cell for one day of the shown month, by its spoken date text. */
     private fun dayCell(day: Int): SemanticsMatcher = SemanticsMatcher("day cell $day") { node ->
         node.config.getOrNull(SemanticsProperties.Text)?.any { " $day " in it.text } == true

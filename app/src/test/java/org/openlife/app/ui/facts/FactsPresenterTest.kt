@@ -156,6 +156,25 @@ class FactsPresenterTest {
     }
 
     @Test
+    fun aPickedTimeIsSavedAsATimeValueWithItsHourAndMinute() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val outcome = presenter.addUserTime(9, 30)
+        assertTrue(outcome is UserFactOutcome.Saved)
+        val (_, kind, value) = gateway.additions.single()
+        assertEquals(FactKind.TIME, kind)
+        assertEquals("09:30", value.canonicalText)
+    }
+
+    @Test
+    fun noTimeChosenIsRefusedAndNeverSaved() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        assertEquals(UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN), presenter.addUserTime(null, null))
+        assertTrue(gateway.additions.isEmpty())
+    }
+
+    @Test
     fun aPickedDayStaysTheSameDayInEveryTimeZone() {
         val before = TimeZone.getDefault()
         try {
