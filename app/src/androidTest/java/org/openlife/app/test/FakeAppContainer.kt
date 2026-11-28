@@ -68,6 +68,7 @@ class FakeAppContainer(
     override val searchBackend = SearchBackend { flowOf(searchHits) }
 
     override val facts: FactsGateway = factsGateway
+    override val writeScope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)
 
     override val ocr = OcrPresenter(
         object : OcrBackend {

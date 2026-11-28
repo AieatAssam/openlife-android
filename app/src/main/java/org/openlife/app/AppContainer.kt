@@ -52,6 +52,9 @@ interface AppContainer {
 
     /** P3-05: the facts of a source and the writes the facts UI asks for. */
     val facts: FactsGateway
+
+    /** P3-05 review U-05: the scope a facts write runs in, so leaving the screen does not cancel it. */
+    val writeScope: CoroutineScope
     val scrubber: ContentScrubber
     val internalLinks: InternalLinks
     val settings: SettingsPort
@@ -111,6 +114,7 @@ internal class OpenLifeAppContainer(private val app: OpenLifeApp) : AppContainer
     override val sources: SourceStore = VaultSourceStore(app, uiScope)
     override val searchBackend: SearchBackend = AppSearchBackend(app)
     override val facts: FactsGateway = VaultFactsGateway(app)
+    override val writeScope: CoroutineScope get() = uiScope
 
     override val ocr: OcrPresenter = appOcrPresenter(app, uiScope).also { presenter ->
         app.registerPreResetCallback(presenter::forgetAll)

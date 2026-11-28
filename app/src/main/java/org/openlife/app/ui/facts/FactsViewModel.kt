@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,49 +34,27 @@ enum class FactMessage {
  */
 class FactsViewModel(container: AppContainer, sourceId: UUID) : ViewModel() {
     private val presenter = FactsPresenter(container.facts, sourceId, viewModelScope)
+    private val commands = FactsCommands(presenter, container.writeScope)
     private val unregisterScrub = container.scrubber.register { clear() }
     private val unregisterResetCallback = container.registerPreReset(::clear)
-    private val mutableMessage = MutableStateFlow<FactMessage?>(null)
 
     val state: StateFlow<FactsUiState> = presenter.state
-    val message: StateFlow<FactMessage?> = mutableMessage.asStateFlow()
+    val message: StateFlow<FactMessage?> = commands.message
 
     fun start() = presenter.start()
 
-    fun clear() {
-        presenter.clear()
-        mutableMessage.value = null
-    }
+    fun clear() = commands.clear()
 
-    fun review(item: FactItem, decision: ReviewDecision) {
-        viewModelScope.launch { presenter.review(item, decision) }
-    }
+    fun review(item: FactItem, decision: ReviewDecision) = commands.review(item, decision)
 
-    fun findAgain() {
-        viewModelScope.launch { presenter.findAgain() }
-    }
+    fun findAgain() = commands.findAgain()
 
-    fun choose(item: FactItem, index: Int) {
-        viewModelScope.launch { presenter.chooseCandidate(item, index) }
-    }
+    fun choose(item: FactItem, index: Int) = commands.choose(item, index)
 
-    fun add(input: UserFactInput) = report { presenter.addUserInput(input) }
+    fun add(input: UserFactInput) = commands.add(input)
 
     /** C2-R37: a correction reports the same messages as an add. */
-    fun correct(item: FactItem, input: UserFactInput) = report { presenter.correct(item, input) }
-
-    private fun report(outcome: suspend () -> UserFactOutcome) {
-        viewModelScope.launch {
-            mutableMessage.value = when (val result = outcome()) {
-                is UserFactOutcome.Saved -> when (result.result) {
-                    is FactWriteResult.Written -> FactMessage.SAVED
-                    else -> FactMessage.NOT_SAVED
-                }
-
-                is UserFactOutcome.Refused -> result.reason.toMessage()
-            }
-        }
-    }
+    fun correct(item: FactItem, input: UserFactInput) = commands.correct(item, input)
 
     override fun onCleared() {
         unregisterScrub()
@@ -98,4 +77,53 @@ private fun UserValueRefusal.toMessage(): FactMessage = when (this) {
     UserValueRefusal.MONEY_NEEDS_CODE -> FactMessage.REFUSED_MONEY_CODE
     UserValueRefusal.NOT_ONE_VALUE -> FactMessage.REFUSED_NOT_ONE_VALUE
     UserValueRefusal.KIND_MISMATCH -> FactMessage.NOT_SAVED
+}
+
+/**
+ * P3-05 review U-05: the writes the facts screen asks for. Each runs in [writeScope] (the application scope), so
+ * leaving the screen does not cancel a write in flight; a refused or failed write reports [FactMessage.NOT_SAVED]
+ * and never the value. JVM-testable: [FactsViewModel] itself needs a ViewModelStore and viewModelScope.
+ */
+internal class FactsCommands(private val presenter: FactsPresenter, private val writeScope: CoroutineScope) {
+    private val mutableMessage = MutableStateFlow<FactMessage?>(null)
+    val message: StateFlow<FactMessage?> = mutableMessage.asStateFlow()
+
+    fun clear() {
+        presenter.clear()
+        mutableMessage.value = null
+    }
+
+    fun review(item: FactItem, decision: ReviewDecision) {
+        writeScope.launch { reportWrite(presenter.review(item, decision)) }
+    }
+
+    fun choose(item: FactItem, index: Int) {
+        writeScope.launch { reportWrite(presenter.chooseCandidate(item, index)) }
+    }
+
+    fun findAgain() {
+        writeScope.launch { presenter.findAgain() }
+    }
+
+    fun add(input: UserFactInput) = report { presenter.addUserInput(input) }
+
+    /** C2-R37: a correction reports the same messages as an add. */
+    fun correct(item: FactItem, input: UserFactInput) = report { presenter.correct(item, input) }
+
+    private fun report(outcome: suspend () -> UserFactOutcome) {
+        writeScope.launch {
+            mutableMessage.value = when (val result = outcome()) {
+                is UserFactOutcome.Saved -> when (result.result) {
+                    is FactWriteResult.Written -> FactMessage.SAVED
+                    else -> FactMessage.NOT_SAVED
+                }
+
+                is UserFactOutcome.Refused -> result.reason.toMessage()
+            }
+        }
+    }
+
+    private fun reportWrite(result: FactWriteResult) {
+        if (result !is FactWriteResult.Written) mutableMessage.value = FactMessage.NOT_SAVED
+    }
 }
