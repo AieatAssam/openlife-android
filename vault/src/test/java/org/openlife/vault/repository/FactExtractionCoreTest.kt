@@ -107,6 +107,32 @@ class FactExtractionCoreTest {
         assertEquals(revisionsAfterFirst, count("SELECT COUNT(*) FROM fact_revisions"))
     }
 
+    /**
+     * P3-05-R2 item 3 (FactRepository.findAgain): a USER-triggered run reads the current reading only; an older
+     * READY reading of the same source contributes no evidence, and the run is recorded against the current one.
+     */
+    @Test
+    fun findAgainRunsOnTheCurrentReadingAndNeverOnAnOlderOne() {
+        groundedReading()
+        val f = fixture!!
+        f.revision("a-old", "a")
+        f.span("a-old-s1", "a-old", 0, "Due 26.11.2026")
+        host.exec("UPDATE ocr_spans SET hasEvidenceRegion = 1, scriptStatus = 'LATIN' WHERE revisionId = 'a-old'")
+        assertEquals(ExtractionOutcome.COMPLETED, finished(extract(ExtractionTrigger.USER)).outcome)
+        assertEquals(2L, factCount())
+        assertEquals(
+            "the older reading has no evidence",
+            0L,
+            count("SELECT COUNT(*) FROM fact_evidence WHERE ocrSpanId = 'a-old-s1'"),
+        )
+        assertEquals(
+            "the evidence names the current reading's spans",
+            2L,
+            count("SELECT COUNT(DISTINCT ocrSpanId) FROM fact_evidence WHERE ocrSpanId IN ('a-s1', 'a-s2')"),
+        )
+        assertEquals(listOf(listOf<Any?>("a-r", "USER")), host.query("SELECT ocrRevisionId, `trigger` FROM fact_extraction_runs"))
+    }
+
     @Test
     fun newOcrRevisionMarksPreviousFactsStale() {
         groundedReading()

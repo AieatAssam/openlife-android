@@ -5,10 +5,13 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import org.openlife.vault.facts.FactKind
 import org.openlife.vault.facts.FactLimits
 import org.openlife.vault.facts.FactRefusal
 import org.openlife.vault.facts.FactValue
+import org.openlife.vault.facts.extract.UserValueNormaliser
+import org.openlife.vault.facts.extract.UserValueResult
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.storage.FactHost
@@ -244,5 +247,34 @@ class FactWriterTest {
         rows.revision("x2", factId)
         rows.current(factId, "x2")
         rows.evidence("e2", "x2", "a", "a-s2")
+    }
+
+    /** P3-05-R2 item 3: each kind the add form offers, through the normaliser, writes one CONFIRMED USER revision. */
+    @Test
+    fun addingAUserFactOfEachKindCreatesAConfirmedUserRevisionWithNoEvidence() = runBlocking {
+        rows.readySourceWithReading(FactHost.fresh(host), "a")
+        val samples = listOf(
+            FactKind.URL to UserValueNormaliser.text(FactKind.URL, "https://example.org/a"),
+            FactKind.EMAIL to UserValueNormaliser.text(FactKind.EMAIL, "name@example.org"),
+            FactKind.PHONE to UserValueNormaliser.text(FactKind.PHONE, "+44 20 7946 0958"),
+            FactKind.DATE to UserValueNormaliser.date(LocalDate.of(2026, 4, 3)),
+            FactKind.TIME to UserValueNormaliser.time(14, 30, null),
+            FactKind.MONEY to UserValueNormaliser.money("12.50", "GBP"),
+        )
+        for ((kind, result) in samples) {
+            assertTrue("$kind: $result", result is UserValueResult.Accepted)
+            val added = written(writer.addUserFact("a", kind, (result as UserValueResult.Accepted).value))
+            val row = host.query(
+                "SELECT origin, kind, status, createdAt FROM fact_revisions WHERE id = ?",
+                added.revisionId,
+            ).single()
+            assertEquals("$kind", listOf<Any?>("USER", kind.name, "CONFIRMED"), row.take(3))
+            assertTrue("$kind has a creation time", (row[3] as Long) > 0)
+            assertEquals(
+                "$kind: a USER revision has no evidence rows",
+                0L,
+                host.long("SELECT COUNT(*) FROM fact_evidence WHERE revisionId = ?", added.revisionId),
+            )
+        }
     }
 }
