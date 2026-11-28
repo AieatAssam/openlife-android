@@ -71,6 +71,8 @@ private fun FactsList(state: FactsUiState.Ready, actions: FactActions, modifier:
     }
 }
 
+private val INERT_KINDS = setOf(FactKind.URL, FactKind.EMAIL, FactKind.PHONE)
+
 private fun checkNote(check: ExtractionCheck): Int? = when (check) {
     ExtractionCheck.NotChecked -> R.string.facts_not_checked
     ExtractionCheck.Completed -> null
@@ -83,6 +85,10 @@ private fun FactCard(item: FactItem, currentReadingId: UUID?, actions: FactActio
         Text(text = stringResource(kindLabel(item.kind)), style = MaterialTheme.typography.labelLarge)
         // Plain text on purpose: no link, selection or copy action on a fact value (C2 inert values, R3).
         Text(text = item.value.canonicalText, style = MaterialTheme.typography.bodyLarge)
+        if (item.kind in INERT_KINDS) {
+            // P3-05-R3: the note says what the value does not do; the value itself stays plain text.
+            Text(text = stringResource(R.string.facts_inert_note), style = MaterialTheme.typography.bodySmall)
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Decorative: the origin label beside it names the origin.
             Icon(

@@ -370,6 +370,7 @@
     <string name="facts_refused_too_long">This value is too long.</string>
     <string name="facts_refused_control">This value has a character that is not allowed.</string>
     <string name="facts_refused_not_one">Enter one value of the kind you chose.</string>
+    <string name="facts_inert_note">OpenLife does not open links or copy them</string>
     <string name="facts_not_saved">The fact could not be saved.</string>
     <string name="viewer_open_facts">Facts</string>
 </resources>
