@@ -21,6 +21,7 @@ import org.openlife.vault.facts.StaleReason
 import org.openlife.vault.facts.extract.UserValueNormaliser
 import org.openlife.vault.facts.extract.UserValueRefusal
 import org.openlife.vault.facts.extract.UserValueResult
+import java.time.LocalDate
 import java.util.UUID
 
 /** The app-side port the facts presenter reads through; the app container implements it over FactRepository. */
@@ -136,6 +137,9 @@ class FactsPresenter(
 
             is UserValueResult.Refused -> UserFactOutcome.Refused(result.reason)
         }
+
+    /** P3-05-R2: a day from the date picker; no chosen day is refused and never reaches the repository. */
+    suspend fun addUserDate(date: LocalDate?): UserFactOutcome = TODO("P3-05-R2 RED stub")
 
     private fun toItem(row: FactWithLatestRevision, evidence: List<FactEvidence>): FactItem = FactItem(
         factId = row.fact.id,

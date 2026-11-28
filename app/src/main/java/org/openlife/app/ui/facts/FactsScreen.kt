@@ -147,5 +147,6 @@ private fun messageLabel(message: FactMessage): Int = when (message) {
     FactMessage.REFUSED_TOO_LONG -> R.string.facts_refused_too_long
     FactMessage.REFUSED_CONTROL_CHARACTER -> R.string.facts_refused_control
     FactMessage.REFUSED_NOT_ONE_VALUE -> R.string.facts_refused_not_one
+    FactMessage.REFUSED_NOT_CHOSEN -> R.string.facts_refused_not_chosen
     FactMessage.NOT_SAVED -> R.string.facts_not_saved
 }

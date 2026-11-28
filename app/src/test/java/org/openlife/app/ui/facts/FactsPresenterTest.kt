@@ -20,6 +20,10 @@ import org.openlife.vault.facts.FactWithLatestRevision
 import org.openlife.vault.facts.FactWriteResult
 import org.openlife.vault.facts.ReviewDecision
 import org.openlife.vault.facts.extract.UserValueRefusal
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.util.TimeZone
 import java.util.UUID
 
 /** P3-05-R1, R2: the facts presenter shows origin and status per fact and holds nothing once cleared. */
@@ -130,6 +134,40 @@ class FactsPresenterTest {
         assertTrue(outcome is UserFactOutcome.Saved)
         assertEquals(1, gateway.additions.size)
         assertEquals(FactKind.EMAIL, gateway.additions.single().second)
+    }
+
+    @Test
+    fun aPickedDateIsSavedAsADateValueWithItsDay() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        val outcome = presenter.addUserDate(LocalDate.of(2026, 4, 3))
+        assertTrue(outcome is UserFactOutcome.Saved)
+        val (_, kind, value) = gateway.additions.single()
+        assertEquals(FactKind.DATE, kind)
+        assertEquals("2026-04-03", value.canonicalText)
+    }
+
+    @Test
+    fun noDateChosenIsRefusedAndNeverSaved() = runBlocking {
+        val gateway = FakeGateway(MutableStateFlow(emptyList()))
+        val presenter = FactsPresenter(gateway, sourceId, CoroutineScope(Dispatchers.Unconfined))
+        assertEquals(UserFactOutcome.Refused(UserValueRefusal.NOT_CHOSEN), presenter.addUserDate(null))
+        assertTrue(gateway.additions.isEmpty())
+    }
+
+    @Test
+    fun aPickedDayStaysTheSameDayInEveryTimeZone() {
+        val before = TimeZone.getDefault()
+        try {
+            val picked = LocalDate.of(2026, 4, 3).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            for (zone in listOf("America/Los_Angeles", "Pacific/Honolulu", "Pacific/Auckland", "UTC")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of(zone)))
+                assertEquals(zone, LocalDate.of(2026, 4, 3), PickedDate.fromMillis(picked))
+            }
+            assertEquals(null, PickedDate.fromMillis(null))
+        } finally {
+            TimeZone.setDefault(before)
+        }
     }
 
     private fun toItemFor(row: FactWithLatestRevision): FactItem {

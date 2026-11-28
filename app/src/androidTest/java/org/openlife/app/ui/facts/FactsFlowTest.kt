@@ -197,6 +197,26 @@ class FactsFlowTest {
     }
 
     @Test
+    fun addingAUserDateSavesTheChosenDayWithNoEvidence() {
+        val source = source(UUID(0L, 46L))
+        val facts = FakeFactsGateway(readingId = READING)
+        openFacts(source, facts)
+
+        composeRule.onNodeWithText(context.getString(R.string.facts_add)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_kind_date)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_pick_date)).performClick()
+        composeRule.onAllNodesWithText("15").onFirst().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_picker_confirm)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.facts_add_save)).performClick()
+
+        composeRule.waitUntil(WAIT_MS) { facts.additions.isNotEmpty() }
+        val (sourceId, kind, value) = facts.additions.single()
+        assertEquals(source.id, sourceId)
+        assertEquals(FactKind.DATE, kind)
+        assertTrue("the picked day must be stored canonically", Regex("\\d{4}-\\d{2}-15").matches(value.canonicalText))
+    }
+
+    @Test
     fun addingABlankUserValueIsRefusedAndNeverReachesTheGateway() {
         val source = source(UUID(0L, 44L))
         val facts = FakeFactsGateway(readingId = READING)

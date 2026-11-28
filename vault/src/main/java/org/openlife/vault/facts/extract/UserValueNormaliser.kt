@@ -16,6 +16,9 @@ enum class UserValueRefusal {
     /** A money amount needs an ISO 4217 code: ADR-0008 stores "not stated" only with a printed symbol (P3-05 notes). */
     MONEY_NEEDS_CODE,
 
+    /** The picker was closed without a choice (P3-05-R2): nothing is saved for it. */
+    NOT_CHOSEN,
+
     /** The rules do not accept exactly one value of the kind covering the whole input. */
     NOT_ONE_VALUE,
 }
