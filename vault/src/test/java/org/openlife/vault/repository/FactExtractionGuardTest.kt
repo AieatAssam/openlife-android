@@ -19,6 +19,8 @@ import org.openlife.vault.facts.extract.ExtractedKind
 import org.openlife.vault.search.SearchFixture
 import org.openlife.vault.storage.FactHost
 import org.openlife.vault.storage.FactRows
+import org.openlife.vault.storage.FactDao
+import org.openlife.vault.storage.HistoryRow
 import org.openlife.vault.storage.HostFactDao
 import org.openlife.vault.storage.HostSqlite
 
@@ -41,6 +43,7 @@ class FactExtractionGuardTest {
     private fun core(
         gate: ExtractionGate = TransactionalHostGate(host),
         deadlineMillis: Long = FactLimits.DEADLINE_MILLIS,
+        dao: FactDao = this.dao,
     ) = FactExtractionCore(
         dao = dao,
         gate = gate,
@@ -154,6 +157,27 @@ class FactExtractionGuardTest {
 
         assertEquals(
             "the candidate continues the lower ordinal; the other stays stale",
+            listOf(listOf<Any?>(1L, "UNREVIEWED"), listOf<Any?>(2L, "STALE")),
+            currentDateRevisions(),
+        )
+    }
+
+    // P-03 (C2-R33): an equal overlap is broken by fact ordinal, whatever order the history rows come back in.
+    // The production SQL has no ORDER BY, and a fact's ordinal always follows its insertion, so the row order is
+    // simulated here by a DAO that reverses the history (test-side only; production is unchanged).
+    @Test
+    fun continuationTieFollowsFactOrdinalWhateverTheRowOrder() {
+        groundedReading()
+        fixture.span("a-r-s3", "a-r", 2, "Paid 26.11.2026")
+        grounded("a-r")
+        finished(extract(trigger = ExtractionTrigger.AUTO))
+        staleOldReading()
+        newReading("a-r2", listOf("Due 26.11.2026", "Total EUR 12.50"))
+
+        finished(extract(core(dao = ReversedHistoryDao(host))))
+
+        assertEquals(
+            "the candidate continues ordinal 1 (Due); the other stays stale",
             listOf(listOf<Any?>(1L, "UNREVIEWED"), listOf<Any?>(2L, "STALE")),
             currentDateRevisions(),
         )
@@ -368,6 +392,12 @@ class FactExtractionGuardTest {
         fixture.span("a-big-m", "a-big", dateCount, "Mail a@example.org")
         grounded("a-big")
         rows.moveCurrentReading("a", "a-big")
+    }
+
+    /** The history in reverse row order: a different order from the same rows, which production does not pin. */
+    private class ReversedHistoryDao(host: HostSqlite) : HostFactDao(host) {
+        override suspend fun revisionHistoryOfSource(sourceId: String): List<HistoryRow> =
+            super.revisionHistoryOfSource(sourceId).reversed()
     }
 }
 

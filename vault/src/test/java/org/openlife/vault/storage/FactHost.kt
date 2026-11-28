@@ -209,7 +209,7 @@ class FactRows(val host: HostSqlite) {
 
 /** [FactDao] over the host database: FactSql runs unchanged. */
 @Suppress("TooManyFunctions") // mirrors FactDao
-class HostFactDao(private val host: HostSqlite) : FactDao {
+open class HostFactDao(private val host: HostSqlite) : FactDao {
     private fun q(sql: String, vararg params: Pair<String, Any?>) = with(FactHost) { host.named(sql, *params) }
 
     /** A write: the number of rows it changed. */
